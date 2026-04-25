@@ -1,0 +1,20 @@
+[project]
+name = "exo-toolkit"
+version = "0.1.0"
+description = "TESS/Kepler exoplanet detection and vetting toolkit"
+authors = [{name = "Rome"}]
+requires-python = ">=3.11"
+dependencies = [
+  "lightkurve",
+  "astropy",
+  "numpy",
+  "scipy",
+  "pandas",
+  "matplotlib",
+  "typer",
+  "rich"
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
