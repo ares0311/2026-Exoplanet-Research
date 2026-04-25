@@ -1,20 +1,109 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "exo-toolkit"
 version = "0.1.0"
-description = "TESS/Kepler exoplanet detection and vetting toolkit"
-authors = [{name = "Rome"}]
+description = "TESS/Kepler exoplanet candidate detection, vetting, scoring, and submission-pathway toolkit"
+readme = "README.md"
 requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [
+  { name = "Rome" }
+]
+keywords = [
+  "exoplanets",
+  "TESS",
+  "Kepler",
+  "astronomy",
+  "light-curves",
+  "Bayesian-scoring",
+  "citizen-science"
+]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Scientific/Engineering :: Astronomy"
+]
 dependencies = [
   "lightkurve",
   "astropy",
+  "astroquery",
   "numpy",
   "scipy",
   "pandas",
   "matplotlib",
   "typer",
-  "rich"
+  "rich",
+  "pydantic",
+  "pyyaml"
 ]
 
-[build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pytest-cov",
+  "ruff",
+  "mypy",
+  "pre-commit",
+  "types-PyYAML"
+]
+
+[project.scripts]
+exo = "exo_toolkit.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -m 'not integration_live'"
+markers = [
+  "integration_live: tests that require live external services such as MAST or NASA Exoplanet Archive",
+  "slow: tests that are slow or data-heavy"
+]
+
+[tool.coverage.run]
+branch = true
+source = ["exo_toolkit"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "E",
+  "F",
+  "I",
+  "B",
+  "UP",
+  "SIM",
+  "C4"
+]
+ignore = []
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_configs = true
+warn_unreachable = true
+pretty = true
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = [
+  "lightkurve.*",
+  "astroquery.*",
+  "matplotlib.*"
+]
+ignore_missing_imports = true
