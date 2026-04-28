@@ -1,0 +1,182 @@
+# CLAUDE.md — Claude Code Project Context
+
+This file is read automatically by Claude Code at session start.
+It contains the facts a coding agent needs to work productively without re-reading every document.
+
+---
+
+## Project
+
+**2026 Exoplanet Research**
+Citizen-science toolkit for detecting and scoring exoplanet transit candidates from TESS and Kepler/K2 data.
+
+Repository: `ares0311/2026-Exoplanet-Research`
+Active branch: `claude/review-markdown-docs-SwVnR`
+Open PR: #1 (draft)
+
+---
+
+## Architecture
+
+```
+Fetch → Clean → Search → Vet → Score → Classify
+```
+
+Python package: `src/exo_toolkit/`
+Tests: `tests/`
+Docs: `docs/`
+CI: `.github/workflows/ci.yml`
+
+### Module build order (each depends on prior)
+
+| Module | Status | Tests |
+|---|---|---|
+| `schemas.py` | **done** | `test_schemas.py` (33) |
+| `features.py` | **done** | `test_features.py` (89) |
+| `hypotheses.py` | **done** | `test_hypotheses.py` (28) |
+| `scoring.py` | **done** | `test_scoring.py` (25) |
+| `pathway.py` | **done** | `test_pathway.py` (35) |
+| `fetch.py` | **not started** | — |
+| `clean.py` | **not started** | — |
+| `search.py` | **not started** | — |
+| `vet.py` | **not started** | — |
+| `calibration.py` | **not started** | — |
+
+**Total passing tests: 210**
+
+---
+
+## Core Design Decisions (see docs/DECISIONS.md for full rationale)
+
+- **Bayesian log-score model**: `log_score_i = log_prior_i + weighted_evidence_i`, then `posterior_i = softmax(log_scores)`
+- **6 hypotheses**: planet_candidate, eclipsing_binary, background_eclipsing_binary, stellar_variability, instrumental_artifact, known_object
+- **OptScore pattern**: `float | None` — `None` means diagnostic not run; missing features contribute 0 to log scores (neutral, no bias)
+- **Conservative priors**: planet_candidate = 0.10, others = 0.20 each, known_object = 0.10
+- **No ML classifiers** until labeled validation data and calibration infrastructure exist
+- **Never output "confirmed planet"** — use "candidate signal" or "follow-up target"
+- **Numerically stable softmax**: subtract max before exponentiation
+
+---
+
+## Key Types (schemas.py)
+
+```python
+Score    = Annotated[float, Field(ge=0.0, le=1.0)]
+OptScore = Annotated[float | None, Field(ge=0.0, le=1.0)]
+Mission  = Literal["TESS", "Kepler", "K2"]
+SubmissionPathway = Literal[
+    "known_object_annotation", "tfop_ready", "planet_hunters_discussion",
+    "kepler_archive_candidate", "github_only_reproducibility", "paper_or_preprint_candidate"
+]
+
+CandidateSignal      # raw BLS output
+CandidateFeatures    # 35 OptScore fields, all default None
+HypothesisPosterior  # 6 Score fields, validator enforces sum ≈ 1.0 ±0.01
+CandidateScores      # 6 Score fields (fpp, detection_confidence, novelty_score, …)
+CandidateExplanation # tuple[str, ...] fields for positive/negative/blocking evidence
+ScoringMetadata      # model name, version, commit, config_hash
+ScoredCandidate      # full pipeline output
+```
+
+All models: `ConfigDict(frozen=True)` — immutable after construction.
+
+---
+
+## Scoring Pipeline (scoring.py)
+
+```
+CandidateFeatures
+    → compute_log_scores()      (hypotheses.py)
+    → softmax()                 (scoring.py)
+    → HypothesisPosterior
+    → compute_scores()          (scoring.py)
+    → CandidateScores
+
+Public entry point: score_candidate(signal, features, log_priors=None)
+    → tuple[HypothesisPosterior, CandidateScores]
+```
+
+---
+
+## Pathway Classification (pathway.py)
+
+`classify_submission_pathway(signal, features, posterior, scores, *, provenance_score=0.0, ...)`
+
+Gate order (spec §11):
+1. `posterior.known_object >= 0.80` → `known_object_annotation`
+2. `fpp >= 0.70` → `github_only_reproducibility`
+3. `transit_count < 2` → `planet_hunters_discussion`
+4. TESS branch → `tfop_ready` (all 9 conditions) or `planet_hunters_discussion` or `github_only_reproducibility`
+5. Kepler/K2 branch → `kepler_archive_candidate` or `github_only_reproducibility`
+6. Fallback → `github_only_reproducibility`
+
+`None` feature scores **fail** gate conditions conservatively.
+`provenance_score` defaults to 0.0 (blocks `tfop_ready` in v0 — not yet computed).
+
+---
+
+## Quality Commands
+
+```bash
+# Run tests (package not pip-installed — use PYTHONPATH)
+PYTHONPATH=src python -m pytest
+
+# Lint
+ruff check .
+ruff check . --fix
+
+# Type-check
+mypy src
+
+# All three together
+ruff check . && mypy src && PYTHONPATH=src python -m pytest
+```
+
+If pytest fails with `ModuleNotFoundError: No module named 'exo_toolkit'`, add `PYTHONPATH=src`.
+
+---
+
+## What Is Not Yet Built
+
+### fetch.py
+- Query MAST via Lightkurve (`search_lightcurve`, `download`)
+- Return `LightCurve` objects + provenance metadata
+- Mark live tests with `@pytest.mark.integration_live`
+
+### clean.py
+- Remove NaNs, sigma-clip outliers, normalize flux
+- Detrend (windowed filter, e.g. `flatten()` from Lightkurve)
+- Output cleaned `LightCurve`
+
+### search.py
+- Run BLS (`astropy.timeseries.BoxLeastSquares` or `lightkurve.periodogram.BoxLeastSquaresPeriodogram`)
+- Multi-peak + iterative masking
+- Return `CandidateSignal` list
+
+### vet.py
+- Compute `RawDiagnostics` from light curve + signal
+- Call `features.extract_features()` → `CandidateFeatures`
+
+### calibration.py
+- Reliability curves, Platt scaling, isotonic regression
+- Brier score, precision-recall, confusion matrix by hypothesis
+
+---
+
+## Guardrails (SCORING_MODEL.md §15)
+
+- Never output "confirmed planet"
+- Always expose false-positive evidence
+- Suppress formal submission if key diagnostics are missing
+- Store scoring model version with every candidate output
+- Prefer conservative classifications
+
+---
+
+## Data Sources
+
+- **TESS**: MAST via Lightkurve (`mission="TESS"`, PDCSAP flux preferred)
+- **Kepler/K2**: MAST via Lightkurve (`mission="Kepler"` / `"K2"`)
+- **Catalogs**: NASA Exoplanet Archive, TOI list, KOI list, CTOI via astroquery
+
+Focus on lightly-worked targets: later TESS sectors, fainter stars (Tmag 10–14), less-crowded fields.
