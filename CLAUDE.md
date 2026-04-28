@@ -40,9 +40,9 @@ CI: `.github/workflows/ci.yml`
 | `clean.py` | **done** | `test_clean.py` (39) |
 | `search.py` | **done** | `test_search.py` (43) |
 | `vet.py` | **done** | `test_vet.py` (47) |
-| `calibration.py` | **not started** | — |
+| `calibration.py` | **done** | `test_calibration.py` (70) |
 
-**Total passing tests: 336 (+ 2 integration_live)**
+**Total passing tests: 406 (+ 2 integration_live)**
 
 ---
 
@@ -171,11 +171,16 @@ Always use `python -m mypy src` locally.
 - Computes: individual depths, odd/even comparison, secondary eclipse SNR, transit shape, data-gap fraction
 - Catalog diagnostics (stellar params, crowding, flags) pass through as keyword arguments
 
+### calibration.py
+- Public API: `compute_metrics`, `fit_calibration`, `apply_calibration`
+- Methods: `"platt"` (Platt scaling via scipy Nelder-Mead), `"isotonic"` (PAVA — no sklearn)
+- One-vs-rest calibration per hypothesis; renormalized to sum to 1.0 post-calibration
+- Metrics: Brier scores, reliability curves, precision/recall/F1, confusion matrix
+- All result containers are frozen dataclasses
+
 ## What Is Not Yet Built
 
-### calibration.py
-- Reliability curves, Platt scaling, isotonic regression
-- Brier score, precision-recall, confusion matrix by hypothesis
+All pipeline modules are complete.
 
 ---
 
