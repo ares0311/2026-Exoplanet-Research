@@ -98,6 +98,8 @@ strict = true
 warn_unused_configs = true
 warn_unreachable = true
 pretty = true
+explicit_package_bases = true
+mypy_path = ["src"]
 files = ["src"]
 
 [[tool.mypy.overrides]]
