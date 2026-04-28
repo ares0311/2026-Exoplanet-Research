@@ -11,8 +11,8 @@ It contains the facts a coding agent needs to work productively without re-readi
 Citizen-science toolkit for detecting and scoring exoplanet transit candidates from TESS and Kepler/K2 data.
 
 Repository: `ares0311/2026-Exoplanet-Research`
-Active branch: `claude/review-markdown-docs-SwVnR`
-Open PR: #1 (draft)
+Active branch: `main`
+PR #1 merged 2026-04-28
 
 ---
 
@@ -80,6 +80,18 @@ ScoredCandidate      # full pipeline output
 
 All models: `ConfigDict(frozen=True)` — immutable after construction.
 
+### Pipeline result types (frozen dataclasses)
+
+```python
+FetchResult(light_curve, provenance: FetchProvenance)
+CleanResult(light_curve, provenance: CleanProvenance)
+VetResult(diagnostics: RawDiagnostics, features: CandidateFeatures)
+# search returns list[CandidateSignal] directly
+```
+
+`RawDiagnostics` (frozen dataclass in `features.py`) — 30+ optional float/int fields covering
+per-transit depths, odd/even, secondary SNR, stellar params, crowding, flags, catalog matches.
+
 ---
 
 ## Scoring Pipeline (scoring.py)
@@ -125,14 +137,17 @@ PYTHONPATH=src python -m pytest
 ruff check .
 ruff check . --fix
 
-# Type-check
-mypy src
+# Type-check (must use python -m mypy so stubs from site-packages are visible)
+python -m mypy src
 
 # All three together
-ruff check . && mypy src && PYTHONPATH=src python -m pytest
+ruff check . && python -m mypy src && PYTHONPATH=src python -m pytest
 ```
 
 If pytest fails with `ModuleNotFoundError: No module named 'exo_toolkit'`, add `PYTHONPATH=src`.
+
+`mypy` (bare binary) sees a different package path and reports false import errors for pydantic/numpy.
+Always use `python -m mypy src` locally.
 
 ---
 
