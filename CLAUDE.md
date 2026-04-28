@@ -36,13 +36,13 @@ CI: `.github/workflows/ci.yml`
 | `hypotheses.py` | **done** | `test_hypotheses.py` (28) |
 | `scoring.py` | **done** | `test_scoring.py` (25) |
 | `pathway.py` | **done** | `test_pathway.py` (35) |
-| `fetch.py` | **not started** | — |
-| `clean.py` | **not started** | — |
-| `search.py` | **not started** | — |
-| `vet.py` | **not started** | — |
+| `fetch.py` | **done** | `test_fetch.py` (40, 2 live) |
+| `clean.py` | **done** | `test_clean.py` (39) |
+| `search.py` | **done** | `test_search.py` (43) |
+| `vet.py` | **done** | `test_vet.py` (47) |
 | `calibration.py` | **not started** | — |
 
-**Total passing tests: 210**
+**Total passing tests: 336 (+ 2 integration_live)**
 
 ---
 
@@ -136,26 +136,27 @@ If pytest fails with `ModuleNotFoundError: No module named 'exo_toolkit'`, add `
 
 ---
 
-## What Is Not Yet Built
+## Data Pipeline Notes
 
 ### fetch.py
-- Query MAST via Lightkurve (`search_lightcurve`, `download`)
-- Return `LightCurve` objects + provenance metadata
-- Mark live tests with `@pytest.mark.integration_live`
+- Lazy lightkurve import (inside `fetch_lightcurve()`); `FetchProvenance` records cadence, sectors, pipeline, fetched_at
+- Live tests use `@pytest.mark.integration_live` and are excluded from CI
 
 ### clean.py
-- Remove NaNs, sigma-clip outliers, normalize flux
-- Detrend (windowed filter, e.g. `flatten()` from Lightkurve)
-- Output cleaned `LightCurve`
+- No lightkurve import at all — calls methods on the passed-in object only
+- `CleanProvenance` records n_cadences_raw/cleaned, sigma_clip_sigma, window_length
 
 ### search.py
-- Run BLS (`astropy.timeseries.BoxLeastSquares` or `lightkurve.periodogram.BoxLeastSquaresPeriodogram`)
-- Multi-peak + iterative masking
-- Return `CandidateSignal` list
+- Uses `astropy.timeseries.BoxLeastSquares` directly (no lightkurve needed)
+- Duration grid capped at 90% of `period_min` to satisfy astropy BLS constraint
+- Iterative transit masking in pure numpy; `_extract_flux_err` falls back to 1.4826×MAD
 
 ### vet.py
-- Compute `RawDiagnostics` from light curve + signal
-- Call `features.extract_features()` → `CandidateFeatures`
+- No lightkurve import — pure numpy diagnostics from `lc.time.jd` / `lc.flux.value`
+- Computes: individual depths, odd/even comparison, secondary eclipse SNR, transit shape, data-gap fraction
+- Catalog diagnostics (stellar params, crowding, flags) pass through as keyword arguments
+
+## What Is Not Yet Built
 
 ### calibration.py
 - Reliability curves, Platt scaling, isotonic regression
