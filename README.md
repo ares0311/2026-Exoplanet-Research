@@ -381,3 +381,51 @@ These guardrails reflect the broader ethical responsibility of automated astrono
 
 Raw photometric data from TESS, Kepler, and K2 is provided by NASA and the MAST archive and is not relicensed by this repository.
 
+---
+
+## Works Cited
+
+Astropy Collaboration, et al. "The Astropy Project: Building an Open-Science Project and Status of the 2018 Astropy Package." *The Astronomical Journal*, vol. 156, no. 3, 2018, p. 123. https://doi.org/10.3847/1538-3881/aabc4f.
+
+Barlow, Richard E., et al. *Statistical Inference under Order Restrictions: The Theory and Application of Isotonic Regression*. Wiley, 1972.
+
+Borucki, William J., et al. "Kepler Planet-Detection Mission: Introduction and First Results." *Science*, vol. 327, no. 5968, 2010, pp. 977–980. https://doi.org/10.1126/science.1185402.
+
+Brier, Glenn W. "Verification of Forecasts Expressed in Terms of Probability." *Monthly Weather Review*, vol. 78, no. 1, 1950, pp. 1–3. https://doi.org/10.1175/1520-0493(1950)078<0001:VOFEIT>2.0.CO;2.
+
+Bryson, Steve, et al. "The Occurrence of Rocky Habitable-Zone Planets around Solar-Like Stars from Kepler Data." *The Astronomical Journal*, vol. 161, no. 1, 2021, p. 36. https://doi.org/10.3847/1538-3881/abc418.
+
+Coughlin, Jeffrey L., et al. "Planetary Candidates Observed by Kepler. VII. Performance of Robovetter." *The Astrophysical Journal Supplement Series*, vol. 224, no. 1, 2016, p. 12. https://doi.org/10.3847/0067-0049/224/1/12.
+
+Díaz, Rodrigo F., et al. "PASTIS: Bayesian Extrasolar Planet Validation — I. General Framework, Models, and Performance." *Monthly Notices of the Royal Astronomical Society*, vol. 441, no. 2, 2014, pp. 983–1004. https://doi.org/10.1093/mnras/stu601.
+
+Fischer, Debra A., et al. "Planet Hunters: The First Two Planet Candidates Identified by the Public Using the Kepler Public Archive." *Monthly Notices of the Royal Astronomical Society*, vol. 419, no. 4, 2012, pp. 2900–2911. https://doi.org/10.1111/j.1365-2966.2011.19932.x.
+
+Fressin, François, et al. "The False Positive Rate of Kepler and the Occurrence of Planets." *The Astrophysical Journal*, vol. 766, no. 2, 2013, p. 81. https://doi.org/10.1088/0004-637X/766/2/81.
+
+Guerrero, Natalia M., et al. "TESS Objects of Interest Catalog from the TESS Prime Mission." *The Astrophysical Journal Supplement Series*, vol. 254, no. 2, 2021, p. 39. https://doi.org/10.3847/1538-4365/abefe1.
+
+Hippke, Michael, and René Heller. "Optimized Transit Detection Algorithm to Search for Periodic Transits of Small Planets." *Astronomy & Astrophysics*, vol. 623, 2019, p. A39. https://doi.org/10.1051/0004-6361/201834672.
+
+Howell, Steve B., et al. "The K2 Mission: Characterization and Early Results." *Publications of the Astronomical Society of the Pacific*, vol. 126, no. 938, 2014, pp. 398–408. https://doi.org/10.1086/676406.
+
+Kopparapu, Ravi Kumar, et al. "Habitable Zones around Main-Sequence Stars: Dependence on Planetary Mass." *The Astrophysical Journal Letters*, vol. 787, no. 2, 2014, p. L29. https://doi.org/10.1088/2041-8205/787/2/L29.
+
+Kovács, Géza, et al. "A Box-fitting Algorithm in the Search for Periodic Transits." *Astronomy & Astrophysics*, vol. 391, no. 1, 2002, pp. L23–L26. https://doi.org/10.1051/0004-6361:20020802.
+
+Lightkurve Collaboration, et al. "Lightkurve: Kepler and TESS Time Series Analysis in Python." *Astrophysics Source Code Library*, 2018, record ascl:1812.013.
+
+Morton, Timothy D. "An Efficient Automated Validation Procedure for Exoplanet Transit Candidates." *The Astrophysical Journal*, vol. 761, no. 1, 2012, p. 6. https://doi.org/10.1088/0004-637X/761/1/6.
+
+Platt, John. "Probabilistic Outputs for Support Vector Machines and Comparisons to Regularized Likelihood Methods." *Advances in Large Margin Classifiers*, edited by Alexander J. Smola et al., MIT Press, 1999, pp. 61–74.
+
+Ricker, George R., et al. "Transiting Exoplanet Survey Satellite (TESS)." *Journal of Astronomical Telescopes, Instruments, and Systems*, vol. 1, no. 1, 2015, p. 014003. https://doi.org/10.1117/1.JATIS.1.1.014003.
+
+Stassun, Keivan G., et al. "The TESS Input Catalog and Candidate Target List." *The Astronomical Journal*, vol. 156, no. 3, 2018, p. 102. https://doi.org/10.3847/1538-3881/aad050.
+
+Thompson, Susan E., et al. "Planetary Candidates Observed by Kepler. VIII. Cumulative Planet Candidate Catalog." *The Astrophysical Journal Supplement Series*, vol. 235, no. 2, 2018, p. 38. https://doi.org/10.3847/1538-4365/aab4f9.
+
+VanderPlas, Jacob T. "Understanding the Lomb-Scargle Periodogram." *The Astrophysical Journal Supplement Series*, vol. 236, no. 1, 2018, p. 16. https://doi.org/10.3847/1538-4365/aab766.
+
+Winn, Joshua N. "Transits and Occultations." *Exoplanets*, edited by Sara Seager, University of Arizona Press, 2010, pp. 55–77.
+
