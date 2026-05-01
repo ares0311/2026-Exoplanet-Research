@@ -198,6 +198,32 @@ All pipeline modules are complete.
 
 After the notebook: injection-recovery testing, then a CLI entry point (`exo-scan <TIC-ID>`).
 
+### Future Enhancement: ML Ensemble Scorer (agreed 2026-05-01)
+
+Replace or augment the Bayesian log-score model with a three-model ensemble once sufficient labeled data is available:
+
+**Tier 1 — XGBoost on tabular features (build first)**
+- Input: the existing 35 `OptScore` fields from `CandidateFeatures` (already a clean tabular vector)
+- Data threshold: ~500–1,000 labeled examples sufficient
+- Interpretable, trains in seconds, zero new data pipeline needed
+- Labeled training data: Kepler Robovetter output (Thompson et al. 2018, ~34,000 TCEs) available from NASA Exoplanet Archive; TESS TOI dispositions from ExoFOP
+
+**Tier 2 — 1D CNN on phase-folded flux (add after 5,000+ TESS labels)**
+- Input: phase-folded, normalized flux array (treat as 1D image)
+- Learns transit morphology directly; proven architecture (Shallue & Vanderburg 2018)
+- Requires TESS-specific fine-tuning — Kepler-trained models are miscalibrated on TESS due to cadence, pixel scale, and systematics differences
+
+**Tier 3 — Stacking meta-learner**
+- Logistic regression (or simple average) over outputs of XGBoost + CNN + existing Bayesian log-score model
+- Requires a separate held-out calibration set (~500+ examples)
+- Final probabilities pass through existing `calibration.py` (Platt / isotonic)
+
+**Architecture fit**
+- XGBoost and CNN sit alongside `scoring.py`; stacking layer blends their posteriors
+- Bayesian log-score model remains as fallback when features are missing (`None` scores)
+- `calibration.py` handles final probability calibration for all model variants
+- Label quality caveat: "candidate" KOIs are noisy labels; train only on confirmed planets vs. confirmed false positives where possible
+
 ---
 
 ## Guardrails (SCORING_MODEL.md §15)
