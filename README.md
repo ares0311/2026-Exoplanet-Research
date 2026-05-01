@@ -14,6 +14,36 @@ This repository implements a complete, reproducible computational pipeline for t
 
 ---
 
+## Project Roadmap
+
+| Status | Milestone | Details |
+|:---:|---|---|
+| 🟢 | **Core data models** | Immutable Pydantic schemas for all pipeline types (`schemas.py`) |
+| 🟢 | **Feature extraction** | 35 normalized diagnostic scores; `RawDiagnostics` container (`features.py`) |
+| 🟢 | **Hypothesis scoring** | Per-hypothesis log-score functions for all 6 hypotheses (`hypotheses.py`) |
+| 🟢 | **Bayesian scorer** | Softmax posterior, FPP, detection confidence, novelty score (`scoring.py`) |
+| 🟢 | **Submission classifier** | Ordered gate logic → 6 submission pathways (`pathway.py`) |
+| 🟢 | **Data acquisition** | MAST retrieval via Lightkurve; provenance tracking (`fetch.py`) |
+| 🟢 | **Light curve cleaning** | Sigma clipping, normalization, windowed detrending (`clean.py`) |
+| 🟢 | **Transit search** | BLS periodicity search; iterative multi-planet masking (`search.py`) |
+| 🟢 | **Signal vetting** | Odd/even, secondary eclipse, transit shape, data-gap diagnostics (`vet.py`) |
+| 🟢 | **Posterior calibration** | Platt scaling, PAVA isotonic regression, Brier score (`calibration.py`) |
+| 🟢 | **Test suite** | 406 passing unit and integration tests; CI via GitHub Actions |
+| 🟢 | **Documentation** | Academic README with typeset math and MLA bibliography |
+| 🟡 | **End-to-end notebook** | Full pipeline demo on a real TESS target; candidate report output |
+| 🟡 | **Injection-recovery** | Synthetic transit injection; completeness maps vs. period and radius |
+| 🟡 | **CLI entry point** | `exo-scan <TIC-ID>` single-command pipeline invocation |
+| 🔴 | **ML Tier 1 — XGBoost** | Tabular classifier on 35 `CandidateFeatures` scores; ~500 labels needed |
+| 🔴 | **ML Tier 2 — 1D CNN** | Phase-folded flux classifier; ~5,000 TESS-specific labels needed |
+| 🔴 | **ML Tier 3 — Ensemble** | Stacking meta-learner over XGBoost + CNN + Bayesian scorer |
+| 🔴 | **Training data pipeline** | Download Kepler Robovetter TCEs and TESS TOI dispositions from NASA Exoplanet Archive |
+| 🔴 | **Mission-specific priors** | Period-, radius-, and stellar-type-dependent priors replacing flat defaults |
+| 🔴 | **Web interface / dashboard** | Interactive candidate browser with score explanations |
+
+🟢 Complete &nbsp;&nbsp; 🟡 In progress &nbsp;&nbsp; 🔴 Planned
+
+---
+
 ## 1. Introduction
 
 The detection of transiting exoplanets from space-based photometry has undergone a paradigm shift from individual targeted observations toward large-scale automated surveys. The Kepler mission (Borucki et al., 2010) surveyed approximately 150,000 stars continuously for four years, yielding more than 4,000 planet candidates and establishing the statistical framework for occurrence-rate studies (Fressin et al., 2013; Bryson et al., 2021). Its successor, the Transiting Exoplanet Survey Satellite (Ricker et al., 2015), observes nearly the entire sky in 27-day sectors, generating a continuous stream of TESS Objects of Interest (TOIs) that require community vetting before resources are allocated for ground-based follow-up.
