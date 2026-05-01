@@ -188,6 +188,16 @@ Always use `python -m mypy src` locally.
 
 All pipeline modules are complete.
 
+### Next Step (agreed 2026-05-01)
+
+**End-to-end example notebook** (`notebooks/pipeline_demo.ipynb`):
+- Run a real TESS target through the full Fetch → Clean → Search → Vet → Score → Classify pipeline
+- Produce a human-readable candidate report with posterior probabilities and explanation
+- Stress-test module integration and surface any API rough edges
+- Serves as the reference usage example for new contributors
+
+After the notebook: injection-recovery testing, then a CLI entry point (`exo-scan <TIC-ID>`).
+
 ---
 
 ## Guardrails (SCORING_MODEL.md §15)
