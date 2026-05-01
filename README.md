@@ -211,3 +211,173 @@ Candidates are routed to one of six submission pathways by an ordered decision g
 
 The nine conditions for `tfop_ready` include: $\mathrm{SNR} \geq 8$, $n_{\mathrm{transits}} \geq 2$, $p_{\mathrm{pc}} \geq 0.65$, $\mathrm{FPP} \leq 0.35$, contamination score $< 0.50$, secondary eclipse score $< 0.40$, odd/even mismatch score $< 0.40$, no known-object match, and a valid provenance score. A `None` feature score conservatively fails any gate condition it participates in.
 
+---
+
+## 4. Installation
+
+The package is not yet published to PyPI. Install directly from source:
+
+```bash
+git clone https://github.com/ares0311/2026-Exoplanet-Research.git
+cd 2026-Exoplanet-Research
+pip install -r requirements.txt
+```
+
+The package is not installed into site-packages; use `PYTHONPATH=src` when running scripts or tests:
+
+```bash
+export PYTHONPATH=src
+python -c "from exo_toolkit.fetch import fetch_lightcurve; print('OK')"
+```
+
+### Dependencies
+
+| Package | Purpose |
+|---|---|
+| `numpy` | Array operations throughout |
+| `astropy` | BLS search (`timeseries.BoxLeastSquares`), units |
+| `lightkurve` | MAST data retrieval and light curve I/O |
+| `astroquery` | Catalog queries (TOI, KOI, Gaia, TIC) |
+| `pydantic` | Immutable typed data models |
+| `scipy` | Platt scaling optimization (Nelder-Mead) |
+
+Development dependencies (`pytest`, `ruff`, `mypy`) are listed in `pyproject.toml`.
+
+---
+
+## 5. Quick Start
+
+```python
+from exo_toolkit.fetch import fetch_lightcurve
+from exo_toolkit.clean import clean_lightcurve
+from exo_toolkit.search import search_lightcurve
+from exo_toolkit.vet import vet_signal
+from exo_toolkit.scoring import score_candidate
+from exo_toolkit.pathway import classify_submission_pathway
+
+# 1. Fetch — downloads PDCSAP photometry from MAST
+fetch_result = fetch_lightcurve("TIC 260647166", mission="TESS")
+
+# 2. Clean — sigma clipping, normalization, windowed detrending
+clean_result = clean_lightcurve(fetch_result.light_curve)
+
+# 3. Search — BLS over a period grid; returns list[CandidateSignal]
+signals = search_lightcurve(clean_result.light_curve)
+
+if signals:
+    signal = signals[0]  # highest-SDE candidate
+
+    # 4. Vet — per-transit depths, odd/even, secondary eclipse, shape
+    vet_result = vet_signal(
+        clean_result.light_curve,
+        signal,
+        stellar_radius_rsun=1.0,    # from TIC catalog
+        contamination_ratio=0.02,   # from pipeline header
+    )
+
+    # 5. Score — Bayesian log-score posterior + derived scores
+    posterior, scores = score_candidate(signal, vet_result.features)
+
+    # 6. Classify — ordered gate logic → submission pathway
+    pathway = classify_submission_pathway(
+        signal, vet_result.features, posterior, scores
+    )
+
+    print(f"Period:   {signal.period_days:.4f} d")
+    print(f"Depth:    {signal.depth_ppm:.0f} ppm")
+    print(f"FPP:      {scores.false_positive_probability:.3f}")
+    print(f"Pathway:  {pathway}")
+```
+
+---
+
+## 6. Repository Structure
+
+```
+2026-Exoplanet-Research/
+├── src/
+│   └── exo_toolkit/
+│       ├── schemas.py       # Pydantic data models
+│       ├── features.py      # RawDiagnostics; feature extraction
+│       ├── hypotheses.py    # Per-hypothesis log-score functions
+│       ├── fetch.py         # MAST data retrieval
+│       ├── clean.py         # Light curve preprocessing
+│       ├── search.py        # BLS transit search
+│       ├── vet.py           # Signal vetting diagnostics
+│       ├── scoring.py       # Posterior computation
+│       ├── pathway.py       # Submission pathway classification
+│       └── calibration.py   # Platt / isotonic calibration
+├── tests/                   # 406 unit and integration tests
+├── docs/
+│   ├── SCORING_MODEL.md     # Mathematical specification
+│   ├── PIPELINE_SPEC.md     # Stage-by-stage architecture
+│   ├── DECISIONS.md         # Durable design decisions
+│   └── ROADMAP.md           # Milestones and future work
+├── Skills/                  # Reusable standalone utility scripts
+├── notebooks/               # Exploratory analysis notebooks
+├── data/                    # Local data cache (not tracked)
+├── pyproject.toml
+└── requirements.txt
+```
+
+---
+
+## 7. Quality Assurance
+
+All three quality gates must pass before any commit is considered complete:
+
+```bash
+# Lint (PEP 8, import order, complexity)
+ruff check .
+
+# Static type checking — always use python -m mypy, not bare mypy
+python -m mypy src
+
+# Full test suite
+PYTHONPATH=src python -m pytest
+```
+
+Continuous integration runs all three gates on every pull request via GitHub Actions. Live integration tests (requiring MAST network access) are excluded from CI and must be run manually:
+
+```bash
+PYTHONPATH=src python -m pytest -m integration_live
+```
+
+---
+
+## 8. Data Sources and Target Selection
+
+| Source | Access | Usage |
+|---|---|---|
+| TESS PDCSAP photometry | MAST via Lightkurve | Primary light curves |
+| Kepler/K2 photometry | MAST via Lightkurve | Archival search |
+| TESS Input Catalog (TIC) | astroquery | Stellar parameters, contamination |
+| TOI catalog | NASA Exoplanet Archive | Known-object matching |
+| KOI / CTOI catalogs | NASA Exoplanet Archive | Known-object matching |
+| Gaia DR3 | astroquery | Crowding, centroid analysis |
+
+The pipeline preferentially targets later TESS sectors, stars with TESS magnitude 10–14, and fields with low Gaia source density. This parameter space is systematically underrepresented in the published TOI catalog, maximizing the expected yield of genuinely novel candidates relative to search effort.
+
+---
+
+## 9. Guardrails and Limitations
+
+This system is designed to identify **candidate signals** for follow-up investigation. The following constraints are enforced by design and must not be circumvented:
+
+- **No confirmation claims.** The pipeline never outputs "confirmed planet." All internal detections are labeled "candidate signal," "possible transit-like event," or "follow-up target."
+- **Mandatory false-positive exposure.** Every `ScoredCandidate` object carries a `CandidateExplanation` that enumerates positive evidence, negative evidence, and blocking issues. Candidates may not be routed to external pathways without a populated explanation.
+- **Missing diagnostics are penalized conservatively.** A `None` feature score fails any gate condition it participates in rather than being treated as neutral evidence.
+- **No ML classifiers in v0.** Machine learning will not be introduced until sufficient labeled validation data and calibration infrastructure exist to prevent overconfident probability estimates.
+- **External catalogs govern confirmation status.** The only valid basis for asserting that a signal corresponds to a known confirmed planet is a match in an authoritative external catalog (NASA Exoplanet Archive, TOI list, KOI list).
+
+These guardrails reflect the broader ethical responsibility of automated astronomical pipelines to avoid generating premature or misleading claims that could misdirect telescope time allocation or public communication.
+
+---
+
+## 10. License
+
+- **Code:** Apache License 2.0 — see [`LICENSE`](LICENSE)
+- **Documentation:** Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+Raw photometric data from TESS, Kepler, and K2 is provided by NASA and the MAST archive and is not relicensed by this repository.
+
