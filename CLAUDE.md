@@ -5,6 +5,12 @@ It contains the facts a coding agent needs to work productively without re-readi
 
 ---
 
+## Standing Rules
+
+- **Skills directory**: Any standalone `.py` utility script created to perform a task (data processing, report generation, injection-recovery, etc.) must be saved in `Skills/` at the project root. Create the directory if it does not exist. This allows scripts to be discovered and reused across sessions rather than recreated.
+
+---
+
 ## Project
 
 **2026 Exoplanet Research**

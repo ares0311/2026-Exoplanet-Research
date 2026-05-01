@@ -1,143 +1,431 @@
-# 🚀 2026 Exoplanet Research
+# 2026 Exoplanet Research
 
-![Status](https://img.shields.io/badge/status-active%20development-blue)
-![License](https://img.shields.io/badge/license-Apache%202.0-green)
-![Focus](https://img.shields.io/badge/focus-exoplanets-purple)
+[![CI](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml/badge.svg)](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
+[![Tests](https://img.shields.io/badge/tests-406%20passing-brightgreen.svg)](tests/)
+[![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 ---
 
-## 🌌 Overview
+## Abstract
 
-A **research-grade, reproducible pipeline** for detecting and evaluating exoplanet candidates from **TESS** and **Kepler** data.
+This repository implements a complete, reproducible computational pipeline for the detection, vetting, and probabilistic classification of exoplanet transit candidates in photometric time-series data from the Transiting Exoplanet Survey Satellite (TESS) and the Kepler/K2 missions. The pipeline proceeds through six deterministic stages — data acquisition, preprocessing, Box Least Squares (BLS) periodicity search, signal vetting, Bayesian multi-hypothesis scoring, and submission pathway classification — and outputs calibrated posterior probabilities over six competing astrophysical and instrumental hypotheses. A conservative log-score approximation to Bayes' theorem is employed in lieu of generative likelihood models, with posterior calibration implemented via Platt scaling and isotonic regression (Pool Adjacent Violators Algorithm). The system is designed around scientific caution: it never labels an internally detected signal as a confirmed planet, exposes all false-positive evidence alongside each candidate score, and defers to authoritative external catalogs for confirmation status. The complete implementation comprises ten Python modules, 406 unit and integration tests, strict static typing (mypy), and continuous integration via GitHub Actions.
 
-### Core Flow
+---
+
+## 1. Introduction
+
+The detection of transiting exoplanets from space-based photometry has undergone a paradigm shift from individual targeted observations toward large-scale automated surveys. The Kepler mission (Borucki et al., 2010) surveyed approximately 150,000 stars continuously for four years, yielding more than 4,000 planet candidates and establishing the statistical framework for occurrence-rate studies (Fressin et al., 2013; Bryson et al., 2021). Its successor, the Transiting Exoplanet Survey Satellite (Ricker et al., 2015), observes nearly the entire sky in 27-day sectors, generating a continuous stream of TESS Objects of Interest (TOIs) that require community vetting before resources are allocated for ground-based follow-up.
+
+A persistent challenge across both missions is the high false-positive rate among photometric transit candidates. Background eclipsing binaries, on-target eclipsing binaries diluted by the target's flux, stellar variability masquerading as periodic dimming, and instrumental systematics collectively account for the majority of transit-like signals detected by automated pipelines (Fressin et al., 2013; Morton, 2012). Rigorous vetting — combining photometric diagnostics, centroid analysis, catalog matching, and probabilistic modeling — is therefore a prerequisite for responsible candidate reporting.
+
+Citizen-science initiatives such as Planet Hunters have demonstrated that human inspection of phase-folded light curves can recover candidates missed by automated pipelines, particularly single-transit events and long-period systems (Fischer et al., 2012). However, the volume of data produced by TESS renders manual inspection alone insufficient. A computational toolkit that automates the vetting and scoring workflow, while remaining interpretable and reproducible, occupies a productive niche between fully automated survey pipelines and ad hoc visual inspection.
+
+This project addresses that niche. The `exo_toolkit` Python package implements a fully automated, end-to-end pipeline from raw MAST data retrieval through calibrated candidate scoring and submission pathway routing. Every scoring decision is accompanied by a structured explanation enumerating positive evidence, negative evidence, and blocking issues. All intermediate results preserve full provenance. The system targets lightly-worked TESS targets — later sectors, fainter stars (TESS magnitude 10–14), and less-crowded fields — where the probability of genuine novel discoveries is highest relative to the existing literature.
+
+---
+
+## 2. Pipeline Architecture
+
+The pipeline is organized as six sequential, independently testable stages:
 
 ```
-Raw Light Curves → Detection → Vetting → Bayesian Scoring → Submission Pathway
+┌─────────┐   ┌─────────┐   ┌──────────┐   ┌─────┐   ┌───────┐   ┌──────────┐
+│  Fetch  │──▶│  Clean  │──▶│  Search  │──▶│ Vet │──▶│ Score │──▶│ Classify │
+└─────────┘   └─────────┘   └──────────┘   └─────┘   └───────┘   └──────────┘
 ```
 
-This project prioritizes:
-- Scientific rigor
-- Low false-positive rates
-- Reproducibility
-- High-value (potentially habitable) candidates
+Each stage produces a typed, immutable result object and preserves provenance metadata. Stages communicate exclusively through these result objects; there is no shared mutable state.
+
+| Module | Stage | Responsibility | Tests |
+|---|---|---|---|
+| `fetch.py` | Fetch | MAST data retrieval via Lightkurve; records cadence, sectors, pipeline | 40 (+2 live) |
+| `clean.py` | Clean | NaN removal, sigma clipping, normalization, windowed detrending | 39 |
+| `search.py` | Search | BLS periodicity search; iterative transit masking for multi-planet systems | 43 |
+| `vet.py` | Vet | Per-transit depth measurement, odd/even comparison, secondary eclipse, transit shape, data-gap fraction | 47 |
+| `scoring.py` | Score | Log-score posterior computation; derived scores (FPP, detection confidence, novelty) | 25 |
+| `pathway.py` | Classify | Ordered gate-based submission pathway classification | 35 |
+| `schemas.py` | — | Immutable Pydantic data models for all pipeline types | 33 |
+| `features.py` | — | `RawDiagnostics` container; `extract_features()` mapping diagnostics to `[0,1]` scores | 89 |
+| `hypotheses.py` | — | Per-hypothesis log-score functions | 28 |
+| `calibration.py` | — | Platt scaling, PAVA isotonic regression, Brier score, reliability curves | 70 |
+| **Total** | | | **406** |
 
 ---
 
-## 🧠 Key Idea
+## 3. Methodology
 
-Most signals are **not planets**.
+### 3.1 Transit Photometry Fundamentals
 
-This system is built to **disprove signals first**, then elevate only the strongest candidates.
+A transiting planet occults a fraction of its host star's disk, producing a periodic reduction in observed flux. For a planet of radius $R_p$ orbiting a star of radius $R_\star$, the fractional transit depth is
+
+$$\delta = \left(\frac{R_p}{R_\star}\right)^2.$$
+
+For a circular orbit with semi-major axis $a$, impact parameter $b = (a/R_\star)\cos i$, and ratio $k = R_p/R_\star$, the total transit duration (first to fourth contact) is
+
+$$T_{14} = \frac{P}{\pi} \arcsin\!\left(\frac{R_\star}{a} \sqrt{(1 + k)^2 - b^2}\right),$$
+
+where $P$ is the orbital period (Winn, 2010). The ingress/egress duration is
+
+$$T_{12} = \frac{P}{\pi} \arcsin\!\left(\frac{R_\star}{a} \sqrt{(1 - k)^2 - b^2}\right).$$
+
+A box-shaped (flat-bottomed) transit satisfies $T_{12} \ll T_{14}$, indicative of a small planet-to-star radius ratio and/or low impact parameter. The ratio $T_{12}/T_{14}$ is used in the pipeline as the transit shape diagnostic `ingress_egress_fraction`.
+
+### 3.2 Box Least Squares Periodicity Search
+
+Transit candidates are identified using the Box Least Squares algorithm of Kovács et al. (2002), as implemented in `astropy.timeseries.BoxLeastSquares`. For a light curve with $N$ cadences $(t_i, f_i, \sigma_i)$, define the inverse-variance weights $w_i = \sigma_i^{-2}$. For trial period $P$, reference epoch $t_0$, and fractional duration $q$, the phase of each observation is
+
+$$\phi_i = \frac{(t_i - t_0) \bmod P}{P} \in [0, 1).$$
+
+The in-transit index set is $\mathcal{T}(P, t_0, q) = \{i : \phi_i \leq q\}$ and the out-of-transit set is $\mathcal{O} = \{1,\ldots,N\} \setminus \mathcal{T}$. The weighted mean fluxes are
+
+$$\bar{f}_{\mathcal{T}} = \frac{\sum_{i \in \mathcal{T}} w_i f_i}{\sum_{i \in \mathcal{T}} w_i}, \qquad \bar{f}_{\mathcal{O}} = \frac{\sum_{i \in \mathcal{O}} w_i f_i}{\sum_{i \in \mathcal{O}} w_i},$$
+
+and the depth estimate is $\hat{s} = \bar{f}_{\mathcal{O}} - \bar{f}_{\mathcal{T}}$. The BLS power spectrum is evaluated over a grid of $(P, t_0, q)$ triples and the Signal Detection Efficiency is
+
+$$\mathrm{SDE}(P) = \frac{\hat{s}(P) - \langle \hat{s} \rangle}{\mathrm{std}(\hat{s})},$$
+
+where the mean and standard deviation are taken over all trial periods at fixed best $(t_0, q)$.
+
+The duration grid is capped at $q_{\max} = 0.9\, P_{\min} / 24$ hours to satisfy the strict BLS constraint that the maximum trial duration must be shorter than the minimum trial period (Kovács et al., 2002). Multi-planet candidates are recovered by iterative transit masking: after each BLS peak the corresponding in-transit cadences are masked and the search is repeated on the residual series.
+
+### 3.3 Bayesian Multi-Hypothesis Scoring
+
+#### 3.3.1 Competing Hypotheses
+
+For each detected signal $\mathbf{D}$, the scoring engine evaluates six mutually exclusive hypotheses $H_i$:
+
+| Symbol | Hypothesis | Prior $P(H_i)$ |
+|---|---|---|
+| $H_\mathrm{pc}$ | Planet candidate | 0.10 |
+| $H_\mathrm{eb}$ | On-target eclipsing binary | 0.20 |
+| $H_\mathrm{beb}$ | Background eclipsing binary | 0.20 |
+| $H_\mathrm{sv}$ | Stellar variability | 0.20 |
+| $H_\mathrm{ia}$ | Instrumental artifact | 0.20 |
+| $H_\mathrm{ko}$ | Known catalog object | 0.10 |
+
+Priors are intentionally pessimistic regarding new planet candidates, consistent with the empirical false-positive rates reported by Fressin et al. (2013) and Morton (2012).
+
+#### 3.3.2 Log-Score Approximation
+
+Because full generative likelihood models $P(\mathbf{D} \mid H_i)$ require detailed stellar and instrumental forward models not available in the early pipeline, the posterior is approximated via a log-score model (Díaz et al., 2014):
+
+$$\ell_i = \log P(H_i) + \sum_{k} w_{ik}\, \phi_k(\mathbf{D}),$$
+
+where $\phi_k(\mathbf{D}) \in [0, 1]$ are normalized diagnostic feature scores and $w_{ik} \in \mathbb{R}$ are hypothesis-specific weights. Positive weights contribute evidence for $H_i$; negative weights contribute evidence against it. Features that are unavailable (e.g., because a catalog query was not performed) are assigned $\phi_k = 0$, contributing neither evidence for nor against any hypothesis.
+
+The normalized posterior is computed via a numerically stable softmax. Letting $\ell_{\max} = \max_i \ell_i$:
+
+$$p_i = P(H_i \mid \mathbf{D}) \approx \frac{\exp(\ell_i - \ell_{\max})}{\displaystyle\sum_{j=1}^{6} \exp(\ell_j - \ell_{\max})}.$$
+
+Subtracting $\ell_{\max}$ before exponentiation prevents floating-point overflow without affecting the normalized result.
+
+#### 3.3.3 False Positive Probability
+
+The false positive probability is defined as
+
+$$\mathrm{FPP} = 1 - p_{\mathrm{pc}}.$$
+
+When $p_{\mathrm{ko}} \geq 0.80$, the signal is reclassified as a known-object annotation and FPP is reported separately to avoid conflating genuine false positives with catalog matches.
+
+### 3.4 Diagnostic Feature Extraction
+
+All features $\phi_k : \mathbf{D} \to [0, 1]$ are typed as `OptScore = float | None`. A `None` value indicates the diagnostic was not computed (missing data or insufficient coverage) and contributes zero to all log scores.
+
+**Signal-to-noise score.**  Using a logarithmic transform for numerical stability across the wide dynamic range of survey SNR values:
+
+$$\phi_{\mathrm{SNR}} = \mathrm{clip}\!\left(\frac{\log\max(\mathrm{SNR},\, 1)}{\log 12},\; 0,\; 1\right).$$
+
+**Transit count score.**  Discrete mapping reflecting the requirement for repeated events:
+
+$$\phi_{\mathrm{tc}} = \begin{cases} 0.25 & n_\mathrm{transits} = 1 \\ 0.70 & n_\mathrm{transits} = 2 \\ 1.00 & n_\mathrm{transits} \geq 3 \end{cases}$$
+
+**Odd/even depth mismatch.**  An eclipsing binary with unequal primary and secondary depths will produce alternating transit depths when phase-folded at half the true period. The mismatch significance is
+
+$$\phi_{\mathrm{OE}} = \mathrm{clip}\!\left(\frac{|\delta_\mathrm{odd} - \delta_\mathrm{even}|}{5\,\sqrt{\sigma_\mathrm{odd}^2 + \sigma_\mathrm{even}^2}},\; 0,\; 1\right),$$
+
+where $\delta_\mathrm{odd}$, $\delta_\mathrm{even}$ are the inverse-variance-weighted mean depths of odd- and even-numbered transits (in ppm) and $\sigma$ are their propagated uncertainties.
+
+**Secondary eclipse SNR.**  The pipeline searches for a secondary eclipse at orbital phase $\phi = 0.5$ (superior conjunction, as expected for a circular orbit):
+
+$$\phi_{\mathrm{sec}} = \mathrm{clip}\!\left(\frac{\mathrm{SNR}_{\phi=0.5}}{7},\; 0,\; 1\right),$$
+
+where $\mathrm{SNR}_{\phi=0.5}$ is the depth divided by its propagated uncertainty in the secondary window, estimated relative to the out-of-transit baseline.
+
+**Transit shape (ingress/egress fraction).**  Comparing the mean depth in the outer half of the transit window ($T/4 < |t - t_c| \leq T/2$) to the inner half ($|t - t_c| \leq T/4$):
+
+$$\phi_{\mathrm{shape}} = \mathrm{clip}\!\left(\frac{\bar{\delta}_{\mathrm{outer}}}{\bar{\delta}_{\mathrm{inner}}},\; 0,\; 1\right).$$
+
+Values near 1 indicate a flat-bottomed (box-shaped) transit consistent with a planet; values near 0 indicate a V-shaped morphology consistent with a grazing eclipse.
+
+**Data gap fraction.**  The fraction of expected transit windows that contain fewer than three in-transit cadences:
+
+$$\phi_{\mathrm{gap}} = \frac{|\{n : |{\{i : |t_i - t_n| \leq T/2\}}| < 3\}|}{N_{\mathrm{windows}}},$$
+
+where $t_n = t_0 + nP$ are the predicted transit centers. This score enters as a penalty on detection confidence.
+
+### 3.5 Posterior Calibration
+
+The initial log-score model is not calibrated by construction. Calibration maps raw model probabilities to empirical frequencies using labeled examples drawn from confirmed planets, TOIs, known false positives, and eclipsing binary catalogs.
+
+#### 3.5.1 Brier Score
+
+Model reliability is quantified per hypothesis using the Brier score (Brier, 1950):
+
+$$\mathrm{BS}_k = \frac{1}{N} \sum_{i=1}^{N} \left(p_{ik} - y_{ik}\right)^2,$$
+
+where $y_{ik} \in \{0, 1\}$ is the binary true-label indicator for hypothesis $k$ in sample $i$, and $p_{ik}$ is the model's posterior probability. A perfectly calibrated model achieves $\mathrm{BS}_k = 0$; the naive uniform prior achieves $\mathrm{BS}_k = 5/6 \cdot (1/6)^2 + 1/6 \cdot (5/6)^2 \approx 0.139$.
+
+#### 3.5.2 Platt Scaling
+
+Platt scaling (Platt, 1999) fits a logistic sigmoid to the raw model probabilities in a one-vs-rest framework. For hypothesis $k$, the calibrated probability is
+
+$$\tilde{p}_k = \sigma(a_k p_k + b_k), \qquad \sigma(x) = \frac{1}{1 + e^{-x}},$$
+
+where parameters $(a_k, b_k)$ are found by minimizing the negative log-likelihood of the sigmoid over the training labels via the Nelder-Mead simplex method (Scipy). The identity mapping $(a_k, b_k) = (1, 0)$ is used as a fallback when fewer than five training samples are available or when all labels are identical.
+
+#### 3.5.3 Isotonic Regression (PAVA)
+
+Isotonic regression (Barlow et al., 1972) provides a non-parametric calibration mapping by fitting the largest monotone non-decreasing step function to the empirical $(p_k, y_k)$ pairs. The Pool Adjacent Violators Algorithm (PAVA) solves
+
+$$\min_{\tilde{p}} \sum_{i=1}^{N} \left(p_i - \tilde{p}_i\right)^2 \quad \text{subject to} \quad \tilde{p}_1 \leq \tilde{p}_2 \leq \cdots \leq \tilde{p}_N,$$
+
+in $O(N)$ time by merging blocks of adjacent violating values into their pooled mean. The pipeline implements PAVA in pure Python without any dependency on scikit-learn.
+
+After applying either calibration method in a one-vs-rest fashion, the six calibrated probabilities are renormalized to sum to unity before constructing the final `HypothesisPosterior`.
+
+### 3.6 Submission Pathway Classification
+
+Candidates are routed to one of six submission pathways by an ordered decision gate evaluated in strict sequence:
+
+| Priority | Condition | Pathway |
+|---|---|---|
+| 1 | $p_{\mathrm{ko}} \geq 0.80$ | `known_object_annotation` |
+| 2 | $\mathrm{FPP} \geq 0.70$ | `github_only_reproducibility` |
+| 3 | $n_{\mathrm{transits}} < 2$ | `planet_hunters_discussion` |
+| 4 | TESS + all 9 quality gates pass | `tfop_ready` |
+| 4 | TESS + detection confidence $\geq 0.45$ | `planet_hunters_discussion` |
+| 5 | Kepler/K2 + $p_{\mathrm{pc}} \geq 0.65$, novelty $\geq 0.70$, FPP $\leq 0.35$ | `kepler_archive_candidate` |
+| 6 | Fallback | `github_only_reproducibility` |
+
+The nine conditions for `tfop_ready` include: $\mathrm{SNR} \geq 8$, $n_{\mathrm{transits}} \geq 2$, $p_{\mathrm{pc}} \geq 0.65$, $\mathrm{FPP} \leq 0.35$, contamination score $< 0.50$, secondary eclipse score $< 0.40$, odd/even mismatch score $< 0.40$, no known-object match, and a valid provenance score. A `None` feature score conservatively fails any gate condition it participates in.
 
 ---
 
-## 📊 Current Status
+## 4. Installation
 
-**Phase:** Foundation / Early Build
+The package is not yet published to PyPI. Install directly from source:
 
-- ✅ Repo initialized
-- ✅ Documentation system built
-- ✅ Scoring architecture defined
-- ⏳ Pipeline implementation in progress
+```bash
+git clone https://github.com/ares0311/2026-Exoplanet-Research.git
+cd 2026-Exoplanet-Research
+pip install -r requirements.txt
+```
 
-👉 See [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md)
+The package is not installed into site-packages; use `PYTHONPATH=src` when running scripts or tests:
+
+```bash
+export PYTHONPATH=src
+python -c "from exo_toolkit.fetch import fetch_lightcurve; print('OK')"
+```
+
+### Dependencies
+
+| Package | Purpose |
+|---|---|
+| `numpy` | Array operations throughout |
+| `astropy` | BLS search (`timeseries.BoxLeastSquares`), units |
+| `lightkurve` | MAST data retrieval and light curve I/O |
+| `astroquery` | Catalog queries (TOI, KOI, Gaia, TIC) |
+| `pydantic` | Immutable typed data models |
+| `scipy` | Platt scaling optimization (Nelder-Mead) |
+
+Development dependencies (`pytest`, `ruff`, `mypy`) are listed in `pyproject.toml`.
 
 ---
 
-## 🛣 Roadmap
+## 5. Quick Start
 
-| Milestone | Description |
-|----------|------------|
-| 1 | Minimal pipeline (fetch → detect) |
-| 2 | Vetting system |
-| 3 | Bayesian scoring engine |
-| 4 | Submission classification |
-| 5 | Reporting system |
-| 6 | Calibration |
-| 7 | Injection–recovery |
+```python
+from exo_toolkit.fetch import fetch_lightcurve
+from exo_toolkit.clean import clean_lightcurve
+from exo_toolkit.search import search_lightcurve
+from exo_toolkit.vet import vet_signal
+from exo_toolkit.scoring import score_candidate
+from exo_toolkit.pathway import classify_submission_pathway
 
-👉 See [`docs/ROADMAP.md`](docs/ROADMAP.md)
+# 1. Fetch — downloads PDCSAP photometry from MAST
+fetch_result = fetch_lightcurve("TIC 260647166", mission="TESS")
+
+# 2. Clean — sigma clipping, normalization, windowed detrending
+clean_result = clean_lightcurve(fetch_result.light_curve)
+
+# 3. Search — BLS over a period grid; returns list[CandidateSignal]
+signals = search_lightcurve(clean_result.light_curve)
+
+if signals:
+    signal = signals[0]  # highest-SDE candidate
+
+    # 4. Vet — per-transit depths, odd/even, secondary eclipse, shape
+    vet_result = vet_signal(
+        clean_result.light_curve,
+        signal,
+        stellar_radius_rsun=1.0,    # from TIC catalog
+        contamination_ratio=0.02,   # from pipeline header
+    )
+
+    # 5. Score — Bayesian log-score posterior + derived scores
+    posterior, scores = score_candidate(signal, vet_result.features)
+
+    # 6. Classify — ordered gate logic → submission pathway
+    pathway = classify_submission_pathway(
+        signal, vet_result.features, posterior, scores
+    )
+
+    print(f"Period:   {signal.period_days:.4f} d")
+    print(f"Depth:    {signal.depth_ppm:.0f} ppm")
+    print(f"FPP:      {scores.false_positive_probability:.3f}")
+    print(f"Pathway:  {pathway}")
+```
 
 ---
 
-## ⚙️ Architecture
+## 6. Repository Structure
 
 ```
-Fetch → Clean → Search → Vet → Score → Classify
-```
-
-| Module | Purpose |
-|-------|--------|
-| fetch.py | Data acquisition |
-| clean.py | Preprocessing |
-| search.py | Transit detection |
-| vet.py | False-positive rejection |
-| scoring.py | Bayesian classification |
-| pathway.py | Submission routing |
-
-👉 See [`docs/PIPELINE_SPEC.md`](docs/PIPELINE_SPEC.md)
-
----
-
-## 📐 Scoring Model
-
-Bayesian framework:
-
-```
-P(H | D) ∝ P(D | H) P(H)
-```
-
-Hypotheses:
-- Planet candidate
-- Eclipsing binary
-- Background binary
-- Stellar variability
-- Instrumental artifact
-- Known object
-
-Outputs:
-- Posterior probabilities
-- False positive probability
-- Detection confidence
-- Submission readiness
-
-👉 See [`docs/SCORING_MODEL.md`](docs/SCORING_MODEL.md)
-
----
-
-## 📂 Project Structure
-
-```
-src/
-notebooks/
-data/
-docs/
-tests/
+2026-Exoplanet-Research/
+├── src/
+│   └── exo_toolkit/
+│       ├── schemas.py       # Pydantic data models
+│       ├── features.py      # RawDiagnostics; feature extraction
+│       ├── hypotheses.py    # Per-hypothesis log-score functions
+│       ├── fetch.py         # MAST data retrieval
+│       ├── clean.py         # Light curve preprocessing
+│       ├── search.py        # BLS transit search
+│       ├── vet.py           # Signal vetting diagnostics
+│       ├── scoring.py       # Posterior computation
+│       ├── pathway.py       # Submission pathway classification
+│       └── calibration.py   # Platt / isotonic calibration
+├── tests/                   # 406 unit and integration tests
+├── docs/
+│   ├── SCORING_MODEL.md     # Mathematical specification
+│   ├── PIPELINE_SPEC.md     # Stage-by-stage architecture
+│   ├── DECISIONS.md         # Durable design decisions
+│   └── ROADMAP.md           # Milestones and future work
+├── Skills/                  # Reusable standalone utility scripts
+├── notebooks/               # Exploratory analysis notebooks
+├── data/                    # Local data cache (not tracked)
+├── pyproject.toml
+└── requirements.txt
 ```
 
 ---
 
-## ⚠️ Important Disclaimer
+## 7. Quality Assurance
 
-This project identifies **candidate signals only**.
+All three quality gates must pass before any commit is considered complete:
 
-❌ No claims of confirmed exoplanets  
-❌ No replacement for professional validation pipelines  
+```bash
+# Lint (PEP 8, import order, complexity)
+ruff check .
+
+# Static type checking — always use python -m mypy, not bare mypy
+python -m mypy src
+
+# Full test suite
+PYTHONPATH=src python -m pytest
+```
+
+Continuous integration runs all three gates on every pull request via GitHub Actions. Live integration tests (requiring MAST network access) are excluded from CI and must be run manually:
+
+```bash
+PYTHONPATH=src python -m pytest -m integration_live
+```
 
 ---
 
-## 📜 License
+## 8. Data Sources and Target Selection
 
-- Code: Apache 2.0  
-- Docs: CC-BY-4.0  
+| Source | Access | Usage |
+|---|---|---|
+| TESS PDCSAP photometry | MAST via Lightkurve | Primary light curves |
+| Kepler/K2 photometry | MAST via Lightkurve | Archival search |
+| TESS Input Catalog (TIC) | astroquery | Stellar parameters, contamination |
+| TOI catalog | NASA Exoplanet Archive | Known-object matching |
+| KOI / CTOI catalogs | NASA Exoplanet Archive | Known-object matching |
+| Gaia DR3 | astroquery | Crowding, centroid analysis |
+
+The pipeline preferentially targets later TESS sectors, stars with TESS magnitude 10–14, and fields with low Gaia source density. This parameter space is systematically underrepresented in the published TOI catalog, maximizing the expected yield of genuinely novel candidates relative to search effort.
 
 ---
 
-## 🔭 Vision
+## 9. Guardrails and Limitations
 
-Build a system that produces:
+This system is designed to identify **candidate signals** for follow-up investigation. The following constraints are enforced by design and must not be circumvented:
 
-> **Scientifically defensible, reproducible exoplanet candidates**
+- **No confirmation claims.** The pipeline never outputs "confirmed planet." All internal detections are labeled "candidate signal," "possible transit-like event," or "follow-up target."
+- **Mandatory false-positive exposure.** Every `ScoredCandidate` object carries a `CandidateExplanation` that enumerates positive evidence, negative evidence, and blocking issues. Candidates may not be routed to external pathways without a populated explanation.
+- **Missing diagnostics are penalized conservatively.** A `None` feature score fails any gate condition it participates in rather than being treated as neutral evidence.
+- **No ML classifiers in v0.** Machine learning will not be introduced until sufficient labeled validation data and calibration infrastructure exist to prevent overconfident probability estimates.
+- **External catalogs govern confirmation status.** The only valid basis for asserting that a signal corresponds to a known confirmed planet is a match in an authoritative external catalog (NASA Exoplanet Archive, TOI list, KOI list).
 
-—not just interesting plots.
+These guardrails reflect the broader ethical responsibility of automated astronomical pipelines to avoid generating premature or misleading claims that could misdirect telescope time allocation or public communication.
+
+---
+
+## 10. License
+
+- **Code:** Apache License 2.0 — see [`LICENSE`](LICENSE)
+- **Documentation:** Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+Raw photometric data from TESS, Kepler, and K2 is provided by NASA and the MAST archive and is not relicensed by this repository.
+
+---
+
+## Works Cited
+
+Astropy Collaboration, et al. "The Astropy Project: Building an Open-Science Project and Status of the 2018 Astropy Package." *The Astronomical Journal*, vol. 156, no. 3, 2018, p. 123. https://doi.org/10.3847/1538-3881/aabc4f.
+
+Barlow, Richard E., et al. *Statistical Inference under Order Restrictions: The Theory and Application of Isotonic Regression*. Wiley, 1972.
+
+Borucki, William J., et al. "Kepler Planet-Detection Mission: Introduction and First Results." *Science*, vol. 327, no. 5968, 2010, pp. 977–980. https://doi.org/10.1126/science.1185402.
+
+Brier, Glenn W. "Verification of Forecasts Expressed in Terms of Probability." *Monthly Weather Review*, vol. 78, no. 1, 1950, pp. 1–3. https://doi.org/10.1175/1520-0493(1950)078<0001:VOFEIT>2.0.CO;2.
+
+Bryson, Steve, et al. "The Occurrence of Rocky Habitable-Zone Planets around Solar-Like Stars from Kepler Data." *The Astronomical Journal*, vol. 161, no. 1, 2021, p. 36. https://doi.org/10.3847/1538-3881/abc418.
+
+Coughlin, Jeffrey L., et al. "Planetary Candidates Observed by Kepler. VII. Performance of Robovetter." *The Astrophysical Journal Supplement Series*, vol. 224, no. 1, 2016, p. 12. https://doi.org/10.3847/0067-0049/224/1/12.
+
+Díaz, Rodrigo F., et al. "PASTIS: Bayesian Extrasolar Planet Validation — I. General Framework, Models, and Performance." *Monthly Notices of the Royal Astronomical Society*, vol. 441, no. 2, 2014, pp. 983–1004. https://doi.org/10.1093/mnras/stu601.
+
+Fischer, Debra A., et al. "Planet Hunters: The First Two Planet Candidates Identified by the Public Using the Kepler Public Archive." *Monthly Notices of the Royal Astronomical Society*, vol. 419, no. 4, 2012, pp. 2900–2911. https://doi.org/10.1111/j.1365-2966.2011.19932.x.
+
+Fressin, François, et al. "The False Positive Rate of Kepler and the Occurrence of Planets." *The Astrophysical Journal*, vol. 766, no. 2, 2013, p. 81. https://doi.org/10.1088/0004-637X/766/2/81.
+
+Guerrero, Natalia M., et al. "TESS Objects of Interest Catalog from the TESS Prime Mission." *The Astrophysical Journal Supplement Series*, vol. 254, no. 2, 2021, p. 39. https://doi.org/10.3847/1538-4365/abefe1.
+
+Hippke, Michael, and René Heller. "Optimized Transit Detection Algorithm to Search for Periodic Transits of Small Planets." *Astronomy & Astrophysics*, vol. 623, 2019, p. A39. https://doi.org/10.1051/0004-6361/201834672.
+
+Howell, Steve B., et al. "The K2 Mission: Characterization and Early Results." *Publications of the Astronomical Society of the Pacific*, vol. 126, no. 938, 2014, pp. 398–408. https://doi.org/10.1086/676406.
+
+Kopparapu, Ravi Kumar, et al. "Habitable Zones around Main-Sequence Stars: Dependence on Planetary Mass." *The Astrophysical Journal Letters*, vol. 787, no. 2, 2014, p. L29. https://doi.org/10.1088/2041-8205/787/2/L29.
+
+Kovács, Géza, et al. "A Box-fitting Algorithm in the Search for Periodic Transits." *Astronomy & Astrophysics*, vol. 391, no. 1, 2002, pp. L23–L26. https://doi.org/10.1051/0004-6361:20020802.
+
+Lightkurve Collaboration, et al. "Lightkurve: Kepler and TESS Time Series Analysis in Python." *Astrophysics Source Code Library*, 2018, record ascl:1812.013.
+
+Morton, Timothy D. "An Efficient Automated Validation Procedure for Exoplanet Transit Candidates." *The Astrophysical Journal*, vol. 761, no. 1, 2012, p. 6. https://doi.org/10.1088/0004-637X/761/1/6.
+
+Platt, John. "Probabilistic Outputs for Support Vector Machines and Comparisons to Regularized Likelihood Methods." *Advances in Large Margin Classifiers*, edited by Alexander J. Smola et al., MIT Press, 1999, pp. 61–74.
+
+Ricker, George R., et al. "Transiting Exoplanet Survey Satellite (TESS)." *Journal of Astronomical Telescopes, Instruments, and Systems*, vol. 1, no. 1, 2015, p. 014003. https://doi.org/10.1117/1.JATIS.1.1.014003.
+
+Stassun, Keivan G., et al. "The TESS Input Catalog and Candidate Target List." *The Astronomical Journal*, vol. 156, no. 3, 2018, p. 102. https://doi.org/10.3847/1538-3881/aad050.
+
+Thompson, Susan E., et al. "Planetary Candidates Observed by Kepler. VIII. Cumulative Planet Candidate Catalog." *The Astrophysical Journal Supplement Series*, vol. 235, no. 2, 2018, p. 38. https://doi.org/10.3847/1538-4365/aab4f9.
+
+VanderPlas, Jacob T. "Understanding the Lomb-Scargle Periodogram." *The Astrophysical Journal Supplement Series*, vol. 236, no. 1, 2018, p. 16. https://doi.org/10.3847/1538-4365/aab766.
+
+Winn, Joshua N. "Transits and Occultations." *Exoplanets*, edited by Sara Seager, University of Arizona Press, 2010, pp. 55–77.
+
