@@ -1,15 +1,15 @@
 """Command-line interface for exo-toolkit.
 
-Entry point: ``exo scan <TIC-ID>``
+Entry point: ``exo <TIC-ID>``
 
 Runs the full pipeline (fetch → clean → search → vet → score → classify)
 on a single target and prints a Rich-formatted candidate report.
 
 Usage examples
 --------------
-    exo scan "TIC 150428135"
-    exo scan "TIC 150428135" --mission TESS --min-snr 7.0
-    exo scan "TIC 150428135" --output results.json
+    exo "TIC 150428135"
+    exo "TIC 150428135" --mission TESS --min-snr 7.0 --scorer xgboost --model-path model.json
+    exo "TIC 150428135" --output results.json
 """
 from __future__ import annotations
 
@@ -35,6 +35,8 @@ app = typer.Typer(
     add_completion=False,
 )
 
+_VALID_SCORERS = ("bayesian", "xgboost", "ensemble")
+
 
 # ---------------------------------------------------------------------------
 # Pipeline orchestration (separated for testability)
@@ -47,6 +49,8 @@ def run_pipeline(
     *,
     min_snr: float = 5.0,
     max_peaks: int = 5,
+    scorer: str = "bayesian",
+    model_path: Path | None = None,
     fetch_fn: Any = None,
     clean_fn: Any = None,
 ) -> list[dict[str, Any]]:
@@ -57,14 +61,38 @@ def run_pipeline(
         mission: ``"TESS"``, ``"Kepler"``, or ``"K2"``.
         min_snr: Minimum BLS SNR threshold for candidate signals.
         max_peaks: Maximum number of signals to return from the BLS search.
+        scorer: Scoring model — ``"bayesian"`` (default), ``"xgboost"``, or
+            ``"ensemble"`` (average of Bayesian + XGBoost).
+        model_path: Path to a saved ``XGBoostScorer`` metadata JSON file.
+            Required when ``scorer`` is ``"xgboost"`` or ``"ensemble"``.
         fetch_fn: Optional callable replacing ``fetch_lightcurve`` (for tests).
         clean_fn: Optional callable replacing ``clean_lightcurve`` (for tests).
 
     Returns:
         List of dicts, one per candidate signal, suitable for JSON output.
+        When ``scorer`` is ``"xgboost"`` or ``"ensemble"``, each dict also
+        contains ``"xgb_planet_probability"`` (and ``"ensemble_planet_probability"``
+        for ``"ensemble"``).
+
+    Raises:
+        ValueError: If ``scorer`` is ``"xgboost"`` or ``"ensemble"`` but
+            ``model_path`` is ``None``.
     """
+    if scorer not in _VALID_SCORERS:
+        raise ValueError(f"scorer must be one of {_VALID_SCORERS}, got {scorer!r}")
+
     _fetch = fetch_fn if fetch_fn is not None else fetch_lightcurve
     _clean = clean_fn if clean_fn is not None else clean_lightcurve
+
+    # Load XGBoost scorer once before the per-signal loop.
+    xgb_scorer = None
+    if scorer in ("xgboost", "ensemble"):
+        if model_path is None:
+            raise ValueError(
+                f"model_path is required when scorer='{scorer}'"
+            )
+        from exo_toolkit.ml.xgboost_scorer import XGBoostScorer
+        xgb_scorer = XGBoostScorer.load(model_path)
 
     fetch_result = _fetch(target_id, mission)
     clean_result = _clean(fetch_result.light_curve)
@@ -87,33 +115,43 @@ def run_pipeline(
         pathway = classify_submission_pathway(
             signal, vet_result.features, posterior, scores
         )
-        rows.append(
-            {
-                "candidate_id": signal.candidate_id,
-                "target_id": signal.target_id,
-                "mission": signal.mission,
-                "period_days": signal.period_days,
-                "epoch_bjd": signal.epoch_bjd,
-                "duration_hours": signal.duration_hours,
-                "depth_ppm": signal.depth_ppm,
-                "transit_count": signal.transit_count,
-                "snr": signal.snr,
-                "posterior": {
-                    "planet_candidate": posterior.planet_candidate,
-                    "eclipsing_binary": posterior.eclipsing_binary,
-                    "background_eclipsing_binary": posterior.background_eclipsing_binary,
-                    "stellar_variability": posterior.stellar_variability,
-                    "instrumental_artifact": posterior.instrumental_artifact,
-                    "known_object": posterior.known_object,
-                },
-                "scores": {
-                    "false_positive_probability": scores.false_positive_probability,
-                    "detection_confidence": scores.detection_confidence,
-                    "novelty_score": scores.novelty_score,
-                },
-                "pathway": pathway,
-            }
-        )
+
+        row: dict[str, Any] = {
+            "candidate_id": signal.candidate_id,
+            "target_id": signal.target_id,
+            "mission": signal.mission,
+            "period_days": signal.period_days,
+            "epoch_bjd": signal.epoch_bjd,
+            "duration_hours": signal.duration_hours,
+            "depth_ppm": signal.depth_ppm,
+            "transit_count": signal.transit_count,
+            "snr": signal.snr,
+            "scorer": scorer,
+            "posterior": {
+                "planet_candidate": posterior.planet_candidate,
+                "eclipsing_binary": posterior.eclipsing_binary,
+                "background_eclipsing_binary": posterior.background_eclipsing_binary,
+                "stellar_variability": posterior.stellar_variability,
+                "instrumental_artifact": posterior.instrumental_artifact,
+                "known_object": posterior.known_object,
+            },
+            "scores": {
+                "false_positive_probability": scores.false_positive_probability,
+                "detection_confidence": scores.detection_confidence,
+                "novelty_score": scores.novelty_score,
+            },
+            "pathway": pathway,
+        }
+
+        if xgb_scorer is not None:
+            xgb_prob = xgb_scorer.predict_proba(vet_result.features)
+            row["xgb_planet_probability"] = xgb_prob
+            if scorer == "ensemble":
+                row["ensemble_planet_probability"] = (
+                    0.5 * posterior.planet_candidate + 0.5 * xgb_prob
+                )
+
+        rows.append(row)
     return rows
 
 
@@ -152,6 +190,16 @@ def _print_results(rows: list[dict[str, Any]], target_id: str) -> None:
             "P(eclipsing binary)",
             f"{row['posterior']['eclipsing_binary']:.3f}",
         )
+        if "xgb_planet_probability" in row:
+            table.add_row(
+                "XGBoost P(planet)",
+                f"{row['xgb_planet_probability']:.3f}",
+            )
+        if "ensemble_planet_probability" in row:
+            table.add_row(
+                "Ensemble P(planet)",
+                f"{row['ensemble_planet_probability']:.3f}",
+            )
         table.add_row("FPP", f"{row['scores']['false_positive_probability']:.3f}")
         table.add_row(
             "Detection confidence",
@@ -173,6 +221,16 @@ def scan(
     mission: str = typer.Option("TESS", help="Mission: TESS, Kepler, or K2"),
     min_snr: float = typer.Option(5.0, "--min-snr", help="Minimum BLS SNR threshold"),
     max_peaks: int = typer.Option(5, "--max-peaks", help="Maximum signals to search for"),
+    scorer: str = typer.Option(
+        "bayesian",
+        "--scorer",
+        help="Scoring model: bayesian (default), xgboost, or ensemble",
+    ),
+    model_path: Path | None = typer.Option(
+        None,
+        "--model-path",
+        help="Path to XGBoost model JSON (required for xgboost/ensemble scorers)",
+    ),
     output: Path | None = typer.Option(
         None, "--output", "-o", help="Write JSON results to this file"
     ),
@@ -186,7 +244,19 @@ def scan(
         typer.echo(f"Invalid mission '{mission}'. Choose from: {valid_missions}", err=True)
         raise typer.Exit(code=1)
 
-    typer.echo(f"Scanning {target_id} ({mission}) ...")
+    if scorer not in _VALID_SCORERS:
+        typer.echo(
+            f"Invalid scorer '{scorer}'. Choose from: {_VALID_SCORERS}", err=True
+        )
+        raise typer.Exit(code=1)
+
+    if scorer in ("xgboost", "ensemble") and model_path is None:
+        typer.echo(
+            f"--model-path is required when --scorer={scorer}", err=True
+        )
+        raise typer.Exit(code=1)
+
+    typer.echo(f"Scanning {target_id} ({mission}) [scorer={scorer}] ...")
 
     try:
         rows = run_pipeline(
@@ -194,6 +264,8 @@ def scan(
             mission,  # type: ignore[arg-type]
             min_snr=min_snr,
             max_peaks=max_peaks,
+            scorer=scorer,
+            model_path=model_path,
         )
     except Exception as exc:  # noqa: BLE001
         typer.echo(f"Pipeline error: {exc}", err=True)
