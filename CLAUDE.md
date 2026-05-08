@@ -51,7 +51,7 @@ CI: `.github/workflows/ci.yml`
 | `ml/xgboost_scorer.py` | **done** | `test_xgboost_scorer.py` (45) |
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
 
-**Total passing tests: 612 (+ 2 integration_live)**
+**Total passing tests: 664 (+ 2 integration_live)**
 **Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `build_training_data.py` (34), `train_xgboost.py` (17), `fetch_tess_toi.py`, `build_tess_training_data.py` (38), `evaluate_scorer.py` (14)**
 
 ---
