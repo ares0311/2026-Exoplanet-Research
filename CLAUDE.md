@@ -47,8 +47,10 @@ CI: `.github/workflows/ci.yml`
 | `search.py` | **done** | `test_search.py` (43) |
 | `vet.py` | **done** | `test_vet.py` (47) |
 | `calibration.py` | **done** | `test_calibration.py` (70) |
+| `cli.py` | **done** | `test_cli.py` (14) |
 
-**Total passing tests: 406 (+ 2 integration_live)**
+**Total passing tests: 463 (+ 2 integration_live)**
+**Skills: `injection_recovery.py` (25 tests in `test_injection_recovery.py`)**
 
 ---
 
@@ -196,14 +198,25 @@ All pipeline modules are complete.
 - Figures: raw vs. cleaned flux, phase-folded transit, posterior bar chart, all-signals grid
 - Human-readable candidate report rendered as Markdown inside the notebook
 
+**Injection-recovery completeness mapping** (`Skills/injection_recovery.py`): ✅
+- Injects synthetic box transits into real or simulated light curves
+- Recovers via `search_lightcurve`; measures recovery rate vs. period and depth
+- Usable as CLI script (`python Skills/injection_recovery.py`) or importable library
+- 25 tests in `tests/test_injection_recovery.py`
+
+**CLI entry point** (`src/exo_toolkit/cli.py`): ✅
+- `exo <TIC-ID>` — runs full pipeline and prints Rich-formatted candidate report
+- Options: `--mission`, `--min-snr`, `--max-peaks`, `--output` (JSON)
+- Entry point registered in `pyproject.toml` as `exo = "exo_toolkit.cli:app"`
+- 14 tests in `tests/test_cli.py`
+
 ### Next Step
 
-**Injection-recovery testing** (`Skills/injection_recovery.py`):
-- Inject synthetic box transits into real TESS light curves
-- Recover via `search_lightcurve`; measure recovery rate vs. period and depth
-- Map completeness as a function of planet radius, orbital period, stellar noise
-
-After injection-recovery: CLI entry point (`exo-scan <TIC-ID>`).
+**ML Ensemble Scorer — Tier 1: XGBoost** (`src/exo_toolkit/ml/xgboost_scorer.py`):
+- Input: existing 35 `OptScore` fields from `CandidateFeatures` (clean tabular vector)
+- Training data: Kepler Robovetter (Thompson et al. 2018, ~34k TCEs) from NASA Exoplanet Archive
+- Data threshold: ~500–1,000 confirmed planet vs. confirmed FP labels sufficient
+- Interpretable, trains in seconds, sits alongside `scoring.py` as alternative scorer
 
 ### Future Enhancement: ML Ensemble Scorer (agreed 2026-05-01)
 
