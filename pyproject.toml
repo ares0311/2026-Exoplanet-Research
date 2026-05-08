@@ -40,7 +40,8 @@ dependencies = [
   "typer",
   "rich",
   "pydantic",
-  "pyyaml"
+  "pyyaml",
+  "xgboost"
 ]
 
 [project.optional-dependencies]
