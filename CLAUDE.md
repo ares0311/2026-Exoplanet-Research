@@ -49,9 +49,10 @@ CI: `.github/workflows/ci.yml`
 | `calibration.py` | **done** | `test_calibration.py` (70) |
 | `cli.py` | **done** | `test_cli.py` (14) |
 | `ml/xgboost_scorer.py` | **done** | `test_xgboost_scorer.py` (45) |
+| `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
 
-**Total passing tests: 508 (+ 2 integration_live)**
-**Skills: `injection_recovery.py` (25 tests in `test_injection_recovery.py`)**
+**Total passing tests: 530 (+ 2 integration_live)**
+**Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `build_training_data.py`, `train_xgboost.py`**
 
 ---
 
@@ -62,6 +63,8 @@ CI: `.github/workflows/ci.yml`
 - **OptScore pattern**: `float | None` — `None` means diagnostic not run; missing features contribute 0 to log scores (neutral, no bias)
 - **Conservative priors**: planet_candidate = 0.10, others = 0.20 each, known_object = 0.10
 - **ML Tier 1 (XGBoost) is built** — `ml/xgboost_scorer.py` ships as an optional alternative scorer; Bayesian log-score model remains the default fallback when labels are unavailable
+- **ML Tier 3 (stacking) is built** — `ml/stacking_scorer.py` blends XGBoost + Bayesian P(planet) with configurable weight; falls back to Bayesian-only when no model loaded
+- **CLI scorer options**: `exo <TIC-ID> --scorer [bayesian|xgboost|ensemble] --model-path <path>`
 - **Never output "confirmed planet"** — use "candidate signal" or "follow-up target"
 - **Numerically stable softmax**: subtract max before exponentiation
 
@@ -217,6 +220,22 @@ All pipeline modules are complete.
 - `None` OptScores → `np.nan`; handled natively by XGBoost missing-value splitting
 - Model serialised as paired metadata JSON + `.xgb.json` files
 - 45 tests in `tests/test_xgboost_scorer.py`
+
+**ML Ensemble Scorer — Tier 3: Stacking scorer** (`src/exo_toolkit/ml/stacking_scorer.py`): ✅
+- Weighted average of XGBoost + Bayesian P(planet_candidate); weight configurable
+- Falls back to Bayesian-only when no XGBoost model available
+- `StackingScorer.from_model_path(path)` / `StackingScorer.bayesian_only()` factory methods
+- 22 tests in `tests/test_stacking_scorer.py`
+
+**Kepler training pipeline** (`Skills/`): ✅
+- `fetch_kepler_tce.py` — downloads KOI cumulative table from NASA Exoplanet Archive
+- `build_training_data.py` — maps 8 KOI columns → CandidateFeatures; 27 remain None
+- `train_xgboost.py` — stratified k-fold CV, ROC-AUC/F1 metrics, saves final model
+
+**CLI scorer options** (`src/exo_toolkit/cli.py`): ✅
+- `--scorer [bayesian|xgboost|ensemble]`, `--model-path <path>`
+- xgboost adds `xgb_planet_probability`; ensemble adds `ensemble_planet_probability`
+- 20 tests in `tests/test_cli.py`
 
 ### Next Step
 
