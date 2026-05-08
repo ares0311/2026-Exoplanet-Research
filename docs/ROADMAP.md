@@ -2,67 +2,81 @@
 
 ## Milestone 1 — Scoring and Classification Engine ✓ COMPLETE
 
-All modules implemented, tested (210 tests), ruff-clean, mypy-clean.
-
 - [x] `schemas.py` — typed Pydantic data contracts
 - [x] `features.py` — 35+ normalized feature extraction functions
 - [x] `hypotheses.py` — Bayesian log-score models for 6 hypotheses
 - [x] `scoring.py` — softmax posterior + FPP, detection confidence, novelty, habitability
 - [x] `pathway.py` — submission pathway classifier (SCORING_MODEL.md §11)
 - [x] CI via GitHub Actions (ruff → mypy → pytest)
-- [x] `.gitignore` — proper Python template
 - [x] `CLAUDE.md` — project context for AI coding agents
 
 ---
 
-## Milestone 2 — Data Pipeline
+## Milestone 2 — Data Pipeline ✓ COMPLETE
 
-Build the Fetch → Clean → Search → Vet chain that produces inputs for the scoring engine.
-
-- [ ] `fetch.py` — query MAST via Lightkurve; return LightCurve + provenance metadata
-- [ ] `clean.py` — NaN removal, sigma-clip, normalization, detrending (Lightkurve `flatten()`)
-- [ ] `search.py` — BLS search → `CandidateSignal` list; iterative masking for multi-planet
-- [ ] `vet.py` — compute `RawDiagnostics` from light curve + signal; call `extract_features()`
-- [ ] Integration tests with mocked Lightkurve responses
-- [ ] `@pytest.mark.integration_live` tests against real MAST data
+- [x] `fetch.py` — query MAST via Lightkurve; return LightCurve + provenance metadata
+- [x] `clean.py` — NaN removal, sigma-clip, normalization, detrending
+- [x] `search.py` — BLS search → `CandidateSignal` list; iterative masking for multi-planet
+- [x] `vet.py` — compute `RawDiagnostics` from light curve + signal; call `extract_features()`
+- [x] `@pytest.mark.integration_live` tests against real MAST data
 
 ---
 
-## Milestone 3 — End-to-End Validation
+## Milestone 3 — End-to-End Validation ✓ COMPLETE
 
-Recover a known TESS or Kepler planet through the full pipeline.
-
-- [ ] Select a confirmed planet as validation target (e.g. TOI-700d or TRAPPIST-1)
-- [ ] Run full pipeline: Fetch → Clean → Search → Vet → Score → Classify
-- [ ] Verify `pathway` output matches expected (e.g. `tfop_ready` or `kepler_archive_candidate`)
-- [ ] Generate a human-readable candidate report (Markdown)
+- [x] `notebooks/pipeline_demo.ipynb` — TOI-700 (TIC 150428135) full pipeline walkthrough
+- [x] All 6 stages covered: Fetch → Clean → Search → Vet → Score → Classify
+- [x] Human-readable candidate report rendered as Markdown in notebook
+- [x] Figures: raw vs. cleaned flux, phase-folded transit, posterior bar chart, all-signals grid
 
 ---
 
-## Milestone 4 — Calibration
+## Milestone 4 — Calibration ✓ COMPLETE
 
-The v0 weights in `hypotheses.py` are starting points, not calibrated values.
-
-- [ ] `calibration.py` — reliability curves, Platt scaling, isotonic regression
-- [ ] Assemble validation set: confirmed planets, TOIs, KOIs, known false positives, known EBs
-- [ ] Measure Brier score, precision-recall, ROC, confusion matrix by hypothesis type
-- [ ] Calibrate by period/radius/SNR bins; update priors and weights with evidence
+- [x] `calibration.py` — reliability curves, Platt scaling (scipy), isotonic regression (PAVA)
+- [x] One-vs-rest calibration per hypothesis; renormalized to sum to 1.0
+- [x] Metrics: Brier scores, reliability curves, precision/recall/F1, confusion matrix
+- [x] `Skills/train_xgboost.py` — includes post-training Platt calibration step
 
 ---
 
-## Milestone 5 — Reporting
+## Milestone 5 — Reporting ✓ COMPLETE
 
-- [ ] Per-candidate Markdown/HTML report with explanation, plots, scoring breakdown
-- [ ] Batch run support (list of targets → ranked candidate table)
-- [ ] Export to standard formats (CSV, JSON, FITS header compatible)
+- [x] Rich-formatted candidate report via `exo <TIC-ID>` CLI
+- [x] JSON output via `--output`
+- [x] Markdown report export via `--report-md`
+- [x] Batch run support via `--batch`
 
 ---
 
-## Milestone 6 — Injection-Recovery (Survey-Aware Reliability)
+## Milestone 6 — Injection-Recovery ✓ COMPLETE
 
-- [ ] Inject synthetic transit signals into real light curves
-- [ ] Run full pipeline and measure recovery rate by radius, period, stellar type, noise
-- [ ] Map completeness function; adjust detection confidence where recovery is poor
+- [x] `Skills/injection_recovery.py` — inject synthetic box transits, recover via BLS
+- [x] Measures recovery rate by radius, period, noise level
+- [x] 25 tests in `tests/test_injection_recovery.py`
+
+---
+
+## Milestone 7 — ML Ensemble Scorer (In Progress)
+
+- [x] Tier 1 — XGBoost on tabular features (`ml/xgboost_scorer.py`, 45 tests)
+- [x] Tier 3 — Stacking scorer blending XGBoost + Bayesian (`ml/stacking_scorer.py`, 22 tests)
+- [x] Kepler training pipeline (`Skills/fetch_kepler_tce.py`, `build_training_data.py`, `train_xgboost.py`)
+- [x] TESS training pipeline (`Skills/fetch_tess_toi.py`, `build_tess_training_data.py`)
+- [x] Evaluation framework (`Skills/evaluate_scorer.py`, ROC-AUC, F1, reliability diagrams)
+- [x] Combined training data (`Skills/build_combined_training_data.py`)
+- [ ] Tier 2 — 1D CNN on phase-folded flux (**BLOCKED: requires 5,000+ TESS labels**)
+  - Architecture spec: `docs/CNN_SPEC.md`
+  - Gate check: `Skills/count_tess_labels.py`
+
+---
+
+## Milestone 8 — Future
+
+- [ ] Provenance score computation (unlocks `tfop_ready` pathway)
+- [ ] Tier 2 CNN once TESS label threshold is met
+- [ ] Web API / batch processing service
+- [ ] Per-star candidate ranking across all sectors
 
 ---
 

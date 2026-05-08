@@ -51,8 +51,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/xgboost_scorer.py` | **done** | `test_xgboost_scorer.py` (45) |
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
 
-**Total passing tests: 664 (+ 2 integration_live)**
-**Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `build_training_data.py` (34), `train_xgboost.py` (17), `fetch_tess_toi.py`, `build_tess_training_data.py` (38), `evaluate_scorer.py` (14)**
+**Total passing tests: 696 (+ 2 integration_live)**
+**Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `fetch_tess_toi.py` (11), `build_training_data.py` (34), `build_tess_training_data.py` (38), `build_combined_training_data.py` (13), `train_xgboost.py` (25), `evaluate_scorer.py` (14), `count_tess_labels.py`**
 
 ---
 
@@ -240,7 +240,7 @@ All pipeline modules are complete.
 
 **Scorer evaluation** (`Skills/evaluate_scorer.py`): ✅
 - Stratified k-fold cross-validation comparing Bayesian vs XGBoost ROC-AUC, F1, precision, recall
-- Optional ROC curve PNG export (requires matplotlib)
+- Optional ROC curve PNG and reliability (calibration) diagram export (requires matplotlib)
 - 14 tests in `tests/test_evaluate_scorer.py`
 
 **CLI scorer options** (`src/exo_toolkit/cli.py`): ✅
@@ -251,23 +251,39 @@ All pipeline modules are complete.
 **ML Scoring Architecture docs** (`docs/ML_SCORING.md`): ✅
 - Documents all scorer modes, training pipeline, column mappings, design decisions
 
+**Platt calibration in training** (`Skills/train_xgboost.py`): ✅
+- Collects out-of-fold predictions during k-fold CV
+- Fits Platt scaling (A, B) via log-loss minimization (scipy Nelder-Mead)
+- Saves `platt_calibration: {a, b}` to the model metadata JSON
+- 25 tests in `tests/test_train_xgboost.py`
+
+**Combined training dataset** (`Skills/build_combined_training_data.py`): ✅
+- Merges Kepler KOI + TESS TOI training pickles
+- Optional per-source cap with stratified subsampling
+- 16 tests in `tests/test_build_combined_training_data.py`
+
+**fetch_tess_toi offline tests** (`tests/test_fetch_tess_toi.py`): ✅
+- 11 unit tests using monkeypatch to avoid live HTTP calls
+
+**CNN Tier-2 gate tools**: ✅
+- `Skills/count_tess_labels.py` — queries ExoFOP CP count, prints gate status
+- `docs/CNN_SPEC.md` — full architecture spec (1D CNN, input format, training params)
+- `docs/DATA_SOURCES.md` — MAST, ExoFOP, NExSci endpoints and caching guide
+- `Skills/__init__.py` — makes Skills a proper Python package
+- `docs/ROADMAP.md` + `docs/PROJECT_STATUS.md` — updated to current state
+
 ### Next Step
 
 **ML Ensemble Scorer — Tier 2: 1D CNN on phase-folded flux**
 - Requires 5,000+ TESS labels before building
-- Input: phase-folded, normalised flux array (treat as 1D image)
-- Proven architecture: Shallue & Vanderburg 2018; needs TESS-specific fine-tuning
+- Gate check: `python Skills/count_tess_labels.py`
+- Architecture spec: `docs/CNN_SPEC.md`
 
 ### Future Enhancement: ML Ensemble Scorer (agreed 2026-05-01)
 
 Replace or augment the Bayesian log-score model with a three-model ensemble once sufficient labeled data is available:
 
-**Tier 1 — XGBoost on tabular features (build first)**
-- Input: the existing 35 `OptScore` fields from `CandidateFeatures` (already a clean tabular vector)
-- Data threshold: ~500–1,000 labeled examples sufficient
-- Interpretable, trains in seconds, zero new data pipeline needed
-- Labeled training data: Kepler Robovetter output (Thompson et al. 2018, ~34,000 TCEs) available from NASA Exoplanet Archive; TESS TOI dispositions from ExoFOP
-
+**Tier 1 — XGBoost on tabular features (build first)** ✅ DONE
 **Tier 2 — 1D CNN on phase-folded flux (add after 5,000+ TESS labels)**
 - Input: phase-folded, normalized flux array (treat as 1D image)
 - Learns transit morphology directly; proven architecture (Shallue & Vanderburg 2018)

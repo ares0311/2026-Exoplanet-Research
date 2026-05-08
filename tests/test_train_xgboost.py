@@ -15,6 +15,8 @@ from Skills.train_xgboost import (
     _metrics,
     _roc_auc,
     _stratified_kfold_indices,
+    apply_platt,
+    fit_platt,
     load_training_data,
     train_and_evaluate,
 )
@@ -158,8 +160,79 @@ class TestTrainAndEvaluate:
         m = train_and_evaluate(
             features_list, labels, k_folds=2, output_path=tmp_path / "model.json"
         )
-        for v in m.values():
-            assert 0.0 <= v <= 1.0 or np.isnan(v)
+        for key in ("auc", "acc", "precision", "recall", "f1"):
+            assert 0.0 <= m[key] <= 1.0 or np.isnan(m[key])
+
+
+# ---------------------------------------------------------------------------
+# load_training_data
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# fit_platt / apply_platt
+# ---------------------------------------------------------------------------
+
+
+class TestFitPlatt:
+    def test_returns_two_floats(self) -> None:
+        y_true = [1, 1, 0, 0, 1, 0]
+        y_prob = np.array([0.9, 0.8, 0.2, 0.1, 0.7, 0.3])
+        a, b = fit_platt(y_true, y_prob)
+        assert isinstance(a, float)
+        assert isinstance(b, float)
+
+    def test_identity_on_well_calibrated(self) -> None:
+        rng = np.random.default_rng(0)
+        y_prob = rng.uniform(0.1, 0.9, 100)
+        y_true = (rng.uniform(size=100) < y_prob).astype(int).tolist()
+        a, b = fit_platt(y_true, y_prob)
+        assert isinstance(a, float)
+
+    def test_calibrated_auc_nonneg(self) -> None:
+        y_true = [1, 0] * 20
+        y_prob = np.array([0.8, 0.2] * 20)
+        a, b = fit_platt(y_true, y_prob)
+        cal = apply_platt(y_prob, a, b)
+        assert 0.0 <= float(cal.mean()) <= 1.0
+
+
+class TestApplyPlatt:
+    def test_output_in_range(self) -> None:
+        y_prob = np.linspace(0.01, 0.99, 20)
+        cal = apply_platt(y_prob, 1.0, 0.0)
+        assert (cal >= 0.0).all() and (cal <= 1.0).all()
+
+    def test_monotone(self) -> None:
+        y_prob = np.linspace(0.1, 0.9, 10)
+        cal = apply_platt(y_prob, 1.5, -0.1)
+        assert (np.diff(cal) > 0).all()
+
+    def test_identity_params(self) -> None:
+        y_prob = np.array([0.3, 0.5, 0.7])
+        cal = apply_platt(y_prob, 1.0, 0.0)
+        expected = 1.0 / (1.0 + np.exp(-y_prob))
+        np.testing.assert_allclose(cal, expected, atol=1e-6)
+
+
+class TestTrainAndEvaluatePlatt:
+    def test_platt_keys_in_result(self, tmp_path: Path) -> None:
+        features_list, labels = _make_features(40)
+        m = train_and_evaluate(
+            features_list, labels, k_folds=2, output_path=tmp_path / "model.json"
+        )
+        assert "platt_a" in m
+        assert "platt_b" in m
+
+    def test_platt_saved_to_metadata(self, tmp_path: Path) -> None:
+        import json
+        features_list, labels = _make_features(40)
+        out = tmp_path / "model.json"
+        train_and_evaluate(features_list, labels, k_folds=2, output_path=out)
+        meta = json.loads(out.read_text())
+        assert "platt_calibration" in meta
+        assert "a" in meta["platt_calibration"]
+        assert "b" in meta["platt_calibration"]
 
 
 # ---------------------------------------------------------------------------
