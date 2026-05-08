@@ -12,15 +12,19 @@
 |------|-----------|-------|
 | Scoring engine | `schemas`, `features`, `hypotheses`, `scoring`, `pathway` | 210 |
 | Data pipeline | `fetch`, `clean`, `search`, `vet`, `calibration` | 236 |
-| CLI | `cli.py` — `exo <TIC-ID>` with scorer options, batch, report-md | 20 |
+| CLI | `cli.py` — `exo <TIC-ID>` with `--scorer`, `--model-path`, `--output` | 20 |
 | ML Tier 1 | `ml/xgboost_scorer.py` | 45 |
 | ML Tier 3 | `ml/stacking_scorer.py` | 22 |
-| Training pipelines | `Skills/` — Kepler KOI + TESS TOI + combined | 34+38+17 |
-| Evaluation | `Skills/evaluate_scorer.py` — ROC-AUC, reliability diagram | 14 |
-| Injection-recovery | `Skills/injection_recovery.py` | 25 |
+| Kepler training | `fetch_kepler_tce.py`, `build_training_data.py`, `train_xgboost.py` | 34+25 |
+| TESS training | `fetch_tess_toi.py`, `build_tess_training_data.py` | 11+38 |
+| Combined training | `build_combined_training_data.py` | 13 |
+| Evaluation | `evaluate_scorer.py` — ROC-AUC, F1, reliability diagram | 14 |
+| Injection-recovery | `injection_recovery.py` | 25 |
+| CNN gate | `count_tess_labels.py` | — |
 | Docs | `ML_SCORING.md`, `CNN_SPEC.md`, `DATA_SOURCES.md`, `DECISIONS.md` | — |
+| README | 12-section rewrite with equations, MLA citations, submission guide | — |
 
-**Total: 664 passing tests (+ 2 integration_live)**
+**Total: 696 passing tests (+ 2 integration_live)**
 
 ---
 
