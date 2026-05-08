@@ -90,7 +90,9 @@ select = [
   "SIM",
   "C4"
 ]
-ignore = []
+ignore = [
+  "B008",  # typer.Argument/Option calls in function defaults are intentional
+]
 
 [tool.mypy]
 python_version = "3.11"
@@ -107,6 +109,8 @@ module = [
   "lightkurve.*",
   "astroquery.*",
   "matplotlib.*",
-  "astropy.*"
+  "astropy.*",
+  "typer.*",
+  "rich.*"
 ]
 ignore_missing_imports = true
