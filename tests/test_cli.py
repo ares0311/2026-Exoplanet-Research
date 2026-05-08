@@ -348,3 +348,87 @@ class TestScanCommand:
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
         assert "TIC" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Scorer / model-path option tests
+# ---------------------------------------------------------------------------
+
+
+class TestScorerOption:
+    def test_default_scorer_is_bayesian(self) -> None:
+        captured: dict[str, Any] = {}
+
+        def _spy(target_id: str, mission: str, **kwargs: Any) -> list[Any]:
+            captured["scorer"] = kwargs.get("scorer")
+            return []
+
+        with patch("exo_toolkit.cli.run_pipeline", side_effect=_spy):
+            runner.invoke(app, ["TIC 0"])
+
+        assert captured.get("scorer") == "bayesian"
+
+    def test_scorer_option_forwarded(self) -> None:
+        captured: dict[str, Any] = {}
+
+        def _spy(target_id: str, mission: str, **kwargs: Any) -> list[Any]:
+            captured["scorer"] = kwargs.get("scorer")
+            captured["model_path"] = kwargs.get("model_path")
+            return []
+
+        with patch("exo_toolkit.cli.run_pipeline", side_effect=_spy):
+            runner.invoke(app, ["TIC 0", "--scorer", "xgboost", "--model-path", "/tmp/m.json"])
+
+        assert captured.get("scorer") == "xgboost"
+        assert captured.get("model_path") == Path("/tmp/m.json")
+
+    def test_xgboost_without_model_path_exits_nonzero(self) -> None:
+        result = runner.invoke(app, ["TIC 0", "--scorer", "xgboost"])
+        assert result.exit_code != 0
+
+    def test_ensemble_without_model_path_exits_nonzero(self) -> None:
+        result = runner.invoke(app, ["TIC 0", "--scorer", "ensemble"])
+        assert result.exit_code != 0
+
+    def test_invalid_scorer_exits_nonzero(self) -> None:
+        result = runner.invoke(app, ["TIC 0", "--scorer", "neural_net"])
+        assert result.exit_code != 0
+
+    def test_run_pipeline_xgboost_adds_xgb_key(self, tmp_path: Path) -> None:
+        from unittest.mock import MagicMock
+
+        from exo_toolkit.cli import run_pipeline
+
+        lc = _mock_lc()
+        signal = _make_signal()
+        posterior = _uniform_posterior()
+        scores = _make_scores()
+
+        mock_scorer = MagicMock()
+        mock_scorer.predict_proba.return_value = 0.77
+
+        with (
+            patch("exo_toolkit.cli.search_lightcurve", return_value=[signal]),
+            patch(
+                "exo_toolkit.cli.vet_signal",
+                return_value=MagicMock(features=CandidateFeatures()),
+            ),
+            patch("exo_toolkit.cli.score_candidate", return_value=(posterior, scores)),
+            patch(
+                "exo_toolkit.cli.classify_submission_pathway",
+                return_value="planet_hunters_discussion",
+            ),
+            patch("exo_toolkit.ml.xgboost_scorer.XGBoostScorer.load", return_value=mock_scorer),
+        ):
+            result = run_pipeline(
+                "TIC 0",
+                "TESS",
+                scorer="xgboost",
+                model_path=tmp_path / "model.json",
+                fetch_fn=lambda *_: MagicMock(light_curve=lc),
+                clean_fn=lambda *_: MagicMock(light_curve=lc),
+            )
+
+        assert len(result) == 1
+        assert "xgb_planet_probability" in result[0]
+        assert abs(result[0]["xgb_planet_probability"] - 0.77) < 1e-9
