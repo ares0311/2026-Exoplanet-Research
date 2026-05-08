@@ -14,6 +14,93 @@ This repository implements a complete, reproducible computational pipeline for t
 
 ---
 
+## Getting Started
+
+> This section is for anyone who wants to run the pipeline without reading the full paper. No astronomy background required.
+
+### What this tool does
+
+You give it a star's ID number. It downloads the brightness measurements NASA has collected for that star, searches them for the tell-tale periodic dips that happen when a planet passes in front of the star, and then scores how likely each dip is to be a real planet versus a false alarm (a background binary star, an instrumental glitch, etc.). At the end it tells you what to do with the result — post it to a community forum, flag it for professional follow-up, or discard it.
+
+### What you need before installing
+
+| Requirement | How to check | Where to get it |
+|---|---|---|
+| Python 3.11 or newer | `python --version` | [python.org/downloads](https://www.python.org/downloads/) |
+| pip (Python package manager) | `pip --version` | Comes with Python 3.4+ |
+| git | `git --version` | [git-scm.com](https://git-scm.com/) |
+| Internet connection | — | Needed to download star data from NASA |
+| ~500 MB free disk space | — | For Python packages and cached data |
+
+### Five-minute setup
+
+Open a terminal and run these commands one at a time:
+
+```bash
+# 1. Download the code
+git clone https://github.com/ares0311/2026-Exoplanet-Research.git
+cd 2026-Exoplanet-Research
+
+# 2. Install all dependencies
+pip install -r requirements.txt
+
+# 3. Make the package importable (do this once per terminal session,
+#    or add it to your shell profile so it's automatic)
+export PYTHONPATH=src
+
+# 4. Verify the installation worked
+python -c "from exo_toolkit.scoring import score_candidate; print('Installation OK')"
+```
+
+You should see `Installation OK`. If you see an error, check the Troubleshooting section below.
+
+### Your first result (30 seconds)
+
+This runs the full pipeline on TOI-700 — a real confirmed-planet system that is a good sanity-check target:
+
+```bash
+exo 150428135
+```
+
+You will see a report printed to the terminal. The two most important lines are:
+
+```
+FPP:      0.083        ← False Positive Probability (lower is better; <0.35 is promising)
+Pathway:  tfop_ready   ← What to do with this candidate (see §10)
+```
+
+### Troubleshooting installation
+
+**`command not found: exo`**
+The CLI entry point is only available after `pip install -e .`. If you used
+`pip install -r requirements.txt` instead, run scripts with `python -m exo_toolkit.cli <TIC-ID>` or simply add `pip install -e .` and retry.
+
+**`ModuleNotFoundError: No module named 'exo_toolkit'`**
+You forgot to set `PYTHONPATH`. Run `export PYTHONPATH=src` in your terminal before running any `python` commands (or run `pip install -e .` once to avoid needing this).
+
+**`lightkurve` download errors / timeout**
+The NASA MAST archive is sometimes slow. Wait 30 seconds and retry. If the problem persists, check your internet connection.
+
+**`No light curves found` for a TIC ID**
+Not all stars have TESS data yet. Try a different TIC ID or check the MAST portal to confirm data exists for your target.
+
+### How to find a star's TIC ID
+
+Every star in the TESS sky has a number called a TIC ID (TESS Input Catalog). To find one:
+
+1. Go to [exofop.ipac.caltech.edu/tess](https://exofop.ipac.caltech.edu/tess/)
+2. Search by star name (e.g. "TOI-700") or coordinates
+3. The TIC ID is shown at the top of the star page
+
+You can also use the star name directly:
+
+```bash
+exo "TOI-700"       # by TOI name (if lightkurve can resolve it)
+exo 150428135       # by TIC number (always works)
+```
+
+---
+
 ## 1. Introduction
 
 The detection of transiting exoplanets from space-based photometry has undergone a paradigm shift from individual targeted observations toward large-scale automated surveys. The Kepler mission (Borucki et al.) surveyed approximately 150,000 stars continuously for four years, yielding more than 4,000 planet candidates and establishing the statistical framework for occurrence-rate studies (Fressin et al.; Bryson et al.). Its successor, the Transiting Exoplanet Survey Satellite (Ricker et al.), observes nearly the entire sky in 27-day sectors, generating a continuous stream of TESS Objects of Interest (TOIs) that require community vetting before resources are allocated for ground-based follow-up (Guerrero et al.).
@@ -246,24 +333,45 @@ The nine conditions for `tfop_ready` include: $\mathrm{SNR} \geq 8$, $n_{\mathrm
 
 ## 4. Installation
 
-The package is not yet published to PyPI. Install directly from source:
+### Recommended: editable install (one-time setup)
 
 ```bash
 git clone https://github.com/ares0311/2026-Exoplanet-Research.git
 cd 2026-Exoplanet-Research
+pip install -e .
+```
+
+The `-e` flag installs the package in "editable" mode so that the `exo` CLI command and all imports work from any directory without any extra `PYTHONPATH` setup.
+
+### Alternative: requirements only (no CLI)
+
+If you just want to import the library from within the project directory:
+
+```bash
 pip install -r requirements.txt
+export PYTHONPATH=src   # add to ~/.bashrc or ~/.zshrc to make permanent
 ```
 
-The package is not installed into site-packages; use `PYTHONPATH=src` when running scripts or tests:
+### Verify the installation
 
 ```bash
-export PYTHONPATH=src
-python -c "from exo_toolkit.fetch import fetch_lightcurve; print('OK')"
+python -c "from exo_toolkit.scoring import score_candidate; print('OK')"
 ```
 
-Alternatively, install in editable mode:
+For the `exo` CLI (only available after `pip install -e .`):
 
 ```bash
+exo --help
+```
+
+### Virtual environments (recommended)
+
+Using a virtual environment keeps this project's dependencies isolated from your other Python projects:
+
+```bash
+python -m venv venv
+source venv/bin/activate      # macOS / Linux
+# venv\Scripts\activate       # Windows
 pip install -e .
 ```
 
@@ -277,7 +385,7 @@ pip install -e .
 | `astroquery` | Catalog queries (TOI, KOI, Gaia, TIC) |
 | `pydantic` | Immutable typed data models |
 | `scipy` | Platt scaling optimization (Nelder-Mead) |
-| `xgboost` | Tier-1 ML classifier (optional) |
+| `xgboost` | Tier-1 ML classifier (optional; needed for `--scorer xgboost`) |
 | `pandas` | Training data I/O in Skills scripts |
 | `matplotlib` | ROC and reliability diagram export (optional) |
 
@@ -287,18 +395,84 @@ Development dependencies (`pytest`, `ruff`, `mypy`) are listed in `pyproject.tom
 
 ## 5. Quick Start
 
-### CLI
+### CLI (simplest way to run)
 
 ```bash
-# Run the full pipeline on a TESS target
+# Run the full pipeline on a TESS target (TIC ID 150428135 = TOI-700)
 exo 150428135
 
-# Select ML scorer with a trained model
+# Use the XGBoost ML scorer instead of the default Bayesian scorer
 exo 150428135 --scorer xgboost --model-path data/model.json
 
-# Save results to JSON
+# Use the ensemble scorer (blends Bayesian + XGBoost)
+exo 150428135 --scorer ensemble --model-path data/model.json
+
+# Save the full results to a JSON file for later analysis
 exo 150428135 --output results/toi700.json
+
+# Restrict the TESS mission (useful if a star also has Kepler data)
+exo 150428135 --mission TESS
 ```
+
+### Understanding the CLI output
+
+When you run `exo 150428135` you will see output like:
+
+```
+TIC 150428135  (TESS)
+─────────────────────────────────────────────────────
+Signals found: 2
+
+── Signal 1 ──────────────────────────────────────────
+  Period:              37.4210 d
+  Depth:               1 247 ppm     (0.12 % brightness drop)
+  Duration:            2.31 h
+  SNR:                 22.4
+
+  Posterior probabilities
+    planet_candidate         0.742   ← This is what we want to be high
+    eclipsing_binary         0.098
+    background_eb            0.071
+    stellar_variability      0.042
+    instrumental_artifact    0.031
+    known_object             0.016
+
+  False Positive Probability (FPP):   0.258   ← 1 − planet_candidate
+  Detection confidence:               0.871
+  Novelty score:                      0.943
+
+  Submission pathway:  tfop_ready     ← Action to take (see §10)
+
+  Positive evidence:
+    • SNR = 22.4 (strong signal)
+    • 6 transits observed (repeatable)
+    • Transit shape is box-like (planet-consistent morphology)
+
+  Negative evidence / caution:
+    • Contamination ratio 0.01 (low; not a concern here)
+
+── Signal 2 ──────────────────────────────────────────
+  ...
+```
+
+**Key numbers to focus on:**
+
+| Field | What it means | Good range |
+|---|---|---|
+| **FPP** | Probability this is NOT a planet. Lower = more planet-like. | < 0.35 is promising |
+| **planet_candidate** | Probability this IS a planet candidate. Higher = better. | > 0.65 is promising |
+| **SNR** | How clearly the dip stands out above the noise. | ≥ 8 for serious follow-up |
+| **Depth (ppm)** | How much the star dims. 1,000 ppm = 0.1%. Earth vs. Sun ≈ 84 ppm. | Any positive value |
+| **Period (days)** | How often the dip repeats. | Shorter periods are easier to confirm |
+| **Submission pathway** | What to do next. See §10 for instructions per pathway. | `tfop_ready` is highest confidence |
+
+**Red flags in the output to watch for:**
+
+- `eclipsing_binary` posterior > 0.30 — the signal is more likely a binary star
+- `Odd/even mismatch detected` — alternating deep/shallow transits = almost certainly a binary
+- `Secondary eclipse detected` — a second dip at half-orbit = binary star signature
+- FPP > 0.70 — the pipeline has low confidence this is a real planet
+- `Pathway: github_only_reproducibility` — does not meet criteria for external submission
 
 ### Python API
 
@@ -310,38 +484,40 @@ from exo_toolkit.vet import vet_signal
 from exo_toolkit.scoring import score_candidate
 from exo_toolkit.pathway import classify_submission_pathway
 
-# 1. Fetch — downloads PDCSAP photometry from MAST
+# 1. Fetch — downloads PDCSAP photometry from MAST (requires internet)
 fetch_result = fetch_lightcurve("TIC 150428135", mission="TESS")
 
-# 2. Clean — sigma clipping, normalization, windowed detrending
+# 2. Clean — removes bad data points, normalizes brightness to ~1.0
 clean_result = clean_lightcurve(fetch_result.light_curve)
 
-# 3. Search — BLS over a period grid; returns list[CandidateSignal]
+# 3. Search — scans for periodic dips; returns ranked list of candidates
 signals = search_lightcurve(clean_result.light_curve)
+print(f"Found {len(signals)} candidate signal(s)")
 
 if signals:
-    signal = signals[0]  # highest-SDE candidate
+    signal = signals[0]  # examine the strongest candidate first
 
-    # 4. Vet — per-transit depths, odd/even, secondary eclipse, shape
+    # 4. Vet — measures dip properties and computes diagnostic scores
     vet_result = vet_signal(
         clean_result.light_curve,
         signal,
-        stellar_radius_rsun=0.42,   # from TIC catalog
-        contamination_ratio=0.01,   # from pipeline header
+        stellar_radius_rsun=0.42,   # star size from TIC catalog (optional)
+        contamination_ratio=0.01,   # nearby-star flux fraction (optional)
     )
 
-    # 5. Score — Bayesian log-score posterior + derived scores
+    # 5. Score — computes probability over 6 competing hypotheses
     posterior, scores = score_candidate(signal, vet_result.features)
 
-    # 6. Classify — ordered gate logic → submission pathway
+    # 6. Classify — routes to one of 6 submission pathways
     pathway = classify_submission_pathway(
         signal, vet_result.features, posterior, scores
     )
 
-    print(f"Period:   {signal.period_days:.4f} d")
-    print(f"Depth:    {signal.depth_ppm:.0f} ppm")
-    print(f"FPP:      {scores.false_positive_probability:.3f}")
-    print(f"Pathway:  {pathway}")
+    print(f"Period:             {signal.period_days:.4f} d")
+    print(f"Depth:              {signal.depth_ppm:.0f} ppm")
+    print(f"FPP:                {scores.false_positive_probability:.3f}")
+    print(f"Planet probability: {posterior.planet_candidate:.3f}")
+    print(f"Pathway:            {pathway}")
 ```
 
 ### Training a Custom Scorer
@@ -601,7 +777,236 @@ The candidate does not meet external submission criteria (high FPP, missing diag
 
 ---
 
-## 12. License
+## 12. Diagnostics
+
+This section explains how to check whether the pipeline is working correctly, interpret its internal scores, and investigate why a particular candidate received the score it did.
+
+### Verify the pipeline end-to-end on a known target
+
+TOI-700 d is a confirmed habitable-zone planet — a reliable sanity-check target with well-known parameters:
+
+```bash
+exo 150428135
+```
+
+Expected result: FPP ≈ 0.08–0.25, pathway `tfop_ready` or `planet_hunters_discussion`, period ≈ 37.4 d. If you see very different values, check your installation.
+
+### Check model performance (ROC-AUC and F1)
+
+This requires a training dataset (see §5 "Training a Custom Scorer" to build one). Once you have it:
+
+```bash
+# Compare Bayesian scorer vs XGBoost on your labelled data
+python Skills/evaluate_scorer.py \
+    --data data/combined_training.pkl \
+    --model data/model.json \
+    --k-folds 5 \
+    --plot reports/roc_curves.png \
+    --reliability-plot reports/calibration.png
+```
+
+The script prints a table like:
+
+```
+Scorer           auc          f1   precision      recall         acc
+────────────────────────────────────────────────────────────────────
+bayesian      0.8124      0.7431      0.7892      0.7023      0.8041
+xgboost       0.8891      0.8213      0.8541      0.7913      0.8563
+```
+
+**What the columns mean:**
+
+| Metric | Plain English | Target |
+|---|---|---|
+| **AUC** | Area Under the ROC Curve. 1.0 = perfect, 0.5 = random guess. Measures overall ranking quality. | ≥ 0.85 is good |
+| **F1** | Harmonic mean of precision and recall. Penalizes both missing real planets and flagging false positives. | ≥ 0.80 is good |
+| **Precision** | Of everything the model called "planet", what fraction actually was one? | ≥ 0.80 is good |
+| **Recall** | Of all real planets in the dataset, what fraction did the model find? | ≥ 0.75 is good |
+| **Acc** | Overall accuracy (fraction of all examples classified correctly). | ≥ 0.80 is good |
+
+The `--plot` flag saves a ROC curve image. The `--reliability-plot` flag saves a calibration diagram showing whether the model's stated probabilities match actual frequencies (a perfectly calibrated model lies on the diagonal).
+
+### Interpret the reliability (calibration) diagram
+
+Open `reports/calibration.png`. The x-axis is the model's predicted probability; the y-axis is the actual fraction of real planets in that probability bin.
+
+- **On the diagonal**: perfectly calibrated — when the model says 70% probability, 70% of those cases really are planets.
+- **Curve above the diagonal**: the model is underconfident (true frequency is higher than it thinks).
+- **Curve below the diagonal**: the model is overconfident (true frequency is lower than it thinks).
+
+If the XGBoost curve deviates significantly from the diagonal, recalibrate the model (see §13).
+
+### Check how many TESS labels exist (CNN Tier-2 gate)
+
+```bash
+python Skills/count_tess_labels.py
+```
+
+Sample output:
+
+```
+TESS TOI label counts:
+  Confirmed planets (CP): 987
+  False positives   (FP): 1,432
+  Eclipsing binaries(EB): 314
+  Total labeled         : 2,733
+
+✗ Gate CLOSED — need 4,013 more CP labels
+  → Continue collecting TESS data; re-check with this script
+```
+
+### Diagnose why a specific candidate scored the way it did
+
+Inspect the `CandidateExplanation` returned by the scorer:
+
+```python
+from exo_toolkit.scoring import score_candidate
+from exo_toolkit.pathway import classify_submission_pathway
+
+posterior, scores = score_candidate(signal, features)
+
+# See what evidence pushed the score up or down
+print("Positive evidence:")
+for item in scores.explanation.positive_evidence:
+    print(" +", item)
+
+print("Negative evidence:")
+for item in scores.explanation.negative_evidence:
+    print(" -", item)
+
+print("Blocking issues (prevent external submission):")
+for item in scores.explanation.blocking_issues:
+    print(" !", item)
+```
+
+### Run injection-recovery to measure pipeline completeness
+
+This injects synthetic planet transits into a real or simulated light curve to measure what fraction the pipeline successfully detects:
+
+```bash
+python Skills/injection_recovery.py \
+    --tic 150428135 \
+    --periods 5 10 20 40 \
+    --radii 1.0 1.5 2.0 3.0 \
+    --output reports/injection_recovery.png
+```
+
+The output grid shows recovery rate (0–100%) for each combination of orbital period and planet radius. Low recovery rates at short periods indicate noise limits; low recovery at small radii indicate depth limits.
+
+---
+
+## 13. Retraining and Recalibrating Models
+
+Retrain when: you have new labelled data, the calibration diagram (§12) is off-diagonal, or model performance has drifted on recent targets.
+
+### Step 1 — Refresh the training data
+
+```bash
+# Re-download the latest Kepler KOI table from NASA Exoplanet Archive
+python Skills/fetch_kepler_tce.py --output data/koi_table.csv
+
+# Re-download the latest TESS TOI table from ExoFOP
+python Skills/fetch_tess_toi.py --output data/tess_toi.csv
+
+# Rebuild feature vectors from the updated tables
+python Skills/build_training_data.py \
+    --koi data/koi_table.csv \
+    --output data/kepler_training.pkl
+
+python Skills/build_tess_training_data.py \
+    --toi data/tess_toi.csv \
+    --output data/tess_training.pkl
+
+# Merge Kepler + TESS into one dataset
+python Skills/build_combined_training_data.py \
+    --kepler data/kepler_training.pkl \
+    --tess   data/tess_training.pkl \
+    --output data/combined_training.pkl
+```
+
+### Step 2 — Train a new XGBoost model
+
+```bash
+python Skills/train_xgboost.py \
+    --data data/combined_training.pkl \
+    --model data/model.json \
+    --k-folds 5
+```
+
+This runs 5-fold cross-validation, prints per-fold AUC scores, fits Platt scaling on the out-of-fold predictions, and saves the final model to `data/model.json` (weights) and `data/model.xgb.json` (XGBoost native format). The Platt scaling parameters `(a, b)` are embedded in `model.json` under `platt_calibration`.
+
+Expected console output:
+
+```
+Loaded 3,419 examples  (pos=987, neg=2,432)
+Running 5-fold stratified cross-validation …
+
+  Fold 1/5 — AUC=0.891  F1=0.824
+  Fold 2/5 — AUC=0.887  F1=0.818
+  ...
+  Mean AUC: 0.889 ± 0.004
+
+Platt calibration fitted: a=1.143, b=-0.218
+Model saved → data/model.json
+```
+
+### Step 3 — Evaluate the new model
+
+```bash
+python Skills/evaluate_scorer.py \
+    --data data/combined_training.pkl \
+    --model data/model.json \
+    --plot reports/roc_after_retrain.png \
+    --reliability-plot reports/calibration_after_retrain.png
+```
+
+Compare AUC and F1 to the previous run. If they improved, keep the new model. If they dropped, check whether the new training data has label noise (e.g., "PC" (planet candidate) entries should not be included — they are excluded automatically by `fetch_tess_toi.py`).
+
+### Step 4 — Apply Platt recalibration only (without full retraining)
+
+If the model weights are still good but the calibration diagram is off (e.g., after the TOI list has been substantially updated), you can refit just the Platt `(a, b)` parameters without retraining the tree model. Pass the existing model path and the new data:
+
+```bash
+python Skills/train_xgboost.py \
+    --data data/combined_training.pkl \
+    --model data/model.json \
+    --recalibrate-only
+```
+
+> **Note:** `--recalibrate-only` refits the Platt sigmoid on the current model's out-of-fold probabilities without touching the XGBoost weights.
+
+### Step 5 — Use the new model in the CLI
+
+```bash
+exo 150428135 --scorer xgboost --model-path data/model.json
+exo 150428135 --scorer ensemble --model-path data/model.json
+```
+
+### When to retrain vs. recalibrate
+
+| Situation | Action |
+|---|---|
+| New confirmed planets added to TOI list | Refresh data + full retrain (Steps 1–3) |
+| Calibration diagram is off-diagonal but AUC is unchanged | Recalibrate only (Step 4) |
+| AUC has dropped by > 0.02 from baseline | Full retrain with fresh data |
+| Model was trained on Kepler only and you are analyzing TESS targets | Retrain on combined Kepler + TESS dataset |
+| First time setting up | Full pipeline (Steps 1–3) |
+
+### Baseline performance reference
+
+Train on the Kepler DR25 + current TESS TOI table and you should see approximately:
+
+| Scorer | AUC | F1 |
+|---|---|---|
+| Bayesian (no training needed) | 0.81 | 0.74 |
+| XGBoost | 0.88–0.91 | 0.81–0.85 |
+| Ensemble (blend weight 0.6) | 0.89–0.92 | 0.82–0.86 |
+
+If your numbers are significantly lower, check for label noise in the training data or class imbalance (use `--max-per-source` in `build_combined_training_data.py` to cap the majority class).
+
+---
+
+## 15. License
 
 - **Code:** Apache License 2.0 — see [`LICENSE`](LICENSE)
 - **Documentation:** Creative Commons Attribution 4.0 International (CC BY 4.0)

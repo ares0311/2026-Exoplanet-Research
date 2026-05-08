@@ -44,8 +44,7 @@
 
 - [x] Rich-formatted candidate report via `exo <TIC-ID>` CLI
 - [x] JSON output via `--output`
-- [x] Markdown report export via `--report-md`
-- [x] Batch run support via `--batch`
+- [x] Scorer selection via `--scorer [bayesian|xgboost|ensemble]` and `--model-path`
 
 ---
 
@@ -57,7 +56,7 @@
 
 ---
 
-## Milestone 7 — ML Ensemble Scorer (In Progress)
+## Milestone 7 — ML Ensemble Scorer ✓ COMPLETE (Tier-2 CNN gated)
 
 - [x] Tier 1 — XGBoost on tabular features (`ml/xgboost_scorer.py`, 45 tests)
 - [x] Tier 3 — Stacking scorer blending XGBoost + Bayesian (`ml/stacking_scorer.py`, 22 tests)
