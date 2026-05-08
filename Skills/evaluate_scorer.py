@@ -144,6 +144,7 @@ def evaluate(
     model_path: Path | None = None,
     k_folds: int = 5,
     plot_path: Path | None = None,
+    reliability_path: Path | None = None,
 ) -> dict[str, dict[str, float]]:
     """Run stratified k-fold evaluation of Bayesian and (optionally) XGBoost.
 
@@ -202,6 +203,8 @@ def evaluate(
 
     if plot_path is not None:
         _save_roc_plot(roc_data, plot_path)
+    if reliability_path is not None:
+        _save_reliability_plot(roc_data, reliability_path)
 
     return result
 
@@ -249,6 +252,61 @@ def _save_roc_plot(
     print(f"ROC plot saved → {path}")
 
 
+def _save_reliability_plot(
+    roc_data: dict[str, list[Any]], path: Path, n_bins: int = 10
+) -> None:
+    """Save reliability (calibration) diagrams for all scorers to *path* (PNG).
+
+    Each subplot shows mean predicted probability vs. fraction of positives
+    per bin.  A perfectly calibrated model falls on the diagonal.
+    """
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError:
+        print("matplotlib not installed — skipping reliability plot")
+        return
+
+    colours = {"bayesian": "steelblue", "xgboost": "darkorange"}
+    fig, ax = plt.subplots(figsize=(6, 5))
+    ax.plot([0, 1], [0, 1], "k--", lw=0.8, label="Perfect calibration")
+
+    bin_edges = np.linspace(0.0, 1.0, n_bins + 1)
+
+    for name, folds in roc_data.items():
+        if not folds:
+            continue
+        all_true: list[int] = []
+        all_prob: list[float] = []
+        for y_true, y_prob in folds:
+            all_true.extend(y_true)
+            all_prob.extend(y_prob.tolist())
+
+        y_arr = np.array(all_true)
+        p_arr = np.array(all_prob)
+
+        bin_centers, mean_pred, frac_pos = [], [], []
+        for lo, hi in zip(bin_edges[:-1], bin_edges[1:], strict=True):
+            mask = (p_arr >= lo) & (p_arr < hi)
+            if mask.sum() > 0:
+                bin_centers.append(float((lo + hi) / 2))
+                mean_pred.append(float(p_arr[mask].mean()))
+                frac_pos.append(float(y_arr[mask].mean()))
+
+        ax.plot(
+            mean_pred, frac_pos,
+            "o-", label=name, color=colours.get(name), ms=5
+        )
+
+    ax.set_xlabel("Mean Predicted Probability")
+    ax.set_ylabel("Fraction of Positives")
+    ax.set_title("Reliability Diagram — Exoplanet Candidate Scorer")
+    ax.legend(loc="upper left")
+    fig.tight_layout()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=150)
+    print(f"Reliability diagram saved → {path}")
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -271,6 +329,11 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--model", default=None, help="XGBoostScorer metadata JSON (optional)")
     p.add_argument("--k-folds", type=int, default=5)
     p.add_argument("--plot", default=None, help="Save ROC plot to this PNG path")
+    p.add_argument(
+        "--reliability-plot",
+        default=None,
+        help="Save reliability diagram to this PNG path",
+    )
     return p.parse_args()
 
 
@@ -283,10 +346,12 @@ if __name__ == "__main__":
 
     model_path = Path(args.model) if args.model else None
     plot_path = Path(args.plot) if args.plot else None
+    reliability_path = Path(args.reliability_plot) if args.reliability_plot else None
     results = evaluate(
         features_list, labels,
         model_path=model_path,
         k_folds=args.k_folds,
         plot_path=plot_path,
+        reliability_path=reliability_path,
     )
     _print_table(results)

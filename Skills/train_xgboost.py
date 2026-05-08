@@ -4,6 +4,10 @@ Reads the pickle produced by ``build_training_data.py``, trains an
 ``XGBoostScorer``, evaluates with stratified k-fold cross-validation,
 and saves the final model trained on the full dataset.
 
+After CV, Platt scaling is fitted on the out-of-fold predictions to
+calibrate the raw XGBoost sigmoid outputs.  The calibration parameters
+(A, B) are appended to the saved metadata JSON under ``platt_calibration``.
+
 Metrics reported per fold and overall
 --------------------------------------
   ROC-AUC, accuracy (threshold=0.5), precision, recall, F1
@@ -17,16 +21,61 @@ Usage
 from __future__ import annotations
 
 import argparse
+import json
 import pickle
 import sys
 from pathlib import Path
 
 import numpy as np
+from scipy.optimize import minimize  # type: ignore[import-untyped]
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from exo_toolkit.ml.xgboost_scorer import XGBoostScorer
 from exo_toolkit.schemas import CandidateFeatures
+
+# ---------------------------------------------------------------------------
+# Platt calibration
+# ---------------------------------------------------------------------------
+
+
+def fit_platt(y_true: list[int], y_prob: np.ndarray) -> tuple[float, float]:
+    """Fit Platt scaling: sigmoid(A*p + B) via log-loss minimisation.
+
+    Args:
+        y_true: Binary ground-truth labels.
+        y_prob: Raw predicted probabilities from XGBoost.
+
+    Returns:
+        ``(A, B)`` — Platt scaling parameters.
+    """
+    y = np.array(y_true, dtype=np.float64)
+    p = np.clip(y_prob, 1e-7, 1 - 1e-7)
+
+    def neg_log_loss(params: np.ndarray) -> float:
+        a, b = params
+        q = 1.0 / (1.0 + np.exp(-(a * p + b)))
+        q = np.clip(q, 1e-7, 1 - 1e-7)
+        return -float(np.mean(y * np.log(q) + (1 - y) * np.log(1 - q)))
+
+    res = minimize(neg_log_loss, x0=np.array([1.0, 0.0]), method="Nelder-Mead")
+    a, b = float(res.x[0]), float(res.x[1])
+    return a, b
+
+
+def apply_platt(y_prob: np.ndarray, a: float, b: float) -> np.ndarray:
+    """Apply Platt scaling to raw probabilities.
+
+    Args:
+        y_prob: Raw predicted probabilities.
+        a: Platt A parameter.
+        b: Platt B parameter.
+
+    Returns:
+        Calibrated probabilities in [0, 1].
+    """
+    return 1.0 / (1.0 + np.exp(-(a * y_prob + b)))
+
 
 # ---------------------------------------------------------------------------
 # Evaluation helpers
@@ -125,6 +174,9 @@ def train_and_evaluate(
     splits = _stratified_kfold_indices(labels, k=k_folds, seed=seed)
 
     fold_metrics: list[dict[str, float]] = []
+    oof_probs = np.zeros(len(labels))
+    oof_labels = np.zeros(len(labels), dtype=int)
+
     for fold_i, (train_idx, val_idx) in enumerate(splits):
         X_train = [features_list[i] for i in train_idx]
         y_train = [labels[i] for i in train_idx]
@@ -134,6 +186,9 @@ def train_and_evaluate(
         scorer = XGBoostScorer()
         scorer.fit(X_train, y_train, seed=seed)
         y_prob = scorer.predict_proba_batch(X_val)
+        for k_idx, orig_idx in enumerate(val_idx):
+            oof_probs[orig_idx] = y_prob[k_idx]
+            oof_labels[orig_idx] = y_val[k_idx]
         m = _metrics(y_val, y_prob)
         fold_metrics.append(m)
         print(
@@ -151,13 +206,30 @@ def train_and_evaluate(
         f"F1={mean_metrics['f1']:.3f}"
     )
 
+    # Fit Platt calibration on OOF predictions.
+    platt_a, platt_b = fit_platt(list(oof_labels), oof_probs)
+    cal_probs = apply_platt(oof_probs, platt_a, platt_b)
+    cal_auc = _roc_auc(list(oof_labels), cal_probs)
+    print(
+        f"\nPlatt calibration  A={platt_a:.4f}  B={platt_b:.4f}  "
+        f"calibrated OOF AUC={cal_auc:.3f}"
+    )
+
     # Train on full dataset and save.
     print("\nTraining on full dataset …")
     final_scorer = XGBoostScorer()
     final_scorer.fit(features_list, labels, seed=seed)
     final_scorer.save(output_path)
+
+    # Append Platt params to the saved metadata JSON.
+    meta_path = Path(output_path)
+    meta = json.loads(meta_path.read_text())
+    meta["platt_calibration"] = {"a": platt_a, "b": platt_b}
+    meta_path.write_text(json.dumps(meta, indent=2))
     print(f"Model saved → {output_path}")
 
+    mean_metrics["platt_a"] = platt_a
+    mean_metrics["platt_b"] = platt_b
     return mean_metrics
 
 
