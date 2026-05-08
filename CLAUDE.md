@@ -188,15 +188,22 @@ Always use `python -m mypy src` locally.
 
 All pipeline modules are complete.
 
-### Next Step (agreed 2026-05-01)
+### Completed (2026-05-08)
 
-**End-to-end example notebook** (`notebooks/pipeline_demo.ipynb`):
-- Run a real TESS target through the full Fetch → Clean → Search → Vet → Score → Classify pipeline
-- Produce a human-readable candidate report with posterior probabilities and explanation
-- Stress-test module integration and surface any API rough edges
-- Serves as the reference usage example for new contributors
+**End-to-end example notebook** (`notebooks/pipeline_demo.ipynb`): ✅
+- Target: TOI-700 (TIC 150428135) — M-dwarf with confirmed habitable-zone planet
+- 25 cells covering all 6 pipeline stages with prose, code, and figures
+- Figures: raw vs. cleaned flux, phase-folded transit, posterior bar chart, all-signals grid
+- Human-readable candidate report rendered as Markdown inside the notebook
 
-After the notebook: injection-recovery testing, then a CLI entry point (`exo-scan <TIC-ID>`).
+### Next Step
+
+**Injection-recovery testing** (`Skills/injection_recovery.py`):
+- Inject synthetic box transits into real TESS light curves
+- Recover via `search_lightcurve`; measure recovery rate vs. period and depth
+- Map completeness as a function of planet radius, orbital period, stellar noise
+
+After injection-recovery: CLI entry point (`exo-scan <TIC-ID>`).
 
 ### Future Enhancement: ML Ensemble Scorer (agreed 2026-05-01)
 
