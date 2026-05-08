@@ -8,6 +8,53 @@
 
 ---
 
+## Table of Contents
+
+- [Abstract](#abstract)
+- [Getting Started](#getting-started)
+  - [What you need before installing](#what-you-need-before-installing)
+  - [Five-minute setup](#five-minute-setup)
+  - [Your first result](#your-first-result-30-seconds)
+  - [Troubleshooting](#troubleshooting-installation)
+  - [How to find a star's TIC ID](#how-to-find-a-stars-tic-id)
+- [1. Introduction](#1-introduction)
+- [2. Pipeline Architecture](#2-pipeline-architecture)
+  - [ML Scoring Modes](#ml-scoring-modes)
+- [3. Methodology](#3-methodology)
+  - [3.1 Transit Photometry Fundamentals](#31-transit-photometry-fundamentals)
+  - [3.2 Box Least Squares Periodicity Search](#32-box-least-squares-periodicity-search)
+  - [3.3 Bayesian Multi-Hypothesis Scoring](#33-bayesian-multi-hypothesis-scoring)
+  - [3.4 Diagnostic Feature Extraction](#34-diagnostic-feature-extraction)
+  - [3.5 ML Scorer — XGBoost Tier-1](#35-ml-scorer--xgboost-tier-1)
+  - [3.6 Posterior Calibration](#36-posterior-calibration)
+  - [3.7 Submission Pathway Classification](#37-submission-pathway-classification)
+- [4. Installation](#4-installation)
+- [5. Quick Start](#5-quick-start)
+  - [CLI](#cli-simplest-way-to-run)
+  - [Understanding the output](#understanding-the-cli-output)
+  - [Python API](#python-api)
+  - [Training a Custom Scorer](#training-a-custom-scorer)
+- [6. Repository Structure](#6-repository-structure)
+- [7. Quality Assurance](#7-quality-assurance)
+- [8. Data Sources](#8-data-sources-and-target-selection)
+- [9. Guardrails](#9-guardrails-and-scientific-integrity)
+- [10. Submission Instructions](#10-submission-instructions)
+- [11. Project Roadmap](#11-project-roadmap)
+- [12. Diagnostics](#12-diagnostics)
+  - [End-to-end sanity check](#verify-the-pipeline-end-to-end-on-a-known-target)
+  - [Check model performance](#check-model-performance-roc-auc-and-f1)
+  - [Interpret calibration diagram](#interpret-the-reliability-calibration-diagram)
+  - [CNN Tier-2 label gate](#check-how-many-tess-labels-exist-cnn-tier-2-gate)
+  - [Diagnose a candidate's score](#diagnose-why-a-specific-candidate-scored-the-way-it-did)
+  - [Injection-recovery](#run-injection-recovery-to-measure-pipeline-completeness)
+- [13. Retraining and Recalibrating Models](#13-retraining-and-recalibrating-models)
+  - [When to retrain vs. recalibrate](#when-to-retrain-vs-recalibrate)
+  - [Baseline performance reference](#baseline-performance-reference)
+- [14. License](#14-license)
+- [Works Cited](#works-cited)
+
+---
+
 ## Abstract
 
 This repository implements a complete, reproducible computational pipeline for the detection, vetting, and probabilistic classification of exoplanet transit candidates in photometric time-series data from the Transiting Exoplanet Survey Satellite (TESS) and the Kepler/K2 missions. The pipeline proceeds through six deterministic stages — data acquisition, preprocessing, Box Least Squares (BLS) periodicity search, signal vetting, Bayesian multi-hypothesis scoring, and submission pathway classification — and outputs calibrated posterior probabilities over six competing astrophysical and instrumental hypotheses. A conservative log-score approximation to Bayes' theorem is employed in lieu of generative likelihood models, with posterior calibration implemented via Platt scaling and isotonic regression (Pool Adjacent Violators Algorithm). An optional Tier-1 XGBoost classifier and Tier-3 stacking meta-learner augment the Bayesian scorer when labelled training data are available. The system is designed around scientific caution: it never labels an internally detected signal as a confirmed planet, exposes all false-positive evidence alongside each candidate score, and defers to authoritative external catalogs for confirmation status. The complete implementation comprises thirteen Python modules, 696 unit and integration tests, strict static typing (mypy), and continuous integration via GitHub Actions.
@@ -1006,7 +1053,7 @@ If your numbers are significantly lower, check for label noise in the training d
 
 ---
 
-## 15. License
+## 14. License
 
 - **Code:** Apache License 2.0 — see [`LICENSE`](LICENSE)
 - **Documentation:** Creative Commons Attribution 4.0 International (CC BY 4.0)
