@@ -48,8 +48,9 @@ CI: `.github/workflows/ci.yml`
 | `vet.py` | **done** | `test_vet.py` (47) |
 | `calibration.py` | **done** | `test_calibration.py` (70) |
 | `cli.py` | **done** | `test_cli.py` (14) |
+| `ml/xgboost_scorer.py` | **done** | `test_xgboost_scorer.py` (45) |
 
-**Total passing tests: 463 (+ 2 integration_live)**
+**Total passing tests: 508 (+ 2 integration_live)**
 **Skills: `injection_recovery.py` (25 tests in `test_injection_recovery.py`)**
 
 ---
@@ -60,7 +61,7 @@ CI: `.github/workflows/ci.yml`
 - **6 hypotheses**: planet_candidate, eclipsing_binary, background_eclipsing_binary, stellar_variability, instrumental_artifact, known_object
 - **OptScore pattern**: `float | None` — `None` means diagnostic not run; missing features contribute 0 to log scores (neutral, no bias)
 - **Conservative priors**: planet_candidate = 0.10, others = 0.20 each, known_object = 0.10
-- **No ML classifiers** until labeled validation data and calibration infrastructure exist
+- **ML Tier 1 (XGBoost) is built** — `ml/xgboost_scorer.py` ships as an optional alternative scorer; Bayesian log-score model remains the default fallback when labels are unavailable
 - **Never output "confirmed planet"** — use "candidate signal" or "follow-up target"
 - **Numerically stable softmax**: subtract max before exponentiation
 
@@ -210,13 +211,19 @@ All pipeline modules are complete.
 - Entry point registered in `pyproject.toml` as `exo = "exo_toolkit.cli:app"`
 - 14 tests in `tests/test_cli.py`
 
+**ML Ensemble Scorer — Tier 1: XGBoost** (`src/exo_toolkit/ml/xgboost_scorer.py`): ✅
+- Binary XGBoost classifier (planet candidate vs false positive) on 35 OptScore fields
+- Native XGBoost API (`xgb.DMatrix` + `xgb.train`) — no sklearn dependency
+- `None` OptScores → `np.nan`; handled natively by XGBoost missing-value splitting
+- Model serialised as paired metadata JSON + `.xgb.json` files
+- 45 tests in `tests/test_xgboost_scorer.py`
+
 ### Next Step
 
-**ML Ensemble Scorer — Tier 1: XGBoost** (`src/exo_toolkit/ml/xgboost_scorer.py`):
-- Input: existing 35 `OptScore` fields from `CandidateFeatures` (clean tabular vector)
-- Training data: Kepler Robovetter (Thompson et al. 2018, ~34k TCEs) from NASA Exoplanet Archive
-- Data threshold: ~500–1,000 confirmed planet vs. confirmed FP labels sufficient
-- Interpretable, trains in seconds, sits alongside `scoring.py` as alternative scorer
+**ML Ensemble Scorer — Tier 2: 1D CNN on phase-folded flux**
+- Requires 5,000+ TESS labels before building
+- Input: phase-folded, normalised flux array (treat as 1D image)
+- Proven architecture: Shallue & Vanderburg 2018; needs TESS-specific fine-tuning
 
 ### Future Enhancement: ML Ensemble Scorer (agreed 2026-05-01)
 
