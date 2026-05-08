@@ -68,7 +68,7 @@ def _roc_auc(y_true: list[int], y_prob: np.ndarray) -> float:
     fpr = fp_cumsum / n_neg
     tpr = np.concatenate([[0.0], tpr])
     fpr = np.concatenate([[0.0], fpr])
-    return float(np.trapz(tpr, fpr))
+    return float(np.trapezoid(tpr, fpr))
 
 
 def _stratified_kfold_indices(

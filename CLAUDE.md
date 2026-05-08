@@ -51,8 +51,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/xgboost_scorer.py` | **done** | `test_xgboost_scorer.py` (45) |
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
 
-**Total passing tests: 530 (+ 2 integration_live)**
-**Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `build_training_data.py`, `train_xgboost.py`**
+**Total passing tests: 664 (+ 2 integration_live)**
+**Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `build_training_data.py` (34), `train_xgboost.py` (17), `fetch_tess_toi.py`, `build_tess_training_data.py` (38), `evaluate_scorer.py` (14)**
 
 ---
 
@@ -231,11 +231,25 @@ All pipeline modules are complete.
 - `fetch_kepler_tce.py` — downloads KOI cumulative table from NASA Exoplanet Archive
 - `build_training_data.py` — maps 8 KOI columns → CandidateFeatures; 27 remain None
 - `train_xgboost.py` — stratified k-fold CV, ROC-AUC/F1 metrics, saves final model
+- 34 + 17 tests in `tests/test_build_training_data.py`, `tests/test_train_xgboost.py`
+
+**TESS TOI training pipeline** (`Skills/`): ✅
+- `fetch_tess_toi.py` — downloads TESS TOI table (CP/FP/EB) from ExoFOP-TESS
+- `build_tess_training_data.py` — maps 5 TOI columns → CandidateFeatures; 30 remain None
+- 38 tests in `tests/test_build_tess_training_data.py`
+
+**Scorer evaluation** (`Skills/evaluate_scorer.py`): ✅
+- Stratified k-fold cross-validation comparing Bayesian vs XGBoost ROC-AUC, F1, precision, recall
+- Optional ROC curve PNG export (requires matplotlib)
+- 14 tests in `tests/test_evaluate_scorer.py`
 
 **CLI scorer options** (`src/exo_toolkit/cli.py`): ✅
 - `--scorer [bayesian|xgboost|ensemble]`, `--model-path <path>`
 - xgboost adds `xgb_planet_probability`; ensemble adds `ensemble_planet_probability`
 - 20 tests in `tests/test_cli.py`
+
+**ML Scoring Architecture docs** (`docs/ML_SCORING.md`): ✅
+- Documents all scorer modes, training pipeline, column mappings, design decisions
 
 ### Next Step
 
