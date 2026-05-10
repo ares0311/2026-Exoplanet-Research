@@ -21,3 +21,27 @@ rad.json
 *.flf
 #Test results file
 TestResults.xml.venv/
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+
+# Runtime automation state. Keep the top-level logs directory, not generated DBs.
+logs/*.sqlite
+logs/*.sqlite3
+logs/*.db
+logs/*.db-shm
+logs/*.db-wal
+
+# Runtime report exports.
+reports/background/*.md
+reports/background/*.html

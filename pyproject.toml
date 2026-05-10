@@ -59,6 +59,9 @@ exo = "exo_toolkit.cli:app"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+exo_toolkit = ["background/fixtures/*.json", "py.typed"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra -m 'not integration_live'"
@@ -99,6 +102,8 @@ warn_unused_configs = true
 warn_unreachable = true
 pretty = true
 files = ["src"]
+explicit_package_bases = true
+mypy_path = "src"
 
 [[tool.mypy.overrides]]
 module = [

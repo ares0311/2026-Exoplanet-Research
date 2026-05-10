@@ -1,0 +1,226 @@
+{
+  "targets": [
+    {
+      "target_id": "TIC 150428135",
+      "target_name": "TOI-700 d benchmark",
+      "mission": "TESS",
+      "fixture_version": "known_tess_examples_v0.2",
+      "period_days": 37.42,
+      "epoch_bjd": 2458816.1,
+      "duration_hours": 3.4,
+      "depth_ppm": 650.0,
+      "transit_count": 3,
+      "snr": 9.8,
+      "scientific_interest_score": 0.95,
+      "data_completeness_score": 0.88,
+      "false_positive_risk_score": 0.18,
+      "follow_up_feasibility_score": 0.74,
+      "calibration_confidence_score": 0.82,
+      "blocking_issue_penalty": 0.05,
+      "known_object": true,
+      "provenance": [
+        "Known TESS benchmark fixture",
+        "Fixture values are static development examples, not live catalog assertions"
+      ],
+      "positive_evidence": [
+        "Repeated TESS-like transit signal in a known example",
+        "Low fixture false-positive risk",
+        "High scientific-interest benchmark"
+      ],
+      "negative_evidence": [
+        "Known object benchmark, not a new discovery",
+        "Fixture-only provenance until live catalog mode is explicitly enabled"
+      ],
+      "fixture_labels": ["known_tess_example", "strong_known_object"]
+    },
+    {
+      "target_id": "TIC 261136679",
+      "target_name": "pi Mensae c benchmark",
+      "mission": "TESS",
+      "fixture_version": "known_tess_examples_v0.2",
+      "period_days": 6.27,
+      "epoch_bjd": 2458325.5,
+      "duration_hours": 3.0,
+      "depth_ppm": 300.0,
+      "transit_count": 5,
+      "snr": 11.6,
+      "scientific_interest_score": 0.82,
+      "data_completeness_score": 0.9,
+      "false_positive_risk_score": 0.16,
+      "follow_up_feasibility_score": 0.86,
+      "calibration_confidence_score": 0.86,
+      "blocking_issue_penalty": 0.04,
+      "known_object": true,
+      "provenance": [
+        "Known TESS benchmark fixture",
+        "Fixture values are static development examples, not live catalog assertions"
+      ],
+      "positive_evidence": [
+        "Repeated high-SNR TESS-like benchmark signal",
+        "Bright-host follow-up benchmark",
+        "Low fixture false-positive risk"
+      ],
+      "negative_evidence": [
+        "Known object benchmark, not a new discovery",
+        "Fixture-only provenance until live catalog mode is explicitly enabled"
+      ],
+      "fixture_labels": ["known_tess_example", "bright_host_known_object"]
+    },
+    {
+      "target_id": "TIC 410153553",
+      "target_name": "LHS 3844 b benchmark",
+      "mission": "TESS",
+      "fixture_version": "known_tess_examples_v0.2",
+      "period_days": 0.46,
+      "epoch_bjd": 2458325.7,
+      "duration_hours": 0.6,
+      "depth_ppm": 3500.0,
+      "transit_count": 12,
+      "snr": 14.2,
+      "scientific_interest_score": 0.78,
+      "data_completeness_score": 0.84,
+      "false_positive_risk_score": 0.22,
+      "follow_up_feasibility_score": 0.8,
+      "calibration_confidence_score": 0.8,
+      "blocking_issue_penalty": 0.06,
+      "known_object": true,
+      "provenance": [
+        "Known TESS benchmark fixture",
+        "Fixture values are static development examples, not live catalog assertions"
+      ],
+      "positive_evidence": [
+        "Many repeated TESS-like benchmark transits",
+        "High signal-to-noise benchmark",
+        "Useful short-period recovery example"
+      ],
+      "negative_evidence": [
+        "Known object benchmark, not a new discovery",
+        "Short-period hot-planet benchmark is not a habitable-zone candidate"
+      ],
+      "fixture_labels": ["known_tess_example", "short_period_known_object"]
+    },
+    {
+      "target_id": "SYNTH-TESS-WEAK-001",
+      "target_name": "Synthetic weak TESS-like signal",
+      "mission": "TESS",
+      "fixture_version": "known_tess_examples_v0.2",
+      "period_days": 12.1,
+      "epoch_bjd": 2459001.2,
+      "duration_hours": 1.8,
+      "depth_ppm": 120.0,
+      "transit_count": 1,
+      "snr": 3.8,
+      "scientific_interest_score": 0.18,
+      "data_completeness_score": 0.55,
+      "false_positive_risk_score": 0.78,
+      "follow_up_feasibility_score": 0.2,
+      "calibration_confidence_score": 0.65,
+      "blocking_issue_penalty": 0.15,
+      "known_object": false,
+      "provenance": [
+        "Synthetic edge-case fixture",
+        "Designed to exercise reviewed outcomes for weak signals"
+      ],
+      "positive_evidence": [
+        "One shallow transit-like dip in fixture data"
+      ],
+      "negative_evidence": [
+        "Single event only",
+        "Low signal-to-noise fixture",
+        "High false-positive risk fixture"
+      ],
+      "fixture_labels": ["synthetic_edge_case", "weak_signal", "reviewed_outcome_candidate"]
+    },
+    {
+      "target_id": "SYNTH-TESS-CONTAM-001",
+      "target_name": "Synthetic contaminated aperture case",
+      "mission": "TESS",
+      "fixture_version": "known_tess_examples_v0.2",
+      "period_days": 5.2,
+      "epoch_bjd": 2459010.5,
+      "duration_hours": 2.1,
+      "depth_ppm": 2100.0,
+      "transit_count": 4,
+      "snr": 10.1,
+      "scientific_interest_score": 0.52,
+      "data_completeness_score": 0.66,
+      "false_positive_risk_score": 0.84,
+      "follow_up_feasibility_score": 0.35,
+      "calibration_confidence_score": 0.64,
+      "blocking_issue_penalty": 0.48,
+      "known_object": false,
+      "provenance": [
+        "Synthetic edge-case fixture",
+        "Designed to exercise contamination and blocking issue triggers"
+      ],
+      "positive_evidence": [
+        "Repeated periodic transit-like dips"
+      ],
+      "negative_evidence": [
+        "High contamination-risk fixture",
+        "Blocking issue requires human judgment before report use"
+      ],
+      "fixture_labels": ["synthetic_edge_case", "contamination_risk", "blocking_issue"]
+    },
+    {
+      "target_id": "SYNTH-TESS-NOPROV-001",
+      "target_name": "Synthetic incomplete provenance case",
+      "mission": "TESS",
+      "fixture_version": "known_tess_examples_v0.2",
+      "period_days": 18.4,
+      "epoch_bjd": 2459022.4,
+      "duration_hours": 2.8,
+      "depth_ppm": 720.0,
+      "transit_count": 2,
+      "snr": 7.4,
+      "scientific_interest_score": 0.7,
+      "data_completeness_score": 0.25,
+      "false_positive_risk_score": 0.42,
+      "follow_up_feasibility_score": 0.55,
+      "calibration_confidence_score": 0.58,
+      "blocking_issue_penalty": 0.55,
+      "known_object": false,
+      "provenance": [],
+      "positive_evidence": [
+        "Two transit-like events in fixture data"
+      ],
+      "negative_evidence": [
+        "Provenance intentionally omitted",
+        "Calibration confidence below threshold"
+      ],
+      "fixture_labels": ["synthetic_edge_case", "incomplete_provenance", "calibration_uncertain"]
+    },
+    {
+      "target_id": "SYNTH-TESS-CAL-001",
+      "target_name": "Synthetic calibration-uncertain case",
+      "mission": "TESS",
+      "fixture_version": "known_tess_examples_v0.2",
+      "period_days": 29.7,
+      "epoch_bjd": 2459033.3,
+      "duration_hours": 4.0,
+      "depth_ppm": 540.0,
+      "transit_count": 2,
+      "snr": 8.1,
+      "scientific_interest_score": 0.76,
+      "data_completeness_score": 0.72,
+      "false_positive_risk_score": 0.3,
+      "follow_up_feasibility_score": 0.62,
+      "calibration_confidence_score": 0.42,
+      "blocking_issue_penalty": 0.22,
+      "known_object": false,
+      "provenance": [
+        "Synthetic edge-case fixture",
+        "Designed to exercise calibration uncertainty trigger"
+      ],
+      "positive_evidence": [
+        "Moderate SNR repeated transit-like fixture signal",
+        "Low fixture false-positive risk"
+      ],
+      "negative_evidence": [
+        "Calibration confidence intentionally below threshold",
+        "Only two transits in fixture data"
+      ],
+      "fixture_labels": ["synthetic_edge_case", "calibration_uncertain"]
+    }
+  ]
+}

@@ -10,6 +10,7 @@
 - Formalizing system architecture
 - Implementing scoring prototype
 - Preparing first end-to-end pipeline
+- Using the documented local system profile to size batch runs and performance-sensitive defaults
 
 ---
 

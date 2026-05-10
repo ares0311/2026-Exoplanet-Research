@@ -133,3 +133,4 @@ Each stage must output:
 - Transparency over performance
 - Conservative classification
 - Modular architecture
+- Local runtime sizing should follow `docs/SYSTEM_PROFILE.md` while remaining configurable and portable

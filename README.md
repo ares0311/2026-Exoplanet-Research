@@ -116,6 +116,10 @@ docs/
 tests/
 ```
 
+## 🖥 Local System Profile
+
+Local development and batch-run sizing guidance is recorded in [`docs/SYSTEM_PROFILE.md`](docs/SYSTEM_PROFILE.md).
+
 ---
 
 ## ⚠️ Important Disclaimer
