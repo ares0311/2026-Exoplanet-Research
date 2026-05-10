@@ -203,3 +203,65 @@ Store thresholds in versioned config files, such as:
 - Improves reproducibility.
 - Allows explicit model-version tracking.
 - Makes calibration updates auditable.
+
+---
+
+## DECISION-009: Record Local System Profile for Runtime Sizing
+
+**Date:** 2026-05-01
+**Status:** Accepted
+
+### Context
+
+The project will run computationally meaningful light-curve cleaning, BLS searches, vetting, scoring, reporting, and eventually injection-recovery experiments. Local runtime defaults should reflect the development machine's capacity without making the scientific code depend on one workstation.
+
+### Decision
+
+Record the local development machine profile in `docs/SYSTEM_PROFILE.md` and use it to guide default worker counts, memory targets, threading limits, cache behavior, and benchmarking expectations.
+
+### Rationale
+
+- Makes local performance assumptions explicit.
+- Reduces accidental CPU or memory oversubscription.
+- Helps future agents choose sensible defaults for batch jobs.
+- Keeps machine-specific optimization separate from scientific logic.
+- Preserves portability by requiring system-specific behavior to remain configurable.
+
+---
+
+## DECISION-010: Implement Background Search Automation with Top-Level SQLite Logs
+
+**Date:** 2026-05-09  
+**Status:** Accepted
+
+### Context
+
+The project needs a conservative background search process that can run repeatedly, select promising targets, preserve provenance, record negative evidence, and stop before external submission unless a human explicitly approves. Multiple agents may work on this implementation, so the storage, fixture, and scheduler defaults must be documented in the repository rather than left in chat context.
+
+### Decision
+
+Implement the first background search automation against known TESS example fixtures.
+
+Use a top-level `logs/` directory for runtime logs. Store the durable run ledger, reviewed outcomes, needs-follow-up outcomes, target priority evaluations, follow-up test records, and submission recommendations in SQLite, with an initial database path such as `logs/background_search.sqlite3`.
+
+Expose one bounded command for a single run through the existing project CLI namespace, such as:
+
+```bash
+exo background-run-once
+```
+
+Scheduler documentation should remain broadly compatible across cron, systemd timers, launchd, and controlled workflow runners. Because the primary local development environment is macOS, include a concrete macOS `launchd` example.
+
+Background automation configuration should live in a top-level `configs/` directory. Scheduled or manual runs should briefly wait for an active run lock before failing, rather than immediately failing on overlap. Report export should support both Markdown and HTML. Fixture coverage should include known TESS examples plus clearly labeled edge cases for weak signals, contamination, incomplete provenance, calibration uncertainty, reviewed outcomes, and guardrail behavior.
+
+### Rationale
+
+- SQLite gives durable, queryable, transactional logs without requiring a separate service.
+- A top-level `logs/` directory makes automation state easy to find across agents and sessions.
+- Known TESS examples allow deterministic, scientifically inspectable development before live data access.
+- A single-run command keeps scheduled work auditable, restartable, and reproducible.
+- Broad scheduler guidance avoids hardcoding the workflow to one operating system while still supporting macOS well.
+- Top-level configs make scientific thresholds easy for multiple agents to inspect and version.
+- A short lock wait is friendlier to schedulers while still preventing overlapping runs.
+- Markdown and HTML exports support both review in Git and richer local inspection.
+- Edge-case fixtures make conservative guardrails testable before live data is introduced.

@@ -6,6 +6,7 @@
 
 ---
 
+<<<<<<< HEAD
 ## What Is Complete
 
 | Area | Key Files | Tests |
@@ -25,6 +26,13 @@
 | README | 12-section rewrite with equations, MLA citations, submission guide | — |
 
 **Total: 696 passing tests (+ 2 integration_live)**
+=======
+## Current Focus
+- Formalizing system architecture
+- Implementing scoring prototype
+- Preparing first end-to-end pipeline
+- Using the documented local system profile to size batch runs and performance-sensitive defaults
+>>>>>>> codex-background-automation-hardening
 
 ---
 

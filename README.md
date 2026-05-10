@@ -146,6 +146,10 @@ exo "TOI-700"       # by TOI name (if lightkurve can resolve it)
 exo 150428135       # by TIC number (always works)
 ```
 
+## 🖥 Local System Profile
+
+Local development and batch-run sizing guidance is recorded in [`docs/SYSTEM_PROFILE.md`](docs/SYSTEM_PROFILE.md).
+
 ---
 
 ## 1. Introduction
