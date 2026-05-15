@@ -47,12 +47,51 @@ CI: `.github/workflows/ci.yml`
 | `search.py` | **done** | `test_search.py` (43) |
 | `vet.py` | **done** | `test_vet.py` (47) |
 | `calibration.py` | **done** | `test_calibration.py` (70) |
-| `cli.py` | **done** | `test_cli.py` (14) |
+| `cli.py` | **done** | `test_cli.py` (20) |
 | `ml/xgboost_scorer.py` | **done** | `test_xgboost_scorer.py` (45) |
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
+| `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Total passing tests: 696 (+ 2 integration_live)**
-**Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `fetch_tess_toi.py` (11), `build_training_data.py` (34), `build_tess_training_data.py` (38), `build_combined_training_data.py` (13), `train_xgboost.py` (25), `evaluate_scorer.py` (14), `count_tess_labels.py`**
+**Total passing tests: 750 (+ 2 integration_live)**
+**Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `fetch_tess_toi.py` (11), `build_training_data.py` (34), `build_tess_training_data.py` (38), `build_combined_training_data.py` (13), `train_xgboost.py` (25), `evaluate_scorer.py` (14), `count_tess_labels.py`, `star_scanner.py` (38)**
+
+---
+
+## Background Automation Module (`src/exo_toolkit/background/`)
+
+Added in Weekly cleanup (2026-05-10). Implements one-shot, scheduler-friendly background search over known TESS fixture targets.
+
+| Submodule | Purpose |
+|---|---|
+| `schemas.py` | `KnownTessTarget`, `PriorityFactors`, `BackgroundRunResult`, `Outcome`, `FollowUpStatus` |
+| `config.py` | Load/validate `configs/background_search_v0.json`; `ConfigError` on bad config |
+| `fixtures.py` | Load `fixtures/known_tess_examples.json`; `fixture_summary()` |
+| `priority.py` | `build_priority_summary()` — 8-factor composite score with reason codes |
+| `followup.py` | `mandatory_follow_up_tests()`, `trigger_reason_codes()` |
+| `runner.py` | `background_run_once(db_path, ...)` — single bounded run; dry_run mode |
+| `reports.py` | `build_draft_report()`, `export_draft_report()`, `build_submission_recommendations()` |
+| `storage.py` | `BackgroundStore` — SQLite with 6 tables; schema v2 with v1→v2 migration |
+| `reason_codes.py` | `ReasonCode` enum — stable string values for audit trails |
+
+**CLI subcommands** (via `exo <subcommand>`):
+`background-run-once`, `run-summary`, `sqlite-integrity`, `target-priority-summary`, `config-summary`, `fixture-summary`, `background-ledger-summary`, `reviewed-log-summary`, `needs-follow-up-summary`, `follow-up-test-summary`, `draft-report-summary`, `submission-recommendation-summary`, `report-export-summary`, `approval-record-summary`, `target-history`, `scheduler-notification-summary`, `validation-summary`
+
+**Exit codes**: `EXIT_SUCCESS=0`, `EXIT_NEEDS_FOLLOW_UP=20`, `EXIT_BLOCKED=30`, `EXIT_CONFIG_ERROR=40`, `EXIT_INTERNAL_ERROR=50`
+
+**Key constraint**: No external submission or discovery claim without explicit human approval. Draft reports go to `reports/background/`. SQLite DB at `logs/background_search.sqlite3`.
+
+---
+
+## Star Scanner (`Skills/star_scanner.py`)
+
+Queries the TESS Input Catalog (TIC) via astroquery to rank uncharacterised stars by transit-search promise, then scans them in priority order, logging results.
+
+- `priority_score(tmag, teff, n_sectors, contratio)` → float in [0, 1]
+- `ScanLog(path)` — atomic-write JSON log; `record()`, `is_scanned()`, `scanned_ids()`, `summary()`
+- `select_targets(n, tmag_range, exclude_tic_ids)` — TIC query, ranked, filtered
+- `scan_star(tic_id, *, log, ...)` → dict with status/n_signals/best_fpp/best_pathway
+- `run_background_scan(log_path, ...)` — iterates until Ctrl-C or max stars reached
+- Excludes TOI list at startup; skips already-scanned IDs from log
 
 ---
 

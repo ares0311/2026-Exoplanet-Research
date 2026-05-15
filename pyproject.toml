@@ -107,8 +107,6 @@ pretty = true
 explicit_package_bases = true
 mypy_path = ["src"]
 files = ["src"]
-explicit_package_bases = true
-mypy_path = "src"
 
 [[tool.mypy.overrides]]
 module = [

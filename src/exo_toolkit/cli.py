@@ -1,20 +1,28 @@
-<<<<<<< HEAD
 """Command-line interface for exo-toolkit.
 
-Entry point: ``exo <TIC-ID>``
+Two operating modes:
 
-Runs the full pipeline (fetch → clean → search → vet → score → classify)
-on a single target and prints a Rich-formatted candidate report.
+  1. **Transit scan** (``exo <TIC-ID>``): run the full detection pipeline on a
+     single target and print a Rich-formatted candidate report.
+  2. **Background automation** (``exo background-run-once``): one-shot
+     scheduler-friendly run using SQLite state and known TESS fixtures.
 
 Usage examples
 --------------
     exo "TIC 150428135"
     exo "TIC 150428135" --mission TESS --min-snr 7.0 --scorer xgboost --model-path model.json
     exo "TIC 150428135" --output results.json
+
+    exo background-run-once
+    exo background-run-once --dry-run
+    exo run-summary
+    exo sqlite-integrity
 """
 from __future__ import annotations
 
+import argparse
 import json
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +30,11 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from exo_toolkit.background.config import DEFAULT_CONFIG_PATH, ConfigError, load_background_config
+from exo_toolkit.background.fixtures import fixture_summary, load_known_tess_examples
+from exo_toolkit.background.priority import build_priority_summary
+from exo_toolkit.background.runner import background_run_once
+from exo_toolkit.background.storage import BackgroundStore
 from exo_toolkit.clean import clean_lightcurve
 from exo_toolkit.fetch import fetch_lightcurve
 from exo_toolkit.pathway import classify_submission_pathway
@@ -29,6 +42,22 @@ from exo_toolkit.schemas import CandidateSignal, Mission
 from exo_toolkit.scoring import score_candidate
 from exo_toolkit.search import search_lightcurve
 from exo_toolkit.vet import vet_signal
+
+# ---------------------------------------------------------------------------
+# Exit codes (used by background automation and scheduler integrations)
+# ---------------------------------------------------------------------------
+
+EXIT_SUCCESS = 0
+EXIT_NEEDS_FOLLOW_UP = 20
+EXIT_BLOCKED = 30
+EXIT_CONFIG_ERROR = 40
+EXIT_INTERNAL_ERROR = 50
+
+DEFAULT_DB_PATH = Path("logs/background_search.sqlite3")
+
+# ---------------------------------------------------------------------------
+# Typer app — exo <TIC-ID> transit scan command
+# ---------------------------------------------------------------------------
 
 app = typer.Typer(
     name="exo",
@@ -85,7 +114,6 @@ def run_pipeline(
     _fetch = fetch_fn if fetch_fn is not None else fetch_lightcurve
     _clean = clean_fn if clean_fn is not None else clean_lightcurve
 
-    # Load XGBoost scorer once before the per-signal loop.
     xgb_scorer = None
     if scorer in ("xgboost", "ensemble"):
         if model_path is None:
@@ -157,20 +185,17 @@ def run_pipeline(
 
 
 # ---------------------------------------------------------------------------
-# Display helpers
+# Display helpers (typer scan command)
 # ---------------------------------------------------------------------------
 
 
 def _print_results(rows: list[dict[str, Any]], target_id: str) -> None:
-    """Print pipeline results.  Key summary lines go via typer.echo so that
-    CliRunner captures them; rich Tables are printed to a fresh Console."""
     if not rows:
         typer.echo(f"No transit candidates found above SNR threshold for {target_id}.")
         return
 
     typer.echo(f"{len(rows)} candidate signal(s) found for {target_id}")
 
-    # Fresh Console so it binds to the current sys.stdout (important in tests).
     c = Console(highlight=False)
     for i, row in enumerate(rows, 1):
         table = Table(title=f"Signal {i}: {row['candidate_id']}", show_header=True)
@@ -183,36 +208,21 @@ def _print_results(rows: list[dict[str, Any]], target_id: str) -> None:
         table.add_row("Transits", str(row["transit_count"]))
         table.add_row("SNR", f"{row['snr']:.1f}")
         table.add_row("", "")
-        table.add_row(
-            "P(planet candidate)",
-            f"{row['posterior']['planet_candidate']:.3f}",
-        )
-        table.add_row(
-            "P(eclipsing binary)",
-            f"{row['posterior']['eclipsing_binary']:.3f}",
-        )
+        table.add_row("P(planet candidate)", f"{row['posterior']['planet_candidate']:.3f}")
+        table.add_row("P(eclipsing binary)", f"{row['posterior']['eclipsing_binary']:.3f}")
         if "xgb_planet_probability" in row:
-            table.add_row(
-                "XGBoost P(planet)",
-                f"{row['xgb_planet_probability']:.3f}",
-            )
+            table.add_row("XGBoost P(planet)", f"{row['xgb_planet_probability']:.3f}")
         if "ensemble_planet_probability" in row:
-            table.add_row(
-                "Ensemble P(planet)",
-                f"{row['ensemble_planet_probability']:.3f}",
-            )
+            table.add_row("Ensemble P(planet)", f"{row['ensemble_planet_probability']:.3f}")
         table.add_row("FPP", f"{row['scores']['false_positive_probability']:.3f}")
-        table.add_row(
-            "Detection confidence",
-            f"{row['scores']['detection_confidence']:.3f}",
-        )
+        table.add_row("Detection confidence", f"{row['scores']['detection_confidence']:.3f}")
         table.add_row("Pathway", row["pathway"])
         c.print(table)
         typer.echo(f"  Pathway: {row['pathway']}")
 
 
 # ---------------------------------------------------------------------------
-# CLI commands
+# Typer CLI command — exo <TIC-ID>
 # ---------------------------------------------------------------------------
 
 
@@ -246,15 +256,11 @@ def scan(
         raise typer.Exit(code=1)
 
     if scorer not in _VALID_SCORERS:
-        typer.echo(
-            f"Invalid scorer '{scorer}'. Choose from: {_VALID_SCORERS}", err=True
-        )
+        typer.echo(f"Invalid scorer '{scorer}'. Choose from: {_VALID_SCORERS}", err=True)
         raise typer.Exit(code=1)
 
     if scorer in ("xgboost", "ensemble") and model_path is None:
-        typer.echo(
-            f"--model-path is required when --scorer={scorer}", err=True
-        )
+        typer.echo(f"--model-path is required when --scorer={scorer}", err=True)
         raise typer.Exit(code=1)
 
     typer.echo(f"Scanning {target_id} ({mission}) [scorer={scorer}] ...")
@@ -280,39 +286,8 @@ def scan(
 
 
 # ---------------------------------------------------------------------------
-# Script entry point
+# Argparse CLI — background automation subcommands
 # ---------------------------------------------------------------------------
-
-
-def main() -> None:
-    app()
-
-
-if __name__ == "__main__":
-    main()
-=======
-"""Command line interface for exo-toolkit."""
-
-from __future__ import annotations
-
-import argparse
-import json
-from collections.abc import Sequence
-from pathlib import Path
-from typing import Any
-
-from exo_toolkit.background.config import DEFAULT_CONFIG_PATH, ConfigError, load_background_config
-from exo_toolkit.background.fixtures import fixture_summary, load_known_tess_examples
-from exo_toolkit.background.priority import build_priority_summary
-from exo_toolkit.background.runner import background_run_once
-from exo_toolkit.background.storage import BackgroundStore
-
-DEFAULT_DB_PATH = Path("logs/background_search.sqlite3")
-EXIT_SUCCESS = 0
-EXIT_NEEDS_FOLLOW_UP = 20
-EXIT_BLOCKED = 30
-EXIT_CONFIG_ERROR = 40
-EXIT_INTERNAL_ERROR = 50
 
 
 def _print_json(payload: Any) -> None:
@@ -329,7 +304,7 @@ def _cmd_target_priority_summary(args: argparse.Namespace) -> int:
     targets = load_known_tess_examples()
     summary = build_priority_summary(targets, store, config)
     _print_json(summary.to_jsonable())
-    return 0
+    return EXIT_SUCCESS
 
 
 def _cmd_config_summary(args: argparse.Namespace) -> int:
@@ -385,49 +360,49 @@ def _cmd_background_run_once(args: argparse.Namespace) -> int:
 def _cmd_background_ledger_summary(args: argparse.Namespace) -> int:
     store = BackgroundStore(_db_path(args))
     _print_json({"runs": store.list_run_ledger()})
-    return 0
+    return EXIT_SUCCESS
 
 
 def _cmd_reviewed_log_summary(args: argparse.Namespace) -> int:
     store = BackgroundStore(_db_path(args))
     _print_json({"reviewed": store.list_reviewed_outcomes()})
-    return 0
+    return EXIT_SUCCESS
 
 
 def _cmd_needs_follow_up_summary(args: argparse.Namespace) -> int:
     store = BackgroundStore(_db_path(args))
     _print_json({"needs_follow_up": store.list_needs_follow_up_outcomes()})
-    return 0
+    return EXIT_SUCCESS
 
 
 def _cmd_follow_up_test_summary(args: argparse.Namespace) -> int:
     store = BackgroundStore(_db_path(args))
     _print_json({"follow_up_tests": store.list_follow_up_tests()})
-    return 0
+    return EXIT_SUCCESS
 
 
 def _cmd_draft_report_summary(args: argparse.Namespace) -> int:
     store = BackgroundStore(_db_path(args))
     _print_json({"draft_reports": store.list_draft_reports()})
-    return 0
+    return EXIT_SUCCESS
 
 
 def _cmd_submission_recommendation_summary(args: argparse.Namespace) -> int:
     store = BackgroundStore(_db_path(args))
     _print_json({"submission_recommendations": store.list_submission_recommendations()})
-    return 0
+    return EXIT_SUCCESS
 
 
 def _cmd_report_export_summary(args: argparse.Namespace) -> int:
     store = BackgroundStore(_db_path(args))
     _print_json({"report_exports": store.list_report_exports()})
-    return 0
+    return EXIT_SUCCESS
 
 
 def _cmd_approval_record_summary(args: argparse.Namespace) -> int:
     store = BackgroundStore(_db_path(args))
     _print_json({"approval_records": store.list_approval_records()})
-    return 0
+    return EXIT_SUCCESS
 
 
 def _cmd_run_summary(args: argparse.Namespace) -> int:
@@ -459,7 +434,7 @@ def _cmd_validation_summary(args: argparse.Namespace) -> int:
     store = BackgroundStore(_db_path(args))
     validation = store.validation_summary()
     _print_json(validation)
-    return 0
+    return EXIT_SUCCESS
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -533,17 +508,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Argparse entry point for background automation subcommands."""
     parser = build_parser()
     args = parser.parse_args(argv)
     handler = args.handler
     return int(handler(args))
 
 
-def app() -> int:
-    """Console script entry point used by pyproject.toml."""
-    return main()
-
-
 if __name__ == "__main__":
     raise SystemExit(main())
->>>>>>> codex-background-automation-hardening
