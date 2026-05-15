@@ -3,7 +3,7 @@
 [![CI](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml/badge.svg)](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-696%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-750%20passing-brightgreen.svg)](tests/)
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 ---
@@ -57,7 +57,7 @@
 
 ## Abstract
 
-This repository implements a complete, reproducible computational pipeline for the detection, vetting, and probabilistic classification of exoplanet transit candidates in photometric time-series data from the Transiting Exoplanet Survey Satellite (TESS) and the Kepler/K2 missions. The pipeline proceeds through six deterministic stages — data acquisition, preprocessing, Box Least Squares (BLS) periodicity search, signal vetting, Bayesian multi-hypothesis scoring, and submission pathway classification — and outputs calibrated posterior probabilities over six competing astrophysical and instrumental hypotheses. A conservative log-score approximation to Bayes' theorem is employed in lieu of generative likelihood models, with posterior calibration implemented via Platt scaling and isotonic regression (Pool Adjacent Violators Algorithm). An optional Tier-1 XGBoost classifier and Tier-3 stacking meta-learner augment the Bayesian scorer when labelled training data are available. The system is designed around scientific caution: it never labels an internally detected signal as a confirmed planet, exposes all false-positive evidence alongside each candidate score, and defers to authoritative external catalogs for confirmation status. The complete implementation comprises thirteen Python modules, 696 unit and integration tests, strict static typing (mypy), and continuous integration via GitHub Actions.
+This repository implements a complete, reproducible computational pipeline for the detection, vetting, and probabilistic classification of exoplanet transit candidates in photometric time-series data from the Transiting Exoplanet Survey Satellite (TESS) and the Kepler/K2 missions. The pipeline proceeds through six deterministic stages — data acquisition, preprocessing, Box Least Squares (BLS) periodicity search, signal vetting, Bayesian multi-hypothesis scoring, and submission pathway classification — and outputs calibrated posterior probabilities over six competing astrophysical and instrumental hypotheses. A conservative log-score approximation to Bayes' theorem is employed in lieu of generative likelihood models, with posterior calibration implemented via Platt scaling and isotonic regression (Pool Adjacent Violators Algorithm). An optional Tier-1 XGBoost classifier and Tier-3 stacking meta-learner augment the Bayesian scorer when labelled training data are available. The system is designed around scientific caution: it never labels an internally detected signal as a confirmed planet, exposes all false-positive evidence alongside each candidate score, and defers to authoritative external catalogs for confirmation status. The complete implementation comprises thirteen Python modules, an autonomous background search engine with SQLite-backed durable state, an autonomous star-scanner for priority-ranked target discovery, 750 unit and integration tests, strict static typing (mypy), and continuous integration via GitHub Actions.
 
 ---
 
@@ -463,6 +463,16 @@ exo 150428135 --output results/toi700.json
 
 # Restrict the TESS mission (useful if a star also has Kepler data)
 exo 150428135 --mission TESS
+
+# Run one iteration of the background search automation (writes to SQLite log)
+exo background-run-once
+
+# Dry-run — plan what the background run would do, without writing anything
+exo background-run-once --dry-run
+
+# Inspect run history and SQLite integrity
+exo run-summary
+exo sqlite-integrity
 ```
 
 ### Understanding the CLI output
@@ -642,6 +652,7 @@ python Skills/evaluate_scorer.py \
 │   ├── test_cli.py              # 20 tests
 │   ├── test_xgboost_scorer.py   # 45 tests
 │   ├── test_stacking_scorer.py  # 22 tests
+│   ├── test_background_automation.py  # 16 tests
 │   └── ...                      # Skills tests
 ├── Skills/                      # Reusable standalone utility scripts
 │   ├── fetch_kepler_tce.py      # Download Kepler KOI cumulative table
@@ -652,7 +663,14 @@ python Skills/evaluate_scorer.py \
 │   ├── train_xgboost.py         # k-fold CV training with Platt calibration
 │   ├── evaluate_scorer.py       # Bayesian vs XGBoost comparison (ROC, F1)
 │   ├── injection_recovery.py    # Synthetic transit injection completeness maps
-│   └── count_tess_labels.py     # Check CNN Tier-2 label gate (≥5,000 CP)
+│   ├── count_tess_labels.py     # Check CNN Tier-2 label gate (≥5,000 CP)
+│   └── star_scanner.py          # TIC priority ranking and background scan loop
+├── configs/                     # Versioned runtime configuration
+│   └── background_search_v0.json  # Background automation thresholds and weights
+├── logs/                        # Runtime SQLite logs (not tracked by git)
+│   └── background_search.sqlite3  # Background search run ledger (created at runtime)
+├── reports/                     # Generated candidate reports (not tracked by git)
+│   └── background/              # Draft reports from background-run-once
 ├── notebooks/
 │   └── pipeline_demo.ipynb      # End-to-end demo on TOI-700 (TIC 150428135)
 ├── docs/
@@ -662,6 +680,10 @@ python Skills/evaluate_scorer.py \
 │   ├── CNN_SPEC.md              # Tier-2 CNN architecture spec (gated)
 │   ├── DATA_SOURCES.md          # MAST, ExoFOP, NExSci endpoints and caching
 │   ├── DECISIONS.md             # Durable design decisions with rationale
+│   ├── BACKGROUND_SEARCH_AUTOMATION_BLUEPRINT.md  # Background automation design
+│   ├── BACKGROUND_SEARCH_SQLITE_SCHEMA.md  # SQLite schema reference
+│   ├── SCHEDULER.md             # cron/launchd/systemd integration guide
+│   ├── SYSTEM_PROFILE.md        # Hardware sizing and batch-run defaults
 │   ├── ROADMAP.md               # Milestones and future work
 │   └── PROJECT_STATUS.md        # Current implementation status
 ├── data/                        # Local data cache (not tracked by git)
@@ -712,8 +734,9 @@ PYTHONPATH=src python -m pytest -m integration_live
 | `cli.py` | 20 |
 | `ml/xgboost_scorer.py` | 45 |
 | `ml/stacking_scorer.py` | 22 |
-| Skills (injection recovery, training, evaluation, etc.) | 160 |
-| **Total** | **696** |
+| `background/` module | 16 |
+| Skills (injection recovery, training, evaluation, star scanner, etc.) | 198 |
+| **Total** | **750** |
 
 ---
 
@@ -820,6 +843,8 @@ The candidate does not meet external submission criteria (high FPP, missing diag
 | ✅ | **Combined training dataset** | Merged Kepler + TESS pickle with stratified per-source capping |
 | ✅ | **Scorer evaluation** | k-fold ROC-AUC, F1, precision, recall; ROC and calibration diagram export |
 | ✅ | **CNN Tier-2 gate** | `count_tess_labels.py`; `CNN_SPEC.md` architecture document |
+| ✅ | **Background automation** | `background/` — SQLite state, one-shot runner, priority scoring, draft reports; 16 subcommands |
+| ✅ | **Star scanner** | `Skills/star_scanner.py` — TIC priority ranking, TOI exclusion, JSON scan log, background loop |
 | 🔴 | **ML Tier 2 — 1D CNN** | Phase-folded flux classifier; gated on ≥5,000 TESS CP labels (Shallue and Vanderburg) |
 | 🔴 | **Mission-specific priors** | Period-, radius-, and stellar-type-dependent priors replacing flat defaults |
 | 🔴 | **Web interface / dashboard** | Interactive candidate browser with score explanations |

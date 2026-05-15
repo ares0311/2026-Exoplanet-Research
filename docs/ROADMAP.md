@@ -70,7 +70,32 @@
 
 ---
 
-## Milestone 8 — Future
+## Milestone 8 — Background Automation ✓ COMPLETE
+
+- [x] `background/` module — SQLite-backed durable state (run ledger, reviewed/needs-follow-up logs, follow-up tests, reports, approvals)
+- [x] `background/runner.py` — `background_run_once()` — one-shot scheduler-friendly invocation
+- [x] `background/priority.py` — composite priority scoring (8 factors) with reason codes
+- [x] `background/storage.py` — `BackgroundStore` with 6 SQLite tables; schema v2 with migration
+- [x] `background/reports.py` — draft Markdown/HTML reports; human-approval gate enforced
+- [x] `background/fixtures.py` + `fixtures/known_tess_examples.json` — deterministic offline target pool
+- [x] CLI subcommands: `exo background-run-once`, `run-summary`, `sqlite-integrity`, `target-priority-summary`, and 13 others
+- [x] Scheduler docs (`docs/SCHEDULER.md`): cron, launchd, systemd timer examples
+- [x] System profile (`docs/SYSTEM_PROFILE.md`): hardware sizing and batch-run defaults
+- [x] `configs/background_search_v0.json` — versioned, fingerprinted configuration
+- [x] 16 tests in `tests/test_background_automation.py`
+
+---
+
+## Milestone 8b — Star Scanner ✓ COMPLETE
+
+- [x] `Skills/star_scanner.py` — `priority_score()`, `ScanLog` (JSON), `select_targets()` (TIC query), `scan_star()`, `run_background_scan()`
+- [x] Priority scoring: Tmag (0.30), Teff/stellar type (0.25), sector coverage (0.25), contamination ratio (0.20)
+- [x] TOI exclusion at startup; already-scanned exclusion via log; graceful Ctrl-C resume
+- [x] 38 tests in `tests/test_star_scanner.py`
+
+---
+
+## Milestone 9 — Future
 
 - [ ] Provenance score computation (unlocks `tfop_ready` pathway)
 - [ ] Tier 2 CNN once TESS label threshold is met
