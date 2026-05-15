@@ -181,6 +181,55 @@ def fetch_lightcurve(
 
 
 # ---------------------------------------------------------------------------
+# Provenance score
+# ---------------------------------------------------------------------------
+
+# Cadence bounds for linear interpolation of the cadence sub-score.
+_CADENCE_BEST_S: float = 120.0    # 2-min TESS short-cadence
+_CADENCE_WORST_S: float = 1800.0  # 30-min Kepler/TESS long-cadence
+
+# Per-pipeline quality weights.  Unknown pipelines receive the default.
+_PIPELINE_QUALITY: dict[str, float] = {
+    "SPOC": 1.00,
+    "QLP": 0.85,
+    "TGLC": 0.75,
+    "Kepler": 1.00,
+    "K2": 1.00,
+}
+_PIPELINE_QUALITY_DEFAULT: float = 0.60
+
+# Number of sectors / quarters needed for maximum sector sub-score.
+_SECTORS_FOR_MAX: float = 3.0
+
+
+def compute_provenance_score(provenance: FetchProvenance) -> float:
+    """Compute a data-quality score in [0, 1] from download provenance metadata.
+
+    The score is used as the ``provenance_score`` gate in
+    :func:`~exo_toolkit.pathway.classify_submission_pathway`.  A score ≥ 0.80
+    is required for the ``tfop_ready`` pathway.
+
+    Sub-scores and weights
+    ----------------------
+    - **cadence** (0.40): linear ramp; 1.0 at 2-min, 0.0 at 30-min.
+    - **sector coverage** (0.35): ``min(n_sectors / 3, 1.0)``; saturates at 3+ sectors.
+    - **pipeline quality** (0.25): SPOC/Kepler/K2 → 1.0; QLP → 0.85; TGLC → 0.75;
+      unknown → 0.60.
+    """
+    cadence_sub = max(
+        0.0,
+        min(
+            1.0,
+            (_CADENCE_WORST_S - provenance.cadence_seconds)
+            / (_CADENCE_WORST_S - _CADENCE_BEST_S),
+        ),
+    )
+    sector_sub = min(len(provenance.sectors_or_quarters) / _SECTORS_FOR_MAX, 1.0)
+    pipeline_sub = _PIPELINE_QUALITY.get(provenance.pipeline, _PIPELINE_QUALITY_DEFAULT)
+    return 0.40 * cadence_sub + 0.35 * sector_sub + 0.25 * pipeline_sub
+
+
+# ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 

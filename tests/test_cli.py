@@ -11,6 +11,7 @@ import pytest
 from typer.testing import CliRunner
 
 from exo_toolkit.cli import app, run_pipeline
+from exo_toolkit.fetch import FetchProvenance
 from exo_toolkit.schemas import (
     CandidateFeatures,
     CandidateScores,
@@ -38,9 +39,29 @@ def _mock_lc(n: int = 500) -> MagicMock:
     return lc
 
 
-def _make_fetch_result(lc: Any) -> MagicMock:
+def _make_provenance(
+    *,
+    cadence_seconds: float = 120.0,
+    sectors: tuple[int, ...] = (1, 2, 3),
+    pipeline: str = "SPOC",
+) -> FetchProvenance:
+    return FetchProvenance(
+        target_id="TIC 0",
+        mission="TESS",
+        sectors_or_quarters=sectors,
+        cadence_seconds=cadence_seconds,
+        pipeline=pipeline,
+        flux_column="pdcsap_flux",
+        n_cadences=1000,
+        time_baseline_days=81.0,
+        fetched_at="2026-01-01T00:00:00+00:00",
+    )
+
+
+def _make_fetch_result(lc: Any, **prov_kwargs: Any) -> MagicMock:
     fr = MagicMock()
     fr.light_curve = lc
+    fr.provenance = _make_provenance(**prov_kwargs)
     return fr
 
 
@@ -251,6 +272,7 @@ class TestScanCommand:
                 "depth_ppm": 1000.0,
                 "transit_count": 9,
                 "snr": 12.5,
+                "provenance_score": 1.0,
                 "posterior": {
                     "planet_candidate": 0.167,
                     "eclipsing_binary": 0.167,
@@ -295,6 +317,7 @@ class TestScanCommand:
                 "depth_ppm": 1000.0,
                 "transit_count": 9,
                 "snr": 12.5,
+                "provenance_score": 1.0,
                 "posterior": {
                     "planet_candidate": 0.167,
                     "eclipsing_binary": 0.167,
@@ -425,10 +448,90 @@ class TestScorerOption:
                 "TESS",
                 scorer="xgboost",
                 model_path=tmp_path / "model.json",
-                fetch_fn=lambda *_: MagicMock(light_curve=lc),
+                fetch_fn=lambda *_: _make_fetch_result(lc),
                 clean_fn=lambda *_: MagicMock(light_curve=lc),
             )
 
         assert len(result) == 1
         assert "xgb_planet_probability" in result[0]
         assert abs(result[0]["xgb_planet_probability"] - 0.77) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# Task 5: provenance_score flows through run_pipeline
+# ---------------------------------------------------------------------------
+
+
+class TestProvenanceScoreFlow:
+    """Verify that compute_provenance_score is called and its output reaches the row."""
+
+    def _run(self, lc: Any, **prov_kwargs: Any) -> list[dict[str, Any]]:
+        signal = _make_signal()
+        posterior = _uniform_posterior()
+        scores = _make_scores()
+        fetch_result = _make_fetch_result(lc, **prov_kwargs)
+
+        with (
+            patch("exo_toolkit.cli.search_lightcurve", return_value=[signal]),
+            patch(
+                "exo_toolkit.cli.vet_signal",
+                return_value=MagicMock(features=CandidateFeatures()),
+            ),
+            patch("exo_toolkit.cli.score_candidate", return_value=(posterior, scores)),
+            patch(
+                "exo_toolkit.cli.classify_submission_pathway",
+                return_value="planet_hunters_discussion",
+            ),
+        ):
+            return run_pipeline(
+                "TIC 0",
+                "TESS",
+                fetch_fn=lambda *_: fetch_result,
+                clean_fn=lambda *_: MagicMock(light_curve=lc),
+            )
+
+    def test_provenance_score_present_in_row(self) -> None:
+        lc = _mock_lc()
+        result = self._run(lc)
+        assert "provenance_score" in result[0]
+
+    def test_2min_spoc_3sectors_score_is_one(self) -> None:
+        lc = _mock_lc()
+        result = self._run(lc, cadence_seconds=120.0, sectors=(1, 2, 3), pipeline="SPOC")
+        assert abs(result[0]["provenance_score"] - 1.0) < 1e-9
+
+    def test_30min_single_sector_score_below_threshold(self) -> None:
+        lc = _mock_lc()
+        result = self._run(lc, cadence_seconds=1800.0, sectors=(1,), pipeline="QLP")
+        assert result[0]["provenance_score"] < 0.80
+
+    def test_provenance_score_passed_to_classify_pathway(self) -> None:
+        lc = _mock_lc()
+        signal = _make_signal()
+        posterior = _uniform_posterior()
+        scores = _make_scores()
+        fetch_result = _make_fetch_result(lc, cadence_seconds=120.0, sectors=(1, 2, 3))
+        captured: list[dict[str, Any]] = []
+
+        def _fake_classify(*args: Any, **kwargs: Any) -> str:
+            captured.append(kwargs)
+            return "planet_hunters_discussion"
+
+        with (
+            patch("exo_toolkit.cli.search_lightcurve", return_value=[signal]),
+            patch(
+                "exo_toolkit.cli.vet_signal",
+                return_value=MagicMock(features=CandidateFeatures()),
+            ),
+            patch("exo_toolkit.cli.score_candidate", return_value=(posterior, scores)),
+            patch("exo_toolkit.cli.classify_submission_pathway", side_effect=_fake_classify),
+        ):
+            run_pipeline(
+                "TIC 0",
+                "TESS",
+                fetch_fn=lambda *_: fetch_result,
+                clean_fn=lambda *_: MagicMock(light_curve=lc),
+            )
+
+        assert "provenance_score" in captured[0]
+        assert abs(captured[0]["provenance_score"] - 1.0) < 1e-9

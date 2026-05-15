@@ -36,7 +36,7 @@ from exo_toolkit.background.priority import build_priority_summary
 from exo_toolkit.background.runner import background_run_once
 from exo_toolkit.background.storage import BackgroundStore
 from exo_toolkit.clean import clean_lightcurve
-from exo_toolkit.fetch import fetch_lightcurve
+from exo_toolkit.fetch import compute_provenance_score, fetch_lightcurve
 from exo_toolkit.pathway import classify_submission_pathway
 from exo_toolkit.schemas import CandidateSignal, Mission
 from exo_toolkit.scoring import score_candidate
@@ -125,6 +125,7 @@ def run_pipeline(
 
     fetch_result = _fetch(target_id, mission)
     clean_result = _clean(fetch_result.light_curve)
+    provenance_score = compute_provenance_score(fetch_result.provenance)
 
     signals: list[CandidateSignal] = search_lightcurve(
         clean_result.light_curve,
@@ -142,7 +143,8 @@ def run_pipeline(
         vet_result = vet_signal(signal, clean_result.light_curve)
         posterior, scores = score_candidate(signal, vet_result.features)
         pathway = classify_submission_pathway(
-            signal, vet_result.features, posterior, scores
+            signal, vet_result.features, posterior, scores,
+            provenance_score=provenance_score,
         )
 
         row: dict[str, Any] = {
@@ -156,6 +158,7 @@ def run_pipeline(
             "transit_count": signal.transit_count,
             "snr": signal.snr,
             "scorer": scorer,
+            "provenance_score": provenance_score,
             "posterior": {
                 "planet_candidate": posterior.planet_candidate,
                 "eclipsing_binary": posterior.eclipsing_binary,
@@ -216,6 +219,7 @@ def _print_results(rows: list[dict[str, Any]], target_id: str) -> None:
             table.add_row("Ensemble P(planet)", f"{row['ensemble_planet_probability']:.3f}")
         table.add_row("FPP", f"{row['scores']['false_positive_probability']:.3f}")
         table.add_row("Detection confidence", f"{row['scores']['detection_confidence']:.3f}")
+        table.add_row("Provenance score", f"{row['provenance_score']:.3f}")
         table.add_row("Pathway", row["pathway"])
         c.print(table)
         typer.echo(f"  Pathway: {row['pathway']}")

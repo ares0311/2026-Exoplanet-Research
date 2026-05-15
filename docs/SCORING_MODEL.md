@@ -963,3 +963,62 @@ It should answer five questions:
 5. Where should it go next?
 
 The first version should be conservative, interpretable, reproducible, and easy to improve.
+
+---
+
+# 21. Provenance Score
+
+`compute_provenance_score(provenance: FetchProvenance) -> float`
+
+The provenance score quantifies the *data-quality* of the downloaded light curve. It is required by the `tfop_ready` pathway (gate threshold: ≥ 0.80). When the score is below threshold the candidate is downgraded to `planet_hunters_discussion` or `github_only_reproducibility`.
+
+## Formula
+
+$$\text{provenance} = 0.40 \cdot s_{\text{cadence}} + 0.35 \cdot s_{\text{sectors}} + 0.25 \cdot s_{\text{pipeline}}$$
+
+### Sub-scores
+
+**Cadence sub-score** (linear ramp, 0.40 weight)
+
+$$s_{\text{cadence}} = \text{clip}\!\left(\frac{1800 - \Delta t}{1800 - 120},\; 0,\; 1\right)$$
+
+where $\Delta t$ is `cadence_seconds`. Score is 1.0 at 2-min cadence, 0.0 at 30-min cadence, clipped outside this range.
+
+| Cadence | $s_{\text{cadence}}$ |
+|---|---|
+| 120 s (2-min TESS) | 1.000 |
+| 600 s (10-min FFI) | 0.714 |
+| 1800 s (30-min) | 0.000 |
+
+**Sector coverage sub-score** (0.35 weight)
+
+$$s_{\text{sectors}} = \min\!\left(\frac{N_{\text{sectors}}}{3},\; 1.0\right)$$
+
+Saturates at 3 sectors (≈ 81 days of baseline). A single sector scores 0.333.
+
+**Pipeline quality sub-score** (0.25 weight)
+
+| Pipeline | $s_{\text{pipeline}}$ |
+|---|---|
+| SPOC | 1.00 |
+| QLP | 0.85 |
+| TGLC | 0.75 |
+| Kepler / K2 | 1.00 |
+| Unknown | 0.60 |
+
+## Representative scores
+
+| Scenario | Score | tfop_ready? |
+|---|---|---|
+| 2-min SPOC, 3 sectors | 1.000 | ✅ |
+| 2-min SPOC, 2 sectors | 0.883 | ✅ |
+| 10-min SPOC, 3 sectors | 0.886 | ✅ |
+| 10-min QLP, 2 sectors | 0.820 | ✅ |
+| 10-min SPOC, 1 sector | 0.698 | ✗ |
+| 30-min SPOC, 1 sector | 0.367 | ✗ |
+
+## Implementation
+
+`src/exo_toolkit/fetch.py` — `compute_provenance_score()`
+
+Called in `run_pipeline()` immediately after `fetch_lightcurve()` and passed to `classify_submission_pathway(provenance_score=...)`. The score is also included in the JSON output row as `"provenance_score"`.
