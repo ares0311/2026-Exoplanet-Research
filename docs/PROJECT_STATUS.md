@@ -1,7 +1,7 @@
 # PROJECT STATUS
 
 ## Status: Active Development
-## Phase: Phase 3 — Background Automation Complete; CNN Tier-2 Gated on Data
+## Phase: Phase 4 — Provenance Score, Batch Tools, Ranking Complete; CNN Tier-2 Gated on Data
 ## Last Updated: 2026-05-15
 
 ---
@@ -12,7 +12,8 @@
 |------|-----------|-------|
 | Scoring engine | `schemas`, `features`, `hypotheses`, `scoring`, `pathway` | 210 |
 | Data pipeline | `fetch`, `clean`, `search`, `vet`, `calibration` | 236 |
-| CLI — transit scan | `cli.py` — `exo <TIC-ID>` with `--scorer`, `--model-path`, `--output` | 20 |
+| Provenance score | `fetch.py` — `compute_provenance_score()`; wired into `run_pipeline()` | 19 |
+| CLI — transit scan | `cli.py` — `exo <TIC-ID>` with `--scorer`, `--model-path`, `--output` | 24 |
 | CLI — background automation | `cli.py` — `exo background-run-once`, `run-summary`, `sqlite-integrity`, etc. | 16 |
 | Background automation module | `background/` — SQLite store, runner, priority, reports, fixtures, followup | (above) |
 | ML Tier 1 | `ml/xgboost_scorer.py` | 45 |
@@ -23,12 +24,15 @@
 | Evaluation | `evaluate_scorer.py` — ROC-AUC, F1, reliability diagram | 14 |
 | Injection-recovery | `injection_recovery.py` | 25 |
 | Star scanner | `star_scanner.py` — TIC priority ranking, background scan loop, JSON log | 38 |
+| Candidate ranking | `rank_candidates.py` — composite rank score, Rich table, `--top N` | 12 |
+| Batch scan | `batch_scan.py` — text/CSV input, incremental JSON output, `--resume` | 14 |
+| Sector coverage | `sector_coverage.py` — query TESS sector availability without download | 10 |
 | CNN gate | `count_tess_labels.py` | — |
-| Docs | `ML_SCORING.md`, `CNN_SPEC.md`, `DATA_SOURCES.md`, `DECISIONS.md` | — |
+| Docs | `ML_SCORING.md`, `CNN_SPEC.md`, `DATA_SOURCES.md`, `DECISIONS.md`, `SCORING_MODEL.md §21` | — |
 | Docs — automation | `BACKGROUND_SEARCH_AUTOMATION_BLUEPRINT.md`, `BACKGROUND_SEARCH_SQLITE_SCHEMA.md`, `SCHEDULER.md`, `SYSTEM_PROFILE.md` | — |
 | README | 14-section rewrite with equations, MLA citations, submission guide, user guide | — |
 
-**Total: 750 passing tests (+ 2 integration_live)**
+**Total: 805 passing tests (+ 2 integration_live)**
 
 ---
 

@@ -18,9 +18,14 @@ import pydantic
 import pytest
 
 from exo_toolkit.fetch import (
+    _CADENCE_BEST_S,
+    _CADENCE_WORST_S,
+    _PIPELINE_QUALITY,
+    _PIPELINE_QUALITY_DEFAULT,
     FetchProvenance,
     FetchResult,
     _extract_sectors,
+    compute_provenance_score,
     fetch_lightcurve,
 )
 
@@ -483,3 +488,111 @@ class TestFetchLightcurveIntegrationLive:
         assert isinstance(result, FetchResult)
         assert result.provenance.mission == "Kepler"
         assert result.provenance.n_cadences > 1000
+
+
+# ---------------------------------------------------------------------------
+# Task 4: compute_provenance_score
+# ---------------------------------------------------------------------------
+
+
+def _prov(
+    *,
+    cadence_seconds: float = 120.0,
+    sectors: tuple[int, ...] = (1, 2, 3),
+    pipeline: str = "SPOC",
+) -> FetchProvenance:
+    return FetchProvenance(
+        target_id="TIC 1",
+        mission="TESS",
+        sectors_or_quarters=sectors,
+        cadence_seconds=cadence_seconds,
+        pipeline=pipeline,
+        flux_column="pdcsap_flux",
+        n_cadences=1000,
+        time_baseline_days=81.0,
+        fetched_at="2026-01-01T00:00:00+00:00",
+    )
+
+
+class TestComputeProvenanceScore:
+    def test_best_case_returns_one(self) -> None:
+        # 2-min SPOC, 3 sectors → maximum score
+        score = compute_provenance_score(_prov())
+        assert abs(score - 1.0) < 1e-9
+
+    def test_score_in_unit_interval(self) -> None:
+        for cadence in [60.0, 120.0, 600.0, 1800.0, 3600.0]:
+            s = compute_provenance_score(_prov(cadence_seconds=cadence))
+            assert 0.0 <= s <= 1.0
+
+    def test_2min_spoc_4sectors_passes_tfop(self) -> None:
+        score = compute_provenance_score(_prov(sectors=(1, 2, 3, 4)))
+        assert score >= 0.80
+
+    def test_2min_spoc_2sectors_passes_tfop(self) -> None:
+        # 2 sectors: sector_sub = 2/3 ≈ 0.667
+        score = compute_provenance_score(_prov(sectors=(1, 2)))
+        # 0.40*1 + 0.35*0.667 + 0.25*1 = 0.883
+        assert score >= 0.80
+
+    def test_10min_spoc_3sectors_passes_tfop(self) -> None:
+        score = compute_provenance_score(_prov(cadence_seconds=600.0))
+        assert score >= 0.80
+
+    def test_30min_single_sector_fails_tfop(self) -> None:
+        score = compute_provenance_score(_prov(cadence_seconds=1800.0, sectors=(1,)))
+        assert score < 0.80
+
+    def test_worst_cadence_yields_zero_cadence_sub(self) -> None:
+        score = compute_provenance_score(_prov(cadence_seconds=_CADENCE_WORST_S, sectors=(1,)))
+        # cadence_sub=0, sector_sub=1/3, pipeline=1.0 → 0+0.35/3+0.25 ≈ 0.367
+        assert score < 0.50
+
+    def test_cadence_beyond_worst_clipped_to_zero(self) -> None:
+        # cadence > 1800s should clip to 0, not go negative
+        score = compute_provenance_score(_prov(cadence_seconds=3600.0, sectors=(1,)))
+        score_at_worst = compute_provenance_score(
+            _prov(cadence_seconds=_CADENCE_WORST_S, sectors=(1,))
+        )
+        assert score == score_at_worst
+
+    def test_cadence_below_best_clipped_to_one(self) -> None:
+        # cadence < 120s (e.g. Kepler short cadence ~58s) clips to 1
+        score = compute_provenance_score(_prov(cadence_seconds=58.0))
+        score_at_best = compute_provenance_score(_prov(cadence_seconds=_CADENCE_BEST_S))
+        assert score == score_at_best
+
+    def test_more_sectors_increases_score(self) -> None:
+        s1 = compute_provenance_score(_prov(sectors=(1,)))
+        s2 = compute_provenance_score(_prov(sectors=(1, 2)))
+        s3 = compute_provenance_score(_prov(sectors=(1, 2, 3)))
+        assert s1 < s2 < s3
+
+    def test_sector_sub_saturates_at_three(self) -> None:
+        s3 = compute_provenance_score(_prov(sectors=(1, 2, 3)))
+        s5 = compute_provenance_score(_prov(sectors=(1, 2, 3, 4, 5)))
+        assert s3 == s5
+
+    def test_spoc_scores_higher_than_qlp(self) -> None:
+        spoc = compute_provenance_score(_prov(pipeline="SPOC"))
+        qlp = compute_provenance_score(_prov(pipeline="QLP"))
+        assert spoc > qlp
+
+    def test_qlp_scores_higher_than_unknown(self) -> None:
+        qlp = compute_provenance_score(_prov(pipeline="QLP"))
+        unk = compute_provenance_score(_prov(pipeline="UNKNOWN_PIPELINE"))
+        assert qlp > unk
+
+    def test_known_pipeline_values(self) -> None:
+        for pipeline, expected_sub in _PIPELINE_QUALITY.items():
+            score = compute_provenance_score(
+                _prov(cadence_seconds=_CADENCE_BEST_S, sectors=(1, 2, 3), pipeline=pipeline)
+            )
+            # cadence_sub=1, sector_sub=1 → 0.40 + 0.35 + 0.25*expected_sub
+            assert abs(score - (0.75 + 0.25 * expected_sub)) < 1e-9
+
+    def test_unknown_pipeline_uses_default_weight(self) -> None:
+        score = compute_provenance_score(
+            _prov(cadence_seconds=_CADENCE_BEST_S, sectors=(1, 2, 3), pipeline="MYSTERY")
+        )
+        assert abs(score - (0.75 + 0.25 * _PIPELINE_QUALITY_DEFAULT)) < 1e-9

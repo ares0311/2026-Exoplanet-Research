@@ -95,12 +95,45 @@
 
 ---
 
-## Milestone 9 — Future
+## Milestone 9a — Provenance Score ✓ COMPLETE
 
-- [ ] Provenance score computation (unlocks `tfop_ready` pathway)
-- [ ] Tier 2 CNN once TESS label threshold is met
-- [ ] Web API / batch processing service
-- [ ] Per-star candidate ranking across all sectors
+- [x] `compute_provenance_score(provenance: FetchProvenance) -> float` in `fetch.py`
+- [x] Wired into `run_pipeline()` in `cli.py`; `provenance_score` included in JSON output rows
+- [x] `tfop_ready` pathway now correctly enabled/blocked based on cadence, sector count, pipeline quality
+- [x] 15 unit tests in `tests/test_fetch.py`; 4 flow tests in `tests/test_cli.py`
+- [x] Documented in `docs/SCORING_MODEL.md §21`
+
+---
+
+## Milestone 9b — Candidate Ranking ✓ COMPLETE
+
+- [x] `Skills/rank_candidates.py` — composite rank score weighting FPP, detection confidence, novelty, provenance, pathway
+- [x] `load_candidates()`, `compute_rank_score()`, `rank_candidates()`, `print_rank_table()`
+- [x] 12 tests in `tests/test_rank_candidates.py`
+
+---
+
+## Milestone 9c — Batch Scan ✓ COMPLETE
+
+- [x] `Skills/batch_scan.py` — scan TIC ID lists from text/CSV; incremental JSON output with `--resume`
+- [x] `read_tic_ids()`, `batch_scan()` with mock-injectable pipeline function
+- [x] 14 tests in `tests/test_batch_scan.py`
+
+---
+
+## Milestone 9d — Sector Coverage ✓ COMPLETE
+
+- [x] `Skills/sector_coverage.py` — query available TESS sectors per target without downloading data
+- [x] `get_sector_coverage()`, `format_coverage_table()`; CLI with `--json` output
+- [x] 10 tests in `tests/test_sector_coverage.py`
+
+---
+
+## Milestone 10 — Future
+
+- [ ] Tier 2 CNN once TESS label threshold is met (5,000+ CP labels)
+- [ ] Web API / dashboard for candidate browsing
+- [ ] Per-star multi-sector phase-fold comparison across sectors
 
 ---
 

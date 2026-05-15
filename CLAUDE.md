@@ -52,8 +52,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Total passing tests: 750 (+ 2 integration_live)**
-**Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `fetch_tess_toi.py` (11), `build_training_data.py` (34), `build_tess_training_data.py` (38), `build_combined_training_data.py` (13), `train_xgboost.py` (25), `evaluate_scorer.py` (14), `count_tess_labels.py`, `star_scanner.py` (38)**
+**Total passing tests: 805 (+ 2 integration_live)**
+**Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `fetch_tess_toi.py` (11), `build_training_data.py` (34), `build_tess_training_data.py` (38), `build_combined_training_data.py` (13), `train_xgboost.py` (25), `evaluate_scorer.py` (14), `count_tess_labels.py`, `star_scanner.py` (38), `rank_candidates.py` (12), `batch_scan.py` (14), `sector_coverage.py` (10)**
 
 ---
 
@@ -79,6 +79,55 @@ Added in Weekly cleanup (2026-05-10). Implements one-shot, scheduler-friendly ba
 **Exit codes**: `EXIT_SUCCESS=0`, `EXIT_NEEDS_FOLLOW_UP=20`, `EXIT_BLOCKED=30`, `EXIT_CONFIG_ERROR=40`, `EXIT_INTERNAL_ERROR=50`
 
 **Key constraint**: No external submission or discovery claim without explicit human approval. Draft reports go to `reports/background/`. SQLite DB at `logs/background_search.sqlite3`.
+
+---
+
+## Provenance Score (`src/exo_toolkit/fetch.py`)
+
+`compute_provenance_score(provenance: FetchProvenance) -> float` — data-quality score in [0, 1] from cadence, sector count, and pipeline.
+
+- Formula: `0.40*cadence_sub + 0.35*sector_sub + 0.25*pipeline_sub`
+- `cadence_sub`: linear ramp, 1.0 at 2-min, 0.0 at 30-min
+- `sector_sub`: `min(n_sectors / 3, 1.0)`; saturates at 3 sectors
+- `pipeline_sub`: SPOC/Kepler/K2 → 1.0; QLP → 0.85; TGLC → 0.75; unknown → 0.60
+- Called in `run_pipeline()` immediately after fetch; passed to `classify_submission_pathway(provenance_score=...)`
+- Threshold for `tfop_ready`: ≥ 0.80 (2-min SPOC data with ≥ 2 sectors passes)
+- Documented in `docs/SCORING_MODEL.md §21`
+
+---
+
+## Candidate Ranking (`Skills/rank_candidates.py`)
+
+Ranks `exo --output` JSON results by composite score and prints a Rich table.
+
+- `load_candidates(paths)` — flatten one or more JSON output files
+- `compute_rank_score(row)` — `0.45*(1-FPP) + 0.30*DC + 0.15*novelty + 0.10*provenance + pathway_bonus`
+- `rank_candidates(rows, top_n)` — sort by rank_score descending
+- CLI: `python Skills/rank_candidates.py results/*.json --top 10 [--json]`
+- 12 tests in `tests/test_rank_candidates.py`
+
+---
+
+## Batch Scan (`Skills/batch_scan.py`)
+
+Scans a list of TIC IDs from a text or CSV file, writing incremental JSON results.
+
+- `read_tic_ids(path)` — parse TIC IDs from plain text or CSV (skips comments, headers)
+- `batch_scan(tic_ids, *, output_path, resume, run_pipeline_fn, ...)` — calls `run_pipeline` per target; writes after each result; `--resume` skips already-completed IDs
+- Status per entry: `"candidate_found"` | `"scanned_clear"` | `"error"`
+- CLI: `python Skills/batch_scan.py targets.txt --output results.json [--resume]`
+- 14 tests in `tests/test_batch_scan.py`
+
+---
+
+## Sector Coverage (`Skills/sector_coverage.py`)
+
+Queries MAST for which TESS sectors are available for a target without downloading data.
+
+- `get_sector_coverage(target_id, *, pipeline, search_fn)` → `SectorCoverage`
+- `format_coverage_table(coverages)` → plain-text table
+- CLI: `python Skills/sector_coverage.py TIC 150428135 [--pipeline QLP] [--json]`
+- 10 tests in `tests/test_sector_coverage.py`
 
 ---
 
