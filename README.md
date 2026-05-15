@@ -193,7 +193,17 @@ Each stage produces a typed, immutable result object and preserves provenance me
 | `cli.py` | — | `exo <TIC-ID>` entry point; `--scorer`, `--model-path`, `--output` options | 20 |
 | `ml/xgboost_scorer.py` | — | XGBoost tabular classifier on 35 `OptScore` features | 45 |
 | `ml/stacking_scorer.py` | — | Weighted blend of XGBoost + Bayesian posteriors | 22 |
-| **Total** | | | **696** |
+| `background/` | — | SQLite-backed automation: one-shot runner, priority scoring, draft reports | 16 |
+| **Total** | | | **750** |
+
+### Operating Modes
+
+The toolkit supports two complementary operating modes that share the same scoring engine:
+
+1. **Interactive transit scan** (`exo <TIC-ID>`): one target, full pipeline (Fetch → Clean → Search → Vet → Score → Classify), Rich-formatted output. This is the default entry point.
+2. **Background automation** (`exo background-run-once`): one bounded run over the known-TESS fixture pool, ranked by an 8-factor composite priority score, persisted to a SQLite ledger (`logs/background_search.sqlite3`), with draft reports written to `reports/background/`. Designed to be invoked by an external scheduler (cron, launchd, systemd timer) — see `docs/SCHEDULER.md`. No external submission is performed without explicit human approval.
+
+A third utility, `Skills/star_scanner.py`, provides a lighter-weight TIC-catalog scan that queries `astroquery` for promising uncharacterized targets and runs the full pipeline against them in priority order. Unlike `background/`, it does not persist to SQLite and is intended for ad-hoc exploration rather than scheduled operation.
 
 ### ML Scoring Modes
 
@@ -638,7 +648,7 @@ python Skills/evaluate_scorer.py \
 │       └── ml/
 │           ├── xgboost_scorer.py    # XGBoost binary classifier (Tier-1)
 │           └── stacking_scorer.py   # Weighted blend scorer (Tier-3)
-├── tests/                       # 696 unit and integration tests
+├── tests/                       # 750 unit and integration tests
 │   ├── test_schemas.py          # 33 tests
 │   ├── test_features.py         # 89 tests
 │   ├── test_hypotheses.py       # 28 tests
