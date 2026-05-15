@@ -1,7 +1,7 @@
 # PROJECT STATUS
 
 ## Status: Active Development
-## Phase: Phase 4 — Provenance Score, Batch Tools, Ranking Complete; CNN Tier-2 Gated on Data
+## Phase: Phase 5 — Chi-Square Depth Test, Phase-Fold Plots, Watchlist, Summary Report Complete
 ## Last Updated: 2026-05-15
 
 ---
@@ -10,8 +10,8 @@
 
 | Area | Key Files | Tests |
 |------|-----------|-------|
-| Scoring engine | `schemas`, `features`, `hypotheses`, `scoring`, `pathway` | 210 |
-| Data pipeline | `fetch`, `clean`, `search`, `vet`, `calibration` | 236 |
+| Scoring engine | `schemas`, `features`, `hypotheses`, `scoring`, `pathway` | 223 |
+| Data pipeline | `fetch`, `clean`, `search`, `vet`, `calibration` | 254 |
 | Provenance score | `fetch.py` — `compute_provenance_score()`; wired into `run_pipeline()` | 19 |
 | CLI — transit scan | `cli.py` — `exo <TIC-ID>` with `--scorer`, `--model-path`, `--output` | 24 |
 | CLI — background automation | `cli.py` — `exo background-run-once`, `run-summary`, `sqlite-integrity`, etc. | 16 |
@@ -27,12 +27,16 @@
 | Candidate ranking | `rank_candidates.py` — composite rank score, Rich table, `--top N` | 12 |
 | Batch scan | `batch_scan.py` — text/CSV input, incremental JSON output, `--resume` | 14 |
 | Sector coverage | `sector_coverage.py` — query TESS sector availability without download | 10 |
+| Depth chi-square | `features.py` — `depth_scatter_chi2_score`; wired into instrumental/planet hypotheses | 13 |
+| Phase-fold plots | `plot_lc.py` — `phase_fold`, `plot_candidate`, `plot_all` | 11 |
+| Watchlist | `watchlist.py` — persistent JSON watchlist for follow-up TIC IDs | 13 |
+| Summary report | `summary_report.py` — Markdown report from batch_scan output | 14 |
 | CNN gate | `count_tess_labels.py` | — |
 | Docs | `ML_SCORING.md`, `CNN_SPEC.md`, `DATA_SOURCES.md`, `DECISIONS.md`, `SCORING_MODEL.md §21` | — |
 | Docs — automation | `BACKGROUND_SEARCH_AUTOMATION_BLUEPRINT.md`, `BACKGROUND_SEARCH_SQLITE_SCHEMA.md`, `SCHEDULER.md`, `SYSTEM_PROFILE.md` | — |
 | README | 14-section rewrite with equations, MLA citations, submission guide, user guide | — |
 
-**Total: 805 passing tests (+ 2 integration_live)**
+**Total: 857 passing tests (+ 2 integration_live; 6 skipped without matplotlib)**
 
 ---
 
@@ -49,7 +53,7 @@
 
 1. Run `python Skills/count_tess_labels.py` periodically to monitor CNN gate
 2. Once gate opens: implement Tier 2 CNN per `docs/CNN_SPEC.md`
-3. Compute `provenance_score` in `vet.py` to unlock `tfop_ready` pathway
+3. Track watchlist candidates through `batch_scan.py` for systematic follow-up
 
 ---
 
@@ -59,7 +63,8 @@
 - `OptScore = float | None` — missing diagnostics are neutral (contribute 0)
 - Conservative priors: 10% planet_candidate, 20% each false-positive class
 - `None` feature scores fail threshold gates conservatively (§15 Guardrails)
-- `provenance_score` defaults to 0.0 (blocks `tfop_ready` until computed)
+- `provenance_score` computed from cadence, sector count, pipeline quality
+- `depth_scatter_chi2_score` complements `depth_consistency_score` with error-weighted chi-square
 - Never output "confirmed planet" — use "candidate signal"
 - Background automation uses SQLite for durable state; JSON fixtures for offline testing
 - Background automation obeys human-approval gate — no external submission without review

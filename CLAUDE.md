@@ -38,22 +38,22 @@ CI: `.github/workflows/ci.yml`
 | Module | Status | Tests |
 |---|---|---|
 | `schemas.py` | **done** | `test_schemas.py` (33) |
-| `features.py` | **done** | `test_features.py` (89) |
-| `hypotheses.py` | **done** | `test_hypotheses.py` (28) |
+| `features.py` | **done** | `test_features.py` (97) — includes `depth_scatter_chi2_score` |
+| `hypotheses.py` | **done** | `test_hypotheses.py` (33) — `depth_scatter_chi2_score` wiring |
 | `scoring.py` | **done** | `test_scoring.py` (25) |
 | `pathway.py` | **done** | `test_pathway.py` (35) |
-| `fetch.py` | **done** | `test_fetch.py` (40, 2 live) |
+| `fetch.py` | **done** | `test_fetch.py` (55, 2 live) |
 | `clean.py` | **done** | `test_clean.py` (39) |
 | `search.py` | **done** | `test_search.py` (43) |
 | `vet.py` | **done** | `test_vet.py` (47) |
 | `calibration.py` | **done** | `test_calibration.py` (70) |
-| `cli.py` | **done** | `test_cli.py` (20) |
+| `cli.py` | **done** | `test_cli.py` (24) |
 | `ml/xgboost_scorer.py` | **done** | `test_xgboost_scorer.py` (45) |
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Total passing tests: 805 (+ 2 integration_live)**
-**Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `fetch_tess_toi.py` (11), `build_training_data.py` (34), `build_tess_training_data.py` (38), `build_combined_training_data.py` (13), `train_xgboost.py` (25), `evaluate_scorer.py` (14), `count_tess_labels.py`, `star_scanner.py` (38), `rank_candidates.py` (12), `batch_scan.py` (14), `sector_coverage.py` (10)**
+**Total passing tests: 857 (+ 2 integration_live; 6 skipped without matplotlib)**
+**Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `fetch_tess_toi.py` (11), `build_training_data.py` (34), `build_tess_training_data.py` (38), `build_combined_training_data.py` (13), `train_xgboost.py` (25), `evaluate_scorer.py` (14), `count_tess_labels.py`, `star_scanner.py` (38), `rank_candidates.py` (12), `batch_scan.py` (14), `sector_coverage.py` (10), `plot_lc.py` (11), `watchlist.py` (13), `summary_report.py` (14)**
 
 ---
 
@@ -141,6 +141,56 @@ Queries the TESS Input Catalog (TIC) via astroquery to rank uncharacterised star
 - `scan_star(tic_id, *, log, ...)` → dict with status/n_signals/best_fpp/best_pathway
 - `run_background_scan(log_path, ...)` — iterates until Ctrl-C or max stars reached
 - Excludes TOI list at startup; skips already-scanned IDs from log
+
+---
+
+## Depth Scatter Chi-Square Score
+
+New feature in `features.py` and `schemas.py` (Milestone 10a):
+
+- `depth_scatter_chi2_score(depths, errors, chi2_threshold=3.0) -> float | None`
+- Reduced chi-square test: `chi2_reduced = sum((d_i - d_mean_w)^2 / err_i^2) / (n-1)` using inverse-variance weighted mean
+- Score = `clip(chi2_reduced / 3.0)` — saturates at chi2_reduced = 3
+- High score → depths vary more than expected from measurement noise → evidence for instrumental artifact
+- Wired into `log_score_instrumental()` (+0.90 weight) and `log_score_planet()` (−0.60 weight)
+- Complements existing `depth_consistency_score` (robust CV, no error weighting) with error-aware test
+- Returns `None` if fewer than 2 transits or any error ≤ 0
+
+---
+
+## Phase-Fold Plots (`Skills/plot_lc.py`)
+
+Generates phase-folded light curve PNGs from candidate JSON rows.
+
+- `phase_fold(time, flux, period, epoch)` → `(phase, flux)` sorted, phase in [−0.5, 0.5)
+- `plot_candidate(row, *, output_dir, show, time, flux)` → `Path | None`
+- `plot_all(path, *, output_dir, show)` → `list[Path]`
+- Requires matplotlib; returns `None`/empty list if not installed
+- 11 tests in `tests/test_plot_lc.py` (6 skipped when matplotlib absent)
+
+---
+
+## Watchlist (`Skills/watchlist.py`)
+
+Persistent JSON watchlist for follow-up TIC IDs. Integrates with `batch_scan.py`.
+
+- `Watchlist(path)` — `add(tic_id, note)`, `remove(tic_id)`, `contains(tic_id)`, `list_ids()`, `entries()`, `clear()`, `summary()`
+- Atomic write via tempfile rename
+- CLI: `python Skills/watchlist.py add/remove/list/clear/summary`
+- 13 tests in `tests/test_watchlist.py`
+
+---
+
+## Summary Report (`Skills/summary_report.py`)
+
+Generates Markdown summary reports from batch_scan JSON output.
+
+- `load_results(paths)` → flat list of result dicts
+- `build_report(rows, *, title)` → Markdown string with overview table + candidates + errors
+- `write_report(rows, output_path, *, title)` → `Path`
+- Partitions by status: `candidate_found`, `scanned_clear`, `no_data`, `error`
+- Candidates sorted by FPP ascending (best first)
+- 14 tests in `tests/test_summary_report.py`
 
 ---
 

@@ -98,6 +98,7 @@ class CandidateFeatures(BaseModel):
     background_excursion_score: OptScore = None
     single_event_score: OptScore = None
     nearby_targets_common_signal_score: OptScore = None
+    depth_scatter_chi2_score: OptScore = None
 
     # Known-object indicators
     known_object_score: OptScore = None
