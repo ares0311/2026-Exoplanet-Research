@@ -71,6 +71,7 @@ def log_score_planet(
         - _w(features.contamination_score, 1.20)
         - _w(features.systematics_overlap_score, 1.10)
         - _w(features.stellar_variability_score, 0.90)
+        - _w(features.depth_scatter_chi2_score, 0.60)
     )
 
 
@@ -133,6 +134,7 @@ def log_score_instrumental(
         + _w(features.background_excursion_score, 1.20)
         + _w(features.single_event_score, 1.00)
         + _w(features.nearby_targets_common_signal_score, 1.00)
+        + _w(features.depth_scatter_chi2_score, 0.90)
     )
 
 

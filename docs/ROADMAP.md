@@ -129,7 +129,32 @@
 
 ---
 
-## Milestone 10 — Future
+## Milestone 10a — Depth Scatter Chi-Square ✓ COMPLETE
+
+- [x] `depth_scatter_chi2_score(depths, errors, chi2_threshold=3.0)` in `features.py`
+- [x] New `depth_scatter_chi2_score: OptScore` field in `CandidateFeatures` (schemas.py)
+- [x] Error-weighted reduced chi-square test complements existing robust-CV `depth_consistency_score`
+- [x] Wired into `log_score_instrumental()` (+0.90 weight) and `log_score_planet()` (−0.60 weight)
+- [x] 8 tests in `tests/test_features.py`; 5 tests in `tests/test_hypotheses.py`
+
+---
+
+## Milestone 10b — Phase-Fold Plots ✓ COMPLETE
+
+- [x] `Skills/plot_lc.py` — `phase_fold()`, `plot_candidate()`, `plot_all()`
+- [x] Generates PNG for each candidate row from `exo --output` JSON
+- [x] No-op when matplotlib is absent; 11 tests in `tests/test_plot_lc.py`
+
+---
+
+## Milestone 10c — Watchlist + Summary Report ✓ COMPLETE
+
+- [x] `Skills/watchlist.py` — atomic JSON watchlist; `add`, `remove`, `contains`, `list_ids`, `entries`, `clear`, `summary`; 13 tests
+- [x] `Skills/summary_report.py` — `load_results`, `build_report`, `write_report`; partitions by status; candidates sorted by FPP; 14 tests
+
+---
+
+## Milestone 11 — Future
 
 - [ ] Tier 2 CNN once TESS label threshold is met (5,000+ CP labels)
 - [ ] Web API / dashboard for candidate browsing

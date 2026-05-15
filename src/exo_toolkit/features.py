@@ -460,6 +460,32 @@ def data_gap_overlap_score(data_gap_fraction: float) -> float:
     return _clip(data_gap_fraction)
 
 
+def depth_scatter_chi2_score(
+    depths: tuple[float, ...],
+    errors: tuple[float, ...],
+    chi2_threshold: float = 3.0,
+) -> float | None:
+    """
+    Reduced chi-square of individual transit depths relative to measurement errors.
+    Returns None when fewer than two transits are available or any error is ≤ 0.
+
+    High score → depths vary more than expected from noise alone, suggesting
+    instrumental artifacts or a non-periodic astrophysical contaminant.
+    """
+    if len(depths) < 2 or len(errors) < 2:
+        return None
+    depths_arr = np.array(depths, dtype=float)
+    errors_arr = np.array(errors, dtype=float)
+    if np.any(errors_arr <= 0.0):
+        return None
+    weights = 1.0 / errors_arr**2
+    weighted_mean = float(np.dot(weights, depths_arr) / weights.sum())
+    chi2_reduced = float(
+        np.sum(((depths_arr - weighted_mean) / errors_arr) ** 2) / (len(depths) - 1)
+    )
+    return _clip(chi2_reduced / chi2_threshold)
+
+
 def systematics_overlap_score(
     quality_flag_fraction: float | None,
     sector_boundary_fraction: float | None,
@@ -565,8 +591,12 @@ def extract_features(
     )
 
     depth_cons_s: float | None = None
+    depth_chi2_s: float | None = None
     if d.individual_depths is not None and d.individual_depth_errors is not None:
         depth_cons_s = depth_consistency_score(
+            d.individual_depths, d.individual_depth_errors
+        )
+        depth_chi2_s = depth_scatter_chi2_score(
             d.individual_depths, d.individual_depth_errors
         )
 
@@ -742,6 +772,7 @@ def extract_features(
         background_excursion_score=be_s,
         single_event_score=se_s,
         nearby_targets_common_signal_score=ntcs,
+        depth_scatter_chi2_score=depth_chi2_s,
         # known object
         known_object_score=ko_s,
         target_id_match_score=tid_s,

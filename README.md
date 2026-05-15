@@ -3,7 +3,7 @@
 [![CI](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml/badge.svg)](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-750%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-858%20passing-brightgreen.svg)](tests/)
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 ---
@@ -57,7 +57,7 @@
 
 ## Abstract
 
-This repository implements a complete, reproducible computational pipeline for the detection, vetting, and probabilistic classification of exoplanet transit candidates in photometric time-series data from the Transiting Exoplanet Survey Satellite (TESS) and the Kepler/K2 missions. The pipeline proceeds through six deterministic stages — data acquisition, preprocessing, Box Least Squares (BLS) periodicity search, signal vetting, Bayesian multi-hypothesis scoring, and submission pathway classification — and outputs calibrated posterior probabilities over six competing astrophysical and instrumental hypotheses. A conservative log-score approximation to Bayes' theorem is employed in lieu of generative likelihood models, with posterior calibration implemented via Platt scaling and isotonic regression (Pool Adjacent Violators Algorithm). An optional Tier-1 XGBoost classifier and Tier-3 stacking meta-learner augment the Bayesian scorer when labelled training data are available. The system is designed around scientific caution: it never labels an internally detected signal as a confirmed planet, exposes all false-positive evidence alongside each candidate score, and defers to authoritative external catalogs for confirmation status. The complete implementation comprises thirteen Python modules, an autonomous background search engine with SQLite-backed durable state, an autonomous star-scanner for priority-ranked target discovery, 750 unit and integration tests, strict static typing (mypy), and continuous integration via GitHub Actions.
+This repository implements a complete, reproducible computational pipeline for the detection, vetting, and probabilistic classification of exoplanet transit candidates in photometric time-series data from the Transiting Exoplanet Survey Satellite (TESS) and the Kepler/K2 missions. The pipeline proceeds through six deterministic stages — data acquisition, preprocessing, Box Least Squares (BLS) periodicity search, signal vetting, Bayesian multi-hypothesis scoring, and submission pathway classification — and outputs calibrated posterior probabilities over six competing astrophysical and instrumental hypotheses. A conservative log-score approximation to Bayes' theorem is employed in lieu of generative likelihood models, with posterior calibration implemented via Platt scaling and isotonic regression (Pool Adjacent Violators Algorithm). An optional Tier-1 XGBoost classifier and Tier-3 stacking meta-learner augment the Bayesian scorer when labelled training data are available. The system is designed around scientific caution: it never labels an internally detected signal as a confirmed planet, exposes all false-positive evidence alongside each candidate score, and defers to authoritative external catalogs for confirmation status. The complete implementation comprises thirteen Python modules, an autonomous background search engine with SQLite-backed durable state, an autonomous star-scanner for priority-ranked target discovery, 858 unit and integration tests, strict static typing (mypy), and continuous integration via GitHub Actions.
 
 ---
 
@@ -187,14 +187,14 @@ Each stage produces a typed, immutable result object and preserves provenance me
 | `scoring.py` | Score | Log-score posterior computation; derived scores (FPP, detection confidence, novelty) | 25 |
 | `pathway.py` | Classify | Ordered gate-based submission pathway classification | 35 |
 | `schemas.py` | — | Immutable Pydantic data models for all pipeline types | 33 |
-| `features.py` | — | `RawDiagnostics` container; `extract_features()` mapping diagnostics to `[0,1]` scores | 89 |
-| `hypotheses.py` | — | Per-hypothesis log-score functions | 28 |
+| `features.py` | — | `RawDiagnostics` container; `extract_features()` mapping diagnostics to `[0,1]` scores; 36 features including `depth_scatter_chi2_score` | 97 |
+| `hypotheses.py` | — | Per-hypothesis log-score functions; `depth_scatter_chi2_score` wired into instrumental and planet hypotheses | 33 |
 | `calibration.py` | — | Platt scaling, PAVA isotonic regression, Brier score, reliability curves | 70 |
-| `cli.py` | — | `exo <TIC-ID>` entry point; `--scorer`, `--model-path`, `--output` options | 20 |
-| `ml/xgboost_scorer.py` | — | XGBoost tabular classifier on 35 `OptScore` features | 45 |
+| `cli.py` | — | `exo <TIC-ID>` entry point; `--scorer`, `--model-path`, `--output` options | 24 |
+| `ml/xgboost_scorer.py` | — | XGBoost tabular classifier on 36 `OptScore` features | 45 |
 | `ml/stacking_scorer.py` | — | Weighted blend of XGBoost + Bayesian posteriors | 22 |
 | `background/` | — | SQLite-backed automation: one-shot runner, priority scoring, draft reports | 16 |
-| **Total** | | | **750** |
+| **Total** | | | **858** |
 
 ### Operating Modes
 
@@ -333,6 +333,16 @@ Values near 1 indicate a flat-bottomed (box-shaped) transit consistent with a pl
 $$\phi_{\mathrm{gap}} = \frac{|\{n : |\{i : |t_i - t_n| \leq T/2\}| < 3\}|}{N_{\mathrm{windows}}},$$
 
 where $t_n = t_0 + nP$ are the predicted transit centers. This score enters as a penalty on detection confidence.
+
+**Depth scatter chi-square score.**  A statistically rigorous test of depth consistency using per-transit measurement errors. The weighted mean depth is
+
+$$\bar{\delta}_w = \frac{\sum_i \delta_i / \sigma_i^2}{\sum_i 1/\sigma_i^2},$$
+
+and the reduced chi-square is
+
+$$\chi^2_\nu = \frac{1}{N-1}\sum_{i=1}^{N}\left(\frac{\delta_i - \bar{\delta}_w}{\sigma_i}\right)^2.$$
+
+The score $\phi_{\chi^2} = \mathrm{clip}(\chi^2_\nu / 3,\, 0,\, 1)$ saturates at a threshold of three. A high score — depths inconsistent relative to their measurement noise — contributes positively to the instrumental artifact hypothesis and negatively to the planet candidate hypothesis.
 
 ### 3.5 ML Scorer — XGBoost Tier-1
 
@@ -674,7 +684,13 @@ python Skills/evaluate_scorer.py \
 │   ├── evaluate_scorer.py       # Bayesian vs XGBoost comparison (ROC, F1)
 │   ├── injection_recovery.py    # Synthetic transit injection completeness maps
 │   ├── count_tess_labels.py     # Check CNN Tier-2 label gate (≥5,000 CP)
-│   └── star_scanner.py          # TIC priority ranking and background scan loop
+│   ├── star_scanner.py          # TIC priority ranking and background scan loop
+│   ├── rank_candidates.py       # Composite rank scoring and Rich table output
+│   ├── batch_scan.py            # Bulk TIC-ID scanning with resume and JSON output
+│   ├── sector_coverage.py       # Query TESS sector availability without downloading
+│   ├── plot_lc.py               # Phase-folded light curve PNG from candidate JSON
+│   ├── watchlist.py             # Persistent JSON watchlist of follow-up TIC IDs
+│   └── summary_report.py        # Markdown summary report from batch_scan output
 ├── configs/                     # Versioned runtime configuration
 │   └── background_search_v0.json  # Background automation thresholds and weights
 ├── logs/                        # Runtime SQLite logs (not tracked by git)
@@ -732,21 +748,21 @@ PYTHONPATH=src python -m pytest -m integration_live
 | Module | Tests |
 |---|---|
 | `schemas.py` | 33 |
-| `features.py` | 89 |
-| `hypotheses.py` | 28 |
+| `features.py` | 97 |
+| `hypotheses.py` | 33 |
 | `scoring.py` | 25 |
 | `pathway.py` | 35 |
-| `fetch.py` | 40 (+2 live) |
+| `fetch.py` | 55 (+2 live) |
 | `clean.py` | 39 |
 | `search.py` | 43 |
 | `vet.py` | 47 |
 | `calibration.py` | 70 |
-| `cli.py` | 20 |
+| `cli.py` | 24 |
 | `ml/xgboost_scorer.py` | 45 |
 | `ml/stacking_scorer.py` | 22 |
 | `background/` module | 16 |
-| Skills (injection recovery, training, evaluation, star scanner, etc.) | 198 |
-| **Total** | **750** |
+| Skills (injection recovery, training, evaluation, star scanner, ranking, batch scan, sector coverage, plot_lc, watchlist, summary report) | 251 |
+| **Total** | **858** |
 
 ---
 
@@ -855,6 +871,14 @@ The candidate does not meet external submission criteria (high FPP, missing diag
 | ✅ | **CNN Tier-2 gate** | `count_tess_labels.py`; `CNN_SPEC.md` architecture document |
 | ✅ | **Background automation** | `background/` — SQLite state, one-shot runner, priority scoring, draft reports; 16 subcommands |
 | ✅ | **Star scanner** | `Skills/star_scanner.py` — TIC priority ranking, TOI exclusion, JSON scan log, background loop |
+| ✅ | **Provenance score** | `compute_provenance_score()` in `fetch.py`; wired into `tfop_ready` pathway gate |
+| ✅ | **Candidate ranking** | `Skills/rank_candidates.py` — composite rank score, Rich table, `--top N` |
+| ✅ | **Batch scan** | `Skills/batch_scan.py` — text/CSV input, incremental JSON output, `--resume` |
+| ✅ | **Sector coverage** | `Skills/sector_coverage.py` — query TESS sector availability without download |
+| ✅ | **Depth chi-square score** | `depth_scatter_chi2_score` — error-weighted depth scatter test wired into hypothesis scoring |
+| ✅ | **Phase-fold plots** | `Skills/plot_lc.py` — phase-folded PNG from candidate JSON |
+| ✅ | **Watchlist** | `Skills/watchlist.py` — persistent JSON watchlist with add/remove/list/scan |
+| ✅ | **Summary report** | `Skills/summary_report.py` — Markdown report from batch_scan JSON output |
 | 🔴 | **ML Tier 2 — 1D CNN** | Phase-folded flux classifier; gated on ≥5,000 TESS CP labels (Shallue and Vanderburg) |
 | 🔴 | **Mission-specific priors** | Period-, radius-, and stellar-type-dependent priors replacing flat defaults |
 | 🔴 | **Web interface / dashboard** | Interactive candidate browser with score explanations |

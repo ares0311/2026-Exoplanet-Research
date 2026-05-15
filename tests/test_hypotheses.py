@@ -352,3 +352,41 @@ class TestComputeLogScores:
     ) -> None:
         scores = compute_log_scores(known_object_features)
         assert scores["known_object"] == max(scores.values())
+
+
+# ---------------------------------------------------------------------------
+# depth_scatter_chi2_score wiring
+# ---------------------------------------------------------------------------
+
+
+class TestDepthScatterChi2Wiring:
+    def test_high_chi2_lowers_planet_score(self) -> None:
+        base = CandidateFeatures()
+        scattered = CandidateFeatures(depth_scatter_chi2_score=1.0)
+        assert log_score_planet(scattered) < log_score_planet(base)
+
+    def test_high_chi2_raises_instrumental_score(self) -> None:
+        base = CandidateFeatures()
+        scattered = CandidateFeatures(depth_scatter_chi2_score=1.0)
+        assert log_score_instrumental(scattered) > log_score_instrumental(base)
+
+    def test_zero_chi2_neutral_for_planet(self) -> None:
+        base = CandidateFeatures()
+        clean = CandidateFeatures(depth_scatter_chi2_score=0.0)
+        assert log_score_planet(clean) == pytest.approx(log_score_planet(base))
+
+    def test_none_chi2_neutral(self) -> None:
+        base = CandidateFeatures()
+        null_chi2 = CandidateFeatures(depth_scatter_chi2_score=None)
+        assert log_score_planet(null_chi2) == pytest.approx(log_score_planet(base))
+        assert log_score_instrumental(null_chi2) == pytest.approx(
+            log_score_instrumental(base)
+        )
+
+    def test_scattered_depths_boost_instrumental_in_full_scores(self) -> None:
+        clean = CandidateFeatures(depth_scatter_chi2_score=0.0)
+        scattered = CandidateFeatures(depth_scatter_chi2_score=1.0)
+        scores_clean = compute_log_scores(clean)
+        scores_scattered = compute_log_scores(scattered)
+        assert scores_scattered["instrumental_artifact"] > scores_clean["instrumental_artifact"]
+        assert scores_scattered["planet_candidate"] < scores_clean["planet_candidate"]

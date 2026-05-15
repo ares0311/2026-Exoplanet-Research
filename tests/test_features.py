@@ -37,6 +37,7 @@ from exo_toolkit.features import (
     systematics_overlap_score,
     target_id_match_score,
     transit_count_score,
+    depth_scatter_chi2_score,
     transit_shape_score,
     v_shape_score,
     variability_periodogram_score,
@@ -641,3 +642,70 @@ class TestExtractFeatures:
         assert f.odd_even_mismatch_score is not None and f.odd_even_mismatch_score < 0.2
         assert f.secondary_eclipse_score is not None and f.secondary_eclipse_score < 0.2
         assert f.transit_shape_score is not None and f.transit_shape_score > 0.5
+
+
+# ---------------------------------------------------------------------------
+# depth_scatter_chi2_score
+# ---------------------------------------------------------------------------
+
+
+class TestDepthScatterChi2Score:
+    def test_consistent_depths_near_zero(self) -> None:
+        # depths match within errors → chi2_reduced ≈ 0 → score near 0
+        depths = (1000.0, 1000.0, 1000.0)
+        errors = (50.0, 50.0, 50.0)
+        s = depth_scatter_chi2_score(depths, errors)
+        assert s is not None and s == pytest.approx(0.0)
+
+    def test_highly_scattered_depths_near_one(self) -> None:
+        # huge scatter relative to errors → chi2_reduced >> threshold → score 1
+        depths = (100.0, 2000.0, 100.0, 2000.0)
+        errors = (1.0, 1.0, 1.0, 1.0)
+        s = depth_scatter_chi2_score(depths, errors)
+        assert s is not None and s == pytest.approx(1.0)
+
+    def test_none_when_single_transit(self) -> None:
+        assert depth_scatter_chi2_score((1000.0,), (50.0,)) is None
+
+    def test_none_when_empty(self) -> None:
+        assert depth_scatter_chi2_score((), ()) is None
+
+    def test_none_when_zero_error(self) -> None:
+        assert depth_scatter_chi2_score((1000.0, 1000.0), (0.0, 50.0)) is None
+
+    def test_moderate_scatter_in_range(self) -> None:
+        # chi2_reduced ≈ 0.25 / 3.0 ≈ 0.08 → in (0, 1)
+        depths = (1000.0, 1050.0, 950.0)
+        errors = (100.0, 100.0, 100.0)
+        s = depth_scatter_chi2_score(depths, errors)
+        assert s is not None and 0.0 < s < 1.0
+
+    def test_custom_chi2_threshold(self) -> None:
+        depths = (1000.0, 1000.0, 1000.0)
+        errors = (50.0, 50.0, 50.0)
+        # threshold doesn't matter when scatter is zero
+        s = depth_scatter_chi2_score(depths, errors, chi2_threshold=1.0)
+        assert s is not None and s == pytest.approx(0.0)
+
+    def test_extract_features_propagates_chi2(self) -> None:
+        """extract_features should populate depth_scatter_chi2_score."""
+        from exo_toolkit.schemas import CandidateSignal  # noqa: PLC0415
+
+        sig = CandidateSignal(
+            candidate_id="x",
+            mission="TESS",
+            target_id="TIC 1",
+            period_days=5.0,
+            epoch_bjd=2458600.0,
+            duration_hours=2.0,
+            depth_ppm=1000.0,
+            transit_count=3,
+            snr=10.0,
+        )
+        diag = RawDiagnostics(
+            individual_depths=(1000.0, 1000.0, 1000.0),
+            individual_depth_errors=(50.0, 50.0, 50.0),
+        )
+        f = extract_features(sig, diag)
+        assert f.depth_scatter_chi2_score is not None
+        assert f.depth_scatter_chi2_score == pytest.approx(0.0)
