@@ -1022,3 +1022,36 @@ Saturates at 3 sectors (≈ 81 days of baseline). A single sector scores 0.333.
 `src/exo_toolkit/fetch.py` — `compute_provenance_score()`
 
 Called in `run_pipeline()` immediately after `fetch_lightcurve()` and passed to `classify_submission_pathway(provenance_score=...)`. The score is also included in the JSON output row as `"provenance_score"`.
+
+---
+
+## §22 Transit Timing Variation Score
+
+**Function**: `transit_timing_variation_score(midpoints, period_days, epoch_bjd, rms_threshold_minutes=10.0)`
+
+Measures the root-mean-square scatter of observed transit midpoint times relative to a strict linear ephemeris (constant period):
+
+$$\Delta t_i = t_i - \left(t_0 + n_i \cdot P\right), \qquad n_i = \mathrm{round}\!\left(\frac{t_i - t_0}{P}\right)$$
+
+$$\sigma_\mathrm{OC} = \sqrt{\frac{1}{N}\sum_{i=1}^{N} \Delta t_i^2} \quad [\text{minutes}]$$
+
+$$\phi_\mathrm{TTV} = \mathrm{clip}\!\left(\frac{\sigma_\mathrm{OC}}{\sigma_\mathrm{thresh}},\; 0,\; 1\right)$$
+
+where the default threshold is $\sigma_\mathrm{thresh} = 10$ minutes.
+
+**Interpretation**:
+- $\phi_\mathrm{TTV} \approx 0$: timing is consistent with a strict linear ephemeris — supports the planet candidate hypothesis.
+- $\phi_\mathrm{TTV} \approx 1$: large scatter — timing is inconsistent with a periodic signal, suggesting an instrumental artifact or non-periodic astrophysical event.
+
+**Hypothesis weights**:
+
+| Hypothesis | Weight | Direction |
+|---|---|---|
+| `planet_candidate` | 0.50 | Negative (high TTV penalises planet hypothesis) |
+| `instrumental_artifact` | 0.60 | Positive (high TTV supports instrumental hypothesis) |
+
+**Returns**: `None` when fewer than two observed midpoints are available.
+
+**Implementation**: `src/exo_toolkit/features.py` — `transit_timing_variation_score()`
+
+Input field: `RawDiagnostics.individual_transit_midpoints` (tuple of BJD times, one per observed transit).

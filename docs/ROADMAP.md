@@ -154,7 +154,35 @@
 
 ---
 
-## Milestone 11 — Future
+## Milestone 11a — Transit Timing Variation Score ✓ COMPLETE
+
+- [x] `transit_timing_variation_score(midpoints, period_days, epoch_bjd, rms_threshold_minutes=10.0)` in `features.py`
+- [x] New `transit_timing_variation_score: OptScore` field in `CandidateFeatures` (`schemas.py`)
+- [x] O-C residuals in minutes; score = `clip(RMS_OC / threshold)` — saturates at threshold
+- [x] Wired into `log_score_planet()` (−0.50 weight) and `log_score_instrumental()` (+0.60 weight)
+- [x] 10 tests in `tests/test_features.py`; 3 tests in `tests/test_hypotheses.py`
+- [x] Documented in `docs/SCORING_MODEL.md §22`
+
+---
+
+## Milestone 11b — TOI Checker + Export Candidates ✓ COMPLETE
+
+- [x] `Skills/toi_checker.py` — `check_toi(tic_id)` queries ExoFOP TOI CSV; `format_toi_result()` one-liner status; handles column-name variations
+- [x] `Skills/export_candidates.py` — `to_csv()`, `to_markdown_table()`, `to_summary_stats()`; 10-column export with display headers
+- [x] 12 tests in `tests/test_toi_checker.py`; 13 tests in `tests/test_export_candidates.py`
+
+---
+
+## Milestone 11c — Alert Filter + Skills Guide ✓ COMPLETE
+
+- [x] `Skills/alert_filter.py` — `filter_candidates()` AND-logic threshold filter (FPP, pathway, signals, rank, SNR); `apply_filters()` loads + writes JSON
+- [x] `_fpp()` helper handles all dict shapes: `scores.false_positive_probability`, `best_fpp`, top-level
+- [x] `docs/SKILLS_GUIDE.md` — complete user reference for all 19 Skills; workflow diagram; CLI examples; library usage pattern; ML pipeline walkthrough
+- [x] 12 tests in `tests/test_alert_filter.py`
+
+---
+
+## Milestone 12 — Future
 
 - [ ] Tier 2 CNN once TESS label threshold is met (5,000+ CP labels)
 - [ ] Web API / dashboard for candidate browsing
