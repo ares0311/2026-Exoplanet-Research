@@ -38,8 +38,8 @@ CI: `.github/workflows/ci.yml`
 | Module | Status | Tests |
 |---|---|---|
 | `schemas.py` | **done** | `test_schemas.py` (33) |
-| `features.py` | **done** | `test_features.py` (97) — includes `depth_scatter_chi2_score` |
-| `hypotheses.py` | **done** | `test_hypotheses.py` (33) — `depth_scatter_chi2_score` wiring |
+| `features.py` | **done** | `test_features.py` (107) — includes `depth_scatter_chi2_score`, `transit_timing_variation_score` |
+| `hypotheses.py` | **done** | `test_hypotheses.py` (36) — `depth_scatter_chi2_score` + `transit_timing_variation_score` wiring |
 | `scoring.py` | **done** | `test_scoring.py` (25) |
 | `pathway.py` | **done** | `test_pathway.py` (35) |
 | `fetch.py` | **done** | `test_fetch.py` (55, 2 live) |
@@ -52,8 +52,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Total passing tests: 857 (+ 2 integration_live; 6 skipped without matplotlib)**
-**Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `fetch_tess_toi.py` (11), `build_training_data.py` (34), `build_tess_training_data.py` (38), `build_combined_training_data.py` (13), `train_xgboost.py` (25), `evaluate_scorer.py` (14), `count_tess_labels.py`, `star_scanner.py` (38), `rank_candidates.py` (12), `batch_scan.py` (14), `sector_coverage.py` (10), `plot_lc.py` (11), `watchlist.py` (13), `summary_report.py` (14)**
+**Total passing tests: 907 (+ 2 integration_live; 6 skipped without matplotlib)**
+**Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `fetch_tess_toi.py` (11), `build_training_data.py` (34), `build_tess_training_data.py` (38), `build_combined_training_data.py` (13), `train_xgboost.py` (25), `evaluate_scorer.py` (14), `count_tess_labels.py`, `star_scanner.py` (38), `rank_candidates.py` (12), `batch_scan.py` (14), `sector_coverage.py` (10), `plot_lc.py` (11), `watchlist.py` (13), `summary_report.py` (14), `toi_checker.py` (12), `export_candidates.py` (13), `alert_filter.py` (12)**
 
 ---
 
@@ -191,6 +191,64 @@ Generates Markdown summary reports from batch_scan JSON output.
 - Partitions by status: `candidate_found`, `scanned_clear`, `no_data`, `error`
 - Candidates sorted by FPP ascending (best first)
 - 14 tests in `tests/test_summary_report.py`
+
+---
+
+## TOI Checker (`Skills/toi_checker.py`)
+
+Looks up a TIC ID in the ExoFOP TOI list to check prior follow-up status before investing pipeline time.
+
+- `check_toi(tic_id, *, toi_table_fn) -> dict | None` — fetches ExoFOP CSV, returns dict with `toi`, `tic_id`, `disposition`, `period_days`, `epoch_bjd`, `depth_ppm`, `duration_hours`; returns `None` if not in TOI list
+- `format_toi_result(result, tic_id) -> str` — one-line human-readable status string
+- Handles column-name variations between ExoFOP CSV versions
+- 12 tests in `tests/test_toi_checker.py`
+
+---
+
+## Export Candidates (`Skills/export_candidates.py`)
+
+Exports ranked candidate results to CSV and GitHub-flavored Markdown table formats.
+
+- `to_csv(rows, path) -> Path` — 10-column CSV with display headers; creates parent dirs
+- `to_markdown_table(rows) -> str` — `| col | ... |` table; returns `"_No candidates._"` for empty input
+- `to_summary_stats(rows) -> dict` — `n_candidates`, `mean_fpp`, `min_fpp`, `max_rank_score`, `pathway_counts`
+- 13 tests in `tests/test_export_candidates.py`
+
+---
+
+## Alert Filter (`Skills/alert_filter.py`)
+
+Filters batch_scan or star_scanner JSON results by configurable quality thresholds.
+
+- `filter_candidates(rows, *, fpp_max, pathway, min_signals, min_rank_score, min_snr) -> list[dict]` — AND-logic; `None` = not checked
+- `apply_filters(path, *, output_path, ...) -> list[dict]` — load + filter + optionally write JSON
+- `_fpp()` helper extracts FPP from `scores.false_positive_probability`, `best_fpp`, or top-level `false_positive_probability`
+- 12 tests in `tests/test_alert_filter.py`
+
+---
+
+## Transit Timing Variation Score
+
+New feature in `features.py` and `schemas.py` (Milestone 11a):
+
+- `transit_timing_variation_score(midpoints, period_days, epoch_bjd, rms_threshold_minutes=10.0) -> float | None`
+- O-C residuals: `n_i = round((t_i - epoch_bjd) / period_days)`, residual = `(t_i - (epoch_bjd + n_i * period_days)) * 1440` minutes
+- Score = `clip(RMS_OC / rms_threshold_minutes)` — saturates at threshold
+- High score → timing is irregular → evidence for instrumental artifact (not a clean Keplerian transit)
+- Wired into `log_score_planet()` (−0.50 weight) and `log_score_instrumental()` (+0.60 weight)
+- Returns `None` if fewer than 2 midpoints
+
+---
+
+## Skills Guide (`docs/SKILLS_GUIDE.md`)
+
+Complete user reference for all 19 Skills scripts.
+
+- Quick-reference table of all scripts with purpose and key functions
+- Discovery workflow diagram: `star_scanner → batch_scan → alert_filter → rank_candidates → watchlist/export/report`
+- CLI examples for every script with common flag combinations
+- Library usage pattern (importable functions without running CLI)
+- ML training pipeline walkthrough (fetch → build → merge → train → evaluate)
 
 ---
 

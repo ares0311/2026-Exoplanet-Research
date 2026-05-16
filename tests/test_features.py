@@ -38,6 +38,7 @@ from exo_toolkit.features import (
     target_id_match_score,
     transit_count_score,
     depth_scatter_chi2_score,
+    transit_timing_variation_score,
     transit_shape_score,
     v_shape_score,
     variability_periodogram_score,
@@ -709,3 +710,91 @@ class TestDepthScatterChi2Score:
         f = extract_features(sig, diag)
         assert f.depth_scatter_chi2_score is not None
         assert f.depth_scatter_chi2_score == pytest.approx(0.0)
+
+
+# ---------------------------------------------------------------------------
+# transit_timing_variation_score
+# ---------------------------------------------------------------------------
+
+
+class TestTransitTimingVariationScore:
+    _PERIOD = 5.0     # days
+    _EPOCH  = 2458600.0  # BJD
+
+    def _midpoints(self, offsets_minutes: list[float]) -> tuple[float, ...]:
+        """Build midpoints: exact linear ephemeris + given offsets in minutes."""
+        days = [self._EPOCH + n * self._PERIOD for n in range(len(offsets_minutes))]
+        return tuple(d + o / 1440.0 for d, o in zip(days, offsets_minutes, strict=True))
+
+    def test_perfect_timing_gives_zero(self) -> None:
+        mids = self._midpoints([0.0, 0.0, 0.0])
+        s = transit_timing_variation_score(mids, self._PERIOD, self._EPOCH)
+        assert s is not None and s == pytest.approx(0.0)
+
+    def test_large_scatter_clips_to_one(self) -> None:
+        mids = self._midpoints([100.0, -100.0, 100.0, -100.0])
+        s = transit_timing_variation_score(mids, self._PERIOD, self._EPOCH)
+        assert s is not None and s == pytest.approx(1.0)
+
+    def test_none_when_single_midpoint(self) -> None:
+        mids = (self._EPOCH,)
+        assert transit_timing_variation_score(mids, self._PERIOD, self._EPOCH) is None
+
+    def test_none_when_empty(self) -> None:
+        assert transit_timing_variation_score((), self._PERIOD, self._EPOCH) is None
+
+    def test_moderate_scatter_in_range(self) -> None:
+        # rms = 5 min / 10 min threshold → 0.5
+        mids = self._midpoints([5.0, -5.0])
+        s = transit_timing_variation_score(mids, self._PERIOD, self._EPOCH, rms_threshold_minutes=10.0)
+        assert s is not None and pytest.approx(s, abs=0.01) == 0.5
+
+    def test_custom_threshold_scales_score(self) -> None:
+        mids = self._midpoints([5.0, -5.0])
+        s_default = transit_timing_variation_score(mids, self._PERIOD, self._EPOCH, rms_threshold_minutes=10.0)
+        s_tight   = transit_timing_variation_score(mids, self._PERIOD, self._EPOCH, rms_threshold_minutes=5.0)
+        assert s_tight is not None and s_default is not None
+        assert s_tight > s_default
+
+    def test_output_in_zero_one(self) -> None:
+        mids = self._midpoints([3.0, -2.0, 1.0])
+        s = transit_timing_variation_score(mids, self._PERIOD, self._EPOCH)
+        assert s is not None and 0.0 <= s <= 1.0
+
+    def test_extract_features_propagates_ttv(self) -> None:
+        sig = CandidateSignal(
+            candidate_id="x",
+            mission="TESS",
+            target_id="TIC 1",
+            period_days=self._PERIOD,
+            epoch_bjd=self._EPOCH,
+            duration_hours=2.0,
+            depth_ppm=1000.0,
+            transit_count=3,
+            snr=10.0,
+        )
+        mids = self._midpoints([0.0, 0.0, 0.0])
+        diag = RawDiagnostics(individual_transit_midpoints=mids)
+        f = extract_features(sig, diag)
+        assert f.transit_timing_variation_score is not None
+        assert f.transit_timing_variation_score == pytest.approx(0.0)
+
+    def test_none_midpoints_gives_none_feature(self) -> None:
+        sig = CandidateSignal(
+            candidate_id="x",
+            mission="TESS",
+            target_id="TIC 1",
+            period_days=self._PERIOD,
+            epoch_bjd=self._EPOCH,
+            duration_hours=2.0,
+            depth_ppm=1000.0,
+            transit_count=3,
+            snr=10.0,
+        )
+        f = extract_features(sig, RawDiagnostics())
+        assert f.transit_timing_variation_score is None
+
+    def test_two_midpoints_sufficient(self) -> None:
+        mids = self._midpoints([0.0, 0.0])
+        s = transit_timing_variation_score(mids, self._PERIOD, self._EPOCH)
+        assert s is not None

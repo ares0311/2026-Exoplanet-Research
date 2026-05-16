@@ -3,7 +3,7 @@
 [![CI](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml/badge.svg)](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-858%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-907%20passing-brightgreen.svg)](tests/)
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 ---
@@ -57,7 +57,7 @@
 
 ## Abstract
 
-This repository implements a complete, reproducible computational pipeline for the detection, vetting, and probabilistic classification of exoplanet transit candidates in photometric time-series data from the Transiting Exoplanet Survey Satellite (TESS) and the Kepler/K2 missions. The pipeline proceeds through six deterministic stages — data acquisition, preprocessing, Box Least Squares (BLS) periodicity search, signal vetting, Bayesian multi-hypothesis scoring, and submission pathway classification — and outputs calibrated posterior probabilities over six competing astrophysical and instrumental hypotheses. A conservative log-score approximation to Bayes' theorem is employed in lieu of generative likelihood models, with posterior calibration implemented via Platt scaling and isotonic regression (Pool Adjacent Violators Algorithm). An optional Tier-1 XGBoost classifier and Tier-3 stacking meta-learner augment the Bayesian scorer when labelled training data are available. The system is designed around scientific caution: it never labels an internally detected signal as a confirmed planet, exposes all false-positive evidence alongside each candidate score, and defers to authoritative external catalogs for confirmation status. The complete implementation comprises thirteen Python modules, an autonomous background search engine with SQLite-backed durable state, an autonomous star-scanner for priority-ranked target discovery, 858 unit and integration tests, strict static typing (mypy), and continuous integration via GitHub Actions.
+This repository implements a complete, reproducible computational pipeline for the detection, vetting, and probabilistic classification of exoplanet transit candidates in photometric time-series data from the Transiting Exoplanet Survey Satellite (TESS) and the Kepler/K2 missions. The pipeline proceeds through six deterministic stages — data acquisition, preprocessing, Box Least Squares (BLS) periodicity search, signal vetting, Bayesian multi-hypothesis scoring, and submission pathway classification — and outputs calibrated posterior probabilities over six competing astrophysical and instrumental hypotheses. A conservative log-score approximation to Bayes' theorem is employed in lieu of generative likelihood models, with posterior calibration implemented via Platt scaling and isotonic regression (Pool Adjacent Violators Algorithm). An optional Tier-1 XGBoost classifier and Tier-3 stacking meta-learner augment the Bayesian scorer when labelled training data are available. The system is designed around scientific caution: it never labels an internally detected signal as a confirmed planet, exposes all false-positive evidence alongside each candidate score, and defers to authoritative external catalogs for confirmation status. The complete implementation comprises thirteen Python modules, an autonomous background search engine with SQLite-backed durable state, an autonomous star-scanner for priority-ranked target discovery, nineteen standalone Skills utility scripts, 907 unit and integration tests, strict static typing (mypy), and continuous integration via GitHub Actions.
 
 ---
 
@@ -187,14 +187,14 @@ Each stage produces a typed, immutable result object and preserves provenance me
 | `scoring.py` | Score | Log-score posterior computation; derived scores (FPP, detection confidence, novelty) | 25 |
 | `pathway.py` | Classify | Ordered gate-based submission pathway classification | 35 |
 | `schemas.py` | — | Immutable Pydantic data models for all pipeline types | 33 |
-| `features.py` | — | `RawDiagnostics` container; `extract_features()` mapping diagnostics to `[0,1]` scores; 36 features including `depth_scatter_chi2_score` | 97 |
-| `hypotheses.py` | — | Per-hypothesis log-score functions; `depth_scatter_chi2_score` wired into instrumental and planet hypotheses | 33 |
+| `features.py` | — | `RawDiagnostics` container; `extract_features()` mapping diagnostics to `[0,1]` scores; 37 features including `depth_scatter_chi2_score`, `transit_timing_variation_score` | 107 |
+| `hypotheses.py` | — | Per-hypothesis log-score functions; `depth_scatter_chi2_score` + `transit_timing_variation_score` wired into instrumental and planet hypotheses | 36 |
 | `calibration.py` | — | Platt scaling, PAVA isotonic regression, Brier score, reliability curves | 70 |
 | `cli.py` | — | `exo <TIC-ID>` entry point; `--scorer`, `--model-path`, `--output` options | 24 |
 | `ml/xgboost_scorer.py` | — | XGBoost tabular classifier on 36 `OptScore` features | 45 |
 | `ml/stacking_scorer.py` | — | Weighted blend of XGBoost + Bayesian posteriors | 22 |
 | `background/` | — | SQLite-backed automation: one-shot runner, priority scoring, draft reports | 16 |
-| **Total** | | | **858** |
+| **Total** | | | **907** |
 
 ### Operating Modes
 
@@ -690,7 +690,10 @@ python Skills/evaluate_scorer.py \
 │   ├── sector_coverage.py       # Query TESS sector availability without downloading
 │   ├── plot_lc.py               # Phase-folded light curve PNG from candidate JSON
 │   ├── watchlist.py             # Persistent JSON watchlist of follow-up TIC IDs
-│   └── summary_report.py        # Markdown summary report from batch_scan output
+│   ├── summary_report.py        # Markdown summary report from batch_scan output
+│   ├── toi_checker.py           # ExoFOP TOI lookup before investing pipeline time
+│   ├── export_candidates.py     # Export ranked candidates to CSV and Markdown
+│   └── alert_filter.py          # AND-logic threshold filter for batch results
 ├── configs/                     # Versioned runtime configuration
 │   └── background_search_v0.json  # Background automation thresholds and weights
 ├── logs/                        # Runtime SQLite logs (not tracked by git)
@@ -711,7 +714,8 @@ python Skills/evaluate_scorer.py \
 │   ├── SCHEDULER.md             # cron/launchd/systemd integration guide
 │   ├── SYSTEM_PROFILE.md        # Hardware sizing and batch-run defaults
 │   ├── ROADMAP.md               # Milestones and future work
-│   └── PROJECT_STATUS.md        # Current implementation status
+│   ├── PROJECT_STATUS.md        # Current implementation status
+│   └── SKILLS_GUIDE.md          # User reference for all 19 Skills scripts
 ├── data/                        # Local data cache (not tracked by git)
 ├── pyproject.toml
 └── requirements.txt
@@ -748,8 +752,8 @@ PYTHONPATH=src python -m pytest -m integration_live
 | Module | Tests |
 |---|---|
 | `schemas.py` | 33 |
-| `features.py` | 97 |
-| `hypotheses.py` | 33 |
+| `features.py` | 107 |
+| `hypotheses.py` | 36 |
 | `scoring.py` | 25 |
 | `pathway.py` | 35 |
 | `fetch.py` | 55 (+2 live) |
@@ -761,8 +765,8 @@ PYTHONPATH=src python -m pytest -m integration_live
 | `ml/xgboost_scorer.py` | 45 |
 | `ml/stacking_scorer.py` | 22 |
 | `background/` module | 16 |
-| Skills (injection recovery, training, evaluation, star scanner, ranking, batch scan, sector coverage, plot_lc, watchlist, summary report) | 251 |
-| **Total** | **858** |
+| Skills (injection recovery, training, evaluation, star scanner, ranking, batch scan, sector coverage, plot_lc, watchlist, summary report, toi_checker, export_candidates, alert_filter) | 300 |
+| **Total** | **907** |
 
 ---
 
@@ -879,6 +883,11 @@ The candidate does not meet external submission criteria (high FPP, missing diag
 | ✅ | **Phase-fold plots** | `Skills/plot_lc.py` — phase-folded PNG from candidate JSON |
 | ✅ | **Watchlist** | `Skills/watchlist.py` — persistent JSON watchlist with add/remove/list/scan |
 | ✅ | **Summary report** | `Skills/summary_report.py` — Markdown report from batch_scan JSON output |
+| ✅ | **Transit timing variation** | `transit_timing_variation_score` — O-C RMS test; wired into planet/instrumental hypotheses |
+| ✅ | **TOI checker** | `Skills/toi_checker.py` — ExoFOP TOI lookup before investing pipeline time |
+| ✅ | **Export candidates** | `Skills/export_candidates.py` — CSV and Markdown table export with summary stats |
+| ✅ | **Alert filter** | `Skills/alert_filter.py` — AND-logic threshold filter over FPP/pathway/signals/SNR |
+| ✅ | **Skills guide** | `docs/SKILLS_GUIDE.md` — complete user reference for all 19 Skills with workflow diagram |
 | 🔴 | **ML Tier 2 — 1D CNN** | Phase-folded flux classifier; gated on ≥5,000 TESS CP labels (Shallue and Vanderburg) |
 | 🔴 | **Mission-specific priors** | Period-, radius-, and stellar-type-dependent priors replacing flat defaults |
 | 🔴 | **Web interface / dashboard** | Interactive candidate browser with score explanations |

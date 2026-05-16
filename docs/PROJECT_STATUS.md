@@ -1,8 +1,8 @@
 # PROJECT STATUS
 
 ## Status: Active Development
-## Phase: Phase 5 — Chi-Square Depth Test, Phase-Fold Plots, Watchlist, Summary Report Complete
-## Last Updated: 2026-05-15
+## Phase: Phase 6 — TTV Score, TOI Checker, Export, Alert Filter, Skills Guide Complete
+## Last Updated: 2026-05-16
 
 ---
 
@@ -31,12 +31,16 @@
 | Phase-fold plots | `plot_lc.py` — `phase_fold`, `plot_candidate`, `plot_all` | 11 |
 | Watchlist | `watchlist.py` — persistent JSON watchlist for follow-up TIC IDs | 13 |
 | Summary report | `summary_report.py` — Markdown report from batch_scan output | 14 |
+| Transit timing variation | `features.py` — `transit_timing_variation_score`; wired into instrumental/planet hypotheses | 13 |
+| TOI checker | `toi_checker.py` — ExoFOP TOI lookup; format_toi_result | 12 |
+| Export candidates | `export_candidates.py` — `to_csv`, `to_markdown_table`, `to_summary_stats` | 13 |
+| Alert filter | `alert_filter.py` — AND-logic threshold filtering over FPP/pathway/signals/SNR | 12 |
 | CNN gate | `count_tess_labels.py` | — |
-| Docs | `ML_SCORING.md`, `CNN_SPEC.md`, `DATA_SOURCES.md`, `DECISIONS.md`, `SCORING_MODEL.md §21` | — |
+| Docs | `ML_SCORING.md`, `CNN_SPEC.md`, `DATA_SOURCES.md`, `DECISIONS.md`, `SCORING_MODEL.md §21-22`, `SKILLS_GUIDE.md` | — |
 | Docs — automation | `BACKGROUND_SEARCH_AUTOMATION_BLUEPRINT.md`, `BACKGROUND_SEARCH_SQLITE_SCHEMA.md`, `SCHEDULER.md`, `SYSTEM_PROFILE.md` | — |
 | README | 14-section rewrite with equations, MLA citations, submission guide, user guide | — |
 
-**Total: 857 passing tests (+ 2 integration_live; 6 skipped without matplotlib)**
+**Total: 907 passing tests (+ 2 integration_live; 6 skipped without matplotlib)**
 
 ---
 
@@ -53,7 +57,9 @@
 
 1. Run `python Skills/count_tess_labels.py` periodically to monitor CNN gate
 2. Once gate opens: implement Tier 2 CNN per `docs/CNN_SPEC.md`
-3. Track watchlist candidates through `batch_scan.py` for systematic follow-up
+3. Use `toi_checker.py` before investing pipeline time on any new target
+4. Track watchlist candidates through `batch_scan.py` + `alert_filter.py` → `export_candidates.py` for systematic follow-up
+5. Consult `docs/SKILLS_GUIDE.md` for the full Skills discovery workflow
 
 ---
 
@@ -65,6 +71,9 @@
 - `None` feature scores fail threshold gates conservatively (§15 Guardrails)
 - `provenance_score` computed from cadence, sector count, pipeline quality
 - `depth_scatter_chi2_score` complements `depth_consistency_score` with error-weighted chi-square
+- `transit_timing_variation_score` measures O-C RMS; high score → artifact evidence
+- `toi_checker.py` should be consulted before investing pipeline time on any new target
+- `alert_filter.py` applies AND-logic threshold filtering; FPP extracted from multiple dict shapes
 - Never output "confirmed planet" — use "candidate signal"
 - Background automation uses SQLite for durable state; JSON fixtures for offline testing
 - Background automation obeys human-approval gate — no external submission without review

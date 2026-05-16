@@ -390,3 +390,21 @@ class TestDepthScatterChi2Wiring:
         scores_scattered = compute_log_scores(scattered)
         assert scores_scattered["instrumental_artifact"] > scores_clean["instrumental_artifact"]
         assert scores_scattered["planet_candidate"] < scores_clean["planet_candidate"]
+
+
+class TestTransitTimingVariationWiring:
+    def test_high_ttv_lowers_planet_score(self) -> None:
+        base = CandidateFeatures()
+        erratic = CandidateFeatures(transit_timing_variation_score=1.0)
+        assert log_score_planet(erratic) < log_score_planet(base)
+
+    def test_high_ttv_raises_instrumental_score(self) -> None:
+        base = CandidateFeatures()
+        erratic = CandidateFeatures(transit_timing_variation_score=1.0)
+        assert log_score_instrumental(erratic) > log_score_instrumental(base)
+
+    def test_none_ttv_is_neutral(self) -> None:
+        base = CandidateFeatures()
+        null_ttv = CandidateFeatures(transit_timing_variation_score=None)
+        assert log_score_planet(null_ttv) == pytest.approx(log_score_planet(base))
+        assert log_score_instrumental(null_ttv) == pytest.approx(log_score_instrumental(base))

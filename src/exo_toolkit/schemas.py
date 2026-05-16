@@ -67,6 +67,7 @@ class CandidateFeatures(BaseModel):
     duration_plausibility_score: OptScore = None
     transit_shape_score: OptScore = None
     data_gap_overlap_score: OptScore = None
+    transit_timing_variation_score: OptScore = None
 
     # Eclipsing binary indicators
     odd_even_mismatch_score: OptScore = None

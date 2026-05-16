@@ -32,6 +32,7 @@ class RawDiagnostics:
     individual_depth_errors: tuple[float, ...] | None = None
     individual_durations: tuple[float, ...] | None = None
     individual_duration_errors: tuple[float, ...] | None = None
+    individual_transit_midpoints: tuple[float, ...] | None = None  # BJD
 
     # Odd/even transit depth comparison
     depth_odd_ppm: float | None = None
@@ -154,6 +155,32 @@ def duration_consistency_score(
         return None
     cv = _robust_cv(durations)
     return _clip(1.0 - cv / cv_threshold)
+
+
+def transit_timing_variation_score(
+    midpoints: tuple[float, ...],
+    period_days: float,
+    epoch_bjd: float,
+    rms_threshold_minutes: float = 10.0,
+) -> float | None:
+    """
+    Observed-minus-computed (O-C) scatter of transit midpoints.
+
+    Measures how much the observed transit times deviate from a strict linear
+    ephemeris (constant period).  High scatter relative to the threshold
+    suggests instrumental artifacts or non-periodic events.
+
+    Score = clip(rms_oc_minutes / rms_threshold_minutes).
+    Returns None when fewer than two midpoints are available.
+    """
+    if len(midpoints) < 2:
+        return None
+    arr = np.array(midpoints, dtype=float)
+    transit_numbers = np.round((arr - epoch_bjd) / period_days).astype(int)
+    predicted = epoch_bjd + transit_numbers * period_days
+    oc_minutes = (arr - predicted) * 1440.0  # days → minutes
+    rms = float(np.sqrt(np.mean(oc_minutes**2)))
+    return _clip(rms / rms_threshold_minutes)
 
 
 def duration_plausibility_score(
@@ -606,6 +633,12 @@ def extract_features(
             d.individual_durations, d.individual_duration_errors
         )
 
+    ttv_s: float | None = None
+    if d.individual_transit_midpoints is not None:
+        ttv_s = transit_timing_variation_score(
+            d.individual_transit_midpoints, signal.period_days, signal.epoch_bjd
+        )
+
     # --- transit morphology ---
     shape_s: float | None = None
     v_s: float | None = None
@@ -745,6 +778,7 @@ def extract_features(
         duration_plausibility_score=dur_plaus_s,
         transit_shape_score=shape_s,
         data_gap_overlap_score=dg_s,
+        transit_timing_variation_score=ttv_s,
         # eclipsing binary
         odd_even_mismatch_score=odd_even_s,
         secondary_eclipse_score=sec_s,
