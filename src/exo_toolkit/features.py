@@ -34,6 +34,10 @@ class RawDiagnostics:
     individual_duration_errors: tuple[float, ...] | None = None
     individual_transit_midpoints: tuple[float, ...] | None = None  # BJD
 
+    # Per-sector measurements
+    sector_depths: tuple[float, ...] | None = None        # per-sector mean transit depths (ppm)
+    sector_depth_errors: tuple[float, ...] | None = None  # per-sector depth uncertainties (ppm)
+
     # Odd/even transit depth comparison
     depth_odd_ppm: float | None = None
     err_odd_ppm: float | None = None
@@ -49,10 +53,12 @@ class RawDiagnostics:
     # Stellar parameters for orbit plausibility checks
     stellar_radius_rsun: float | None = None
     stellar_mass_msun: float | None = None
+    stellar_teff_k: float | None = None
 
     # Aperture contamination and centroid diagnostics
     contamination_ratio: float | None = None         # flux fraction from other sources
     centroid_offset_sigma: float | None = None        # significance of in-transit centroid shift
+    centroid_motion_arcsec: float | None = None       # in-transit centroid displacement (arcsec)
 
     # Background eclipsing binary indicators
     nearby_bright_source_count: int | None = None     # Gaia/TIC sources inside aperture
@@ -65,6 +71,7 @@ class RawDiagnostics:
     background_excursion_sigma: float | None = None   # peak background excursion during transit (σ)
     data_gap_fraction: float | None = None            # fraction of transits falling in data gaps
     nearby_targets_common_signal: float | None = None  # cross-target correlation coefficient
+    oot_scatter_sigma: float | None = None  # out-of-transit scatter (units: expected photon noise)
 
     # Stellar variability indicators
     ls_power_at_period: float | None = None           # Lomb-Scargle power at transit period
@@ -181,6 +188,81 @@ def transit_timing_variation_score(
     oc_minutes = (arr - predicted) * 1440.0  # days → minutes
     rms = float(np.sqrt(np.mean(oc_minutes**2)))
     return _clip(rms / rms_threshold_minutes)
+
+
+def out_of_transit_scatter_score(
+    oot_scatter_sigma: float,
+    sigma_threshold: float = 3.0,
+) -> float:
+    return _clip(oot_scatter_sigma / sigma_threshold)
+
+
+def multi_sector_depth_consistency_score(
+    sector_depths: tuple[float, ...],
+    sector_depth_errors: tuple[float, ...] | None = None,
+    cv_threshold: float = 0.20,
+) -> float | None:
+    if len(sector_depths) < 2:
+        return None
+    cv = _robust_cv(sector_depths)
+    return _clip(1.0 - cv / cv_threshold)
+
+
+_G_CGS = 6.674e-8          # cm³ g⁻¹ s⁻²
+_RSUN_CM = 6.957e10        # cm
+_MSUN_G = 1.989e33         # g
+_SECONDS_PER_DAY = 86400.0
+
+
+def stellar_density_consistency_score(
+    duration_hours: float,
+    period_days: float,
+    depth_ppm: float,
+    stellar_radius_rsun: float,
+    stellar_mass_msun: float,
+    tolerance_factor: float = 3.0,
+) -> float:
+    """Compare photometric stellar density to catalog density."""
+    if period_days <= 0 or duration_hours <= 0 or depth_ppm <= 0:
+        return 0.0
+    R = stellar_radius_rsun * _RSUN_CM
+    M = stellar_mass_msun * _MSUN_G
+    rho_cat = M / (4.0 / 3.0 * 3.14159265 * R**3)
+    T = duration_hours * 3600.0
+    P = period_days * _SECONDS_PER_DAY
+    aR = P / (3.14159265 * T)  # a/R_star from transit duration approximation (b=0)
+    rho_phot = (3.0 * 3.14159265 / (_G_CGS * P**2)) * aR**3
+    if rho_cat <= 0:
+        return 0.0
+    discrepancy = abs(rho_phot - rho_cat) / (tolerance_factor * rho_cat)
+    return _clip(1.0 - discrepancy)
+
+
+def centroid_motion_score(
+    centroid_motion_arcsec: float,
+    saturation_arcsec: float = 2.0,
+) -> float:
+    return _clip(centroid_motion_arcsec / saturation_arcsec)
+
+
+def _ld_ingress_egress_fraction(depth_ppm: float, stellar_teff_k: float) -> float:
+    """Expected ingress+egress fraction via quadratic LD approximation."""
+    teff_norm = max(0.0, min(1.0, (stellar_teff_k - 3000.0) / 7000.0))
+    u_sum = 0.30 + 0.50 * (1.0 - teff_norm)
+    k = (depth_ppm / 1e6) ** 0.5
+    return _clip(2.0 * k / (1.0 + u_sum / 6.0))
+
+
+def limb_darkening_plausibility_score(
+    ingress_egress_fraction: float,
+    depth_ppm: float,
+    stellar_teff_k: float = 5778.0,
+) -> float:
+    expected_ief = _ld_ingress_egress_fraction(depth_ppm, stellar_teff_k)
+    if expected_ief <= 0:
+        return 0.5
+    discrepancy = abs(ingress_egress_fraction - expected_ief) / max(expected_ief, 0.01)
+    return _clip(1.0 - discrepancy)
 
 
 def duration_plausibility_score(
@@ -744,6 +826,35 @@ def extract_features(
     if d.data_gap_fraction is not None:
         dg_s = data_gap_overlap_score(d.data_gap_fraction)
 
+    oot_s: float | None = None
+    if d.oot_scatter_sigma is not None:
+        oot_s = out_of_transit_scatter_score(d.oot_scatter_sigma)
+
+    ms_depth_s: float | None = None
+    if d.sector_depths is not None:
+        ms_depth_s = multi_sector_depth_consistency_score(d.sector_depths, d.sector_depth_errors)
+
+    density_s: float | None = None
+    if d.stellar_radius_rsun is not None and d.stellar_mass_msun is not None:
+        density_s = stellar_density_consistency_score(
+            signal.duration_hours,
+            signal.period_days,
+            signal.depth_ppm,
+            d.stellar_radius_rsun,
+            d.stellar_mass_msun,
+        )
+
+    cm_motion_s: float | None = None
+    if d.centroid_motion_arcsec is not None:
+        cm_motion_s = centroid_motion_score(d.centroid_motion_arcsec)
+
+    ld_s: float | None = None
+    if d.ingress_egress_fraction is not None:
+        teff = d.stellar_teff_k if d.stellar_teff_k is not None else 5778.0
+        ld_s = limb_darkening_plausibility_score(
+            d.ingress_egress_fraction, signal.depth_ppm, teff
+        )
+
     # --- known object ---
     ko_s = known_object_score(
         d.target_id_matched,
@@ -779,6 +890,10 @@ def extract_features(
         transit_shape_score=shape_s,
         data_gap_overlap_score=dg_s,
         transit_timing_variation_score=ttv_s,
+        out_of_transit_scatter_score=oot_s,
+        multi_sector_depth_consistency_score=ms_depth_s,
+        stellar_density_consistency_score=density_s,
+        limb_darkening_plausibility_score=ld_s,
         # eclipsing binary
         odd_even_mismatch_score=odd_even_s,
         secondary_eclipse_score=sec_s,
@@ -792,6 +907,7 @@ def extract_features(
         nearby_bright_source_score=nearby_s,
         aperture_edge_score=aper_s,
         dilution_sensitivity_score=dil_s,
+        centroid_motion_score=cm_motion_s,
         # stellar variability
         stellar_variability_score=sv_s,
         variability_periodogram_score=var_s,

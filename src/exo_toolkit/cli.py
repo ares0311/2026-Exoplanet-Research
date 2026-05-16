@@ -22,7 +22,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +32,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from exo_toolkit import __version__
 from exo_toolkit.background.config import DEFAULT_CONFIG_PATH, ConfigError, load_background_config
 from exo_toolkit.background.fixtures import fixture_summary, load_known_tess_examples
 from exo_toolkit.background.priority import build_priority_summary
@@ -66,6 +69,25 @@ app = typer.Typer(
 )
 
 _VALID_SCORERS = ("bayesian", "xgboost", "ensemble")
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"exo-toolkit {__version__}")
+        raise typer.Exit()
+
+
+def _git_commit_short() -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        return result.stdout.strip() or None
+    except Exception:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -147,6 +169,12 @@ def run_pipeline(
             provenance_score=provenance_score,
         )
 
+        features_available = [
+            name
+            for name in type(vet_result.features).model_fields
+            if getattr(vet_result.features, name) is not None
+        ]
+
         row: dict[str, Any] = {
             "candidate_id": signal.candidate_id,
             "target_id": signal.target_id,
@@ -173,6 +201,13 @@ def run_pipeline(
                 "novelty_score": scores.novelty_score,
             },
             "pathway": pathway,
+            "meta": {
+                "toolkit_version": __version__,
+                "run_at": datetime.now(UTC).isoformat(),
+                "scorer": scorer,
+                "git_commit": _git_commit_short(),
+                "features_available": features_available,
+            },
         }
 
         if xgb_scorer is not None:
@@ -248,6 +283,15 @@ def scan(
     ),
     output: Path | None = typer.Option(
         None, "--output", "-o", help="Write JSON results to this file"
+    ),
+    version: bool | None = typer.Option(
+        None,
+        "--version",
+        "-V",
+        callback=_version_callback,
+        is_eager=True,
+        help="Show version and exit.",
+        show_default=False,
     ),
 ) -> None:
     """Scan a target for exoplanet transit candidates.

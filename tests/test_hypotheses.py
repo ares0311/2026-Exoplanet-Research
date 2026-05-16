@@ -408,3 +408,71 @@ class TestTransitTimingVariationWiring:
         null_ttv = CandidateFeatures(transit_timing_variation_score=None)
         assert log_score_planet(null_ttv) == pytest.approx(log_score_planet(base))
         assert log_score_instrumental(null_ttv) == pytest.approx(log_score_instrumental(base))
+
+
+# ---------------------------------------------------------------------------
+# New feature wiring tests (Milestones 12a-12e)
+# ---------------------------------------------------------------------------
+
+
+class TestOutOfTransitScatterWiring:
+    def test_high_oot_lowers_planet_score(self) -> None:
+        base = CandidateFeatures()
+        scattered = CandidateFeatures(out_of_transit_scatter_score=1.0)
+        assert log_score_planet(scattered) < log_score_planet(base)
+
+    def test_high_oot_raises_instrumental_score(self) -> None:
+        base = CandidateFeatures()
+        scattered = CandidateFeatures(out_of_transit_scatter_score=1.0)
+        assert log_score_instrumental(scattered) > log_score_instrumental(base)
+
+
+class TestMultiSectorDepthWiring:
+    def test_consistent_sector_depths_raises_planet_score(self) -> None:
+        base = CandidateFeatures()
+        consistent = CandidateFeatures(multi_sector_depth_consistency_score=1.0)
+        assert log_score_planet(consistent) > log_score_planet(base)
+
+    def test_consistent_sector_depths_lowers_instrumental_score(self) -> None:
+        base = CandidateFeatures()
+        consistent = CandidateFeatures(multi_sector_depth_consistency_score=1.0)
+        assert log_score_instrumental(consistent) < log_score_instrumental(base)
+
+
+class TestStellarDensityWiring:
+    def test_consistent_density_raises_planet_score(self) -> None:
+        base = CandidateFeatures()
+        consistent = CandidateFeatures(stellar_density_consistency_score=1.0)
+        assert log_score_planet(consistent) > log_score_planet(base)
+
+    def test_consistent_density_lowers_eb_score(self) -> None:
+        from exo_toolkit.hypotheses import log_score_eclipsing_binary
+        base = CandidateFeatures()
+        consistent = CandidateFeatures(stellar_density_consistency_score=1.0)
+        assert log_score_eclipsing_binary(consistent) < log_score_eclipsing_binary(base)
+
+
+class TestCentroidMotionWiring:
+    def test_high_centroid_motion_lowers_planet_score(self) -> None:
+        base = CandidateFeatures()
+        motion = CandidateFeatures(centroid_motion_score=1.0)
+        assert log_score_planet(motion) < log_score_planet(base)
+
+    def test_high_centroid_motion_raises_beb_score(self) -> None:
+        from exo_toolkit.hypotheses import log_score_background_eb
+        base = CandidateFeatures()
+        motion = CandidateFeatures(centroid_motion_score=1.0)
+        assert log_score_background_eb(motion) > log_score_background_eb(base)
+
+
+class TestLimbDarkeningWiring:
+    def test_plausible_ld_raises_planet_score(self) -> None:
+        base = CandidateFeatures()
+        plausible = CandidateFeatures(limb_darkening_plausibility_score=1.0)
+        assert log_score_planet(plausible) > log_score_planet(base)
+
+    def test_plausible_ld_lowers_eb_score(self) -> None:
+        from exo_toolkit.hypotheses import log_score_eclipsing_binary
+        base = CandidateFeatures()
+        plausible = CandidateFeatures(limb_darkening_plausibility_score=1.0)
+        assert log_score_eclipsing_binary(plausible) < log_score_eclipsing_binary(base)

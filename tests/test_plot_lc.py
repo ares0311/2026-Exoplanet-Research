@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -12,7 +12,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from Skills.plot_lc import phase_fold, plot_all, plot_candidate  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -57,7 +57,7 @@ def to_csv(rows: list[dict[str, Any]], path: Path | str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
 
     fieldnames = [col for col, _ in _EXPORT_COLUMNS]
-    display_headers = {col: label for col, label in _EXPORT_COLUMNS}
+    display_headers = dict(_EXPORT_COLUMNS)
 
     with path.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")

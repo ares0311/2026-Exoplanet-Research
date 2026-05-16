@@ -535,3 +535,124 @@ class TestProvenanceScoreFlow:
 
         assert "provenance_score" in captured[0]
         assert abs(captured[0]["provenance_score"] - 1.0) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# CLI --version flag (Milestone 12m)
+# ---------------------------------------------------------------------------
+
+
+class TestCLIVersion:
+    def test_version_flag_exits_zero(self) -> None:
+        result = runner.invoke(app, ["--version"])
+        assert result.exit_code == 0
+
+    def test_version_output_contains_semver(self) -> None:
+        import re
+        result = runner.invoke(app, ["--version"])
+        assert re.search(r"\d+\.\d+\.\d+", result.output)
+
+    def test_short_version_flag_works(self) -> None:
+        result = runner.invoke(app, ["-V"])
+        assert result.exit_code == 0
+        import re
+        assert re.search(r"\d+\.\d+\.\d+", result.output)
+
+    def test_help_exits_zero(self) -> None:
+        result = runner.invoke(app, ["--help"])
+        assert result.exit_code == 0
+
+    def test_scan_help_exits_zero(self) -> None:
+        result = runner.invoke(app, ["scan", "--help"])
+        assert result.exit_code == 0
+
+    def test_version_consistent_with_package(self) -> None:
+        from exo_toolkit import __version__
+        result = runner.invoke(app, ["--version"])
+        assert __version__ in result.output
+
+
+# ---------------------------------------------------------------------------
+# Richer JSON output metadata (Milestone 12n)
+# ---------------------------------------------------------------------------
+
+
+class TestOutputMetadata:
+    def _run_pipeline_mocked(self, scorer: str = "bayesian") -> list[dict]:
+        lc = _mock_lc()
+        signal = _make_signal()
+        posterior = _uniform_posterior()
+        scores = _make_scores()
+        fetch_result = _make_fetch_result(lc, cadence_seconds=120.0, sectors=(1, 2, 3))
+        with (
+            patch("exo_toolkit.cli.search_lightcurve", return_value=[signal]),
+            patch(
+                "exo_toolkit.cli.vet_signal",
+                return_value=MagicMock(features=CandidateFeatures()),
+            ),
+            patch("exo_toolkit.cli.score_candidate", return_value=(posterior, scores)),
+            patch(
+                "exo_toolkit.cli.classify_submission_pathway",
+                return_value="planet_hunters_discussion",
+            ),
+        ):
+            return run_pipeline(
+                "TIC 0",
+                "TESS",
+                scorer=scorer,
+                fetch_fn=lambda *_: fetch_result,
+                clean_fn=lambda *_: MagicMock(light_curve=lc),
+            )
+
+    def test_row_contains_meta_key(self) -> None:
+        rows = self._run_pipeline_mocked()
+        assert len(rows) == 1
+        assert "meta" in rows[0]
+
+    def test_meta_toolkit_version_is_string(self) -> None:
+        rows = self._run_pipeline_mocked()
+        assert isinstance(rows[0]["meta"]["toolkit_version"], str)
+        assert len(rows[0]["meta"]["toolkit_version"]) > 0
+
+    def test_meta_run_at_is_iso8601(self) -> None:
+        from datetime import datetime
+        rows = self._run_pipeline_mocked()
+        run_at = rows[0]["meta"]["run_at"]
+        datetime.fromisoformat(run_at)  # raises if invalid
+
+    def test_meta_scorer_matches_argument(self) -> None:
+        rows = self._run_pipeline_mocked(scorer="bayesian")
+        assert rows[0]["meta"]["scorer"] == "bayesian"
+
+    def test_meta_git_commit_none_or_string(self) -> None:
+        rows = self._run_pipeline_mocked()
+        commit = rows[0]["meta"]["git_commit"]
+        assert commit is None or isinstance(commit, str)
+
+    def test_meta_features_available_is_list(self) -> None:
+        rows = self._run_pipeline_mocked()
+        assert isinstance(rows[0]["meta"]["features_available"], list)
+
+    def test_meta_features_available_names_valid(self) -> None:
+        rows = self._run_pipeline_mocked()
+        valid_names = set(CandidateFeatures.model_fields.keys())
+        for name in rows[0]["meta"]["features_available"]:
+            assert name in valid_names
+
+    def test_json_output_contains_meta(self, tmp_path: Path) -> None:
+        out = tmp_path / "out.json"
+        rows = self._run_pipeline_mocked()
+        assert "meta" in rows[0]
+        out.write_text(json.dumps(rows))
+        assert out.exists()
+        data = json.loads(out.read_text())
+        assert isinstance(data, list)
+        assert "meta" in data[0]
+
+    def test_meta_present_with_bayesian_scorer(self) -> None:
+        rows = self._run_pipeline_mocked(scorer="bayesian")
+        assert "meta" in rows[0]
+
+    def test_meta_scorer_field_correct_for_bayesian(self) -> None:
+        rows = self._run_pipeline_mocked(scorer="bayesian")
+        assert rows[0]["meta"]["scorer"] == "bayesian"

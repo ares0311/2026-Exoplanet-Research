@@ -21,6 +21,11 @@ Run any script with `--help` to see its full CLI options.
 | `export_candidates.py` | Export ranked candidates to CSV and Markdown | `to_csv`, `to_markdown_table` |
 | `summary_report.py` | Generate Markdown summary from batch_scan output | `build_report`, `write_report` |
 | `plot_lc.py` | Phase-fold PNG from candidate JSON | `plot_candidate`, `phase_fold` |
+| `notebook_generator.py` | Generate Jupyter notebook for a TIC target | `generate_notebook` |
+| `target_prioritizer.py` | Rank TIC IDs by TOI status + sector coverage | `prioritize_targets`, `format_recommendations` |
+| `compare_candidates.py` | Merge multi-file JSON into Markdown comparison | `load_and_merge`, `build_comparison_report` |
+| `candidate_timeline.py` | Track candidate score evolution across runs | `CandidateTimeline.record`, `to_markdown` |
+| `fits_header_extractor.py` | Extract stellar params from TESS SPOC FITS headers | `extract_from_header`, `to_vet_kwargs` |
 | `injection_recovery.py` | Measure pipeline completeness via synthetic transit injection | `run_injection_recovery` |
 | `evaluate_scorer.py` | k-fold ROC-AUC, F1, reliability diagram | `evaluate_scorer` |
 | `build_training_data.py` | Map Kepler KOI table → CandidateFeatures pickle | `build_training_data` |
@@ -198,6 +203,81 @@ python Skills/injection_recovery.py \
 ```bash
 python Skills/count_tess_labels.py
 # Current CP count: 4,217  |  Gate threshold: 5,000  |  Status: BLOCKED
+```
+
+---
+
+## Notebook generation
+
+Generate a ready-to-run Jupyter notebook for any TIC target:
+
+```bash
+python Skills/notebook_generator.py 150428135 \
+    --mission TESS \
+    --stellar-radius 0.42 \
+    --stellar-mass 0.40 \
+    --output notebooks/TIC_150428135.ipynb
+```
+
+The notebook covers all 6 pipeline stages with prose and code cells.
+
+---
+
+## Target prioritization
+
+Rank a list of TIC IDs before committing pipeline time:
+
+```bash
+# targets.txt — one TIC ID per line
+python Skills/target_prioritizer.py targets.txt \
+    --min-priority 0.40 \
+    --skip-tois \
+    --output priority.json
+```
+
+Combines TOI lookup, sector coverage, and a priority heuristic to label each
+target as `scan`, `skip_toi`, or `skip_low_priority`.
+
+---
+
+## Multi-run candidate comparison
+
+Compare results from different pipeline configurations or batch runs:
+
+```bash
+python Skills/compare_candidates.py \
+    results_bayesian.json results_xgboost.json \
+    --sort-by rank_score \
+    --output reports/comparison.md
+```
+
+---
+
+## Candidate timeline tracking
+
+Record how a candidate's FPP and pathway evolve as new data arrives:
+
+```python
+from Skills.candidate_timeline import CandidateTimeline
+
+tl = CandidateTimeline("data/timeline.json")
+tl.record(row, note="added sector 55 data")
+print(tl.to_markdown("TIC0-001"))
+print(tl.summary("TIC0-001"))  # {n_runs, trend_fpp, ...}
+```
+
+---
+
+## FITS stellar parameter extraction
+
+Pull stellar parameters directly from a TESS SPOC FITS file for use with
+`vet_signal`:
+
+```python
+from Skills.fits_header_extractor import extract_stellar_params
+
+params = extract_stellar_params("TIC150428135_s0001_lc.fits")
+vet_result = vet_signal(lc, signal, **params.to_vet_kwargs())
 ```
 
 ---

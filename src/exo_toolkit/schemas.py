@@ -68,6 +68,10 @@ class CandidateFeatures(BaseModel):
     transit_shape_score: OptScore = None
     data_gap_overlap_score: OptScore = None
     transit_timing_variation_score: OptScore = None
+    out_of_transit_scatter_score: OptScore = None
+    multi_sector_depth_consistency_score: OptScore = None
+    stellar_density_consistency_score: OptScore = None
+    limb_darkening_plausibility_score: OptScore = None
 
     # Eclipsing binary indicators
     odd_even_mismatch_score: OptScore = None
@@ -83,6 +87,7 @@ class CandidateFeatures(BaseModel):
     nearby_bright_source_score: OptScore = None
     aperture_edge_score: OptScore = None
     dilution_sensitivity_score: OptScore = None
+    centroid_motion_score: OptScore = None
 
     # Stellar variability indicators
     stellar_variability_score: OptScore = None

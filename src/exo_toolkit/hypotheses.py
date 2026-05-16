@@ -73,6 +73,11 @@ def log_score_planet(
         - _w(features.stellar_variability_score, 0.90)
         - _w(features.depth_scatter_chi2_score, 0.60)
         - _w(features.transit_timing_variation_score, 0.50)
+        - _w(features.out_of_transit_scatter_score, 0.70)
+        + _w(features.multi_sector_depth_consistency_score, 0.60)
+        + _w(features.stellar_density_consistency_score, 0.80)
+        - _w(features.centroid_motion_score, 1.00)
+        + _w(features.limb_darkening_plausibility_score, 0.50)
     )
 
 
@@ -89,6 +94,8 @@ def log_score_eclipsing_binary(
         + _w(features.large_depth_score, 1.20)
         + _w(features.companion_radius_too_large_score, 1.20)
         + _w(features.duration_implausibility_score, 0.80)
+        - _w(features.stellar_density_consistency_score, 0.70)
+        - _w(features.limb_darkening_plausibility_score, 0.40)
     )
 
 
@@ -104,6 +111,8 @@ def log_score_background_eb(
         + _w(features.nearby_bright_source_score, 1.20)
         + _w(features.aperture_edge_score, 1.00)
         + _w(features.dilution_sensitivity_score, 0.80)
+        + _w(features.centroid_motion_score, 1.40)
+        - _w(features.stellar_density_consistency_score, 0.50)
     )
 
 
@@ -137,6 +146,8 @@ def log_score_instrumental(
         + _w(features.nearby_targets_common_signal_score, 1.00)
         + _w(features.depth_scatter_chi2_score, 0.90)
         + _w(features.transit_timing_variation_score, 0.60)
+        + _w(features.out_of_transit_scatter_score, 0.80)
+        - _w(features.multi_sector_depth_consistency_score, 0.50)
     )
 
 

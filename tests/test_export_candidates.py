@@ -15,7 +15,6 @@ from Skills.export_candidates import (  # noqa: E402
     to_summary_stats,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -64,7 +63,7 @@ class TestToCsv:
         out = tmp_path / "out.csv"
         to_csv(rows, out)
         with out.open() as f:
-            lines = [l for l in csv.reader(f)]
+            lines = list(csv.reader(f))
         assert len(lines) == 4  # 1 header + 3 data
 
     def test_creates_parent_directory(self, tmp_path: Path) -> None:

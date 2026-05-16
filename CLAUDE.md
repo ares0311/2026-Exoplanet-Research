@@ -38,22 +38,22 @@ CI: `.github/workflows/ci.yml`
 | Module | Status | Tests |
 |---|---|---|
 | `schemas.py` | **done** | `test_schemas.py` (33) |
-| `features.py` | **done** | `test_features.py` (107) — includes `depth_scatter_chi2_score`, `transit_timing_variation_score` |
-| `hypotheses.py` | **done** | `test_hypotheses.py` (36) — `depth_scatter_chi2_score` + `transit_timing_variation_score` wiring |
-| `scoring.py` | **done** | `test_scoring.py` (25) |
-| `pathway.py` | **done** | `test_pathway.py` (35) |
+| `features.py` | **done** | `test_features.py` (145) — includes all 5 Milestone 12 feature functions |
+| `hypotheses.py` | **done** | `test_hypotheses.py` (46) — all 5 Milestone 12 features wired |
+| `scoring.py` | **done** | `test_scoring.py` (45) — invariants + weight-sensitivity tests |
+| `pathway.py` | **done** | `test_pathway.py` (45) — parametric tfop_ready gate tests |
 | `fetch.py` | **done** | `test_fetch.py` (55, 2 live) |
 | `clean.py` | **done** | `test_clean.py` (39) |
 | `search.py` | **done** | `test_search.py` (43) |
 | `vet.py` | **done** | `test_vet.py` (47) |
 | `calibration.py` | **done** | `test_calibration.py` (70) |
-| `cli.py` | **done** | `test_cli.py` (24) |
+| `cli.py` | **done** | `test_cli.py` (40) — version flag, meta output |
 | `ml/xgboost_scorer.py` | **done** | `test_xgboost_scorer.py` (45) |
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Total passing tests: 907 (+ 2 integration_live; 6 skipped without matplotlib)**
-**Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `fetch_tess_toi.py` (11), `build_training_data.py` (34), `build_tess_training_data.py` (38), `build_combined_training_data.py` (13), `train_xgboost.py` (25), `evaluate_scorer.py` (14), `count_tess_labels.py`, `star_scanner.py` (38), `rank_candidates.py` (12), `batch_scan.py` (14), `sector_coverage.py` (10), `plot_lc.py` (11), `watchlist.py` (13), `summary_report.py` (14), `toi_checker.py` (12), `export_candidates.py` (13), `alert_filter.py` (12)**
+**Total passing tests: 1068 (+ 2 integration_live; 6 skipped without matplotlib)**
+**Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `fetch_tess_toi.py` (11), `build_training_data.py` (34), `build_tess_training_data.py` (38), `build_combined_training_data.py` (13), `train_xgboost.py` (25), `evaluate_scorer.py` (14), `count_tess_labels.py`, `star_scanner.py` (38), `rank_candidates.py` (12), `batch_scan.py` (14), `sector_coverage.py` (10), `plot_lc.py` (11), `watchlist.py` (13), `summary_report.py` (14), `toi_checker.py` (12), `export_candidates.py` (13), `alert_filter.py` (12), `notebook_generator.py` (10), `target_prioritizer.py` (12), `compare_candidates.py` (11), `candidate_timeline.py` (12), `fits_header_extractor.py` (12)**
 
 ---
 
@@ -240,9 +240,101 @@ New feature in `features.py` and `schemas.py` (Milestone 11a):
 
 ---
 
+## Milestone 12 Features (features.py + schemas.py + hypotheses.py)
+
+Five new diagnostic scores added (Milestone 12a–12e):
+
+| Function | Weight in planet | Wired into |
+|---|---|---|
+| `out_of_transit_scatter_score(oot_scatter_sigma, sigma_threshold=3.0)` | −0.70 | planet(−), instrumental(+0.80) |
+| `multi_sector_depth_consistency_score(sector_depths, sector_depth_errors, cv_threshold=0.20)` | +0.60 | planet(+), instrumental(−0.50) |
+| `stellar_density_consistency_score(duration_hours, period_days, depth_ppm, stellar_radius_rsun, stellar_mass_msun)` | +0.80 | planet(+), EB(−0.70), bgEB(−0.50) |
+| `centroid_motion_score(centroid_motion_arcsec, saturation_arcsec=2.0)` | −1.00 | planet(−), bgEB(+1.40) |
+| `limb_darkening_plausibility_score(ingress_egress_fraction, depth_ppm, stellar_teff_k=5778.0)` | +0.50 | planet(+), EB(−0.40) |
+
+`stellar_density_consistency_score` uses transit duration approximation: `a/R_* = P / (π × T)` (b=0).
+New `RawDiagnostics` fields: `oot_scatter_sigma`, `sector_depths`, `sector_depth_errors`, `centroid_motion_arcsec`, `stellar_teff_k`.
+
+---
+
+## CLI Version Flag and Meta Output (Milestone 12f)
+
+- `exo --version` / `exo -V` — prints `exo-toolkit 0.1.0` (eager Typer callback)
+- `__version__ = "0.1.0"` in `src/exo_toolkit/__init__.py` (importlib.metadata fallback)
+- Each output row gains a `"meta"` dict: `toolkit_version`, `run_at`, `scorer`, `git_commit`, `features_available`
+- `_git_commit_short()` reads `git rev-parse --short HEAD`; returns `None` on failure
+
+---
+
+## Notebook Generator (`Skills/notebook_generator.py`)
+
+Programmatically generates Jupyter notebooks for a given TIC target.
+
+- `generate_notebook(tic_id, *, mission, stellar_radius_rsun, stellar_mass_msun, min_snr, output_path) -> Path`
+- Produces `notebooks/TIC_{tic_id}.ipynb` by default
+- 7 cells covering all pipeline stages; nbformat 4.4 compatible
+- 10 tests in `tests/test_notebook_generator.py`
+
+---
+
+## Target Prioritizer (`Skills/target_prioritizer.py`)
+
+Ranks a list of TIC IDs by scan priority, combining TOI status and sector coverage.
+
+- `TargetRecommendation` dataclass: `tic_id`, `priority_score`, `toi_status`, `n_sectors`, `recommendation`, `reason`
+- `prioritize_targets(tic_ids, *, toi_check_fn, toi_table_fn, sector_coverage_fn, priority_fn, min_priority, skip_known_tois)` → sorted list
+- `format_recommendations(recs) -> str` — Markdown table
+- Recommendations: `"scan"` | `"skip_toi"` | `"skip_low_priority"`
+- 12 tests in `tests/test_target_prioritizer.py`
+
+---
+
+## Compare Candidates (`Skills/compare_candidates.py`)
+
+Merges multiple batch_scan JSON files into a unified Markdown comparison report.
+
+- `load_and_merge(paths) -> list[dict]` — flattens list or single-dict JSON files; adds `_source_file`
+- `build_comparison_report(rows, *, title, sort_by) -> str` — `sort_by` in `{"false_positive_probability", "rank_score", "period_days"}`; FPP/period ascending, rank_score descending
+- `write_comparison_report(rows, output_path, *, title) -> Path`
+- 11 tests in `tests/test_compare_candidates.py`
+
+---
+
+## Candidate Timeline (`Skills/candidate_timeline.py`)
+
+Tracks how a candidate's scores evolve across repeated pipeline runs.
+
+- `TimelineEntry` dataclass: `run_at`, `period_days`, `fpp`, `planet_posterior`, `pathway`, `scorer`, `note`
+- `CandidateTimeline(path)` — atomic-write JSON; `record(row, *, note)`, `entries(candidate_id)`, `latest(candidate_id)`, `summary(candidate_id)`, `to_markdown(candidate_id)`
+- `summary()` returns `{n_runs, first_run_at, latest_run_at, trend_fpp}` — `trend_fpp = last_fpp − first_fpp`
+- 12 tests in `tests/test_candidate_timeline.py`
+
+---
+
+## FITS Header Extractor (`Skills/fits_header_extractor.py`)
+
+Extracts stellar parameters from TESS SPOC FITS headers for use as `vet_signal` kwargs.
+
+- `FITSStellarParams` dataclass: `tic_id`, `stellar_radius_rsun`, `stellar_mass_msun`, `stellar_teff_k`, `stellar_logg`, `contamination_ratio`, `sector`
+- `extract_from_header(header: dict) -> FITSStellarParams` — keys: `TICID`, `RADIUS`, `MASS`, `TEFF`, `LOGG`, `CROWDSAP` (→ `1 - CROWDSAP`), `SECTOR`
+- `extract_stellar_params(fits_path, *, hdu_index=0) -> FITSStellarParams` — reads actual FITS file
+- `to_vet_kwargs()` — returns dict excluding `None` fields, ready for `**kwargs` to `vet_signal`
+- 12 tests in `tests/test_fits_header_extractor.py`
+
+---
+
+## Integration Pipeline Tests (`tests/test_integration_pipeline.py`)
+
+End-to-end pipeline test using mocked I/O (no network required).
+
+- Mocks `search_lightcurve` and `vet_signal`; scoring + pathway run for real
+- 10 tests in `TestIntegrationPipeline` covering: non-empty output, required keys, posterior sum, FPP range, valid pathway, scorer modes, error cases, provenance score
+
+---
+
 ## Skills Guide (`docs/SKILLS_GUIDE.md`)
 
-Complete user reference for all 19 Skills scripts.
+Complete user reference for all 24 Skills scripts (updated Milestone 12).
 
 - Quick-reference table of all scripts with purpose and key functions
 - Discovery workflow diagram: `star_scanner → batch_scan → alert_filter → rank_candidates → watchlist/export/report`

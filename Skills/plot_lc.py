@@ -17,7 +17,6 @@ from typing import Any
 
 import numpy as np
 
-
 # ---------------------------------------------------------------------------
 # Core phase-folding math (no matplotlib dependency)
 # ---------------------------------------------------------------------------
@@ -95,7 +94,9 @@ def plot_candidate(
     fig, ax = plt.subplots(figsize=(8, 4))
 
     if time is not None and flux is not None:
-        ph, fl = phase_fold(np.asarray(time, dtype=float), np.asarray(flux, dtype=float), period, epoch)
+        ph, fl = phase_fold(
+            np.asarray(time, dtype=float), np.asarray(flux, dtype=float), period, epoch
+        )
         ax.scatter(ph, fl, s=1, alpha=0.4, color="steelblue", label="data")
 
     ax.axvline(0.0, color="tomato", linewidth=1.2, linestyle="--", label="transit")

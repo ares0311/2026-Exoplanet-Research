@@ -1,4 +1,6 @@
 """Tests for exo_toolkit.pathway."""
+import pytest
+
 from exo_toolkit.pathway import classify_submission_pathway
 from exo_toolkit.schemas import (
     CandidateFeatures,
@@ -511,3 +513,72 @@ class TestEmptyFeatures:
             _scores(fpp=0.25, ns=0.80),
         )
         assert result == "kepler_archive_candidate"
+
+
+# ---------------------------------------------------------------------------
+# Parametric tfop_ready gate tests (Milestone 12k)
+# ---------------------------------------------------------------------------
+
+
+def _all_passing_kwargs() -> dict:
+    """All inputs that satisfy every tfop_ready gate simultaneously."""
+    return {
+        "signal": _signal(snr=9.0, transit_count=3),
+        "features": _tfop_features(),
+        "posterior": _posterior(planet=0.70, ko=0.02, eb=0.12, beb=0.06, sv=0.05, ia=0.05),
+        "scores": _scores(fpp=0.25, dc=0.85),
+        "provenance_score": 0.90,
+    }
+
+
+class TestTfopReadyGatesParametric:
+    @pytest.mark.parametrize(
+        "gate_name,override",
+        [
+            (
+                "planet_posterior",
+                {"posterior": _posterior(
+                    planet=0.40, ko=0.02, eb=0.30, beb=0.12, sv=0.08, ia=0.08
+                )},
+            ),
+            ("fpp", {"scores": _scores(fpp=0.40, dc=0.85)}),
+            ("snr", {"signal": _signal(snr=7.5, transit_count=3)}),
+            ("transit_count", {"signal": _signal(snr=9.0, transit_count=1)}),
+            (
+                "contamination_high",
+                {"features": CandidateFeatures(
+                    contamination_score=0.60,
+                    secondary_eclipse_score=0.05,
+                    odd_even_mismatch_score=0.05,
+                )},
+            ),
+            ("provenance_score", {"provenance_score": 0.50}),
+            (
+                "contamination_none",
+                {"features": CandidateFeatures(
+                    secondary_eclipse_score=0.05, odd_even_mismatch_score=0.05
+                )},
+            ),
+            (
+                "secondary_none",
+                {"features": CandidateFeatures(
+                    contamination_score=0.10, odd_even_mismatch_score=0.05
+                )},
+            ),
+            (
+                "odd_even_none",
+                {"features": CandidateFeatures(
+                    contamination_score=0.10, secondary_eclipse_score=0.05
+                )},
+            ),
+        ],
+    )
+    def test_failing_gate_blocks_tfop(self, gate_name: str, override: dict) -> None:
+        kwargs = _all_passing_kwargs()
+        kwargs.update(override)
+        result = classify_submission_pathway(**kwargs)
+        assert result != "tfop_ready", f"Gate '{gate_name}' should have blocked tfop_ready"
+
+    def test_all_gates_passing_gives_tfop(self) -> None:
+        result = classify_submission_pathway(**_all_passing_kwargs())
+        assert result == "tfop_ready"

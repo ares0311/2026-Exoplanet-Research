@@ -5,12 +5,14 @@ from exo_toolkit.features import (
     RawDiagnostics,
     aperture_edge_score,
     background_excursion_score,
+    centroid_motion_score,
     centroid_offset_score,
     companion_radius_too_large_score,
     contamination_score,
     coordinate_match_score,
     data_gap_overlap_score,
     depth_consistency_score,
+    depth_scatter_chi2_score,
     dilution_sensitivity_score,
     duration_consistency_score,
     duration_implausibility_score,
@@ -21,11 +23,14 @@ from exo_toolkit.features import (
     harmonic_score,
     known_object_score,
     large_depth_score,
+    limb_darkening_plausibility_score,
     log_snr_score,
+    multi_sector_depth_consistency_score,
     nearby_bright_source_score,
     nearby_targets_common_signal_score,
     non_box_shape_score,
     odd_even_mismatch_score,
+    out_of_transit_scatter_score,
     period_match_score,
     quality_flag_score,
     quasi_periodic_score,
@@ -33,13 +38,13 @@ from exo_toolkit.features import (
     sector_boundary_score,
     single_event_score,
     snr_score,
+    stellar_density_consistency_score,
     stellar_variability_score,
     systematics_overlap_score,
     target_id_match_score,
     transit_count_score,
-    depth_scatter_chi2_score,
-    transit_timing_variation_score,
     transit_shape_score,
+    transit_timing_variation_score,
     v_shape_score,
     variability_periodogram_score,
 )
@@ -746,13 +751,19 @@ class TestTransitTimingVariationScore:
     def test_moderate_scatter_in_range(self) -> None:
         # rms = 5 min / 10 min threshold → 0.5
         mids = self._midpoints([5.0, -5.0])
-        s = transit_timing_variation_score(mids, self._PERIOD, self._EPOCH, rms_threshold_minutes=10.0)
+        s = transit_timing_variation_score(
+            mids, self._PERIOD, self._EPOCH, rms_threshold_minutes=10.0
+        )
         assert s is not None and pytest.approx(s, abs=0.01) == 0.5
 
     def test_custom_threshold_scales_score(self) -> None:
         mids = self._midpoints([5.0, -5.0])
-        s_default = transit_timing_variation_score(mids, self._PERIOD, self._EPOCH, rms_threshold_minutes=10.0)
-        s_tight   = transit_timing_variation_score(mids, self._PERIOD, self._EPOCH, rms_threshold_minutes=5.0)
+        s_default = transit_timing_variation_score(
+            mids, self._PERIOD, self._EPOCH, rms_threshold_minutes=10.0
+        )
+        s_tight = transit_timing_variation_score(
+            mids, self._PERIOD, self._EPOCH, rms_threshold_minutes=5.0
+        )
         assert s_tight is not None and s_default is not None
         assert s_tight > s_default
 
@@ -798,3 +809,230 @@ class TestTransitTimingVariationScore:
         mids = self._midpoints([0.0, 0.0])
         s = transit_timing_variation_score(mids, self._PERIOD, self._EPOCH)
         assert s is not None
+
+
+# ---------------------------------------------------------------------------
+# out_of_transit_scatter_score
+# ---------------------------------------------------------------------------
+
+
+def _signal() -> CandidateSignal:
+    return CandidateSignal(
+        candidate_id="x",
+        mission="TESS",
+        target_id="TIC 1",
+        period_days=5.0,
+        epoch_bjd=2458600.0,
+        duration_hours=2.0,
+        depth_ppm=1000.0,
+        transit_count=3,
+        snr=10.0,
+    )
+
+
+class TestOutOfTransitScatterScore:
+    def test_zero_scatter_gives_zero(self) -> None:
+        assert out_of_transit_scatter_score(0.0) == pytest.approx(0.0)
+
+    def test_at_threshold_gives_one(self) -> None:
+        assert out_of_transit_scatter_score(3.0) == pytest.approx(1.0)
+
+    def test_above_threshold_clips_to_one(self) -> None:
+        assert out_of_transit_scatter_score(5.0) == pytest.approx(1.0)
+
+    def test_half_threshold_gives_half(self) -> None:
+        assert out_of_transit_scatter_score(1.5) == pytest.approx(0.5)
+
+    def test_custom_threshold(self) -> None:
+        assert out_of_transit_scatter_score(2.0, sigma_threshold=4.0) == pytest.approx(0.5)
+
+    def test_extract_features_propagates_oot(self) -> None:
+        diag = RawDiagnostics(oot_scatter_sigma=1.5)
+        f = extract_features(_signal(), diag)
+        assert f.out_of_transit_scatter_score == pytest.approx(0.5)
+
+    def test_none_oot_gives_none_feature(self) -> None:
+        f = extract_features(_signal(), RawDiagnostics())
+        assert f.out_of_transit_scatter_score is None
+
+
+# ---------------------------------------------------------------------------
+# multi_sector_depth_consistency_score
+# ---------------------------------------------------------------------------
+
+
+class TestMultiSectorDepthConsistencyScore:
+    def test_identical_depths_gives_one(self) -> None:
+        s = multi_sector_depth_consistency_score((1000.0, 1000.0, 1000.0))
+        assert s == pytest.approx(1.0)
+
+    def test_single_sector_gives_none(self) -> None:
+        assert multi_sector_depth_consistency_score((1000.0,)) is None
+
+    def test_empty_gives_none(self) -> None:
+        assert multi_sector_depth_consistency_score(()) is None
+
+    def test_highly_variable_clips_to_zero(self) -> None:
+        s = multi_sector_depth_consistency_score((1000.0, 5000.0, 100.0))
+        assert s is not None
+        assert s == pytest.approx(0.0)
+
+    def test_consistent_depths_score_high(self) -> None:
+        s = multi_sector_depth_consistency_score((1000.0, 1010.0, 990.0))
+        assert s is not None
+        assert s > 0.8
+
+    def test_custom_cv_threshold(self) -> None:
+        # With cv_threshold=0.10, a CV of 0.05 → score = 1 - 0.05/0.10 = 0.5
+        # depths (950, 1000, 1050): MAD=50, median=1000, CV=0.05
+        s = multi_sector_depth_consistency_score((950.0, 1000.0, 1050.0), cv_threshold=0.10)
+        assert s is not None
+        assert 0.0 < s < 1.0
+
+    def test_extract_features_propagates_sector_depths(self) -> None:
+        diag = RawDiagnostics(sector_depths=(1000.0, 1000.0))
+        f = extract_features(_signal(), diag)
+        assert f.multi_sector_depth_consistency_score is not None
+        assert f.multi_sector_depth_consistency_score == pytest.approx(1.0)
+
+    def test_none_sector_depths_gives_none_feature(self) -> None:
+        f = extract_features(_signal(), RawDiagnostics())
+        assert f.multi_sector_depth_consistency_score is None
+
+
+# ---------------------------------------------------------------------------
+# stellar_density_consistency_score
+# ---------------------------------------------------------------------------
+
+
+class TestStellarDensityConsistencyScore:
+    def test_consistent_solar_transit_scores_high(self) -> None:
+        # Solar star (R=1, M=1), 10-day period, 1000ppm depth, 3h duration
+        s = stellar_density_consistency_score(3.0, 10.0, 1000.0, 1.0, 1.0)
+        assert s > 0.5
+
+    def test_zero_period_gives_zero(self) -> None:
+        assert stellar_density_consistency_score(3.0, 0.0, 1000.0, 1.0, 1.0) == pytest.approx(0.0)
+
+    def test_zero_duration_gives_zero(self) -> None:
+        assert stellar_density_consistency_score(0.0, 10.0, 1000.0, 1.0, 1.0) == pytest.approx(0.0)
+
+    def test_output_in_zero_one(self) -> None:
+        for dur in (1.0, 3.0, 10.0, 48.0):
+            s = stellar_density_consistency_score(dur, 10.0, 1000.0, 1.0, 1.0)
+            assert 0.0 <= s <= 1.0
+
+    def test_extract_features_propagates_density(self) -> None:
+        diag = RawDiagnostics(stellar_radius_rsun=1.0, stellar_mass_msun=1.0)
+        f = extract_features(_signal(), diag)
+        assert f.stellar_density_consistency_score is not None
+
+    def test_none_stellar_params_gives_none_feature(self) -> None:
+        f = extract_features(_signal(), RawDiagnostics())
+        assert f.stellar_density_consistency_score is None
+
+    def test_tolerance_factor_scales_score(self) -> None:
+        # A larger tolerance factor should yield an equal or higher score for the same discrepancy
+        s_tight = stellar_density_consistency_score(
+            3.0, 10.0, 1000.0, 1.0, 1.0, tolerance_factor=1.0
+        )
+        s_loose = stellar_density_consistency_score(
+            3.0, 10.0, 1000.0, 1.0, 1.0, tolerance_factor=5.0
+        )
+        assert s_loose >= s_tight
+
+    def test_wider_discrepancy_gives_lower_score(self) -> None:
+        # Very short duration is less physically consistent → lower score
+        s_long = stellar_density_consistency_score(3.0, 10.0, 1000.0, 1.0, 1.0)
+        s_short = stellar_density_consistency_score(0.1, 10.0, 1000.0, 1.0, 1.0)
+        assert s_long >= s_short
+
+
+# ---------------------------------------------------------------------------
+# centroid_motion_score
+# ---------------------------------------------------------------------------
+
+
+class TestCentroidMotionScore:
+    def test_zero_motion_gives_zero(self) -> None:
+        assert centroid_motion_score(0.0) == pytest.approx(0.0)
+
+    def test_at_saturation_gives_one(self) -> None:
+        assert centroid_motion_score(2.0) == pytest.approx(1.0)
+
+    def test_above_saturation_clips_to_one(self) -> None:
+        assert centroid_motion_score(5.0) == pytest.approx(1.0)
+
+    def test_intermediate_correct(self) -> None:
+        assert centroid_motion_score(1.0) == pytest.approx(0.5)
+
+    def test_custom_saturation(self) -> None:
+        assert centroid_motion_score(2.0, saturation_arcsec=4.0) == pytest.approx(0.5)
+
+    def test_extract_features_propagates_centroid_motion(self) -> None:
+        diag = RawDiagnostics(centroid_motion_arcsec=1.0)
+        f = extract_features(_signal(), diag)
+        assert f.centroid_motion_score == pytest.approx(0.5)
+
+    def test_none_centroid_motion_gives_none_feature(self) -> None:
+        f = extract_features(_signal(), RawDiagnostics())
+        assert f.centroid_motion_score is None
+
+
+# ---------------------------------------------------------------------------
+# limb_darkening_plausibility_score
+# ---------------------------------------------------------------------------
+
+
+class TestLimbDarkeningPlausibilityScore:
+    def test_solar_realistic_transit_scores_above_half(self) -> None:
+        # For depth=1000ppm, Teff=5778K: k≈0.032, expected_ief small
+        # A measured IEF matching expected should score well
+        from exo_toolkit.features import _ld_ingress_egress_fraction  # noqa: PLC0415
+        expected = _ld_ingress_egress_fraction(1000.0, 5778.0)
+        s = limb_darkening_plausibility_score(expected, 1000.0, 5778.0)
+        assert s > 0.5
+
+    def test_v_shape_inconsistency_scores_low(self) -> None:
+        # IEF=0.0 (pure V-shape) vs. expected non-zero → discrepancy → low score
+        s = limb_darkening_plausibility_score(0.0, 1000.0, 5778.0)
+        assert s < 1.0
+
+    def test_output_in_zero_one(self) -> None:
+        for ief in (0.0, 0.1, 0.5, 1.0):
+            s = limb_darkening_plausibility_score(ief, 1000.0, 5778.0)
+            assert 0.0 <= s <= 1.0
+
+    def test_different_teff_changes_expected_ief(self) -> None:
+        from exo_toolkit.features import _ld_ingress_egress_fraction  # noqa: PLC0415
+        ief_cool = _ld_ingress_egress_fraction(1000.0, 3000.0)
+        ief_hot = _ld_ingress_egress_fraction(1000.0, 10000.0)
+        assert ief_cool != ief_hot
+
+    def test_extract_features_propagates_ld(self) -> None:
+        from exo_toolkit.features import _ld_ingress_egress_fraction  # noqa: PLC0415
+        expected = _ld_ingress_egress_fraction(1000.0, 5778.0)
+        diag = RawDiagnostics(ingress_egress_fraction=expected)
+        f = extract_features(_signal(), diag)
+        assert f.limb_darkening_plausibility_score is not None
+        assert f.limb_darkening_plausibility_score > 0.5
+
+    def test_none_ingress_egress_fraction_gives_none_feature(self) -> None:
+        f = extract_features(_signal(), RawDiagnostics())
+        assert f.limb_darkening_plausibility_score is None
+
+    def test_zero_depth_does_not_crash(self) -> None:
+        # depth_ppm=0 → k=0 → expected_ief=0 → returns 0.5 (guard)
+        # CandidateSignal requires depth_ppm > 0, so test function directly
+        from exo_toolkit.features import _ld_ingress_egress_fraction  # noqa: PLC0415
+        ief = _ld_ingress_egress_fraction(0.0, 5778.0)
+        assert ief == pytest.approx(0.0)
+
+    def test_consistent_ief_scores_high(self) -> None:
+        # IEF exactly matching expected → score near 1.0
+        from exo_toolkit.features import _ld_ingress_egress_fraction  # noqa: PLC0415
+        depth = 5000.0
+        teff = 5778.0
+        expected = _ld_ingress_egress_fraction(depth, teff)
+        s = limb_darkening_plausibility_score(expected, depth, teff)
+        assert s == pytest.approx(1.0)

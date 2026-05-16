@@ -13,7 +13,8 @@ from __future__ import annotations
 
 import io
 import urllib.request
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 # Same endpoint as fetch_tess_toi.py
 _EXOFOP_URL: str = (
@@ -138,7 +139,6 @@ def _safe_float(s: str) -> float | None:
 def _cli(argv: list[str] | None = None) -> int:
     import argparse  # noqa: PLC0415
     import json  # noqa: PLC0415
-    import sys  # noqa: PLC0415
 
     parser = argparse.ArgumentParser(
         prog="toi_checker",
