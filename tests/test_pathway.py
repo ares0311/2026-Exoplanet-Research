@@ -582,3 +582,138 @@ class TestTfopReadyGatesParametric:
     def test_all_gates_passing_gives_tfop(self) -> None:
         result = classify_submission_pathway(**_all_passing_kwargs())
         assert result == "tfop_ready"
+
+
+# ---------------------------------------------------------------------------
+# Extended branch coverage (Milestone 13l)
+# ---------------------------------------------------------------------------
+
+
+class TestAllPathwayBranches:
+    """Cover every return-value branch of classify_submission_pathway."""
+
+    def test_known_object_annotation_returned(self) -> None:
+        post = _posterior(planet=0.05, ko=0.82, eb=0.04, beb=0.03, sv=0.03, ia=0.03)
+        result = classify_submission_pathway(
+            _signal(), CandidateFeatures(), post, _scores(fpp=0.05),
+        )
+        assert result == "known_object_annotation"
+
+    def test_github_only_returned_for_high_fpp(self) -> None:
+        post = _posterior(planet=0.20, ko=0.02, eb=0.28, beb=0.20, sv=0.15, ia=0.15)
+        result = classify_submission_pathway(
+            _signal(transit_count=5), CandidateFeatures(), post, _scores(fpp=0.75),
+        )
+        assert result == "github_only_reproducibility"
+
+    def test_planet_hunters_returned_for_single_transit(self) -> None:
+        result = classify_submission_pathway(
+            _signal(transit_count=1), _tfop_features(), _posterior(), _scores(fpp=0.25),
+        )
+        assert result == "planet_hunters_discussion"
+
+    def test_tfop_ready_returned_for_tess_all_conditions(self) -> None:
+        result = classify_submission_pathway(
+            _signal(snr=9.0, transit_count=3),
+            _tfop_features(),
+            _posterior(planet=0.70, ko=0.02, eb=0.12, beb=0.06, sv=0.05, ia=0.05),
+            _scores(fpp=0.25, dc=0.85),
+            provenance_score=0.90,
+        )
+        assert result == "tfop_ready"
+
+    def test_planet_hunters_tess_good_dc_missing_features(self) -> None:
+        result = classify_submission_pathway(
+            _signal(transit_count=3),
+            CandidateFeatures(),
+            _posterior(planet=0.60, ko=0.02, eb=0.15, beb=0.10, sv=0.08, ia=0.05),
+            _scores(fpp=0.25, dc=0.55),
+        )
+        assert result == "planet_hunters_discussion"
+
+    def test_github_only_tess_low_dc(self) -> None:
+        result = classify_submission_pathway(
+            _signal(transit_count=3),
+            CandidateFeatures(),
+            _posterior(planet=0.60, ko=0.02, eb=0.15, beb=0.10, sv=0.08, ia=0.05),
+            _scores(fpp=0.25, dc=0.30),
+        )
+        assert result == "github_only_reproducibility"
+
+    def test_kepler_archive_returned_for_kepler(self) -> None:
+        post = _posterior(planet=0.70, ko=0.02, eb=0.10, beb=0.08, sv=0.05, ia=0.05)
+        result = classify_submission_pathway(
+            _signal(mission="Kepler"), CandidateFeatures(), post, _scores(fpp=0.25, ns=0.80),
+        )
+        assert result == "kepler_archive_candidate"
+
+    def test_kepler_archive_returned_for_k2(self) -> None:
+        post = _posterior(planet=0.70, ko=0.02, eb=0.10, beb=0.08, sv=0.05, ia=0.05)
+        result = classify_submission_pathway(
+            _signal(mission="K2"), CandidateFeatures(), post, _scores(fpp=0.25, ns=0.80),
+        )
+        assert result == "kepler_archive_candidate"
+
+    def test_github_only_kepler_low_planet_posterior(self) -> None:
+        post = _posterior(planet=0.55, ko=0.02, eb=0.18, beb=0.10, sv=0.08, ia=0.07)
+        result = classify_submission_pathway(
+            _signal(mission="Kepler"), CandidateFeatures(), post, _scores(fpp=0.25, ns=0.80),
+        )
+        assert result == "github_only_reproducibility"
+
+    def test_github_only_kepler_low_novelty(self) -> None:
+        post = _posterior(planet=0.70, ko=0.02, eb=0.10, beb=0.08, sv=0.05, ia=0.05)
+        result = classify_submission_pathway(
+            _signal(mission="Kepler"), CandidateFeatures(), post, _scores(fpp=0.25, ns=0.50),
+        )
+        assert result == "github_only_reproducibility"
+
+    def test_github_only_kepler_high_fpp(self) -> None:
+        post = _posterior(planet=0.70, ko=0.02, eb=0.10, beb=0.08, sv=0.05, ia=0.05)
+        result = classify_submission_pathway(
+            _signal(mission="Kepler"), CandidateFeatures(), post, _scores(fpp=0.40, ns=0.80),
+        )
+        assert result == "github_only_reproducibility"
+
+    def test_low_provenance_blocks_tfop(self) -> None:
+        result = classify_submission_pathway(
+            _signal(snr=9.0, transit_count=3),
+            _tfop_features(),
+            _posterior(planet=0.70, ko=0.02, eb=0.12, beb=0.06, sv=0.05, ia=0.05),
+            _scores(fpp=0.25, dc=0.85),
+            provenance_score=0.50,
+        )
+        assert result != "tfop_ready"
+
+    def test_known_object_beats_tfop_conditions(self) -> None:
+        post = _posterior(planet=0.10, ko=0.82, eb=0.03, beb=0.02, sv=0.02, ia=0.01)
+        result = classify_submission_pathway(
+            _signal(snr=9.0, transit_count=3),
+            _tfop_features(),
+            post,
+            _scores(fpp=0.10, dc=0.85),
+            provenance_score=0.90,
+        )
+        assert result == "known_object_annotation"
+
+    def test_fpp_gate_fires_before_mission_routing(self) -> None:
+        post = _posterior(planet=0.50, ko=0.02, eb=0.20, beb=0.12, sv=0.08, ia=0.08)
+        result = classify_submission_pathway(
+            _signal(transit_count=5),
+            _tfop_features(),
+            post,
+            _scores(fpp=0.71, dc=0.90),
+            provenance_score=0.95,
+        )
+        assert result == "github_only_reproducibility"
+
+    def test_transit_count_gate_fires_before_mission_routing(self) -> None:
+        post = _posterior(planet=0.70, ko=0.02, eb=0.10, beb=0.08, sv=0.05, ia=0.05)
+        result = classify_submission_pathway(
+            _signal(transit_count=1),
+            _tfop_features(),
+            post,
+            _scores(fpp=0.20, dc=0.90),
+            provenance_score=0.95,
+        )
+        assert result == "planet_hunters_discussion"

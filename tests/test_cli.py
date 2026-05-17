@@ -656,3 +656,172 @@ class TestOutputMetadata:
     def test_meta_scorer_field_correct_for_bayesian(self) -> None:
         rows = self._run_pipeline_mocked(scorer="bayesian")
         assert rows[0]["meta"]["scorer"] == "bayesian"
+
+
+# ---------------------------------------------------------------------------
+# Calibration integration (Milestone 13i)
+# ---------------------------------------------------------------------------
+
+
+class TestCalibrationIntegration:
+    """Tests for calibration_path parameter in run_pipeline."""
+
+    def _run_with_mocks(self, **kwargs: Any) -> list[dict[str, Any]]:
+        lc = _mock_lc()
+        signal = _make_signal()
+        posterior = _uniform_posterior()
+        scores = _make_scores()
+        fetch_result = _make_fetch_result(lc)
+        with (
+            patch("exo_toolkit.cli.search_lightcurve", return_value=[signal]),
+            patch(
+                "exo_toolkit.cli.vet_signal",
+                return_value=MagicMock(features=CandidateFeatures()),
+            ),
+            patch("exo_toolkit.cli.score_candidate", return_value=(posterior, scores)),
+            patch(
+                "exo_toolkit.cli.classify_submission_pathway",
+                return_value="planet_hunters_discussion",
+            ),
+        ):
+            return run_pipeline(
+                "TIC 0",
+                "TESS",
+                fetch_fn=lambda *_: fetch_result,
+                clean_fn=lambda *_: MagicMock(light_curve=lc),
+                **kwargs,
+            )
+
+    def test_no_calibration_path_no_calibrated_posterior_key(self) -> None:
+        rows = self._run_with_mocks()
+        assert "calibrated_posterior" not in rows[0]
+
+    def test_calibrated_posterior_present_when_path_given(self, tmp_path: Path) -> None:
+        mock_cal = MagicMock()
+        mock_cal_post = _uniform_posterior()
+        with (
+            patch("exo_toolkit.cli.load_calibration", return_value=mock_cal),
+            patch("exo_toolkit.cli.apply_calibration", return_value=mock_cal_post),
+        ):
+            rows = self._run_with_mocks(calibration_path=tmp_path / "cal.json")
+        assert "calibrated_posterior" in rows[0]
+
+    def test_calibrated_posterior_is_dict(self, tmp_path: Path) -> None:
+        mock_cal = MagicMock()
+        mock_cal_post = _uniform_posterior()
+        with (
+            patch("exo_toolkit.cli.load_calibration", return_value=mock_cal),
+            patch("exo_toolkit.cli.apply_calibration", return_value=mock_cal_post),
+        ):
+            rows = self._run_with_mocks(calibration_path=tmp_path / "cal.json")
+        assert isinstance(rows[0]["calibrated_posterior"], dict)
+
+    def test_calibrated_posterior_has_six_hypothesis_keys(self, tmp_path: Path) -> None:
+        mock_cal = MagicMock()
+        mock_cal_post = _uniform_posterior()
+        with (
+            patch("exo_toolkit.cli.load_calibration", return_value=mock_cal),
+            patch("exo_toolkit.cli.apply_calibration", return_value=mock_cal_post),
+        ):
+            rows = self._run_with_mocks(calibration_path=tmp_path / "cal.json")
+        expected = {
+            "planet_candidate", "eclipsing_binary", "background_eclipsing_binary",
+            "stellar_variability", "instrumental_artifact", "known_object",
+        }
+        assert set(rows[0]["calibrated_posterior"].keys()) == expected
+
+    def test_calibrated_posterior_sums_to_one(self, tmp_path: Path) -> None:
+        mock_cal = MagicMock()
+        mock_cal_post = _uniform_posterior()
+        with (
+            patch("exo_toolkit.cli.load_calibration", return_value=mock_cal),
+            patch("exo_toolkit.cli.apply_calibration", return_value=mock_cal_post),
+        ):
+            rows = self._run_with_mocks(calibration_path=tmp_path / "cal.json")
+        total = sum(rows[0]["calibrated_posterior"].values())
+        assert abs(total - 1.0) < 0.02
+
+    def test_load_calibration_called_once_with_path(self, tmp_path: Path) -> None:
+        mock_cal = MagicMock()
+        mock_cal_post = _uniform_posterior()
+        cal_path = tmp_path / "cal.json"
+        with (
+            patch("exo_toolkit.cli.load_calibration", return_value=mock_cal) as mock_load,
+            patch("exo_toolkit.cli.apply_calibration", return_value=mock_cal_post),
+        ):
+            self._run_with_mocks(calibration_path=cal_path)
+        mock_load.assert_called_once_with(cal_path)
+
+    def test_apply_calibration_called_per_signal(self, tmp_path: Path) -> None:
+        lc = _mock_lc()
+        signals = [_make_signal(3.0), _make_signal(7.0)]
+        posterior = _uniform_posterior()
+        scores = _make_scores()
+        fetch_result = _make_fetch_result(lc)
+        mock_cal = MagicMock()
+        mock_cal_post = _uniform_posterior()
+        with (
+            patch("exo_toolkit.cli.search_lightcurve", return_value=signals),
+            patch(
+                "exo_toolkit.cli.vet_signal",
+                return_value=MagicMock(features=CandidateFeatures()),
+            ),
+            patch("exo_toolkit.cli.score_candidate", return_value=(posterior, scores)),
+            patch(
+                "exo_toolkit.cli.classify_submission_pathway",
+                return_value="planet_hunters_discussion",
+            ),
+            patch("exo_toolkit.cli.load_calibration", return_value=mock_cal),
+            patch(
+                "exo_toolkit.cli.apply_calibration", return_value=mock_cal_post
+            ) as mock_apply,
+        ):
+            run_pipeline(
+                "TIC 0",
+                "TESS",
+                fetch_fn=lambda *_: fetch_result,
+                clean_fn=lambda *_: MagicMock(light_curve=lc),
+                calibration_path=tmp_path / "cal.json",
+            )
+        assert mock_apply.call_count == 2
+
+    def test_calibration_load_error_propagates(self, tmp_path: Path) -> None:
+        with (
+            patch("exo_toolkit.cli.load_calibration", side_effect=ValueError("bad file")),
+            pytest.raises(ValueError, match="bad file"),
+        ):
+            self._run_with_mocks(calibration_path=tmp_path / "cal.json")
+
+    def test_raw_posterior_and_calibrated_can_differ(self, tmp_path: Path) -> None:
+        mock_cal = MagicMock()
+        shifted_post = HypothesisPosterior(
+            planet_candidate=0.50,
+            eclipsing_binary=0.10,
+            background_eclipsing_binary=0.10,
+            stellar_variability=0.10,
+            instrumental_artifact=0.10,
+            known_object=0.10,
+        )
+        with (
+            patch("exo_toolkit.cli.load_calibration", return_value=mock_cal),
+            patch("exo_toolkit.cli.apply_calibration", return_value=shifted_post),
+        ):
+            rows = self._run_with_mocks(calibration_path=tmp_path / "cal.json")
+        assert rows[0]["calibrated_posterior"]["planet_candidate"] == pytest.approx(0.50)
+
+    def test_no_apply_calibration_when_no_signals(self) -> None:
+        lc = _mock_lc()
+        with (
+            patch("exo_toolkit.cli.search_lightcurve", return_value=[]),
+            patch("exo_toolkit.cli.load_calibration", return_value=MagicMock()),
+            patch("exo_toolkit.cli.apply_calibration") as mock_apply,
+        ):
+            result = run_pipeline(
+                "TIC 0",
+                "TESS",
+                fetch_fn=lambda *_: _make_fetch_result(lc),
+                clean_fn=lambda *_: MagicMock(light_curve=lc),
+                calibration_path=Path("/tmp/cal.json"),
+            )
+        assert result == []
+        mock_apply.assert_not_called()

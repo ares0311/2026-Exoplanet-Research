@@ -38,6 +38,7 @@ from exo_toolkit.background.fixtures import fixture_summary, load_known_tess_exa
 from exo_toolkit.background.priority import build_priority_summary
 from exo_toolkit.background.runner import background_run_once
 from exo_toolkit.background.storage import BackgroundStore
+from exo_toolkit.calibration import apply_calibration, load_calibration
 from exo_toolkit.clean import clean_lightcurve
 from exo_toolkit.fetch import compute_provenance_score, fetch_lightcurve
 from exo_toolkit.pathway import classify_submission_pathway
@@ -103,6 +104,7 @@ def run_pipeline(
     max_peaks: int = 5,
     scorer: str = "bayesian",
     model_path: Path | None = None,
+    calibration_path: Path | None = None,
     fetch_fn: Any = None,
     clean_fn: Any = None,
 ) -> list[dict[str, Any]]:
@@ -117,6 +119,10 @@ def run_pipeline(
             ``"ensemble"`` (average of Bayesian + XGBoost).
         model_path: Path to a saved ``XGBoostScorer`` metadata JSON file.
             Required when ``scorer`` is ``"xgboost"`` or ``"ensemble"``.
+        calibration_path: Optional path to a ``CalibrationResult`` JSON file
+            written by :func:`~exo_toolkit.calibration.save_calibration`.
+            When provided, each output row gains a ``"calibrated_posterior"``
+            key with probabilities adjusted by the fitted calibration model.
         fetch_fn: Optional callable replacing ``fetch_lightcurve`` (for tests).
         clean_fn: Optional callable replacing ``clean_lightcurve`` (for tests).
 
@@ -144,6 +150,10 @@ def run_pipeline(
             )
         from exo_toolkit.ml.xgboost_scorer import XGBoostScorer
         xgb_scorer = XGBoostScorer.load(model_path)
+
+    calibration_result = None
+    if calibration_path is not None:
+        calibration_result = load_calibration(calibration_path)
 
     fetch_result = _fetch(target_id, mission)
     clean_result = _clean(fetch_result.light_curve)
@@ -217,6 +227,17 @@ def run_pipeline(
                 row["ensemble_planet_probability"] = (
                     0.5 * posterior.planet_candidate + 0.5 * xgb_prob
                 )
+
+        if calibration_result is not None:
+            cal_post = apply_calibration(posterior, calibration_result)
+            row["calibrated_posterior"] = {
+                "planet_candidate": cal_post.planet_candidate,
+                "eclipsing_binary": cal_post.eclipsing_binary,
+                "background_eclipsing_binary": cal_post.background_eclipsing_binary,
+                "stellar_variability": cal_post.stellar_variability,
+                "instrumental_artifact": cal_post.instrumental_artifact,
+                "known_object": cal_post.known_object,
+            }
 
         rows.append(row)
     return rows
