@@ -52,8 +52,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Total passing tests: ~1237 (+ 2 integration_live; 6 skipped without matplotlib)**
-**Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `fetch_tess_toi.py` (11), `build_training_data.py` (34), `build_tess_training_data.py` (38), `build_combined_training_data.py` (13), `train_xgboost.py` (25), `evaluate_scorer.py` (14), `count_tess_labels.py`, `star_scanner.py` (38), `rank_candidates.py` (12), `batch_scan.py` (14), `sector_coverage.py` (10), `plot_lc.py` (11), `watchlist.py` (13), `summary_report.py` (14), `toi_checker.py` (12), `export_candidates.py` (13), `alert_filter.py` (12), `notebook_generator.py` (10), `target_prioritizer.py` (12), `compare_candidates.py` (11), `candidate_timeline.py` (12), `fits_header_extractor.py` (12), `ephemeris_predictor.py` (12), `stellar_params_fetcher.py` (12), `false_positive_vetter.py` (12), `sector_gap_finder.py` (12), `keplerian_fit.py` (11), `data_quality_checker.py` (12), `bulk_priority_update.py` (12), `multi_target_report.py` (13), `detrending_comparator.py` (12), `recovery_completeness_map.py` (12), `candidate_html_export.py` (13), `tess_year_planner.py` (11)**
+**Total passing tests: ~1438 (+ 2 integration_live; 6 skipped without matplotlib)**
+**Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `fetch_tess_toi.py` (11), `build_training_data.py` (34), `build_tess_training_data.py` (38), `build_combined_training_data.py` (13), `train_xgboost.py` (25), `evaluate_scorer.py` (14), `count_tess_labels.py`, `star_scanner.py` (38), `rank_candidates.py` (12), `batch_scan.py` (14), `sector_coverage.py` (10), `plot_lc.py` (11), `watchlist.py` (13), `summary_report.py` (14), `toi_checker.py` (12), `export_candidates.py` (13), `alert_filter.py` (12), `notebook_generator.py` (10), `target_prioritizer.py` (12), `compare_candidates.py` (11), `candidate_timeline.py` (12), `fits_header_extractor.py` (12), `ephemeris_predictor.py` (12), `stellar_params_fetcher.py` (12), `false_positive_vetter.py` (12), `sector_gap_finder.py` (13), `keplerian_fit.py` (11), `data_quality_checker.py` (12), `bulk_priority_update.py` (12), `multi_target_report.py` (13), `detrending_comparator.py` (12), `recovery_completeness_map.py` (12), `candidate_html_export.py` (13), `tess_year_planner.py` (11), `lightcurve_cache.py` (12), `period_alias_checker.py` (13), `multi_planet_checker.py` (11), `centroid_analyzer.py` (10), `catalog_crossmatch.py` (13), `transit_modeler.py` (12), `candidate_database.py` (12), `follow_up_scheduler.py` (13), `config_manager.py` (12), `signal_statistics.py` (11), `stellar_rotation.py` (12), `archive_lookup.py` (12), `vetting_scorecard.py` (15), `period_recovery_validator.py` (11), `alert_webhook.py` (13)**
 
 ---
 
@@ -587,6 +587,28 @@ All pipeline modules are complete.
 - `calibration.py` gains `save_calibration(result, path)` and `load_calibration(path)` helpers
 
 **Extended pathway tests** (`test_pathway.py`): +15 tests covering all 6 return values explicitly
+
+### Completed (2026-05-17) — Milestone 14
+
+**15 new Skills + 201 new tests**: ✅
+
+| Skill | Key Functions | Tests |
+|---|---|---|
+| `lightcurve_cache.py` | `LightcurveCache.save/load/contains/clear`, `cache_key` | 12 |
+| `period_alias_checker.py` | `check_period_alias`, `format_alias_result` | 13 |
+| `multi_planet_checker.py` | `check_for_additional_planets`, `format_multi_planet_result` | 11 |
+| `centroid_analyzer.py` | `analyze_centroid`, `format_centroid_result` | 10 |
+| `catalog_crossmatch.py` | `crossmatch`, `format_crossmatch` | 13 |
+| `transit_modeler.py` | `fit_transit_model`, `transit_model`, `format_model_result` | 12 |
+| `candidate_database.py` | `CandidateDatabase.insert/latest/history/all_latest/export_csv` | 12 |
+| `follow_up_scheduler.py` | `build_schedule`, `format_schedule` | 13 |
+| `config_manager.py` | `load_config`, `validate_config`, `default_config` | 12 |
+| `signal_statistics.py` | `compute_signal_stats`, `format_signal_stats` | 11 |
+| `stellar_rotation.py` | `detect_rotation`, `format_rotation_result` | 12 |
+| `archive_lookup.py` | `check_archive`, `format_archive_status` | 12 |
+| `vetting_scorecard.py` | `build_scorecard`, `format_scorecard` | 15 |
+| `period_recovery_validator.py` | `validate_period`, `format_validation_result` | 11 |
+| `alert_webhook.py` | `build_alert_payload`, `send_alert`, `format_slack_payload` | 13 |
 
 ### Next Step
 
