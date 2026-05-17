@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import pytest
 from Skills.nearby_star_checker import (
-    NearbyStar,
     NearbyStarResult,
     check_nearby_stars,
     format_nearby_result,

@@ -1,8 +1,6 @@
 """Tests for Skills.lc_statistics."""
 from __future__ import annotations
 
-import math
-import pytest
 from Skills.lc_statistics import LCStats, compute_lc_stats, format_lc_stats
 
 

@@ -3,9 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from Skills.toi_watcher import (
-    TOIChange,
     TOIWatchResult,
     format_watch_result,
     watch_toi_list,

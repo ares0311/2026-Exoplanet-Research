@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 from Skills.phase_plot_generator import (
     PhasePlotResult,
-    generate_phase_plot,
     format_plot_result,
+    generate_phase_plot,
 )
 
 

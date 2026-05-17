@@ -1,10 +1,8 @@
 """Tests for Skills.transit_timing_fitter."""
 from __future__ import annotations
 
-import math
 import pytest
 from Skills.transit_timing_fitter import (
-    TransitTiming,
     TransitTimingResult,
     fit_transit_times,
     format_timing_result,

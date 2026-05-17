@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 from Skills.run_summary_exporter import (
     RunSummary,
     build_run_summary,

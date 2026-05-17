@@ -4,7 +4,6 @@ from __future__ import annotations
 import pytest
 from Skills.pipeline_benchmark import (
     BenchmarkResult,
-    StageResult,
     benchmark_pipeline,
     format_benchmark_result,
 )
