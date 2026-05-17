@@ -41,19 +41,19 @@ CI: `.github/workflows/ci.yml`
 | `features.py` | **done** | `test_features.py` (145) — includes all 5 Milestone 12 feature functions |
 | `hypotheses.py` | **done** | `test_hypotheses.py` (46) — all 5 Milestone 12 features wired |
 | `scoring.py` | **done** | `test_scoring.py` (45) — invariants + weight-sensitivity tests |
-| `pathway.py` | **done** | `test_pathway.py` (45) — parametric tfop_ready gate tests |
+| `pathway.py` | **done** | `test_pathway.py` (60) — parametric + all-branch coverage |
 | `fetch.py` | **done** | `test_fetch.py` (55, 2 live) |
 | `clean.py` | **done** | `test_clean.py` (39) |
 | `search.py` | **done** | `test_search.py` (43) |
 | `vet.py` | **done** | `test_vet.py` (47) |
-| `calibration.py` | **done** | `test_calibration.py` (70) |
-| `cli.py` | **done** | `test_cli.py` (40) — version flag, meta output |
+| `calibration.py` | **done** | `test_calibration.py` (70) — now includes `save_calibration`/`load_calibration` |
+| `cli.py` | **done** | `test_cli.py` (50) — version flag, meta output, calibration integration |
 | `ml/xgboost_scorer.py` | **done** | `test_xgboost_scorer.py` (45) |
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Total passing tests: 1068 (+ 2 integration_live; 6 skipped without matplotlib)**
-**Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `fetch_tess_toi.py` (11), `build_training_data.py` (34), `build_tess_training_data.py` (38), `build_combined_training_data.py` (13), `train_xgboost.py` (25), `evaluate_scorer.py` (14), `count_tess_labels.py`, `star_scanner.py` (38), `rank_candidates.py` (12), `batch_scan.py` (14), `sector_coverage.py` (10), `plot_lc.py` (11), `watchlist.py` (13), `summary_report.py` (14), `toi_checker.py` (12), `export_candidates.py` (13), `alert_filter.py` (12), `notebook_generator.py` (10), `target_prioritizer.py` (12), `compare_candidates.py` (11), `candidate_timeline.py` (12), `fits_header_extractor.py` (12)**
+**Total passing tests: ~1237 (+ 2 integration_live; 6 skipped without matplotlib)**
+**Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `fetch_tess_toi.py` (11), `build_training_data.py` (34), `build_tess_training_data.py` (38), `build_combined_training_data.py` (13), `train_xgboost.py` (25), `evaluate_scorer.py` (14), `count_tess_labels.py`, `star_scanner.py` (38), `rank_candidates.py` (12), `batch_scan.py` (14), `sector_coverage.py` (10), `plot_lc.py` (11), `watchlist.py` (13), `summary_report.py` (14), `toi_checker.py` (12), `export_candidates.py` (13), `alert_filter.py` (12), `notebook_generator.py` (10), `target_prioritizer.py` (12), `compare_candidates.py` (11), `candidate_timeline.py` (12), `fits_header_extractor.py` (12), `ephemeris_predictor.py` (12), `stellar_params_fetcher.py` (12), `false_positive_vetter.py` (12), `sector_gap_finder.py` (12), `keplerian_fit.py` (11), `data_quality_checker.py` (12), `bulk_priority_update.py` (12), `multi_target_report.py` (13), `detrending_comparator.py` (12), `recovery_completeness_map.py` (12), `candidate_html_export.py` (13), `tess_year_planner.py` (11)**
 
 ---
 
@@ -472,10 +472,11 @@ Always use `python -m mypy src` locally.
 - Catalog diagnostics (stellar params, crowding, flags) pass through as keyword arguments
 
 ### calibration.py
-- Public API: `compute_metrics`, `fit_calibration`, `apply_calibration`
+- Public API: `compute_metrics`, `fit_calibration`, `apply_calibration`, `save_calibration`, `load_calibration`
 - Methods: `"platt"` (Platt scaling via scipy Nelder-Mead), `"isotonic"` (PAVA — no sklearn)
 - One-vs-rest calibration per hypothesis; renormalized to sum to 1.0 post-calibration
 - Metrics: Brier scores, reliability curves, precision/recall/F1, confusion matrix
+- `save_calibration(result, path)` / `load_calibration(path)` round-trip `CalibrationResult` as JSON
 - All result containers are frozen dataclasses
 
 ## What Is Not Yet Built
@@ -559,6 +560,33 @@ All pipeline modules are complete.
 - `docs/DATA_SOURCES.md` — MAST, ExoFOP, NExSci endpoints and caching guide
 - `Skills/__init__.py` — makes Skills a proper Python package
 - `docs/ROADMAP.md` + `docs/PROJECT_STATUS.md` — updated to current state
+
+### Completed (2026-05-17) — Milestone 13
+
+**12 new Skills + calibration integration + extended tests**: ✅
+
+| Skill | Key Functions | Tests |
+|---|---|---|
+| `ephemeris_predictor.py` | `predict_transits`, `format_transit_table` | 12 |
+| `stellar_params_fetcher.py` | `fetch_stellar_params`, `StellarParams.to_vet_kwargs` | 12 |
+| `false_positive_vetter.py` | `vet_candidate`, `format_vetting_report` | 12 |
+| `sector_gap_finder.py` | `find_sector_gaps`, `format_gap_report` | 12 |
+| `keplerian_fit.py` | `fit_trapezoid`, `trapezoid_model` | 11 |
+| `data_quality_checker.py` | `check_data_quality`, `format_quality_report` | 12 |
+| `bulk_priority_update.py` | `update_priorities` (atomic write) | 12 |
+| `multi_target_report.py` | `build_multi_target_report`, `write_multi_target_report` | 13 |
+| `detrending_comparator.py` | `compare_detrending` (SG window selection by SNR) | 12 |
+| `recovery_completeness_map.py` | `build_completeness_map`, `save_completeness_map`, `load_completeness_map` | 12 |
+| `candidate_html_export.py` | `to_html_gallery`, `write_html_gallery` | 13 |
+| `tess_year_planner.py` | `plan_sectors`, `format_sector_plan` | 11 |
+
+**Calibration integration in `run_pipeline()`** (`src/exo_toolkit/cli.py`):
+- New `calibration_path: Path | None = None` parameter
+- When provided, applies `load_calibration()` + `apply_calibration()` from `calibration.py`
+- Each output row gains `"calibrated_posterior"` dict (same 6-key structure as `"posterior"`)
+- `calibration.py` gains `save_calibration(result, path)` and `load_calibration(path)` helpers
+
+**Extended pathway tests** (`test_pathway.py`): +15 tests covering all 6 return values explicitly
 
 ### Next Step
 

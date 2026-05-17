@@ -14,12 +14,17 @@ Public API
 compute_metrics(labeled_candidates, *, n_bins) → CalibrationMetrics
 fit_calibration(labeled_candidates, *, method, n_bins) → CalibrationResult
 apply_calibration(posterior, result) → HypothesisPosterior
+save_calibration(result, path) → Path
+load_calibration(path) → CalibrationResult
 """
 from __future__ import annotations
 
+import dataclasses
 import datetime
+import json
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Literal
 
 import numpy as np
@@ -573,3 +578,85 @@ def _apply_platt(prob: float, params: PlattParams) -> float:
 
 def _apply_isotonic(prob: float, knots: IsotonicKnots) -> float:
     return float(np.interp(prob, knots.x_knots, knots.y_knots))
+
+
+# ---------------------------------------------------------------------------
+# Serialization helpers
+# ---------------------------------------------------------------------------
+
+
+def save_calibration(result: CalibrationResult, path: Path | str) -> Path:
+    """Serialize a CalibrationResult to JSON.
+
+    Args:
+        result: Fitted model from :func:`fit_calibration`.
+        path: Destination JSON file.
+
+    Returns:
+        Path of the written file.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(dataclasses.asdict(result), indent=2))
+    return path
+
+
+def _dict_to_calibration_result(d: dict[str, Any]) -> CalibrationResult:
+    platt: tuple[PlattParams, ...] | None = None
+    if d.get("platt_params") is not None:
+        platt = tuple(PlattParams(**p) for p in d["platt_params"])
+
+    isotonic: tuple[IsotonicKnots, ...] | None = None
+    if d.get("isotonic_knots") is not None:
+        isotonic = tuple(
+            IsotonicKnots(
+                x_knots=tuple(k["x_knots"]),
+                y_knots=tuple(k["y_knots"]),
+            )
+            for k in d["isotonic_knots"]
+        )
+
+    m = d["training_metrics"]
+    bs = BrierScores(**m["brier_scores"])
+    rcs = tuple(
+        ReliabilityCurve(
+            hypothesis=rc["hypothesis"],
+            bin_edges=tuple(rc["bin_edges"]),
+            bin_centers=tuple(rc["bin_centers"]),
+            mean_predicted=tuple(rc["mean_predicted"]),
+            fraction_positive=tuple(rc["fraction_positive"]),
+            bin_counts=tuple(int(c) for c in rc["bin_counts"]),
+        )
+        for rc in m["reliability_curves"]
+    )
+    prs = tuple(PrecisionRecall(**pr) for pr in m["precision_recall"])
+    metrics = CalibrationMetrics(
+        n_samples=m["n_samples"],
+        brier_scores=bs,
+        reliability_curves=rcs,
+        precision_recall=prs,
+        confusion_labels=tuple(m["confusion_labels"]),
+        confusion_matrix=tuple(tuple(int(v) for v in row) for row in m["confusion_matrix"]),
+    )
+    return CalibrationResult(
+        method=d["method"],
+        n_training_samples=d["n_training_samples"],
+        fitted_at=d["fitted_at"],
+        hypotheses=tuple(d["hypotheses"]),
+        platt_params=platt,
+        isotonic_knots=isotonic,
+        training_metrics=metrics,
+    )
+
+
+def load_calibration(path: Path | str) -> CalibrationResult:
+    """Load a CalibrationResult from a JSON file.
+
+    Args:
+        path: File written by :func:`save_calibration`.
+
+    Returns:
+        :class:`CalibrationResult`.
+    """
+    data = json.loads(Path(path).read_text())
+    return _dict_to_calibration_result(data)
