@@ -52,8 +52,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Total passing tests: ~1438 (+ 2 integration_live; 6 skipped without matplotlib)**
-**Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `fetch_tess_toi.py` (11), `build_training_data.py` (34), `build_tess_training_data.py` (38), `build_combined_training_data.py` (13), `train_xgboost.py` (25), `evaluate_scorer.py` (14), `count_tess_labels.py`, `star_scanner.py` (38), `rank_candidates.py` (12), `batch_scan.py` (14), `sector_coverage.py` (10), `plot_lc.py` (11), `watchlist.py` (13), `summary_report.py` (14), `toi_checker.py` (12), `export_candidates.py` (13), `alert_filter.py` (12), `notebook_generator.py` (10), `target_prioritizer.py` (12), `compare_candidates.py` (11), `candidate_timeline.py` (12), `fits_header_extractor.py` (12), `ephemeris_predictor.py` (12), `stellar_params_fetcher.py` (12), `false_positive_vetter.py` (12), `sector_gap_finder.py` (13), `keplerian_fit.py` (11), `data_quality_checker.py` (12), `bulk_priority_update.py` (12), `multi_target_report.py` (13), `detrending_comparator.py` (12), `recovery_completeness_map.py` (12), `candidate_html_export.py` (13), `tess_year_planner.py` (11), `lightcurve_cache.py` (12), `period_alias_checker.py` (13), `multi_planet_checker.py` (11), `centroid_analyzer.py` (10), `catalog_crossmatch.py` (13), `transit_modeler.py` (12), `candidate_database.py` (12), `follow_up_scheduler.py` (13), `config_manager.py` (12), `signal_statistics.py` (11), `stellar_rotation.py` (12), `archive_lookup.py` (12), `vetting_scorecard.py` (15), `period_recovery_validator.py` (11), `alert_webhook.py` (13)**
+**Total passing tests: ~1628 (+ 2 integration_live; 6 skipped without matplotlib)**
+**Skills: `injection_recovery.py` (25), `fetch_kepler_tce.py`, `fetch_tess_toi.py` (11), `build_training_data.py` (34), `build_tess_training_data.py` (38), `build_combined_training_data.py` (13), `train_xgboost.py` (25), `evaluate_scorer.py` (14), `count_tess_labels.py`, `star_scanner.py` (38), `rank_candidates.py` (12), `batch_scan.py` (14), `sector_coverage.py` (10), `plot_lc.py` (11), `watchlist.py` (13), `summary_report.py` (14), `toi_checker.py` (12), `export_candidates.py` (13), `alert_filter.py` (12), `notebook_generator.py` (10), `target_prioritizer.py` (12), `compare_candidates.py` (11), `candidate_timeline.py` (12), `fits_header_extractor.py` (12), `ephemeris_predictor.py` (12), `stellar_params_fetcher.py` (12), `false_positive_vetter.py` (12), `sector_gap_finder.py` (13), `keplerian_fit.py` (11), `data_quality_checker.py` (12), `bulk_priority_update.py` (12), `multi_target_report.py` (13), `detrending_comparator.py` (12), `recovery_completeness_map.py` (12), `candidate_html_export.py` (13), `tess_year_planner.py` (11), `lightcurve_cache.py` (12), `period_alias_checker.py` (13), `multi_planet_checker.py` (11), `centroid_analyzer.py` (10), `catalog_crossmatch.py` (13), `transit_modeler.py` (12), `candidate_database.py` (12), `follow_up_scheduler.py` (13), `config_manager.py` (12), `signal_statistics.py` (11), `stellar_rotation.py` (12), `archive_lookup.py` (12), `vetting_scorecard.py` (15), `period_recovery_validator.py` (11), `alert_webhook.py` (13), `lc_statistics.py` (13), `transit_depth_corrector.py` (11), `nearby_star_checker.py` (12), `binned_lc_exporter.py` (11), `bootstrap_uncertainty.py` (12), `transit_timing_fitter.py` (12), `candidate_merger.py` (12), `multi_sector_stacker.py` (12), `target_metadata_fetcher.py` (13), `run_summary_exporter.py` (12), `candidate_notes.py` (13), `toi_watcher.py` (12), `flux_contamination_corrector.py` (11), `pipeline_benchmark.py` (12), `phase_plot_generator.py` (13)**
 
 ---
 
@@ -609,6 +609,28 @@ All pipeline modules are complete.
 | `vetting_scorecard.py` | `build_scorecard`, `format_scorecard` | 15 |
 | `period_recovery_validator.py` | `validate_period`, `format_validation_result` | 11 |
 | `alert_webhook.py` | `build_alert_payload`, `send_alert`, `format_slack_payload` | 13 |
+
+### Completed (2026-05-17) — Milestone 15
+
+**15 new Skills + 177 new tests**: ✅
+
+| Skill | Key Functions | Tests |
+|---|---|---|
+| `lc_statistics.py` | `compute_lc_stats`, `format_lc_stats` (CDPP, RMS, photon noise) | 13 |
+| `transit_depth_corrector.py` | `correct_transit_depth`, `format_depth_correction` | 11 |
+| `nearby_star_checker.py` | `check_nearby_stars`, `format_nearby_result` | 12 |
+| `binned_lc_exporter.py` | `bin_lightcurve`, `export_binned_lc`, `load_binned_lc` | 11 |
+| `bootstrap_uncertainty.py` | `bootstrap_uncertainty`, `format_bootstrap_result` | 12 |
+| `transit_timing_fitter.py` | `fit_transit_times`, `format_timing_result` | 12 |
+| `candidate_merger.py` | `merge_candidates`, `write_merged`, `format_merge_summary` | 12 |
+| `multi_sector_stacker.py` | `stack_sectors`, `format_stack_summary` | 12 |
+| `target_metadata_fetcher.py` | `fetch_target_metadata`, `format_target_metadata` | 13 |
+| `run_summary_exporter.py` | `build_run_summary`, `write_run_summary`, `format_run_summary` | 12 |
+| `candidate_notes.py` | `CandidateNotes.add/get/remove/search/summary` | 13 |
+| `toi_watcher.py` | `watch_toi_list`, `format_watch_result` | 12 |
+| `flux_contamination_corrector.py` | `correct_flux_contamination`, `format_contamination_result` | 11 |
+| `pipeline_benchmark.py` | `benchmark_pipeline`, `format_benchmark_result` | 12 |
+| `phase_plot_generator.py` | `generate_phase_plot`, `format_plot_result` | 13 |
 
 ### Next Step
 
