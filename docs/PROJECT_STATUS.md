@@ -90,6 +90,14 @@ No active implementation blocker is known in the default local validation path.
 3. Use `toi_checker.py` before investing pipeline time on new live targets.
 4. Use `batch_scan.py` + `alert_filter.py` + `rank_candidates.py` + `watchlist.py` for systematic follow-up.
 
+Live-network note: the CNN gate check was not run during the latest local
+maintenance pass because it queries ExoFOP and requires intentional live network
+approval.
+
+Remote sync note: local `main` contains commits that may need to be pushed to
+`origin/main`. Pushing exports repository contents to GitHub and requires
+explicit approval in restricted environments.
+
 ## Latest Local Validation
 
 Validated on 2026-05-19:

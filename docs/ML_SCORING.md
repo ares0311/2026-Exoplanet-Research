@@ -15,6 +15,14 @@ The toolkit supports three scorer modes, selectable via the CLI:
 | XGBoost | `--scorer xgboost --model-path <path>` | Binary XGBoost on tabular features |
 | Ensemble | `--scorer ensemble --model-path <path>` | Weighted average of XGBoost + Bayesian |
 
+The current local validation surface passes with 2225 default tests and 2 live
+integration tests deselected. On macOS, installing `xgboost` also requires the
+OpenMP runtime:
+
+```bash
+brew install libomp
+```
+
 ---
 
 ## Tier 1 — XGBoost on Tabular Features
@@ -193,7 +201,13 @@ the output row but does not replace the Bayesian posterior.
 
 ### Tier 2 (CNN on phase-folded flux)
 
-Not yet built.  Requires 5,000+ TESS labels.  See `docs/ROADMAP.md`.
+Not yet built. Requires 5,000+ TESS labels. Supporting utilities already exist
+for labelled snippet collection and augmentation:
+
+- `Skills/labelled_lc_collector.py`
+- `Skills/cnn_feature_augmenter.py`
+
+See `docs/CNN_SPEC.md` and `docs/ROADMAP.md`.
 
 ---
 

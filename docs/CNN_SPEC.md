@@ -4,6 +4,9 @@
 
 Check gate: `python Skills/count_tess_labels.py`
 
+Do not run the live gate check in default validation. It queries ExoFOP and
+should be run only when live network access is intentionally approved.
+
 ---
 
 ## Motivation
@@ -95,7 +98,9 @@ Default weights (to be calibrated after training): `0.35 / 0.35 / 0.30`.
 ## Implementation Checklist
 
 - [ ] `src/exo_toolkit/ml/cnn_scorer.py` — model definition, train, predict
-- [ ] `Skills/build_cnn_training_data.py` — fetch + fold + normalize light curves
+- [x] `Skills/labelled_lc_collector.py` — extract, phase-fold, bin, and store labelled snippets
+- [x] `Skills/cnn_feature_augmenter.py` — noise, shift, scale, and reverse snippets for augmentation
+- [ ] `Skills/build_cnn_training_data.py` — fetch approved live/source data and assemble train/val/test splits
 - [ ] `tests/test_cnn_scorer.py` — ≥ 30 tests
 - [ ] Update `ml/stacking_scorer.py` — add CNN weight
 - [ ] Update `docs/ML_SCORING.md` — document CNN mode

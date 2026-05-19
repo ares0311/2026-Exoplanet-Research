@@ -238,6 +238,11 @@ The CLI should produce structured JSON by default or offer a JSON mode so that s
 
 ## Suggested Build Sequence
 
+Current repository status: items 1-26 are implemented for the fixture-backed
+background automation path and covered by `tests/test_background_automation.py`.
+Future work should treat this sequence as the operational contract to preserve
+when adding live-query modes, alternative target pools, or scheduler wrappers.
+
 1. Define schemas for the durable run ledger, reviewed log, needs-follow-up log, target priority factors, follow-up tests, and submission recommendations.
 2. Create a top-level `logs/` storage contract and SQLite schema for `logs/background_search.sqlite3`.
 3. Build known TESS example fixtures as the first target pool.
@@ -279,3 +284,7 @@ A project has implemented this blueprint when:
 - external submission requires human approval
 - tests validate schemas, logs, CLI behavior, and guardrails
 - documentation explains scheduler setup and operational safety
+
+For this repository, the fixture-backed implementation currently satisfies
+these criteria locally. External submission remains intentionally unimplemented
+and blocked behind human approval records.
