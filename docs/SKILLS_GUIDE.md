@@ -1,13 +1,137 @@
 # Skills Guide
 
-All standalone utility scripts live in `Skills/`.  Each can be used as an
+All standalone utility scripts live in `Skills/`. Each can be used as an
 importable library **and** run directly from the command line.
 
 Run any script with `--help` to see its full CLI options.
 
 ---
 
+## Current inventory
+
+The repository currently has 111 standalone Skills. The quick reference below
+highlights the main workflow entry points; this full inventory keeps the
+complete script surface discoverable for future agents.
+
+```text
+airmass_calculator.py
+alert_filter.py
+alert_webhook.py
+archive_lookup.py
+batch_email_formatter.py
+batch_scan.py
+binned_lc_exporter.py
+bootstrap_uncertainty.py
+build_combined_training_data.py
+build_tess_training_data.py
+build_training_data.py
+bulk_priority_update.py
+candidate_database.py
+candidate_deduplicator.py
+candidate_evidence_aggregator.py
+candidate_html_export.py
+candidate_merger.py
+candidate_notes.py
+candidate_report_card.py
+candidate_timeline.py
+catalog_crossmatch.py
+centroid_analyzer.py
+chi_square_period_checker.py
+cnn_feature_augmenter.py
+compare_candidates.py
+config_manager.py
+count_tess_labels.py
+data_quality_checker.py
+detrending_comparator.py
+duplicate_toi_detector.py
+eb_classifier.py
+ephemeris_predictor.py
+ephemeris_uncertainty_growth.py
+equilibrium_temperature_calculator.py
+evaluate_scorer.py
+export_candidates.py
+false_alarm_probability_estimator.py
+false_positive_vetter.py
+fetch_kepler_tce.py
+fetch_tess_toi.py
+fits_header_extractor.py
+fits_lightcurve_exporter.py
+flux_contamination_corrector.py
+follow_up_scheduler.py
+ground_truth_matcher.py
+harmonic_period_analyzer.py
+impact_parameter_refiner.py
+injection_recovery.py
+keplerian_fit.py
+labelled_lc_collector.py
+lc_statistics.py
+leaderboard_generator.py
+lightcurve_cache.py
+limb_darkening_calculator.py
+momentum_dump_flagger.py
+moon_separation_checker.py
+multi_night_photometry_combiner.py
+multi_planet_checker.py
+multi_sector_stacker.py
+multi_target_report.py
+nearby_star_checker.py
+notebook_generator.py
+obs_request_formatter.py
+odd_even_analyzer.py
+period_alias_checker.py
+period_doubling_checker.py
+period_recovery_validator.py
+phase_coverage_checker.py
+phase_plot_generator.py
+photon_noise_estimator.py
+pipeline_benchmark.py
+pipeline_run_diff.py
+pixel_level_centroid_checker.py
+planet_radius_estimator.py
+plot_lc.py
+rank_candidates.py
+recovery_completeness_map.py
+run_summary_exporter.py
+rv_semiamplitude_estimator.py
+scatter_metric_calculator.py
+secondary_eclipse_mapper.py
+sector_coverage.py
+sector_gap_finder.py
+signal_statistics.py
+snr_estimator.py
+star_scanner.py
+stellar_activity_filter.py
+stellar_density_calculator.py
+stellar_params_fetcher.py
+stellar_rotation.py
+summary_report.py
+target_metadata_fetcher.py
+target_prioritizer.py
+telescope_time_estimator.py
+tess_visibility_checker.py
+tess_year_planner.py
+toi_checker.py
+toi_watcher.py
+train_xgboost.py
+transit_asymmetry_scorer.py
+transit_depth_corrector.py
+transit_duration_calculator.py
+transit_geometry_calculator.py
+transit_modeler.py
+transit_timing_fitter.py
+transit_window_extractor.py
+transmission_window_predictor.py
+trapezoid_box_comparator.py
+tsm_calculator.py
+vetting_scorecard.py
+watchlist.py
+```
+
+---
+
 ## Quick reference
+
+This table is intentionally workflow-oriented rather than exhaustive.
 
 | Script | Purpose | Key function |
 |--------|---------|--------------|
@@ -202,7 +326,7 @@ python Skills/injection_recovery.py \
 
 ```bash
 python Skills/count_tess_labels.py
-# Current CP count: 4,217  |  Gate threshold: 5,000  |  Status: BLOCKED
+# Prints the current CP count and whether the 5,000-label gate is open.
 ```
 
 ---

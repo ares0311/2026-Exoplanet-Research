@@ -14,6 +14,16 @@ python -m pip install -e '.[dev]'
 
 If your shell treats brackets specially, quote `.[dev]` as shown.
 
+### macOS XGBoost Runtime
+
+The default test suite imports `xgboost`. On macOS, the wheel also needs the OpenMP runtime:
+
+```bash
+brew install libomp
+```
+
+If pytest reports that `libxgboost.dylib` cannot load because `libomp.dylib` is missing, install `libomp` and rerun validation.
+
 ## Standard Validation
 
 Run these before handing work to another agent or opening a pull request:
@@ -22,6 +32,14 @@ Run these before handing work to another agent or opening a pull request:
 pytest --cov=exo_toolkit --cov-report=term-missing
 ruff check .
 mypy src
+```
+
+The local `.venv` invocation used for the latest validation was:
+
+```bash
+.venv/bin/ruff check .
+.venv/bin/python -m mypy src
+.venv/bin/python -m pytest
 ```
 
 Default tests must not require live external services. Mark any live service test with `integration_live`.

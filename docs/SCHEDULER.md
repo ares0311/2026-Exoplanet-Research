@@ -58,6 +58,12 @@ This example runs once per day at 03:15 local time. Adjust paths for the local c
 15 3 * * * cd "/path/to/2026 Exoplanet Research" && exo background-run-once --config-path configs/background_search_v0.json --scheduler-exit-codes >> logs/background-search.cron.log 2>&1
 ```
 
+For a local checkout that uses the project virtual environment directly, prefer the explicit module invocation so scheduler PATH differences do not matter:
+
+```cron
+15 3 * * * cd "/path/to/2026 Exoplanet Research" && .venv/bin/python -m exo_toolkit.cli background-run-once --config-path configs/background_search_v0.json --scheduler-exit-codes >> logs/background-search.cron.log 2>&1
+```
+
 ## macOS launchd Example
 
 Save a property list such as `com.exotoolkit.background-search.plist` under `~/Library/LaunchAgents/`, then load it with `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.exotoolkit.background-search.plist`.
@@ -76,7 +82,9 @@ Save a property list such as `com.exotoolkit.background-search.plist` under `~/L
 
   <key>ProgramArguments</key>
   <array>
-    <string>/path/to/exo</string>
+    <string>/path/to/2026 Exoplanet Research/.venv/bin/python</string>
+    <string>-m</string>
+    <string>exo_toolkit.cli</string>
     <string>background-run-once</string>
     <string>--config-path</string>
     <string>configs/background_search_v0.json</string>
@@ -111,11 +119,28 @@ For Linux systems, pair a oneshot service with a timer. Keep the same one-run co
 [Service]
 Type=oneshot
 WorkingDirectory=/path/to/2026 Exoplanet Research
-ExecStart=/path/to/exo background-run-once
+ExecStart=/path/to/2026 Exoplanet Research/.venv/bin/python -m exo_toolkit.cli background-run-once
 ```
 
 ```ini
 [Timer]
 OnCalendar=*-*-* 03:15:00
 Persistent=true
+```
+
+## Local Environment Notes
+
+The XGBoost scorer is optional at runtime but part of the default test suite. On macOS, the `xgboost` wheel requires the OpenMP runtime:
+
+```bash
+brew install libomp
+```
+
+For local validation and scheduler smoke checks, these explicit commands match the current repository setup:
+
+```bash
+.venv/bin/ruff check .
+.venv/bin/python -m mypy src
+.venv/bin/python -m pytest
+.venv/bin/python -m exo_toolkit.cli background-run-once --dry-run
 ```

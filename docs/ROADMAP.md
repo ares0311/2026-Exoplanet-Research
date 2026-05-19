@@ -177,12 +177,24 @@
 
 - [x] `Skills/alert_filter.py` — `filter_candidates()` AND-logic threshold filter (FPP, pathway, signals, rank, SNR); `apply_filters()` loads + writes JSON
 - [x] `_fpp()` helper handles all dict shapes: `scores.false_positive_probability`, `best_fpp`, top-level
-- [x] `docs/SKILLS_GUIDE.md` — complete user reference for all 19 Skills; workflow diagram; CLI examples; library usage pattern; ML pipeline walkthrough
+- [x] `docs/SKILLS_GUIDE.md` — workflow reference plus current inventory for 111 Skills; CLI examples; library usage pattern; ML pipeline walkthrough
 - [x] 12 tests in `tests/test_alert_filter.py`
 
 ---
 
-## Milestone 12 — Future
+## Milestones 12-18 — Diagnostic And Operations Expansion ✓ COMPLETE
+
+- [x] Milestone 12 diagnostic scores, CLI metadata, notebook generation, target prioritization, candidate comparison, timelines, and FITS helper utilities
+- [x] Milestone 13 follow-up preparation, false-positive vetting, data quality, detrending comparison, recovery completeness, and HTML report utilities
+- [x] Milestone 14 caching, period aliases, multi-planet checks, centroid analysis, catalog crossmatch, transit modeling, candidate database, follow-up scheduling, config management, alerts, and scorecards
+- [x] Milestone 15 light-curve statistics, depth correction, nearby-star checks, binned exports, uncertainty, timing, candidate merging, multi-sector stacking, metadata, notes, TOI watching, contamination correction, benchmarking, and phase plots
+- [x] Milestone 16 transit analysis and follow-up preparation utilities including radius, odd/even, secondary eclipse, momentum dump, duplicate TOI, activity, RV, impact parameter, observing request, ephemeris uncertainty, photometry combination, transit windows, labelled snippets, CNN augmentation, and report cards
+- [x] Milestone 17 geometry, noise, period analysis, visibility, ground-truth matching, scatter metrics, centroid checks, and evidence aggregation utilities
+- [x] Milestone 18 observability and analysis utilities including equilibrium temperature, TSM, airmass, moon separation, telescope time, false alarm probability, chi-square period checks, deduplication, run diffs, FITS exports, asymmetry scoring, trapezoid comparison, leaderboard, email formatting, and transmission-window prediction
+
+---
+
+## Future
 
 - [ ] Tier 2 CNN once TESS label threshold is met (5,000+ CP labels)
 - [ ] Web API / dashboard for candidate browsing

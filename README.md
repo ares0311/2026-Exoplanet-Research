@@ -717,7 +717,7 @@ python Skills/evaluate_scorer.py \
 │   ├── SYSTEM_PROFILE.md        # Hardware sizing and batch-run defaults
 │   ├── ROADMAP.md               # Milestones and future work
 │   ├── PROJECT_STATUS.md        # Current implementation status
-│   └── SKILLS_GUIDE.md          # User reference for all 19 Skills scripts
+│   └── SKILLS_GUIDE.md          # User reference and inventory for 111 Skills scripts
 ├── data/                        # Local data cache (not tracked by git)
 ├── pyproject.toml
 └── requirements.txt
@@ -889,7 +889,7 @@ The candidate does not meet external submission criteria (high FPP, missing diag
 | ✅ | **TOI checker** | `Skills/toi_checker.py` — ExoFOP TOI lookup before investing pipeline time |
 | ✅ | **Export candidates** | `Skills/export_candidates.py` — CSV and Markdown table export with summary stats |
 | ✅ | **Alert filter** | `Skills/alert_filter.py` — AND-logic threshold filter over FPP/pathway/signals/SNR |
-| ✅ | **Skills guide** | `docs/SKILLS_GUIDE.md` — complete user reference for all 19 Skills with workflow diagram |
+| ✅ | **Skills guide** | `docs/SKILLS_GUIDE.md` — workflow reference and current inventory for all 111 Skills |
 | 🔴 | **ML Tier 2 — 1D CNN** | Phase-folded flux classifier; gated on ≥5,000 TESS CP labels (Shallue and Vanderburg) |
 | 🔴 | **Mission-specific priors** | Period-, radius-, and stellar-type-dependent priors replacing flat defaults |
 | 🔴 | **Web interface / dashboard** | Interactive candidate browser with score explanations |
