@@ -47,6 +47,8 @@ def _weighted_mean_err(depths: list[float], errs: list[float] | None) -> tuple[f
         if n > 1:
             sq = sum((d - mean) ** 2 for d in depths)
             err = math.sqrt(sq / (n - 1)) / math.sqrt(n)
+            # Identical synthetic depths should not imply perfect measurement precision.
+            err = max(err, abs(mean) * 1e-3, 1.0)
         else:
             err = abs(mean) * 0.1 or 0.1
     return mean, err

@@ -3,7 +3,7 @@
 [![CI](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml/badge.svg)](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-907%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-2100%2B%20collected-informational.svg)](tests/)
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 ---
@@ -57,7 +57,7 @@
 
 ## Abstract
 
-This repository implements a complete, reproducible computational pipeline for the detection, vetting, and probabilistic classification of exoplanet transit candidates in photometric time-series data from the Transiting Exoplanet Survey Satellite (TESS) and the Kepler/K2 missions. The pipeline proceeds through six deterministic stages — data acquisition, preprocessing, Box Least Squares (BLS) periodicity search, signal vetting, Bayesian multi-hypothesis scoring, and submission pathway classification — and outputs calibrated posterior probabilities over six competing astrophysical and instrumental hypotheses. A conservative log-score approximation to Bayes' theorem is employed in lieu of generative likelihood models, with posterior calibration implemented via Platt scaling and isotonic regression (Pool Adjacent Violators Algorithm). An optional Tier-1 XGBoost classifier and Tier-3 stacking meta-learner augment the Bayesian scorer when labelled training data are available. The system is designed around scientific caution: it never labels an internally detected signal as a confirmed planet, exposes all false-positive evidence alongside each candidate score, and defers to authoritative external catalogs for confirmation status. The complete implementation comprises thirteen Python modules, an autonomous background search engine with SQLite-backed durable state, an autonomous star-scanner for priority-ranked target discovery, nineteen standalone Skills utility scripts, 907 unit and integration tests, strict static typing (mypy), and continuous integration via GitHub Actions.
+This repository implements a complete, reproducible computational pipeline for the detection, vetting, and probabilistic classification of exoplanet transit candidates in photometric time-series data from the Transiting Exoplanet Survey Satellite (TESS) and the Kepler/K2 missions. The pipeline proceeds through six deterministic stages — data acquisition, preprocessing, Box Least Squares (BLS) periodicity search, signal vetting, Bayesian multi-hypothesis scoring, and submission pathway classification — and outputs calibrated posterior probabilities over six competing astrophysical and instrumental hypotheses. A conservative log-score approximation to Bayes' theorem is employed in lieu of generative likelihood models, with posterior calibration implemented via Platt scaling and isotonic regression (Pool Adjacent Violators Algorithm). An optional Tier-1 XGBoost classifier and Tier-3 stacking meta-learner augment the Bayesian scorer when labelled training data are available. The system is designed around scientific caution: it never labels an internally detected signal as a confirmed planet, exposes all false-positive evidence alongside each candidate score, and defers to authoritative external catalogs for confirmation status. The current implementation comprises 25 package modules, an autonomous background search engine with SQLite-backed durable state, an autonomous star-scanner for priority-ranked target discovery, 111 standalone Skills utility scripts, 124 test files, strict static typing (mypy), and continuous integration via GitHub Actions.
 
 ---
 
@@ -194,7 +194,9 @@ Each stage produces a typed, immutable result object and preserves provenance me
 | `ml/xgboost_scorer.py` | — | XGBoost tabular classifier on 36 `OptScore` features | 45 |
 | `ml/stacking_scorer.py` | — | Weighted blend of XGBoost + Bayesian posteriors | 22 |
 | `background/` | — | SQLite-backed automation: one-shot runner, priority scoring, draft reports | 16 |
-| **Total** | | | **907** |
+| **Package subtotal** | | | **582** |
+
+The repository also contains 111 standalone `Skills/` utilities with dedicated tests. Current local validation passes 2225 default tests with the two live integration tests deselected; see `docs/PROJECT_STATUS.md` for the latest validation note.
 
 ### Operating Modes
 
@@ -765,8 +767,8 @@ PYTHONPATH=src python -m pytest -m integration_live
 | `ml/xgboost_scorer.py` | 45 |
 | `ml/stacking_scorer.py` | 22 |
 | `background/` module | 16 |
-| Skills (injection recovery, training, evaluation, star scanner, ranking, batch scan, sector coverage, plot_lc, watchlist, summary report, toi_checker, export_candidates, alert_filter) | 300 |
-| **Total** | **907** |
+| Skills utilities | 111 scripts with dedicated tests |
+| **Current default suite** | **2225 passed, 2 live tests deselected** |
 
 ---
 

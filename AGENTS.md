@@ -1,116 +1,110 @@
 # AGENTS.md — Instructions for AI Coding Agents
 
-<<<<<<< HEAD
-This file contains binding rules for AI coding agents (Claude Code, Codex, etc.) working in this repository.
-
----
+This file contains binding rules for AI coding agents working in this repository.
 
 ## Read First
 
-Before writing any code, read:
+Before writing code, recover project context from committed files. Read:
+
 - `CLAUDE.md` — current codebase state, module map, type system, quality commands
-- `docs/SCORING_MODEL.md` — mathematical specification for all scoring and classification logic
+- `docs/SCORING_MODEL.md` — mathematical specification for scoring and classification
 - `docs/PIPELINE_SPEC.md` — end-to-end pipeline architecture
-- `docs/PROJECT_STATUS.md` — what is done and what is next
-- `docs/DECISIONS.md` — durable architectural decisions; do not contradict these without adding a new DECISION-NNN entry
+- `docs/PROJECT_STATUS.md` — current active state and next work
+- `docs/DECISIONS.md` — durable architectural decisions
+- `CONTRIBUTING.md` — setup, validation, and contribution policy
 
----
-
-## Branch
-
-Always develop on: `claude/review-markdown-docs-SwVnR`
-Always push to: `claude/review-markdown-docs-SwVnR`
-Never push to `main` directly.
-
----
-
-## Quality Gates (mandatory before every commit)
-
-```bash
-ruff check .
-mypy src
-PYTHONPATH=src python -m pytest
-```
-
-All three must pass. Fix any errors before committing.
-
----
-
-## Code Standards
-
-- **Python 3.11+** — use `from __future__ import annotations`, `X | Y` unions, `match`/`case` where useful
-- **Pydantic v2** — frozen models, `ConfigDict(frozen=True)`, `Annotated` types, `model_validator`
-- **Type annotations** — all public functions must be fully annotated; run `mypy src` to verify
-- **`OptScore = float | None`** — absent features contribute 0 to log scores (neutral)
-- **No comments explaining WHAT** — good names do that; only add comments for WHY (hidden constraints, workarounds, invariants)
-- **No ML classifiers** — until labeled validation data and calibration infrastructure exist (DECISION-002)
-- **Never output "confirmed planet"** — use "candidate signal" or "follow-up target" (SCORING_MODEL.md §15)
-
----
-
-## Testing Standards
-
-Every module must have a corresponding `tests/test_<module>.py`.
-
-Required coverage:
-- Unit tests for every public function
-- Fixture-based tests for complex interactions
-- Boundary condition tests for numerical thresholds
-- `None`-input tests for all `OptScore` parameters
-- Conservation / sanity tests (e.g. posteriors sum to 1.0, scores in [0, 1])
-- `@pytest.mark.integration_live` for any test requiring live network access
-
-Do not use `@pytest.mark.integration_live` tests in the default suite.
-
----
-
-## Scientific Guardrails (SCORING_MODEL.md §15)
-
-- Never emit "confirmed planet" for internally detected signals
-- Always expose false-positive evidence in explanations
-- Suppress formal submission pathways if key diagnostics are missing
-- Store the scoring model version + threshold hash with every scored candidate
-- Conservative classifications preferred over optimistic ones
-- `None` feature scores must fail threshold gates (not pass them silently)
-
----
-
-## Commit Messages
-
-Format:
-```
-<Short imperative summary (≤72 chars)>
-
-<Body: what changed and why, not how>
-<Reference to spec section if relevant>
-
-https://claude.ai/code/session_014aY2VWw83fBCBSWqqTGxZW
-```
-
----
-
-## What Not To Do
-
-- Do not add features, abstractions, or refactors beyond what the task requires
-- Do not add error handling for scenarios that cannot happen in internal code
-- Do not add comments that describe what code does (names do that)
-- Do not skip ruff, mypy, or pytest before committing
-- Do not push to `main`
-- Do not claim a signal is a confirmed planet
-=======
-[See full content in chat — includes Environment Rules section at bottom]
+Do not rely on chat context, memory, or prior conversation history as the source of truth.
 
 ## Multi-Agent Continuity
 
-Multiple agents may work on this project across separate sessions, branches, and chat threads. Do not rely on chat context, memory, or prior conversation history as the source of truth.
+Multiple agents may work on this project across separate sessions, branches, and chat threads. Repository documentation is the continuity mechanism.
 
-Before making decisions or changes, recover project context from committed files, especially `AGENTS.md`, `README.md`, `CONTRIBUTING.md`, and the files in `docs/`. When new durable instructions, architectural decisions, operating rules, or scientific assumptions are established, record them in the appropriate repository document instead of leaving them only in chat.
+When durable instructions, architectural decisions, operating rules, or scientific assumptions are established, record them in the appropriate repository document instead of leaving them only in chat. If chat context conflicts with repository documentation, prefer repository documentation unless the user explicitly instructs otherwise in the current task.
 
-If chat context conflicts with repository documentation, prefer the repository documentation unless the user explicitly instructs otherwise in the current task. Preserve enough rationale, provenance, and test evidence in commits, docs, and code comments for another agent to continue without needing this conversation.
+Preserve enough rationale, provenance, and test evidence in commits, docs, and code comments for another agent to continue without needing the conversation that produced the change.
+
+## Branch And Git Policy
+
+Default development should happen on a non-`main` branch and be merged through review. Do not push directly to `main` unless the current user explicitly requests a direct `main` commit or push.
+
+Before committing, check `git status --short --branch`. Do not overwrite or revert unrelated user changes.
+
+## Quality Gates
+
+Run these before every commit when the local environment supports them:
+
+```bash
+ruff check .
+python -m mypy src
+PYTHONPATH=src python -m pytest
+```
+
+If a gate cannot run because of a local environment issue, record the exact blocker in the handoff or commit message. Default tests must not require live external services.
+
+## Code Standards
+
+- Python 3.11+.
+- Use `from __future__ import annotations` in Python modules.
+- Prefer Pydantic v2 frozen models for structured data contracts.
+- Public functions must be fully typed.
+- `OptScore = float | None`: absent diagnostics contribute neutrally to log scores, while threshold gates treat missing participating diagnostics conservatively.
+- Add comments for why, not for obvious what.
+- Keep changes scoped to the task and existing architecture.
+
+## Testing Standards
+
+Every meaningful code change needs appropriate tests. Required coverage should scale with risk:
+
+- Unit tests for public functions and numerical thresholds
+- Fixture-based tests for complex interactions
+- `None`-input tests for `OptScore` paths
+- Conservation and sanity tests for posteriors and bounded scores
+- Integration tests for pipeline behavior with mocked external services
+- `@pytest.mark.integration_live` for tests requiring live network access
+
+Do not include live service tests in the default suite.
+
+## Scientific Guardrails
+
+Follow `docs/SCORING_MODEL.md` guardrails:
+
+- Never emit "confirmed planet" for internally detected signals.
+- Use "candidate signal", "possible transit-like event", or "follow-up target".
+- Always expose false-positive evidence.
+- Preserve provenance for scores, thresholds, inputs, and generated reports.
+- Suppress formal submission pathways if key diagnostics are missing.
+- Prefer conservative classifications over optimistic ones.
+- External submission or contact requires explicit human approval.
+
+## Background Automation
+
+Background search automation uses top-level configuration and top-level SQLite runtime logs:
+
+```text
+configs/background_search_v0.json
+logs/background_search.sqlite3
+```
+
+Generated SQLite databases and background report exports are runtime artifacts. Do not commit them unless a future decision explicitly promotes a fixture artifact.
+
+The authoritative one-shot command is:
+
+```bash
+exo background-run-once
+```
+
+Schedulers should call one bounded run at a time, capture stdout/stderr, and avoid overlaps. See `docs/BACKGROUND_SEARCH_AUTOMATION_BLUEPRINT.md`, `docs/BACKGROUND_SEARCH_SQLITE_SCHEMA.md`, and `docs/SCHEDULER.md`.
 
 ## Local System Profile
 
-Before making performance-sensitive changes or running large jobs, read `docs/SYSTEM_PROFILE.md`.
+Before performance-sensitive changes or large jobs, read `docs/SYSTEM_PROFILE.md`.
 
 Optimize local defaults for the recorded MacBook Pro M4 Max profile while keeping scientific code portable and configurable. Do not hardcode local machine assumptions into candidate detection, scoring, or pathway logic.
->>>>>>> codex-background-automation-hardening
+
+## What Not To Do
+
+- Do not add features, abstractions, or refactors beyond what the task requires.
+- Do not skip validation silently.
+- Do not claim a signal is a confirmed planet.
+- Do not enable live network access in default tests.
+- Do not hide durable rules in chat-only context.
