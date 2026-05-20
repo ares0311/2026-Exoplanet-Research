@@ -9,7 +9,7 @@ Run any script with `--help` to see its full CLI options.
 
 ## Current inventory
 
-The repository currently has 111 standalone Skills. The quick reference below
+The repository currently has 112 standalone Skills. The quick reference below
 highlights the main workflow entry points; this full inventory keeps the
 complete script surface discoverable for future agents.
 
@@ -72,6 +72,7 @@ momentum_dump_flagger.py
 moon_separation_checker.py
 multi_night_photometry_combiner.py
 multi_planet_checker.py
+multi_sector_phase_compare.py
 multi_sector_stacker.py
 multi_target_report.py
 nearby_star_checker.py
@@ -139,6 +140,7 @@ This table is intentionally workflow-oriented rather than exhaustive.
 | `batch_scan.py` | Scan a list of TIC IDs from text/CSV | `batch_scan`, `read_tic_ids` |
 | `rank_candidates.py` | Sort exo JSON outputs by composite rank score | `rank_candidates`, `compute_rank_score` |
 | `sector_coverage.py` | Query TESS sector availability without downloading | `get_sector_coverage` |
+| `multi_sector_phase_compare.py` | Compare phase-folded transit depth and phase centroid across sectors | `compare_sector_phase_folds` |
 | `toi_checker.py` | Look up a TIC ID in the ExoFOP TOI list | `check_toi` |
 | `watchlist.py` | Persistent follow-up watchlist | `Watchlist` |
 | `alert_filter.py` | Filter batch results by FPP/pathway/SNR thresholds | `filter_candidates` |

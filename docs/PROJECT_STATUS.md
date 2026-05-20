@@ -14,8 +14,8 @@ The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit w
 - Bayesian log-score model over six hypotheses
 - Optional XGBoost and stacking scorer modes
 - SQLite-backed background automation with top-level logs
-- 111 standalone `Skills/` utility scripts
-- 124 test files
+- 112 standalone `Skills/` utility scripts
+- 125 test files
 - 25 package Python modules under `src/exo_toolkit/`
 
 Local validation note: after restoring the declared `xgboost` dependency and installing the macOS OpenMP runtime (`libomp`), the default test suite passes locally on Python 3.13.12.
@@ -39,6 +39,7 @@ Local validation note: after restoring the declared `xgboost` dependency and ins
 | Training/evaluation Skills | Kepler, TESS, combined training, XGBoost training, scorer evaluation | Complete |
 | Discovery workflow Skills | star scanner, batch scan, alert filter, ranking, watchlist, exports, reports | Complete |
 | Milestones 13-18 Skills | 87 additional analysis, vetting, observability, reporting, and follow-up utilities | Complete |
+| Milestone 19a Skill | `multi_sector_phase_compare.py` — offline per-sector phase-fold comparison | Complete |
 | Docs | `README.md`, `docs/`, `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md` | Active maintenance |
 
 ---
@@ -89,6 +90,7 @@ No active implementation blocker is known in the default local validation path.
 2. Once the CNN gate opens, implement Tier 2 per `docs/CNN_SPEC.md`.
 3. Use `toi_checker.py` before investing pipeline time on new live targets.
 4. Use `batch_scan.py` + `alert_filter.py` + `rank_candidates.py` + `watchlist.py` for systematic follow-up.
+5. Use `multi_sector_phase_compare.py` to inspect sector-to-sector depth and phase consistency before advancing multi-sector follow-up targets.
 
 Live-network note: the CNN gate check was not run during the latest local
 maintenance pass because it queries ExoFOP and requires intentional live network
@@ -108,7 +110,7 @@ Validated on 2026-05-19:
 .venv/bin/python -m pytest
 ```
 
-Result: ruff passed, mypy passed, pytest passed with 2225 passed, 2 deselected, and 33 warnings.
+Result: ruff passed, mypy passed, pytest passed with 2237 passed, 2 deselected, and 33 warnings.
 
 ---
 

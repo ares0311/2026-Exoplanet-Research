@@ -52,8 +52,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 124 test files. Local validation on 2026-05-19 passed with 2225 default tests, 2 `integration_live` tests deselected, and 33 warnings after restoring `xgboost` plus the macOS `libomp` runtime.
-**Skills:** 111 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
+**Current test surface:** 125 test files. Local validation on 2026-05-19 passed with 2237 default tests, 2 `integration_live` tests deselected, and 33 warnings after restoring `xgboost` plus the macOS `libomp` runtime.
+**Skills:** 112 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
 
@@ -697,6 +697,14 @@ All pipeline modules are complete.
 | `leaderboard_generator.py` | `generate_leaderboard`, target/contributor modes, composite score | 14 |
 | `batch_email_formatter.py` | `format_batch_email`, `format_single_candidate_email`, plain+HTML | 14 |
 | `transmission_window_predictor.py` | `predict_transit_windows`, injectable airmass_fn + moon_fn | 17 |
+
+### Completed (2026-05-19) — Milestone 19a
+
+**1 new Skill + 12 new tests**: ✅
+
+| Skill | Key Functions | Tests |
+|---|---|---|
+| `multi_sector_phase_compare.py` | `compare_sector_phase_folds`, `format_phase_comparison` | 12 |
 
 ### Next Step
 

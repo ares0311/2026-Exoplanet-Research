@@ -177,7 +177,7 @@
 
 - [x] `Skills/alert_filter.py` — `filter_candidates()` AND-logic threshold filter (FPP, pathway, signals, rank, SNR); `apply_filters()` loads + writes JSON
 - [x] `_fpp()` helper handles all dict shapes: `scores.false_positive_probability`, `best_fpp`, top-level
-- [x] `docs/SKILLS_GUIDE.md` — workflow reference plus current inventory for 111 Skills; CLI examples; library usage pattern; ML pipeline walkthrough
+- [x] `docs/SKILLS_GUIDE.md` — workflow reference plus current inventory for 112 Skills; CLI examples; library usage pattern; ML pipeline walkthrough
 - [x] 12 tests in `tests/test_alert_filter.py`
 
 ---
@@ -198,7 +198,14 @@
 
 - [ ] Tier 2 CNN once TESS label threshold is met (5,000+ CP labels)
 - [ ] Web API / dashboard for candidate browsing
-- [ ] Per-star multi-sector phase-fold comparison across sectors
+
+---
+
+## Milestone 19a — Multi-Sector Phase-Fold Comparison ✓ COMPLETE
+
+- [x] `Skills/multi_sector_phase_compare.py` — offline per-sector phase-fold comparison for transit depth and phase centroid consistency
+- [x] Flags insufficient coverage, weak/inverted signals, depth mismatches, and phase shifts conservatively
+- [x] 12 tests in `tests/test_multi_sector_phase_compare.py`
 
 ---
 
