@@ -52,8 +52,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 125 test files. Local validation on 2026-05-19 passed with 2237 default tests, 2 `integration_live` tests deselected, and 33 warnings after restoring `xgboost` plus the macOS `libomp` runtime.
-**Skills:** 112 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
+**Current test surface:** 126 test files. Local validation on 2026-05-20 passed with 2255 default tests, 2 `integration_live` tests deselected, and 33 warnings after restoring `xgboost` plus the macOS `libomp` runtime.
+**Skills:** 113 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
 
@@ -705,6 +705,14 @@ All pipeline modules are complete.
 | Skill | Key Functions | Tests |
 |---|---|---|
 | `multi_sector_phase_compare.py` | `compare_sector_phase_folds`, `format_phase_comparison` | 12 |
+
+### Completed (2026-05-19) — Milestone 19b
+
+**1 new Skill + 18 new tests**: ✅
+
+| Skill | Key Functions | Tests |
+|---|---|---|
+| `candidate_dashboard_export.py` | `build_dashboard`, `write_dashboard`, `load_dashboard_rows` | 18 |
 
 ### Next Step
 

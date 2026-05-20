@@ -9,7 +9,7 @@ Run any script with `--help` to see its full CLI options.
 
 ## Current inventory
 
-The repository currently has 112 standalone Skills. The quick reference below
+The repository currently has 113 standalone Skills. The quick reference below
 highlights the main workflow entry points; this full inventory keeps the
 complete script surface discoverable for future agents.
 
@@ -29,6 +29,7 @@ bulk_priority_update.py
 candidate_database.py
 candidate_deduplicator.py
 candidate_evidence_aggregator.py
+candidate_dashboard_export.py
 candidate_html_export.py
 candidate_merger.py
 candidate_notes.py
@@ -146,6 +147,7 @@ This table is intentionally workflow-oriented rather than exhaustive.
 | `alert_filter.py` | Filter batch results by FPP/pathway/SNR thresholds | `filter_candidates` |
 | `export_candidates.py` | Export ranked candidates to CSV and Markdown | `to_csv`, `to_markdown_table` |
 | `summary_report.py` | Generate Markdown summary from batch_scan output | `build_report`, `write_report` |
+| `candidate_dashboard_export.py` | Build static conservative HTML review dashboard | `build_dashboard`, `write_dashboard` |
 | `plot_lc.py` | Phase-fold PNG from candidate JSON | `plot_candidate`, `phase_fold` |
 | `notebook_generator.py` | Generate Jupyter notebook for a TIC target | `generate_notebook` |
 | `target_prioritizer.py` | Rank TIC IDs by TOI status + sector coverage | `prioritize_targets`, `format_recommendations` |
