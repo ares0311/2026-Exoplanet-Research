@@ -70,7 +70,8 @@ The static dashboard should include:
 
 ## Future Extensions
 
-- Local read-only API for candidate browsing.
+- Local read-only API for candidate browsing. Implemented by
+  `Skills/candidate_api.py`; see `docs/API_SPEC.md`.
 - Integration with `logs/background_search.sqlite3` summaries.
 - Embedded phase-fold plots when plot artifacts are supplied.
 - Optional browser UI once the static data contract is stable.

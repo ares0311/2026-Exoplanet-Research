@@ -14,8 +14,8 @@ The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit w
 - Bayesian log-score model over six hypotheses
 - Optional XGBoost and stacking scorer modes
 - SQLite-backed background automation with top-level logs
-- 113 standalone `Skills/` utility scripts
-- 126 test files
+- 114 standalone `Skills/` utility scripts
+- 127 test files
 - 25 package Python modules under `src/exo_toolkit/`
 
 Local validation note: after restoring the declared `xgboost` dependency and installing the macOS OpenMP runtime (`libomp`), the default test suite passes locally on Python 3.13.12.
@@ -41,6 +41,7 @@ Local validation note: after restoring the declared `xgboost` dependency and ins
 | Milestones 13-18 Skills | 87 additional analysis, vetting, observability, reporting, and follow-up utilities | Complete |
 | Milestone 19a Skill | `multi_sector_phase_compare.py` — offline per-sector phase-fold comparison | Complete |
 | Milestone 19b Skill | `candidate_dashboard_export.py` — static conservative candidate dashboard | Complete |
+| Milestone 19c Skill | `candidate_api.py` — local read-only candidate API | Complete |
 | Docs | `README.md`, `docs/`, `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md` | Active maintenance |
 
 ---
@@ -93,6 +94,7 @@ No active implementation blocker is known in the default local validation path.
 4. Use `batch_scan.py` + `alert_filter.py` + `rank_candidates.py` + `watchlist.py` for systematic follow-up.
 5. Use `multi_sector_phase_compare.py` to inspect sector-to-sector depth and phase consistency before advancing multi-sector follow-up targets.
 6. Use `candidate_dashboard_export.py` to build static local review dashboards from existing candidate JSON outputs.
+7. Use `candidate_api.py` to serve existing local candidate JSON through read-only endpoints for local browsing.
 
 Live-network note: the CNN gate check was not run during the latest local
 maintenance pass because it queries ExoFOP and requires intentional live network
@@ -112,7 +114,7 @@ Validated on 2026-05-20:
 .venv/bin/python -m pytest
 ```
 
-Result: ruff passed, mypy passed, pytest passed with 2255 passed, 2 deselected, and 33 warnings.
+Result: ruff passed, mypy passed, pytest passed with 2273 passed, 2 deselected, and 33 warnings.
 
 ---
 

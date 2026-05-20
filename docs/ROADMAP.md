@@ -177,7 +177,7 @@
 
 - [x] `Skills/alert_filter.py` — `filter_candidates()` AND-logic threshold filter (FPP, pathway, signals, rank, SNR); `apply_filters()` loads + writes JSON
 - [x] `_fpp()` helper handles all dict shapes: `scores.false_positive_probability`, `best_fpp`, top-level
-- [x] `docs/SKILLS_GUIDE.md` — workflow reference plus current inventory for 113 Skills; CLI examples; library usage pattern; ML pipeline walkthrough
+- [x] `docs/SKILLS_GUIDE.md` — workflow reference plus current inventory for 114 Skills; CLI examples; library usage pattern; ML pipeline walkthrough
 - [x] 12 tests in `tests/test_alert_filter.py`
 
 ---
@@ -197,7 +197,7 @@
 ## Future
 
 - [ ] Tier 2 CNN once TESS label threshold is met (5,000+ CP labels)
-- [ ] Read-only Web API / interactive dashboard for candidate browsing
+- [ ] Interactive browser UI consuming the local read-only API
 
 ---
 
@@ -215,6 +215,15 @@
 - [x] `Skills/candidate_dashboard_export.py` — static HTML dashboard from existing local candidate JSON rows
 - [x] Preserves false-positive evidence, negative evidence, missing-score states, and blocking issues
 - [x] 18 tests in `tests/test_candidate_dashboard_export.py`
+
+---
+
+## Milestone 19c — Local Read-Only Candidate API ✓ COMPLETE
+
+- [x] `docs/API_SPEC.md` — local API contract, endpoints, guardrails, and non-goals
+- [x] `Skills/candidate_api.py` — standard-library read-only HTTP API for local candidate JSON rows
+- [x] Endpoints: `/health`, `/summary`, `/candidates`, `/candidates/<id>`, `/dashboard`
+- [x] 18 tests in `tests/test_candidate_api.py`
 
 ---
 
