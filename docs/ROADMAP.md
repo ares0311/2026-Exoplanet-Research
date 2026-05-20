@@ -177,7 +177,7 @@
 
 - [x] `Skills/alert_filter.py` — `filter_candidates()` AND-logic threshold filter (FPP, pathway, signals, rank, SNR); `apply_filters()` loads + writes JSON
 - [x] `_fpp()` helper handles all dict shapes: `scores.false_positive_probability`, `best_fpp`, top-level
-- [x] `docs/SKILLS_GUIDE.md` — workflow reference plus current inventory for 114 Skills; CLI examples; library usage pattern; ML pipeline walkthrough
+- [x] `docs/SKILLS_GUIDE.md` — workflow reference plus current inventory for 115 Skills; CLI examples; library usage pattern; ML pipeline walkthrough
 - [x] 12 tests in `tests/test_alert_filter.py`
 
 ---
@@ -197,7 +197,6 @@
 ## Future
 
 - [ ] Tier 2 CNN once TESS label threshold is met (5,000+ CP labels)
-- [ ] Interactive browser UI consuming the local read-only API
 
 ---
 
@@ -224,6 +223,15 @@
 - [x] `Skills/candidate_api.py` — standard-library read-only HTTP API for local candidate JSON rows
 - [x] Endpoints: `/health`, `/summary`, `/candidates`, `/candidates/<id>`, `/dashboard`
 - [x] 18 tests in `tests/test_candidate_api.py`
+
+---
+
+## Milestone 19d — Interactive Local Candidate Browser ✓ COMPLETE
+
+- [x] `Skills/candidate_browser_ui.py` — dependency-free browser UI for candidate review
+- [x] Supports embedded-data mode for offline file viewing and API mode for `candidate_api.py`
+- [x] Includes search, risk filtering, pathway filtering, summary metrics, and detail panel
+- [x] 18 tests in `tests/test_candidate_browser_ui.py`
 
 ---
 

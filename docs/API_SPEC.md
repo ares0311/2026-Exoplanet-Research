@@ -69,6 +69,7 @@ All mutation methods are rejected. The API is read-only.
 ## Future Extensions
 
 - Read-only background SQLite summary endpoints.
-- Optional browser UI consuming the JSON endpoints.
+- Browser UI consuming the JSON endpoints. Implemented by
+  `Skills/candidate_browser_ui.py`.
 - Static artifact mode for GitHub Actions or local report bundles.
 - CORS configuration if a separate local frontend is introduced.

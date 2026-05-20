@@ -14,8 +14,8 @@ The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit w
 - Bayesian log-score model over six hypotheses
 - Optional XGBoost and stacking scorer modes
 - SQLite-backed background automation with top-level logs
-- 114 standalone `Skills/` utility scripts
-- 127 test files
+- 115 standalone `Skills/` utility scripts
+- 128 test files
 - 25 package Python modules under `src/exo_toolkit/`
 
 Local validation note: after restoring the declared `xgboost` dependency and installing the macOS OpenMP runtime (`libomp`), the default test suite passes locally on Python 3.13.12.
@@ -42,6 +42,7 @@ Local validation note: after restoring the declared `xgboost` dependency and ins
 | Milestone 19a Skill | `multi_sector_phase_compare.py` — offline per-sector phase-fold comparison | Complete |
 | Milestone 19b Skill | `candidate_dashboard_export.py` — static conservative candidate dashboard | Complete |
 | Milestone 19c Skill | `candidate_api.py` — local read-only candidate API | Complete |
+| Milestone 19d Skill | `candidate_browser_ui.py` — interactive local candidate browser | Complete |
 | Docs | `README.md`, `docs/`, `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md` | Active maintenance |
 
 ---
@@ -95,6 +96,7 @@ No active implementation blocker is known in the default local validation path.
 5. Use `multi_sector_phase_compare.py` to inspect sector-to-sector depth and phase consistency before advancing multi-sector follow-up targets.
 6. Use `candidate_dashboard_export.py` to build static local review dashboards from existing candidate JSON outputs.
 7. Use `candidate_api.py` to serve existing local candidate JSON through read-only endpoints for local browsing.
+8. Use `candidate_browser_ui.py` for an interactive local browser UI with embedded-data and API modes.
 
 Live-network note: the CNN gate check was not run during the latest local
 maintenance pass because it queries ExoFOP and requires intentional live network
@@ -114,7 +116,7 @@ Validated on 2026-05-20:
 .venv/bin/python -m pytest
 ```
 
-Result: ruff passed, mypy passed, pytest passed with 2273 passed, 2 deselected, and 33 warnings.
+Result: ruff passed, mypy passed, pytest passed with 2291 passed, 2 deselected, and 33 warnings.
 
 ---
 
