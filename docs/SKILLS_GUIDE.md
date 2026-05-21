@@ -9,7 +9,7 @@ Run any script with `--help` to see its full CLI options.
 
 ## Current inventory
 
-The repository currently has 116 standalone Skills. The quick reference below
+The repository currently has 117 standalone Skills. The quick reference below
 highlights the main workflow entry points; this full inventory keeps the
 complete script surface discoverable for future agents.
 
@@ -42,6 +42,7 @@ catalog_crossmatch.py
 centroid_analyzer.py
 chi_square_period_checker.py
 cnn_feature_augmenter.py
+cnn_split_validator.py
 compare_candidates.py
 config_manager.py
 count_tess_labels.py
@@ -163,6 +164,7 @@ This table is intentionally workflow-oriented rather than exhaustive.
 | `evaluate_scorer.py` | k-fold ROC-AUC, F1, reliability diagram | `evaluate_scorer` |
 | `build_training_data.py` | Map Kepler KOI table → CandidateFeatures pickle | `build_training_data` |
 | `build_cnn_training_data.py` | Assemble offline CNN train/validation/test snippet splits | `load_training_examples`, `write_training_splits` |
+| `cnn_split_validator.py` | Validate offline CNN split manifests and train/validation/test artifacts | `validate_split_dir`, `format_validation_summary` |
 | `build_tess_training_data.py` | Map TESS TOI table → CandidateFeatures pickle | `build_tess_training_data` |
 | `build_combined_training_data.py` | Merge Kepler + TESS training pickles | `build_combined_training_data` |
 | `train_xgboost.py` | Stratified k-fold XGBoost training with Platt calibration | `train_xgboost` |

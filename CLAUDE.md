@@ -52,8 +52,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 129 test files. Local validation on 2026-05-20 passed with 2320 default tests, 2 `integration_live` tests deselected, and 33 warnings after restoring `xgboost` plus the macOS `libomp` runtime.
-**Skills:** 116 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
+**Current test surface:** 130 test files. Local validation on 2026-05-21 passed with 2335 default tests, 2 `integration_live` tests deselected, and 33 warnings after restoring `xgboost` plus the macOS `libomp` runtime.
+**Skills:** 117 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
 
@@ -653,6 +653,7 @@ All pipeline modules are complete.
 | `labelled_lc_collector.py` | `extract_snippet`, `build_dataset`, phase-fold+bin for CNN | 13 |
 | `cnn_feature_augmenter.py` | `augment_snippet`, `augment_dataset`, noise/shift/scale/reverse | 12 |
 | `build_cnn_training_data.py` | `load_training_examples`, `write_training_splits`, offline train/val/test split assembly | 13 |
+| `cnn_split_validator.py` | `validate_split_dir`, `validate_split_manifest`, offline split artifact validation | 15 |
 | `candidate_report_card.py` | `build_report_card`, `save_report_card`, integrated vetting card | 15 |
 
 ### Completed (2026-05-18) — Milestone 17
@@ -737,7 +738,7 @@ All pipeline modules are complete.
 - Requires 5,000+ TESS labels before building
 - Gate check: `python Skills/count_tess_labels.py`
 - Architecture spec: `docs/CNN_SPEC.md`
-- Training data infrastructure now available via `labelled_lc_collector.py`, `cnn_feature_augmenter.py`, and `build_cnn_training_data.py`
+- Training data infrastructure now available via `labelled_lc_collector.py`, `cnn_feature_augmenter.py`, `build_cnn_training_data.py`, and `cnn_split_validator.py`
 
 ### Future Enhancement: ML Ensemble Scorer (agreed 2026-05-01)
 

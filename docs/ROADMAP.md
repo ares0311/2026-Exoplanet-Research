@@ -65,6 +65,7 @@
 - [x] Evaluation framework (`Skills/evaluate_scorer.py`, ROC-AUC, F1, reliability diagrams)
 - [x] Combined training data (`Skills/build_combined_training_data.py`)
 - [x] Offline CNN snippet split assembly (`Skills/build_cnn_training_data.py`, 13 tests)
+- [x] Offline CNN split validation (`Skills/cnn_split_validator.py`, 15 tests)
 - [ ] Tier 2 — 1D CNN on phase-folded flux (**BLOCKED: requires 5,000+ TESS labels**)
   - Architecture spec: `docs/CNN_SPEC.md`
   - Gate check: `Skills/count_tess_labels.py`
@@ -178,7 +179,7 @@
 
 - [x] `Skills/alert_filter.py` — `filter_candidates()` AND-logic threshold filter (FPP, pathway, signals, rank, SNR); `apply_filters()` loads + writes JSON
 - [x] `_fpp()` helper handles all dict shapes: `scores.false_positive_probability`, `best_fpp`, top-level
-- [x] `docs/SKILLS_GUIDE.md` — workflow reference plus current inventory for 116 Skills; CLI examples; library usage pattern; ML pipeline walkthrough
+- [x] `docs/SKILLS_GUIDE.md` — workflow reference plus current inventory for 117 Skills; CLI examples; library usage pattern; ML pipeline walkthrough
 - [x] 12 tests in `tests/test_alert_filter.py`
 
 ---

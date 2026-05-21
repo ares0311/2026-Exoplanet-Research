@@ -101,6 +101,7 @@ Default weights (to be calibrated after training): `0.35 / 0.35 / 0.30`.
 - [x] `Skills/labelled_lc_collector.py` — extract, phase-fold, bin, and store labelled snippets
 - [x] `Skills/cnn_feature_augmenter.py` — noise, shift, scale, and reverse snippets for augmentation
 - [x] `Skills/build_cnn_training_data.py` — assemble offline train/val/test splits from existing labelled snippet artifacts
+- [x] `Skills/cnn_split_validator.py` — validate offline split manifests and train/val/test artifacts before training
 - [ ] `tests/test_cnn_scorer.py` — ≥ 30 tests
 - [ ] Update `ml/stacking_scorer.py` — add CNN weight
 - [ ] Update `docs/ML_SCORING.md` — document CNN mode
