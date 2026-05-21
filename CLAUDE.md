@@ -40,7 +40,8 @@ CI: `.github/workflows/ci.yml`
 | `schemas.py` | **done** | `test_schemas.py` (33) |
 | `features.py` | **done** | `test_features.py` (145) — includes all 5 Milestone 12 feature functions |
 | `hypotheses.py` | **done** | `test_hypotheses.py` (46) — all 5 Milestone 12 features wired |
-| `scoring.py` | **done** | `test_scoring.py` (45) — invariants + weight-sensitivity tests |
+| `scoring.py` | **done** | `test_scoring.py` (48) — invariants, prior config flow, weight-sensitivity tests |
+| `priors.py` | **done** | `test_priors.py` (14) — conservative versioned default + mission-prior config |
 | `pathway.py` | **done** | `test_pathway.py` (60) — parametric + all-branch coverage |
 | `fetch.py` | **done** | `test_fetch.py` (55, 2 live) |
 | `clean.py` | **done** | `test_clean.py` (39) |
@@ -52,7 +53,7 @@ CI: `.github/workflows/ci.yml`
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 130 test files. Local validation on 2026-05-21 passed with 2335 default tests, 2 `integration_live` tests deselected, and 33 warnings after restoring `xgboost` plus the macOS `libomp` runtime.
+**Current test surface:** 131 test files. Local validation on 2026-05-21 passed with 2352 default tests, 2 `integration_live` tests deselected, and 33 warnings after restoring `xgboost` plus the macOS `libomp` runtime.
 **Skills:** 117 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
@@ -349,7 +350,8 @@ Complete user reference for all 24 Skills scripts (updated Milestone 12).
 - **Bayesian log-score model**: `log_score_i = log_prior_i + weighted_evidence_i`, then `posterior_i = softmax(log_scores)`
 - **6 hypotheses**: planet_candidate, eclipsing_binary, background_eclipsing_binary, stellar_variability, instrumental_artifact, known_object
 - **OptScore pattern**: `float | None` — `None` means diagnostic not run; missing features contribute 0 to log scores (neutral, no bias)
-- **Conservative priors**: planet_candidate = 0.10, others = 0.20 each, known_object = 0.10
+- **Conservative priors**: built-in defaults remain planet_candidate = 0.10, EB/BEB/stellar/instrumental = 0.20 each, known_object = 0.10
+- **Mission prior profiles**: `configs/scoring_priors_v0.json` defines opt-in conservative TESS/Kepler/K2 profiles loaded by `priors.py`
 - **ML Tier 1 (XGBoost) is built** — `ml/xgboost_scorer.py` ships as an optional alternative scorer; Bayesian log-score model remains the default fallback when labels are unavailable
 - **ML Tier 3 (stacking) is built** — `ml/stacking_scorer.py` blends XGBoost + Bayesian P(planet) with configurable weight; falls back to Bayesian-only when no model loaded
 - **CLI scorer options**: `exo <TIC-ID> --scorer [bayesian|xgboost|ensemble] --model-path <path>`
@@ -399,12 +401,13 @@ per-transit depths, odd/even, secondary SNR, stellar params, crowding, flags, ca
 ```
 CandidateFeatures
     → compute_log_scores()      (hypotheses.py)
+      optional mission priors   (priors.py)
     → softmax()                 (scoring.py)
     → HypothesisPosterior
     → compute_scores()          (scoring.py)
     → CandidateScores
 
-Public entry point: score_candidate(signal, features, log_priors=None)
+Public entry point: score_candidate(signal, features, log_priors=None, prior_config=None)
     → tuple[HypothesisPosterior, CandidateScores]
 ```
 

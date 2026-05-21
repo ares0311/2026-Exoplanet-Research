@@ -1,0 +1,62 @@
+{
+  "confirmation_claims_allowed": false,
+  "default_profile": "conservative_v0",
+  "external_submission_requires_human_approval": true,
+  "mission_profiles": {
+    "K2": "k2_v0",
+    "Kepler": "kepler_v0",
+    "TESS": "tess_v0"
+  },
+  "profiles": {
+    "conservative_v0": {
+      "mission": "default",
+      "name": "conservative_v0",
+      "priors": {
+        "background_eclipsing_binary": 0.2,
+        "eclipsing_binary": 0.2,
+        "instrumental_artifact": 0.2,
+        "known_object": 0.1,
+        "planet_candidate": 0.1,
+        "stellar_variability": 0.2
+      }
+    },
+    "k2_v0": {
+      "mission": "K2",
+      "name": "k2_v0",
+      "priors": {
+        "background_eclipsing_binary": 0.18,
+        "eclipsing_binary": 0.2,
+        "instrumental_artifact": 0.2,
+        "known_object": 0.09,
+        "planet_candidate": 0.09,
+        "stellar_variability": 0.24
+      }
+    },
+    "kepler_v0": {
+      "mission": "Kepler",
+      "name": "kepler_v0",
+      "priors": {
+        "background_eclipsing_binary": 0.14,
+        "eclipsing_binary": 0.22,
+        "instrumental_artifact": 0.14,
+        "known_object": 0.2,
+        "planet_candidate": 0.12,
+        "stellar_variability": 0.18
+      }
+    },
+    "tess_v0": {
+      "mission": "TESS",
+      "name": "tess_v0",
+      "priors": {
+        "background_eclipsing_binary": 0.22,
+        "eclipsing_binary": 0.22,
+        "instrumental_artifact": 0.22,
+        "known_object": 0.08,
+        "planet_candidate": 0.08,
+        "stellar_variability": 0.18
+      }
+    }
+  },
+  "schema_version": "1",
+  "version": "scoring_priors_v0"
+}

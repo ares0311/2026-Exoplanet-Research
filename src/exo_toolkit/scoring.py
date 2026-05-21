@@ -15,6 +15,7 @@ from __future__ import annotations
 import math
 
 from exo_toolkit.hypotheses import compute_log_scores
+from exo_toolkit.priors import ScoringPriorConfig, log_priors_for_signal
 from exo_toolkit.schemas import (
     CandidateFeatures,
     CandidateScores,
@@ -203,6 +204,7 @@ def score_candidate(
     signal: CandidateSignal,
     features: CandidateFeatures,
     log_priors: dict[str, float] | None = None,
+    prior_config: ScoringPriorConfig | None = None,
 ) -> tuple[HypothesisPosterior, CandidateScores]:
     """
     Full scoring pipeline: features → posterior → derived scores.
@@ -211,10 +213,24 @@ def score_candidate(
         signal:     Raw transit signal parameters.
         features:   Extracted feature scores (None = not available).
         log_priors: Optional per-hypothesis log-prior overrides.
+        prior_config: Optional mission-specific prior config. Ignored when
+            explicit log_priors are supplied.
 
     Returns:
         (HypothesisPosterior, CandidateScores)
     """
-    posterior = compute_posterior(features, log_priors)
+    selected_log_priors = (
+        log_priors if log_priors is not None else _mission_log_priors(signal, prior_config)
+    )
+    posterior = compute_posterior(features, selected_log_priors)
     scores = compute_scores(signal, features, posterior)
     return posterior, scores
+
+
+def _mission_log_priors(
+    signal: CandidateSignal,
+    prior_config: ScoringPriorConfig | None,
+) -> dict[str, float] | None:
+    if prior_config is None:
+        return None
+    return log_priors_for_signal(signal, prior_config)

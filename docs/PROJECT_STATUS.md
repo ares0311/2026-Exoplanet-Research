@@ -15,8 +15,8 @@ The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit w
 - Optional XGBoost and stacking scorer modes
 - SQLite-backed background automation with top-level logs
 - 117 standalone `Skills/` utility scripts
-- 130 test files
-- 25 package Python modules under `src/exo_toolkit/`
+- 131 test files
+- 26 package Python modules under `src/exo_toolkit/`
 
 Local validation note: after restoring the declared `xgboost` dependency and installing the macOS OpenMP runtime (`libomp`), the default test suite passes locally on Python 3.13.12.
 
@@ -26,13 +26,14 @@ Local validation note: after restoring the declared `xgboost` dependency and ins
 
 | Area | Key Files | Status |
 |------|-----------|--------|
-| Scoring engine | `schemas.py`, `features.py`, `hypotheses.py`, `scoring.py`, `pathway.py` | Complete |
+| Scoring engine | `schemas.py`, `features.py`, `hypotheses.py`, `priors.py`, `scoring.py`, `pathway.py` | Complete |
 | Data pipeline | `fetch.py`, `clean.py`, `search.py`, `vet.py`, `calibration.py` | Complete |
 | Transit scan CLI | `cli.py` — `exo <TIC-ID>` with `--scorer`, `--model-path`, `--output` | Complete |
 | Background automation CLI | `cli.py` — `background-run-once`, summaries, integrity, validation | Complete |
 | Background automation module | `background/` — config, fixtures, priority, runner, storage, reports | Complete |
 | SQLite runtime state | `logs/background_search.sqlite3` schema v2 | Complete |
 | Background config | `configs/background_search_v0.json` | Complete |
+| Scoring prior config | `configs/scoring_priors_v0.json` — conservative default plus TESS/Kepler/K2 profiles | Complete |
 | Scheduler docs | `docs/SCHEDULER.md` — cron, launchd, systemd | Complete |
 | ML Tier 1 | `ml/xgboost_scorer.py` | Complete, requires `xgboost` dependency |
 | ML Tier 3 | `ml/stacking_scorer.py` | Complete |
@@ -116,7 +117,7 @@ Validated on 2026-05-21:
 .venv/bin/python -m pytest
 ```
 
-Result: ruff passed, mypy passed, pytest passed with 2335 passed, 2 deselected, and 33 warnings.
+Result: ruff passed, mypy passed, pytest passed with 2352 passed, 2 deselected, and 33 warnings.
 
 ---
 
@@ -125,7 +126,7 @@ Result: ruff passed, mypy passed, pytest passed with 2335 passed, 2 deselected, 
 - Bayesian log-score model is default; XGBoost and ensemble are opt-in.
 - `OptScore = float | None`: missing diagnostics contribute neutrally to log scores.
 - Missing diagnostics fail threshold gates conservatively.
-- Conservative priors keep false positives prominent.
+- Conservative priors keep false positives prominent; mission-specific prior profiles are opt-in through `configs/scoring_priors_v0.json`.
 - `provenance_score` is computed from cadence, sector count, and pipeline quality.
 - `toi_checker.py` should be consulted before investing pipeline time on any new target.
 - Default tests must mock external services; live tests require `integration_live`.

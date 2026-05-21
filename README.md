@@ -57,7 +57,7 @@
 
 ## Abstract
 
-This repository implements a complete, reproducible computational pipeline for the detection, vetting, and probabilistic classification of exoplanet transit candidates in photometric time-series data from the Transiting Exoplanet Survey Satellite (TESS) and the Kepler/K2 missions. The pipeline proceeds through six deterministic stages — data acquisition, preprocessing, Box Least Squares (BLS) periodicity search, signal vetting, Bayesian multi-hypothesis scoring, and submission pathway classification — and outputs calibrated posterior probabilities over six competing astrophysical and instrumental hypotheses. A conservative log-score approximation to Bayes' theorem is employed in lieu of generative likelihood models, with posterior calibration implemented via Platt scaling and isotonic regression (Pool Adjacent Violators Algorithm). An optional Tier-1 XGBoost classifier and Tier-3 stacking meta-learner augment the Bayesian scorer when labelled training data are available. The system is designed around scientific caution: it never labels an internally detected signal as a confirmed planet, exposes all false-positive evidence alongside each candidate score, and defers to authoritative external catalogs for confirmation status. The current implementation comprises 25 package modules, an autonomous background search engine with SQLite-backed durable state, an autonomous star-scanner for priority-ranked target discovery, 117 standalone Skills utility scripts, 130 test files, strict static typing (mypy), and continuous integration via GitHub Actions.
+This repository implements a complete, reproducible computational pipeline for the detection, vetting, and probabilistic classification of exoplanet transit candidates in photometric time-series data from the Transiting Exoplanet Survey Satellite (TESS) and the Kepler/K2 missions. The pipeline proceeds through six deterministic stages — data acquisition, preprocessing, Box Least Squares (BLS) periodicity search, signal vetting, Bayesian multi-hypothesis scoring, and submission pathway classification — and outputs calibrated posterior probabilities over six competing astrophysical and instrumental hypotheses. A conservative log-score approximation to Bayes' theorem is employed in lieu of generative likelihood models, with posterior calibration implemented via Platt scaling and isotonic regression (Pool Adjacent Violators Algorithm). An optional Tier-1 XGBoost classifier and Tier-3 stacking meta-learner augment the Bayesian scorer when labelled training data are available. The system is designed around scientific caution: it never labels an internally detected signal as a confirmed planet, exposes all false-positive evidence alongside each candidate score, and defers to authoritative external catalogs for confirmation status. The current implementation comprises 26 package modules, an autonomous background search engine with SQLite-backed durable state, an autonomous star-scanner for priority-ranked target discovery, 117 standalone Skills utility scripts, 131 test files, strict static typing (mypy), and continuous integration via GitHub Actions.
 
 ---
 
@@ -184,19 +184,20 @@ Each stage produces a typed, immutable result object and preserves provenance me
 | `clean.py` | Clean | NaN removal, sigma clipping, normalization, windowed detrending | 39 |
 | `search.py` | Search | BLS periodicity search; iterative transit masking for multi-planet systems | 43 |
 | `vet.py` | Vet | Per-transit depth measurement, odd/even comparison, secondary eclipse, transit shape, data-gap fraction | 47 |
-| `scoring.py` | Score | Log-score posterior computation; derived scores (FPP, detection confidence, novelty) | 25 |
+| `scoring.py` | Score | Log-score posterior computation; mission-prior hook; derived scores (FPP, detection confidence, novelty) | 48 |
 | `pathway.py` | Classify | Ordered gate-based submission pathway classification | 35 |
 | `schemas.py` | — | Immutable Pydantic data models for all pipeline types | 33 |
 | `features.py` | — | `RawDiagnostics` container; `extract_features()` mapping diagnostics to `[0,1]` scores; 37 features including `depth_scatter_chi2_score`, `transit_timing_variation_score` | 107 |
 | `hypotheses.py` | — | Per-hypothesis log-score functions; `depth_scatter_chi2_score` + `transit_timing_variation_score` wired into instrumental and planet hypotheses | 36 |
+| `priors.py` | — | Versioned conservative scoring-prior config loader and mission profile selection | 14 |
 | `calibration.py` | — | Platt scaling, PAVA isotonic regression, Brier score, reliability curves | 70 |
 | `cli.py` | — | `exo <TIC-ID>` entry point; `--scorer`, `--model-path`, `--output` options | 24 |
 | `ml/xgboost_scorer.py` | — | XGBoost tabular classifier on 35 `OptScore` features | 45 |
 | `ml/stacking_scorer.py` | — | Weighted blend of XGBoost + Bayesian posteriors | 22 |
 | `background/` | — | SQLite-backed automation: one-shot runner, priority scoring, draft reports | 16 |
-| **Package subtotal** | | | **582** |
+| **Package subtotal** | | | **599** |
 
-The repository also contains 117 standalone `Skills/` utilities with dedicated tests. Current local validation passes 2335 default tests with the two live integration tests deselected; see `docs/PROJECT_STATUS.md` for the latest validation note.
+The repository also contains 117 standalone `Skills/` utilities with dedicated tests. Current local validation passes 2352 default tests with the two live integration tests deselected; see `docs/PROJECT_STATUS.md` for the latest validation note.
 
 ### Operating Modes
 
@@ -649,6 +650,7 @@ python Skills/evaluate_scorer.py \
 │       ├── schemas.py           # Pydantic data models (frozen, typed)
 │       ├── features.py          # RawDiagnostics; extract_features()
 │       ├── hypotheses.py        # Per-hypothesis log-score functions
+│       ├── priors.py            # Conservative default and mission prior profiles
 │       ├── scoring.py           # Softmax posterior; FPP; detection confidence
 │       ├── pathway.py           # Ordered gate → 6 submission pathways
 │       ├── fetch.py             # MAST retrieval via Lightkurve
@@ -660,18 +662,19 @@ python Skills/evaluate_scorer.py \
 │       └── ml/
 │           ├── xgboost_scorer.py    # XGBoost binary classifier (Tier-1)
 │           └── stacking_scorer.py   # Weighted blend scorer (Tier-3)
-├── tests/                       # 750 unit and integration tests
+├── tests/                       # 2352 default tests plus 2 live tests
 │   ├── test_schemas.py          # 33 tests
-│   ├── test_features.py         # 89 tests
-│   ├── test_hypotheses.py       # 28 tests
-│   ├── test_scoring.py          # 25 tests
+│   ├── test_features.py         # 145 tests
+│   ├── test_hypotheses.py       # 46 tests
+│   ├── test_priors.py           # 14 tests
+│   ├── test_scoring.py          # 48 tests
 │   ├── test_pathway.py          # 35 tests
 │   ├── test_fetch.py            # 40 tests (+2 live)
 │   ├── test_clean.py            # 39 tests
 │   ├── test_search.py           # 43 tests
 │   ├── test_vet.py              # 47 tests
 │   ├── test_calibration.py      # 70 tests
-│   ├── test_cli.py              # 20 tests
+│   ├── test_cli.py              # 50 tests
 │   ├── test_xgboost_scorer.py   # 45 tests
 │   ├── test_stacking_scorer.py  # 22 tests
 │   ├── test_background_automation.py  # 16 tests
@@ -697,7 +700,8 @@ python Skills/evaluate_scorer.py \
 │   ├── export_candidates.py     # Export ranked candidates to CSV and Markdown
 │   └── alert_filter.py          # AND-logic threshold filter for batch results
 ├── configs/                     # Versioned runtime configuration
-│   └── background_search_v0.json  # Background automation thresholds and weights
+│   ├── background_search_v0.json  # Background automation thresholds and weights
+│   └── scoring_priors_v0.json     # Conservative default and mission-specific scoring priors
 ├── logs/                        # Runtime SQLite logs (not tracked by git)
 │   └── background_search.sqlite3  # Background search run ledger (created at runtime)
 ├── reports/                     # Generated candidate reports (not tracked by git)
@@ -758,7 +762,8 @@ PYTHONPATH=src python -m pytest -m integration_live
 | `schemas.py` | 33 |
 | `features.py` | 107 |
 | `hypotheses.py` | 36 |
-| `scoring.py` | 25 |
+| `priors.py` | 14 |
+| `scoring.py` | 48 |
 | `pathway.py` | 35 |
 | `fetch.py` | 55 (+2 live) |
 | `clean.py` | 39 |
@@ -770,7 +775,7 @@ PYTHONPATH=src python -m pytest -m integration_live
 | `ml/stacking_scorer.py` | 22 |
 | `background/` module | 16 |
 | Skills utilities | 117 scripts with dedicated tests |
-| **Current default suite** | **2335 passed, 2 live tests deselected** |
+| **Current default suite** | **2352 passed, 2 live tests deselected** |
 
 ---
 
@@ -860,7 +865,7 @@ The candidate does not meet external submission criteria (high FPP, missing diag
 | ✅ | **Core data models** | Immutable Pydantic schemas for all pipeline types (`schemas.py`) |
 | ✅ | **Feature extraction** | 35 normalized diagnostic scores; `RawDiagnostics` container (`features.py`) |
 | ✅ | **Hypothesis scoring** | Per-hypothesis log-score functions for all 6 hypotheses (`hypotheses.py`) |
-| ✅ | **Bayesian scorer** | Softmax posterior, FPP, detection confidence, novelty score (`scoring.py`) |
+| ✅ | **Bayesian scorer** | Softmax posterior, configurable conservative priors, FPP, detection confidence, novelty score (`scoring.py`, `priors.py`) |
 | ✅ | **Submission classifier** | Ordered gate logic → 6 submission pathways (`pathway.py`) |
 | ✅ | **Data acquisition** | MAST retrieval via Lightkurve; provenance tracking (`fetch.py`) |
 | ✅ | **Light curve cleaning** | Sigma clipping, normalization, windowed detrending (`clean.py`) |
@@ -899,7 +904,8 @@ The candidate does not meet external submission criteria (high FPP, missing diag
 | ✅ | **Alert filter** | `Skills/alert_filter.py` — AND-logic threshold filter over FPP/pathway/signals/SNR |
 | ✅ | **Skills guide** | `docs/SKILLS_GUIDE.md` — workflow reference and current inventory for all 117 Skills |
 | 🔴 | **ML Tier 2 — 1D CNN** | Phase-folded flux classifier; gated on ≥5,000 TESS CP labels (Shallue and Vanderburg) |
-| 🔴 | **Mission-specific priors** | Period-, radius-, and stellar-type-dependent priors replacing flat defaults |
+| ✅ | **Mission-specific priors** | Versioned conservative TESS/Kepler/K2 prior profiles in `configs/scoring_priors_v0.json` |
+| 🔴 | **Regime-specific priors** | Period-, radius-, stellar-type-, and completeness-dependent priors replacing mission-only defaults |
 
 ✅ Complete &nbsp;&nbsp; 🔴 Planned / Gated
 

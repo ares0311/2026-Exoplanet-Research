@@ -5,7 +5,8 @@
 - [x] `schemas.py` — typed Pydantic data contracts
 - [x] `features.py` — 35+ normalized feature extraction functions
 - [x] `hypotheses.py` — Bayesian log-score models for 6 hypotheses
-- [x] `scoring.py` — softmax posterior + FPP, detection confidence, novelty, habitability
+- [x] `priors.py` — versioned conservative default and mission-specific prior profiles
+- [x] `scoring.py` — softmax posterior + configurable priors + FPP, detection confidence, novelty, habitability
 - [x] `pathway.py` — submission pathway classifier (SCORING_MODEL.md §11)
 - [x] CI via GitHub Actions (ruff → mypy → pytest)
 - [x] `CLAUDE.md` — project context for AI coding agents

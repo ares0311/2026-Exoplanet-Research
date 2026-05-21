@@ -265,3 +265,39 @@ Background automation configuration should live in a top-level `configs/` direct
 - A short lock wait is friendlier to schedulers while still preventing overlapping runs.
 - Markdown and HTML exports support both review in Git and richer local inspection.
 - Edge-case fixtures make conservative guardrails testable before live data is introduced.
+
+---
+
+## DECISION-011: Keep Mission-Specific Priors Conservative And Opt-In
+
+**Date:** 2026-05-21
+**Status:** Accepted
+
+### Context
+
+The original Bayesian/log-score model used one conservative default prior
+distribution for every mission. TESS, Kepler, and K2 have different observing
+baselines, pixel scales, catalog maturity, and systematic-noise regimes, so the
+scoring engine needs a durable path to mission-specific priors without making
+default scoring less conservative or less reproducible.
+
+### Decision
+
+Add `configs/scoring_priors_v0.json` and `src/exo_toolkit/priors.py` as an
+opt-in prior configuration layer. Default scoring still uses the built-in
+priors unless a caller explicitly passes a validated `ScoringPriorConfig` into
+`score_candidate(..., prior_config=config)`.
+
+Configured profiles must provide all six hypothesis probabilities, sum to 1.0,
+use positive values, keep the combined false-positive prior larger than the
+planet-candidate prior, disable confirmation claims, and require human approval
+for external submission.
+
+### Rationale
+
+- Preserves default behavior for existing users and tests.
+- Allows TESS, Kepler, and K2 priors to be audited in versioned repository
+  config instead of hidden in chat or ad hoc scripts.
+- Keeps false-positive hypotheses prominent.
+- Leaves room for future period-, radius-, stellar-type-, and completeness-
+  dependent priors after calibration evidence exists.

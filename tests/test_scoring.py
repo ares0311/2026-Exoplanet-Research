@@ -4,6 +4,7 @@ import math
 import pytest
 
 from exo_toolkit.hypotheses import DEFAULT_LOG_PRIORS
+from exo_toolkit.priors import ScoringPriorConfig, load_scoring_prior_config
 from exo_toolkit.schemas import CandidateFeatures, CandidateScores, CandidateSignal
 from exo_toolkit.scoring import (
     compute_posterior,
@@ -337,6 +338,57 @@ class TestScoreCandidate:
         custom["planet_candidate"] = math.log(0.95)
         posterior, _ = score_candidate(base_signal, empty_features, log_priors=custom)
         assert posterior.planet_candidate > 0.5
+
+    def test_prior_config_flow_through(
+        self,
+        base_signal: CandidateSignal,
+        empty_features: CandidateFeatures,
+    ) -> None:
+        config = load_scoring_prior_config()
+        posterior, _ = score_candidate(base_signal, empty_features, prior_config=config)
+        assert posterior.planet_candidate == pytest.approx(
+            config.profiles["tess_v0"].priors["planet_candidate"]
+        )
+
+    def test_explicit_log_priors_override_prior_config(
+        self,
+        base_signal: CandidateSignal,
+        empty_features: CandidateFeatures,
+    ) -> None:
+        config = load_scoring_prior_config()
+        custom = {k: math.log(0.01) for k in DEFAULT_LOG_PRIORS}
+        custom["planet_candidate"] = math.log(0.95)
+        posterior, _ = score_candidate(
+            base_signal,
+            empty_features,
+            log_priors=custom,
+            prior_config=config,
+        )
+        assert posterior.planet_candidate > 0.5
+
+    def test_default_call_matches_default_profile_behavior(
+        self,
+        base_signal: CandidateSignal,
+        empty_features: CandidateFeatures,
+    ) -> None:
+        default_posterior, _ = score_candidate(base_signal, empty_features)
+        config = ScoringPriorConfig(
+            version="test",
+            schema_version="1",
+            default_profile="conservative_v0",
+            profiles={"conservative_v0": load_scoring_prior_config().profiles["conservative_v0"]},
+            mission_profiles={
+                "TESS": "conservative_v0",
+                "Kepler": "conservative_v0",
+                "K2": "conservative_v0",
+            },
+        )
+        configured_posterior, _ = score_candidate(
+            base_signal,
+            empty_features,
+            prior_config=config,
+        )
+        assert configured_posterior == default_posterior
 
     def test_known_object_novelty_near_zero(
         self,

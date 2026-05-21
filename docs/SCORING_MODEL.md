@@ -484,6 +484,21 @@ P(known_object)                  = 0.10
 
 These are intentionally pessimistic about new planet candidates.
 
+The built-in default priors are mirrored by the `conservative_v0` profile in
+`configs/scoring_priors_v0.json`. The scorer does not load that file by
+default; callers must opt in by loading a validated `ScoringPriorConfig` and
+passing it to `score_candidate(..., prior_config=config)`. This preserves the
+existing default behavior while allowing audited mission-specific profiles for
+TESS, Kepler, and K2.
+
+All configured profiles must:
+
+- provide exactly the six hypothesis probabilities
+- use strictly positive probabilities that sum to 1.0
+- keep the combined false-positive prior above the planet-candidate prior
+- keep confirmation claims disabled
+- require human approval for any external submission
+
 Later priors should depend on:
 - Stellar type.
 - Galactic latitude/crowding.
@@ -916,7 +931,8 @@ These are intentionally unresolved and should become future decisions in `DECISI
 
 1. Should the first BLS search be supplemented with Transit Least Squares?
 2. What minimum SNR should define a candidate in v1?
-3. Should priors be mission-specific from the beginning?
+3. Should period-, radius-, stellar-type-, and completeness-dependent priors
+   supersede the current mission-only prior profiles?
 4. Should known-object matching be mandatory before scoring or after scoring?
 5. How should single-transit events be represented?
 6. Should habitability interest use optimistic or conservative habitable-zone limits in v1?
