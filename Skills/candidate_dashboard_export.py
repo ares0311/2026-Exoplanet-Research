@@ -38,6 +38,7 @@ class DashboardCandidate:
     negative_evidence: tuple[str, ...]
     blocking_issues: tuple[str, ...]
     source_file: str | None
+    plot_path: str | None
 
 
 def _as_float(value: Any) -> float | None:
@@ -98,6 +99,34 @@ def _risk_band(fpp: float | None, blocking_issues: tuple[str, ...]) -> str:
     if fpp <= 0.70:
         return "elevated-fpp"
     return "high-fpp"
+
+
+def _plot_path(row: dict[str, Any]) -> str | None:
+    value = _first_present(
+        row,
+        "plot_path",
+        "phase_plot_path",
+        "phase_fold_plot_path",
+        "phase_fold_png",
+        "image_path",
+    )
+    artifacts = row.get("artifacts")
+    if value is None and isinstance(artifacts, dict):
+        value = _first_present(
+            artifacts,
+            "plot_path",
+            "phase_plot_path",
+            "phase_fold_plot_path",
+            "phase_fold_png",
+        )
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    if not text.lower().split("?", maxsplit=1)[0].endswith((".png", ".jpg", ".jpeg", ".webp")):
+        return None
+    return text
 
 
 def load_dashboard_rows(paths: list[Path | str]) -> list[dict[str, Any]]:
@@ -168,6 +197,7 @@ def normalize_candidate(row: dict[str, Any]) -> DashboardCandidate:
         negative_evidence=_evidence(row, "negative_evidence"),
         blocking_issues=blocking_issues,
         source_file=str(row.get("_source_file")) if row.get("_source_file") else None,
+        plot_path=_plot_path(row),
     )
 
 
@@ -263,6 +293,10 @@ def build_dashboard(
         ".blocked { border-color: #b42318; color: #b42318; }",
         ".high-fpp, .elevated-fpp { border-color: #b54708; color: #b54708; }",
         ".low-fpp { border-color: #027a48; color: #027a48; }",
+        ".plot-preview { margin: 12px 0; }",
+        ".plot-preview img { max-width: 100%; border: 1px solid #d9e2ec; "
+        "border-radius: 6px; background: #ffffff; }",
+        ".plot-preview figcaption { color: #52606d; font-size: 13px; margin-top: 6px; }",
         "ul { margin-top: 8px; }",
         "@media (max-width: 760px) { header, main { padding: 18px; } table { font-size: 13px; } }",
         "</style>",
@@ -358,6 +392,20 @@ def build_dashboard(
                     f"<p><b>Period:</b> {_fmt_period(candidate.period_days)} d | "
                     f"<b>Depth:</b> {_fmt_float(candidate.depth_ppm, 1)} ppm | "
                     f"<b>SNR:</b> {_fmt_float(candidate.snr, 2)}</p>",
+                ]
+            )
+            if candidate.plot_path is not None:
+                plot_path = _escape(candidate.plot_path)
+                parts.extend(
+                    [
+                        '<figure class="plot-preview">',
+                        f'<img src="{plot_path}" alt="Phase-fold plot for {candidate_id}">',
+                        f"<figcaption>Phase-fold plot artifact: {plot_path}</figcaption>",
+                        "</figure>",
+                    ]
+                )
+            parts.extend(
+                [
                     "<h4>Positive Evidence</h4>",
                     f"<ul>{positive_items}</ul>",
                     "<h4>False-Positive And Negative Evidence</h4>",

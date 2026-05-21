@@ -36,6 +36,8 @@ The API reads the same local JSON shapes accepted by
 - ranked candidate rows from `rank_candidates.py`
 - wrapped JSON with top-level `candidates` or `rows`
 - candidate-database style rows after JSON export or conversion
+- optional local phase-fold plot artifact paths such as `plot_path`,
+  `phase_plot_path`, or `phase_fold_plot_path`
 
 It does not query MAST, ExoFOP, Gaia, NASA Exoplanet Archive, or any other live
 service.
@@ -61,6 +63,8 @@ All mutation methods are rejected. The API is read-only.
   dashboard.
 - Missing scores remain `null` in JSON, not `0`.
 - Blocking issues produce a `blocked` risk band.
+- Optional phase-fold plot paths are carried through as review artifacts when
+  they point to common local image formats.
 - Responses include language guardrails describing rows as candidate signals or
   follow-up targets.
 - No response should use a confirmed-discovery label for internally detected

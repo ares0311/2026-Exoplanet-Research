@@ -58,6 +58,15 @@ def test_embedded_data_contains_normalized_candidate() -> None:
     assert payload["candidates"][0]["candidate_id"] == "A"
 
 
+def test_embedded_data_contains_plot_path() -> None:
+    html = build_browser_ui(
+        [{**_row(candidate_id="A"), "plot_path": "plots/A_phase_fold.png"}],
+        generated_at="2026-05-20 00:00 UTC",
+    )
+    payload = _embedded_payload(html)
+    assert payload["candidates"][0]["plot_path"] == "plots/A_phase_fold.png"
+
+
 def test_embedded_data_sorts_by_fpp() -> None:
     html = build_browser_ui(
         [_row(candidate_id="high", fpp=0.9), _row(candidate_id="low", fpp=0.02)],
@@ -93,6 +102,12 @@ def test_ui_contains_detail_panel() -> None:
     html = build_browser_ui([_row()], generated_at="2026-05-20 00:00 UTC")
     assert 'id="detail"' in html
     assert "False-Positive And Negative Evidence" in html
+
+
+def test_ui_contains_plot_preview_renderer() -> None:
+    html = build_browser_ui([_row()], generated_at="2026-05-20 00:00 UTC")
+    assert "plotPreview" in html
+    assert "Phase-fold plot artifact" in html
 
 
 def test_ui_contains_summary_metrics() -> None:

@@ -49,6 +49,7 @@ The static dashboard should include:
 - blocking issues
 - pathway or status labels
 - source provenance when available
+- optional phase-fold plot artifact previews when local image paths are supplied
 
 ## Guardrails
 
@@ -74,6 +75,7 @@ The static dashboard should include:
   `Skills/candidate_api.py`; see `docs/API_SPEC.md`.
 - Integration with `logs/background_search.sqlite3` summaries through the
   optional read-only `candidate_api.py` background endpoints.
-- Embedded phase-fold plots when plot artifacts are supplied.
+- Phase-fold plot previews in the static dashboard and browser UI are implemented
+  for supplied local image artifact paths.
 - Browser UI once the static data contract is stable. Implemented by
   `Skills/candidate_browser_ui.py`.

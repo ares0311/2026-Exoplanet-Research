@@ -40,9 +40,9 @@ Local validation note: after restoring the declared `xgboost` dependency and ins
 | Discovery workflow Skills | star scanner, batch scan, alert filter, ranking, watchlist, exports, reports | Complete |
 | Milestones 13-18 Skills | 87 additional analysis, vetting, observability, reporting, and follow-up utilities | Complete |
 | Milestone 19a Skill | `multi_sector_phase_compare.py` — offline per-sector phase-fold comparison | Complete |
-| Milestone 19b Skill | `candidate_dashboard_export.py` — static conservative candidate dashboard | Complete |
+| Milestone 19b Skill | `candidate_dashboard_export.py` — static conservative candidate dashboard with optional plot artifacts | Complete |
 | Milestone 19c Skill | `candidate_api.py` — local read-only candidate API plus optional background SQLite summaries | Complete |
-| Milestone 19d Skill | `candidate_browser_ui.py` — interactive local candidate browser | Complete |
+| Milestone 19d Skill | `candidate_browser_ui.py` — interactive local candidate browser with optional plot previews | Complete |
 | Docs | `README.md`, `docs/`, `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md` | Active maintenance |
 
 ---
@@ -94,9 +94,9 @@ No active implementation blocker is known in the default local validation path.
 3. Use `toi_checker.py` before investing pipeline time on new live targets.
 4. Use `batch_scan.py` + `alert_filter.py` + `rank_candidates.py` + `watchlist.py` for systematic follow-up.
 5. Use `multi_sector_phase_compare.py` to inspect sector-to-sector depth and phase consistency before advancing multi-sector follow-up targets.
-6. Use `candidate_dashboard_export.py` to build static local review dashboards from existing candidate JSON outputs.
+6. Use `candidate_dashboard_export.py` to build static local review dashboards from existing candidate JSON outputs, including optional phase-fold plot artifact paths when available.
 7. Use `candidate_api.py` to serve existing local candidate JSON and optional read-only background SQLite summaries for local browsing.
-8. Use `candidate_browser_ui.py` for an interactive local browser UI with embedded-data and API modes.
+8. Use `candidate_browser_ui.py` for an interactive local browser UI with embedded-data/API modes and optional phase-fold plot previews.
 
 Live-network note: the CNN gate check was not run during the latest local
 maintenance pass because it queries ExoFOP and requires intentional live network
@@ -116,7 +116,7 @@ Validated on 2026-05-20:
 .venv/bin/python -m pytest
 ```
 
-Result: ruff passed, mypy passed, pytest passed with 2299 passed, 2 deselected, and 33 warnings.
+Result: ruff passed, mypy passed, pytest passed with 2307 passed, 2 deselected, and 33 warnings.
 
 ---
 

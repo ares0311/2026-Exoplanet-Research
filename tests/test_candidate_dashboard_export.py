@@ -64,6 +64,23 @@ def test_normalize_reads_batch_scan_shape() -> None:
     assert candidate.pathway == "github_only_reproducibility"
 
 
+def test_normalize_reads_plot_path() -> None:
+    candidate = normalize_candidate({**_row(), "phase_fold_plot_path": "plots/TIC1.png"})
+    assert candidate.plot_path == "plots/TIC1.png"
+
+
+def test_normalize_reads_nested_plot_artifact() -> None:
+    candidate = normalize_candidate(
+        {**_row(), "artifacts": {"phase_fold_plot_path": "plots/nested.webp"}}
+    )
+    assert candidate.plot_path == "plots/nested.webp"
+
+
+def test_normalize_ignores_non_image_plot_path() -> None:
+    candidate = normalize_candidate({**_row(), "plot_path": "javascript:alert(1)"})
+    assert candidate.plot_path is None
+
+
 def test_low_fpp_risk_band() -> None:
     assert normalize_candidate(_row(fpp=0.05)).risk_band == "low-fpp"
 
@@ -106,6 +123,25 @@ def test_build_dashboard_escapes_html() -> None:
     )
     assert "<script>alert(1)</script>" not in html
     assert "&lt;script&gt;" in html
+
+
+def test_build_dashboard_renders_phase_fold_plot() -> None:
+    html = build_dashboard(
+        [{**_row(), "plot_path": "plots/TIC1_phase_fold.png"}],
+        generated_at="2026-05-20 00:00 UTC",
+    )
+    assert '<figure class="plot-preview">' in html
+    assert 'src="plots/TIC1_phase_fold.png"' in html
+    assert "Phase-fold plot artifact" in html
+
+
+def test_build_dashboard_escapes_plot_path() -> None:
+    html = build_dashboard(
+        [{**_row(), "plot_path": 'plots/<bad "name">.png'}],
+        generated_at="2026-05-20 00:00 UTC",
+    )
+    assert 'plots/<bad "name">.png' not in html
+    assert "plots/&lt;bad &quot;name&quot;&gt;.png" in html
 
 
 def test_build_dashboard_handles_empty_rows() -> None:

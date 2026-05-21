@@ -196,7 +196,7 @@ Each stage produces a typed, immutable result object and preserves provenance me
 | `background/` | — | SQLite-backed automation: one-shot runner, priority scoring, draft reports | 16 |
 | **Package subtotal** | | | **582** |
 
-The repository also contains 115 standalone `Skills/` utilities with dedicated tests. Current local validation passes 2299 default tests with the two live integration tests deselected; see `docs/PROJECT_STATUS.md` for the latest validation note.
+The repository also contains 115 standalone `Skills/` utilities with dedicated tests. Current local validation passes 2307 default tests with the two live integration tests deselected; see `docs/PROJECT_STATUS.md` for the latest validation note.
 
 ### Operating Modes
 
@@ -770,7 +770,7 @@ PYTHONPATH=src python -m pytest -m integration_live
 | `ml/stacking_scorer.py` | 22 |
 | `background/` module | 16 |
 | Skills utilities | 115 scripts with dedicated tests |
-| **Current default suite** | **2299 passed, 2 live tests deselected** |
+| **Current default suite** | **2307 passed, 2 live tests deselected** |
 
 ---
 
@@ -886,9 +886,9 @@ The candidate does not meet external submission criteria (high FPP, missing diag
 | ✅ | **Depth chi-square score** | `depth_scatter_chi2_score` — error-weighted depth scatter test wired into hypothesis scoring |
 | ✅ | **Phase-fold plots** | `Skills/plot_lc.py` — phase-folded PNG from candidate JSON |
 | ✅ | **Multi-sector phase comparison** | `Skills/multi_sector_phase_compare.py` — depth and phase consistency across sectors |
-| ✅ | **Static candidate dashboard** | `Skills/candidate_dashboard_export.py` — local HTML review dashboard preserving false-positive evidence |
+| ✅ | **Static candidate dashboard** | `Skills/candidate_dashboard_export.py` — local HTML review dashboard preserving false-positive evidence with optional phase-fold plot artifacts |
 | ✅ | **Local candidate API** | `Skills/candidate_api.py` — standard-library read-only endpoints for local candidate JSON plus optional background SQLite summaries |
-| ✅ | **Interactive browser UI** | `Skills/candidate_browser_ui.py` — dependency-free local candidate browser |
+| ✅ | **Interactive browser UI** | `Skills/candidate_browser_ui.py` — dependency-free local candidate browser with optional plot previews |
 | ✅ | **Watchlist** | `Skills/watchlist.py` — persistent JSON watchlist with add/remove/list/scan |
 | ✅ | **Summary report** | `Skills/summary_report.py` — Markdown report from batch_scan JSON output |
 | ✅ | **Transit timing variation** | `transit_timing_variation_score` — O-C RMS test; wired into planet/instrumental hypotheses |

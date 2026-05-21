@@ -213,7 +213,8 @@
 - [x] `docs/DASHBOARD_SPEC.md` — local-first dashboard data contract and guardrails
 - [x] `Skills/candidate_dashboard_export.py` — static HTML dashboard from existing local candidate JSON rows
 - [x] Preserves false-positive evidence, negative evidence, missing-score states, and blocking issues
-- [x] 18 tests in `tests/test_candidate_dashboard_export.py`
+- [x] Renders optional local phase-fold plot artifacts when supplied
+- [x] 23 tests in `tests/test_candidate_dashboard_export.py`
 
 ---
 
@@ -223,7 +224,8 @@
 - [x] `Skills/candidate_api.py` — standard-library read-only HTTP API for local candidate JSON rows
 - [x] Endpoints: `/health`, `/summary`, `/candidates`, `/candidates/<id>`, `/dashboard`, `/background/summary`, `/background/latest`
 - [x] Optional background SQLite summaries are read-only and do not create or mutate runtime databases
-- [x] 26 tests in `tests/test_candidate_api.py`
+- [x] Candidate payloads carry optional phase-fold plot artifact paths
+- [x] 27 tests in `tests/test_candidate_api.py`
 
 ---
 
@@ -231,8 +233,8 @@
 
 - [x] `Skills/candidate_browser_ui.py` — dependency-free browser UI for candidate review
 - [x] Supports embedded-data mode for offline file viewing and API mode for `candidate_api.py`
-- [x] Includes search, risk filtering, pathway filtering, summary metrics, and detail panel
-- [x] 18 tests in `tests/test_candidate_browser_ui.py`
+- [x] Includes search, risk filtering, pathway filtering, summary metrics, detail panel, and optional plot previews
+- [x] 20 tests in `tests/test_candidate_browser_ui.py`
 
 ---
 

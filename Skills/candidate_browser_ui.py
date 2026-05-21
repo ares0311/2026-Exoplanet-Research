@@ -149,6 +149,19 @@ function listItems(items, fallback) {
   return values.map(item => `<li>${escapeHtml(item)}</li>`).join("");
 }
 
+function plotPreview(c) {
+  if (!c.plot_path) {
+    return "";
+  }
+  const path = escapeHtml(c.plot_path);
+  return `
+    <figure class="plot-preview">
+      <img src="${path}" alt="Phase-fold plot for ${escapeHtml(c.candidate_id)}">
+      <figcaption>Phase-fold plot artifact: ${path}</figcaption>
+    </figure>
+  `;
+}
+
 function selectCandidate(candidateId) {
   state.selectedId = candidateId;
   const c = state.candidates.find(item => item.candidate_id === candidateId);
@@ -172,6 +185,7 @@ function selectCandidate(candidateId) {
       <b>Depth:</b> ${fmt(c.depth_ppm, 1)} ppm |
       <b>SNR:</b> ${fmt(c.snr, 2)}
     </p>
+    ${plotPreview(c)}
     <h3>Positive Evidence</h3>
     <ul>${listItems(c.positive_evidence, "No positive evidence supplied.")}</ul>
     <h3>False-Positive And Negative Evidence</h3>
@@ -339,6 +353,20 @@ tr.selected {
 }
 .error {
   color: #b42318;
+}
+.plot-preview {
+  margin: 12px 0;
+}
+.plot-preview img {
+  background: #ffffff;
+  border: 1px solid #d9e2ec;
+  border-radius: 6px;
+  max-width: 100%;
+}
+.plot-preview figcaption {
+  color: #52606d;
+  font-size: 13px;
+  margin-top: 6px;
 }
 @media (max-width: 900px) {
   .layout,

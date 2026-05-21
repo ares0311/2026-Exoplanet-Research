@@ -166,6 +166,12 @@ def test_candidate_payload_is_json_ready() -> None:
     assert payload["language_guardrail"].startswith("candidate signal")
 
 
+def test_candidate_payload_includes_plot_path() -> None:
+    api = CandidateAPI([{**_row(), "plot_path": "plots/TIC1_phase_fold.png"}])
+    payload = candidate_to_payload(api.candidates[0])
+    assert payload["plot_path"] == "plots/TIC1_phase_fold.png"
+
+
 def test_summary_payload_marks_read_only_and_no_live_services() -> None:
     api = CandidateAPI([_row()])
     payload = summary_payload(api.candidates)
