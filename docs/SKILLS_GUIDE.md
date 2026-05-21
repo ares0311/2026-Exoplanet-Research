@@ -150,7 +150,7 @@ This table is intentionally workflow-oriented rather than exhaustive.
 | `export_candidates.py` | Export ranked candidates to CSV and Markdown | `to_csv`, `to_markdown_table` |
 | `summary_report.py` | Generate Markdown summary from batch_scan output | `build_report`, `write_report` |
 | `candidate_dashboard_export.py` | Build static conservative HTML review dashboard | `build_dashboard`, `write_dashboard` |
-| `candidate_api.py` | Serve local candidate JSON through a read-only API | `CandidateAPI`, `api_response` |
+| `candidate_api.py` | Serve local candidate JSON and optional background SQLite summaries through a read-only API | `CandidateAPI`, `api_response`, `background_summary_payload` |
 | `candidate_browser_ui.py` | Build interactive local browser UI for candidate review | `build_browser_ui`, `write_browser_ui` |
 | `plot_lc.py` | Phase-fold PNG from candidate JSON | `plot_candidate`, `phase_fold` |
 | `notebook_generator.py` | Generate Jupyter notebook for a TIC target | `generate_notebook` |

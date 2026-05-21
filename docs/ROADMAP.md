@@ -221,8 +221,9 @@
 
 - [x] `docs/API_SPEC.md` — local API contract, endpoints, guardrails, and non-goals
 - [x] `Skills/candidate_api.py` — standard-library read-only HTTP API for local candidate JSON rows
-- [x] Endpoints: `/health`, `/summary`, `/candidates`, `/candidates/<id>`, `/dashboard`
-- [x] 18 tests in `tests/test_candidate_api.py`
+- [x] Endpoints: `/health`, `/summary`, `/candidates`, `/candidates/<id>`, `/dashboard`, `/background/summary`, `/background/latest`
+- [x] Optional background SQLite summaries are read-only and do not create or mutate runtime databases
+- [x] 26 tests in `tests/test_candidate_api.py`
 
 ---
 

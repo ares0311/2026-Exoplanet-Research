@@ -52,7 +52,7 @@ CI: `.github/workflows/ci.yml`
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 128 test files. Local validation on 2026-05-20 passed with 2291 default tests, 2 `integration_live` tests deselected, and 33 warnings after restoring `xgboost` plus the macOS `libomp` runtime.
+**Current test surface:** 128 test files. Local validation on 2026-05-20 passed with 2299 default tests, 2 `integration_live` tests deselected, and 33 warnings after restoring `xgboost` plus the macOS `libomp` runtime.
 **Skills:** 115 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
@@ -708,7 +708,7 @@ All pipeline modules are complete.
 
 ### Completed (2026-05-19) — Milestone 19b
 
-**1 new Skill + 18 new tests**: ✅
+**1 new Skill + 26 tests**: ✅
 
 | Skill | Key Functions | Tests |
 |---|---|---|
@@ -720,7 +720,7 @@ All pipeline modules are complete.
 
 | Skill | Key Functions | Tests |
 |---|---|---|
-| `candidate_api.py` | `CandidateAPI`, `api_response`, `summary_payload` | 18 |
+| `candidate_api.py` | `CandidateAPI`, `api_response`, `summary_payload`, `background_summary_payload` | 26 |
 
 ### Completed (2026-05-20) — Milestone 19d
 

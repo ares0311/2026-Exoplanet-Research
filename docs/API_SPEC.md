@@ -16,6 +16,13 @@ The first implementation uses only the Python standard library:
 python Skills/candidate_api.py results.json --host 127.0.0.1 --port 8765
 ```
 
+When a local background automation database already exists, it can be exposed
+read-only:
+
+```bash
+python Skills/candidate_api.py results.json --background-db-path logs/background_search.sqlite3
+```
+
 This keeps the API dependency-free, local-first, and compatible with macOS and
 portable Python environments.
 
@@ -42,6 +49,8 @@ service.
 | `/candidates` | GET | JSON | Normalized candidate list. |
 | `/candidates/<candidate_id>` | GET | JSON | One normalized candidate, or 404 if missing. |
 | `/dashboard` | GET | HTML | Static dashboard view using the shared dashboard contract. |
+| `/background/summary` | GET | JSON | Read-only aggregate summary for an optional background SQLite log. |
+| `/background/latest` | GET | JSON | Latest background run alert state, reason, report paths, and approval state. |
 | `/` | GET | JSON | Endpoint index. |
 
 All mutation methods are rejected. The API is read-only.
@@ -57,6 +66,10 @@ All mutation methods are rejected. The API is read-only.
 - No response should use a confirmed-discovery label for internally detected
   signals.
 - External submission and live-service flags remain false.
+- Background SQLite endpoints never create, initialize, migrate, or mutate a
+  database. Missing databases are reported as unavailable.
+- Background approval records are summarized for review context only; the API
+  does not provide any external submission action.
 
 ## Non-Goals
 
@@ -65,10 +78,10 @@ All mutation methods are rejected. The API is read-only.
 - No live catalog queries.
 - No writes back to source JSON.
 - No replacement for `logs/background_search.sqlite3`.
+- No SQLite writes, migrations, or scheduler actions.
 
 ## Future Extensions
 
-- Read-only background SQLite summary endpoints.
 - Browser UI consuming the JSON endpoints. Implemented by
   `Skills/candidate_browser_ui.py`.
 - Static artifact mode for GitHub Actions or local report bundles.

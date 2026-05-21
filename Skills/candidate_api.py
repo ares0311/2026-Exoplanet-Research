@@ -6,15 +6,17 @@ view. It never queries live services and never mutates source data.
 
 Public API
 ----------
-CandidateAPI(rows, *, title, source_label)
+CandidateAPI(rows, *, title, source_label, background_db_path)
 candidate_to_payload(candidate) -> dict[str, Any]
 summary_payload(candidates) -> dict[str, Any]
+background_summary_payload(db_path) -> dict[str, Any]
 api_response(api, path) -> tuple[int, str, bytes]
-run_server(rows, *, host, port, title, source_label) -> None
+run_server(rows, *, host, port, title, source_label, background_db_path) -> None
 """
 from __future__ import annotations
 
 import json
+import sqlite3
 from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -38,10 +40,12 @@ class CandidateAPI:
         *,
         title: str = "Candidate Review Dashboard",
         source_label: str = "local JSON",
+        background_db_path: Path | None = None,
     ) -> None:
         self.rows = list(rows)
         self.title = title
         self.source_label = source_label
+        self.background_db_path = background_db_path
         self.candidates = sorted(
             (normalize_candidate(row) for row in self.rows),
             key=lambda c: (
@@ -105,6 +109,67 @@ def summary_payload(candidates: list[DashboardCandidate]) -> dict[str, Any]:
     }
 
 
+def background_summary_payload(db_path: Path | None) -> dict[str, Any]:
+    """Build a read-only summary for a background SQLite runtime log."""
+    base: dict[str, Any] = {
+        "database_path": str(db_path) if db_path is not None else None,
+        "available": False,
+        "read_only": True,
+        "live_services": False,
+        "external_submission": False,
+        "language_guardrail": (
+            "background runs may identify follow-up targets only; no discovery claims"
+        ),
+    }
+    if db_path is None:
+        return {**base, "reason": "background SQLite path is not configured"}
+    if not db_path.exists():
+        return {**base, "reason": "background SQLite database does not exist"}
+
+    try:
+        with _connect_read_only(db_path) as connection:
+            tables = _sqlite_tables(connection)
+            ledger_count = _count_if_table(connection, tables, "run_ledger")
+            reviewed_count = _count_if_table(connection, tables, "reviewed_outcomes")
+            needs_follow_up_count = _count_if_table(
+                connection, tables, "needs_follow_up_outcomes"
+            )
+            latest_run = _latest_run(connection, tables)
+            latest_run_id = latest_run["run_id"] if latest_run is not None else None
+            latest_report_paths = _report_paths(connection, tables, latest_run_id)
+            latest_approval = _approval_summary(connection, tables, latest_run_id)
+            reason = _latest_reason(connection, tables, latest_run)
+            schema_version = connection.execute("PRAGMA user_version").fetchone()[0]
+            outcome_counts = _outcome_counts(connection, tables)
+    except sqlite3.Error as exc:
+        return {
+            **base,
+            "reason": f"could not read background SQLite database: {exc}",
+        }
+
+    alert = False
+    if latest_run is not None:
+        alert = latest_run["outcome"] in {"needs_follow_up", "blocked"} or (
+            latest_run["status"] != "completed"
+        )
+    return {
+        **base,
+        "available": True,
+        "reason": None,
+        "sqlite_schema_version": schema_version,
+        "ledger_count": ledger_count,
+        "reviewed_count": reviewed_count,
+        "needs_follow_up_count": needs_follow_up_count,
+        "outcome_count": reviewed_count + needs_follow_up_count,
+        "outcome_counts": outcome_counts,
+        "latest_run": latest_run,
+        "latest_alert": alert,
+        "latest_reason": reason,
+        "latest_report_paths": latest_report_paths,
+        "latest_approval": latest_approval,
+    }
+
+
 def _json_response(
     status: int,
     payload: dict[str, Any] | list[dict[str, Any]],
@@ -130,6 +195,26 @@ def api_response(api: CandidateAPI, path: str) -> tuple[int, str, bytes]:
         )
     if route == "/summary":
         return _json_response(200, summary_payload(api.candidates))
+    if route == "/background/summary":
+        return _json_response(200, background_summary_payload(api.background_db_path))
+    if route == "/background/latest":
+        payload = background_summary_payload(api.background_db_path)
+        return _json_response(
+            200,
+            {
+                "database_path": payload["database_path"],
+                "available": payload["available"],
+                "read_only": payload["read_only"],
+                "live_services": payload["live_services"],
+                "external_submission": payload["external_submission"],
+                "latest_run": payload.get("latest_run"),
+                "latest_alert": payload.get("latest_alert", False),
+                "latest_reason": payload.get("latest_reason"),
+                "latest_report_paths": payload.get("latest_report_paths", []),
+                "latest_approval": payload.get("latest_approval"),
+                "language_guardrail": payload["language_guardrail"],
+            },
+        )
     if route == "/candidates":
         return _json_response(
             200,
@@ -163,6 +248,8 @@ def api_response(api: CandidateAPI, path: str) -> tuple[int, str, bytes]:
                     "/candidates",
                     "/candidates/<candidate_id>",
                     "/dashboard",
+                    "/background/summary",
+                    "/background/latest",
                 ],
             },
         )
@@ -206,9 +293,15 @@ def run_server(
     port: int = 8765,
     title: str = "Candidate Review Dashboard",
     source_label: str = "local JSON",
+    background_db_path: Path | None = None,
 ) -> None:
     """Run the local read-only HTTP server until interrupted."""
-    api = CandidateAPI(rows, title=title, source_label=source_label)
+    api = CandidateAPI(
+        rows,
+        title=title,
+        source_label=source_label,
+        background_db_path=background_db_path,
+    )
     server = ThreadingHTTPServer((host, port), make_handler(api))
     print(f"Serving read-only candidate API at http://{host}:{port}")
     server.serve_forever()
@@ -226,6 +319,12 @@ def _cli(argv: list[str] | None = None) -> int:
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--title", default="Candidate Review Dashboard")
     parser.add_argument("--source-label", default="local JSON")
+    parser.add_argument(
+        "--background-db-path",
+        type=Path,
+        default=None,
+        help="Optional read-only background SQLite log path.",
+    )
     args = parser.parse_args(argv)
 
     rows = load_dashboard_rows(args.files)
@@ -235,8 +334,132 @@ def _cli(argv: list[str] | None = None) -> int:
         port=args.port,
         title=args.title,
         source_label=args.source_label,
+        background_db_path=args.background_db_path,
     )
     return 0
+
+
+def _connect_read_only(db_path: Path) -> sqlite3.Connection:
+    connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    connection.row_factory = sqlite3.Row
+    return connection
+
+
+def _sqlite_tables(connection: sqlite3.Connection) -> set[str]:
+    rows = connection.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table'"
+    ).fetchall()
+    return {row["name"] for row in rows}
+
+
+def _count_if_table(
+    connection: sqlite3.Connection,
+    tables: set[str],
+    table: str,
+) -> int:
+    if table not in tables:
+        return 0
+    return int(connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
+
+
+def _latest_run(
+    connection: sqlite3.Connection,
+    tables: set[str],
+) -> dict[str, Any] | None:
+    if "run_ledger" not in tables:
+        return None
+    row = connection.execute(
+        """
+        SELECT run_id, started_at, completed_at, command, target_id, outcome, status,
+               error_message, config_version, config_fingerprint
+        FROM run_ledger
+        ORDER BY completed_at DESC, started_at DESC
+        LIMIT 1
+        """
+    ).fetchone()
+    return dict(row) if row is not None else None
+
+
+def _outcome_counts(
+    connection: sqlite3.Connection,
+    tables: set[str],
+) -> dict[str, int]:
+    if "run_ledger" not in tables:
+        return {}
+    rows = connection.execute(
+        "SELECT outcome, COUNT(*) AS count FROM run_ledger GROUP BY outcome"
+    ).fetchall()
+    return {row["outcome"]: int(row["count"]) for row in rows}
+
+
+def _report_paths(
+    connection: sqlite3.Connection,
+    tables: set[str],
+    run_id: str | None,
+) -> list[str]:
+    if run_id is None or "report_exports" not in tables:
+        return []
+    rows = connection.execute(
+        "SELECT path FROM report_exports WHERE run_id = ? ORDER BY id ASC",
+        (run_id,),
+    ).fetchall()
+    return [str(row["path"]) for row in rows]
+
+
+def _approval_summary(
+    connection: sqlite3.Connection,
+    tables: set[str],
+    run_id: str | None,
+) -> dict[str, Any]:
+    if run_id is None or "approval_records" not in tables:
+        return {
+            "records": 0,
+            "external_submission_approved": False,
+            "approval_required": True,
+        }
+    rows = connection.execute(
+        """
+        SELECT approved, approval_scope FROM approval_records
+        WHERE run_id = ?
+        """,
+        (run_id,),
+    ).fetchall()
+    external_approved = any(
+        bool(row["approved"]) and row["approval_scope"] == "external_submission"
+        for row in rows
+    )
+    return {
+        "records": len(rows),
+        "external_submission_approved": external_approved,
+        "approval_required": not external_approved,
+    }
+
+
+def _latest_reason(
+    connection: sqlite3.Connection,
+    tables: set[str],
+    latest_run: dict[str, Any] | None,
+) -> str | None:
+    if latest_run is None:
+        return None
+    if latest_run.get("error_message"):
+        return str(latest_run["error_message"])
+    run_id = latest_run["run_id"]
+    if "needs_follow_up_outcomes" in tables:
+        row = connection.execute(
+            "SELECT summary FROM needs_follow_up_outcomes WHERE run_id = ?",
+            (run_id,),
+        ).fetchone()
+        if row is not None:
+            return str(row["summary"])
+    if "reviewed_outcomes" in tables:
+        row = connection.execute(
+            "SELECT summary FROM reviewed_outcomes WHERE run_id = ?",
+            (run_id,),
+        ).fetchone()
+        if row is not None:
+            return str(row["summary"])
+    return None
 
 
 if __name__ == "__main__":

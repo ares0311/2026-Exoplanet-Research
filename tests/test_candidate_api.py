@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import json
+import sqlite3
+from pathlib import Path
 
 from Skills.candidate_api import (
     CandidateAPI,
     api_response,
+    background_summary_payload,
     candidate_to_payload,
     summary_payload,
 )
@@ -39,6 +42,104 @@ def _row(
 
 def _json_body(body: bytes) -> object:
     return json.loads(body.decode("utf-8"))
+
+
+def _background_db(tmp_path: Path) -> Path:
+    db_path = tmp_path / "logs" / "background_search.sqlite3"
+    db_path.parent.mkdir(parents=True)
+    with sqlite3.connect(db_path) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE run_ledger (
+                run_id TEXT PRIMARY KEY,
+                started_at TEXT NOT NULL,
+                completed_at TEXT NOT NULL,
+                command TEXT NOT NULL,
+                target_id TEXT,
+                outcome TEXT NOT NULL,
+                status TEXT NOT NULL,
+                error_message TEXT,
+                config_version TEXT NOT NULL,
+                config_fingerprint TEXT NOT NULL,
+                config_json TEXT NOT NULL,
+                provenance_json TEXT NOT NULL
+            );
+            CREATE TABLE reviewed_outcomes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL UNIQUE,
+                target_id TEXT NOT NULL,
+                reason_codes_json TEXT NOT NULL,
+                negative_evidence_json TEXT NOT NULL,
+                summary TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE needs_follow_up_outcomes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL UNIQUE,
+                target_id TEXT NOT NULL,
+                trigger_codes_json TEXT NOT NULL,
+                mandatory_tests_json TEXT NOT NULL,
+                summary TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE report_exports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                format TEXT NOT NULL,
+                path TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE approval_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                approved INTEGER NOT NULL,
+                approver TEXT NOT NULL,
+                approval_scope TEXT NOT NULL,
+                rationale TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            PRAGMA user_version = 2;
+            """
+        )
+    return db_path
+
+
+def _insert_run(
+    db_path: Path,
+    *,
+    run_id: str,
+    outcome: str,
+    status: str = "completed",
+    target_id: str = "TIC 1",
+    completed_at: str = "2026-05-20T00:00:00+00:00",
+    error_message: str | None = None,
+) -> None:
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            INSERT INTO run_ledger (
+                run_id, started_at, completed_at, command, target_id, outcome, status,
+                error_message, config_version, config_fingerprint, config_json, provenance_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                run_id,
+                "2026-05-20T00:00:00+00:00",
+                completed_at,
+                "exo background-run-once",
+                target_id,
+                outcome,
+                status,
+                error_message,
+                "background_search_v0",
+                "a" * 64,
+                "{}",
+                "[]",
+            ),
+        )
 
 
 def test_candidate_api_sorts_by_fpp() -> None:
@@ -169,3 +270,156 @@ def test_known_object_row_is_still_review_language() -> None:
     payload = candidate_to_payload(api.candidates[0])
     assert payload["pathway"] == "known_object_annotation"
     assert "candidate signal" in payload["language_guardrail"]
+
+
+def test_background_summary_without_configured_db_is_unavailable() -> None:
+    payload = background_summary_payload(None)
+    assert payload["available"] is False
+    assert payload["read_only"] is True
+    assert payload["reason"] == "background SQLite path is not configured"
+
+
+def test_background_summary_missing_db_does_not_create_file(tmp_path: Path) -> None:
+    db_path = tmp_path / "logs" / "background_search.sqlite3"
+    payload = background_summary_payload(db_path)
+    assert payload["available"] is False
+    assert payload["reason"] == "background SQLite database does not exist"
+    assert not db_path.exists()
+
+
+def test_background_summary_empty_db(tmp_path: Path) -> None:
+    db_path = _background_db(tmp_path)
+    payload = background_summary_payload(db_path)
+    assert payload["available"] is True
+    assert payload["ledger_count"] == 0
+    assert payload["latest_run"] is None
+    assert payload["latest_alert"] is False
+
+
+def test_background_summary_reviewed_latest_run(tmp_path: Path) -> None:
+    db_path = _background_db(tmp_path)
+    _insert_run(db_path, run_id="run_reviewed", outcome="reviewed")
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            INSERT INTO reviewed_outcomes (
+                run_id, target_id, reason_codes_json, negative_evidence_json, summary, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "run_reviewed",
+                "TIC 1",
+                '["no_follow_up_triggers"]',
+                '["weak evidence"]',
+                "Reviewed with no follow-up triggers.",
+                "2026-05-20T00:00:00+00:00",
+            ),
+        )
+
+    payload = background_summary_payload(db_path)
+    assert payload["reviewed_count"] == 1
+    assert payload["latest_run"]["outcome"] == "reviewed"
+    assert payload["latest_alert"] is False
+    assert payload["latest_reason"] == "Reviewed with no follow-up triggers."
+
+
+def test_background_summary_needs_follow_up_exposes_reports_and_approval(
+    tmp_path: Path,
+) -> None:
+    db_path = _background_db(tmp_path)
+    _insert_run(db_path, run_id="run_followup", outcome="needs_follow_up")
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            INSERT INTO needs_follow_up_outcomes (
+                run_id, target_id, trigger_codes_json, mandatory_tests_json, summary, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "run_followup",
+                "TIC 1",
+                '["high_priority_score"]',
+                "[]",
+                "Fixture target requires follow-up record and human-readable review.",
+                "2026-05-20T00:00:00+00:00",
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO report_exports (run_id, target_id, format, path, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                "run_followup",
+                "TIC 1",
+                "markdown",
+                "reports/background/run_followup.md",
+                "2026-05-20T00:00:00+00:00",
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO approval_records (
+                run_id, target_id, approved, approver, approval_scope, rationale, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "run_followup",
+                "TIC 1",
+                0,
+                "system",
+                "external_submission",
+                "External submission remains blocked.",
+                "2026-05-20T00:00:00+00:00",
+            ),
+        )
+
+    payload = background_summary_payload(db_path)
+    assert payload["needs_follow_up_count"] == 1
+    assert payload["latest_alert"] is True
+    assert payload["latest_report_paths"] == ["reports/background/run_followup.md"]
+    assert payload["latest_approval"]["external_submission_approved"] is False
+    assert payload["external_submission"] is False
+
+
+def test_background_summary_blocked_latest_run_alerts(tmp_path: Path) -> None:
+    db_path = _background_db(tmp_path)
+    _insert_run(
+        db_path,
+        run_id="run_blocked",
+        outcome="blocked",
+        status="blocked",
+        target_id="RUN_LOCK",
+        error_message="Another background run still owns the run lock.",
+    )
+
+    payload = background_summary_payload(db_path)
+    assert payload["latest_run"]["status"] == "blocked"
+    assert payload["latest_alert"] is True
+    assert payload["latest_reason"] == "Another background run still owns the run lock."
+    assert payload["outcome_counts"]["blocked"] == 1
+
+
+def test_background_latest_endpoint_returns_read_only_payload(tmp_path: Path) -> None:
+    db_path = _background_db(tmp_path)
+    _insert_run(db_path, run_id="run_latest", outcome="reviewed")
+    api = CandidateAPI([], background_db_path=db_path)
+
+    status, _, body = api_response(api, "/background/latest")
+    payload = _json_body(body)
+
+    assert status == 200
+    assert payload["available"] is True
+    assert payload["latest_run"]["run_id"] == "run_latest"
+    assert payload["read_only"] is True
+
+
+def test_root_endpoint_lists_background_endpoints() -> None:
+    status, _, body = api_response(CandidateAPI([]), "/")
+    payload = _json_body(body)
+    assert status == 200
+    assert "/background/summary" in payload["endpoints"]
+    assert "/background/latest" in payload["endpoints"]
