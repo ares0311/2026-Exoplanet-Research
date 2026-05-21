@@ -14,8 +14,8 @@ The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit w
 - Bayesian log-score model over six hypotheses
 - Optional XGBoost and stacking scorer modes
 - SQLite-backed background automation with top-level logs
-- 115 standalone `Skills/` utility scripts
-- 128 test files
+- 116 standalone `Skills/` utility scripts
+- 129 test files
 - 25 package Python modules under `src/exo_toolkit/`
 
 Local validation note: after restoring the declared `xgboost` dependency and installing the macOS OpenMP runtime (`libomp`), the default test suite passes locally on Python 3.13.12.
@@ -36,7 +36,7 @@ Local validation note: after restoring the declared `xgboost` dependency and ins
 | Scheduler docs | `docs/SCHEDULER.md` — cron, launchd, systemd | Complete |
 | ML Tier 1 | `ml/xgboost_scorer.py` | Complete, requires `xgboost` dependency |
 | ML Tier 3 | `ml/stacking_scorer.py` | Complete |
-| Training/evaluation Skills | Kepler, TESS, combined training, XGBoost training, scorer evaluation | Complete |
+| Training/evaluation Skills | Kepler, TESS, combined training, offline CNN split assembly, XGBoost training, scorer evaluation | Complete |
 | Discovery workflow Skills | star scanner, batch scan, alert filter, ranking, watchlist, exports, reports | Complete |
 | Milestones 13-18 Skills | 87 additional analysis, vetting, observability, reporting, and follow-up utilities | Complete |
 | Milestone 19a Skill | `multi_sector_phase_compare.py` — offline per-sector phase-fold comparison | Complete |
@@ -81,7 +81,7 @@ reports/background/*.html
 - Gate: 5,000+ labeled TESS light curves required
 - Gate check: `python Skills/count_tess_labels.py`
 - Architecture spec: `docs/CNN_SPEC.md`
-- Supporting data utilities exist: `labelled_lc_collector.py`, `cnn_feature_augmenter.py`
+- Supporting data utilities exist: `labelled_lc_collector.py`, `cnn_feature_augmenter.py`, `build_cnn_training_data.py`
 
 No active implementation blocker is known in the default local validation path.
 
@@ -116,7 +116,7 @@ Validated on 2026-05-20:
 .venv/bin/python -m pytest
 ```
 
-Result: ruff passed, mypy passed, pytest passed with 2307 passed, 2 deselected, and 33 warnings.
+Result: ruff passed, mypy passed, pytest passed with 2320 passed, 2 deselected, and 33 warnings.
 
 ---
 

@@ -15,7 +15,7 @@ The toolkit supports three scorer modes, selectable via the CLI:
 | XGBoost | `--scorer xgboost --model-path <path>` | Binary XGBoost on tabular features |
 | Ensemble | `--scorer ensemble --model-path <path>` | Weighted average of XGBoost + Bayesian |
 
-The current local validation surface passes with 2307 default tests and 2 live
+The current local validation surface passes with 2320 default tests and 2 live
 integration tests deselected. On macOS, installing `xgboost` also requires the
 OpenMP runtime:
 
@@ -206,6 +206,7 @@ for labelled snippet collection and augmentation:
 
 - `Skills/labelled_lc_collector.py`
 - `Skills/cnn_feature_augmenter.py`
+- `Skills/build_cnn_training_data.py`
 
 See `docs/CNN_SPEC.md` and `docs/ROADMAP.md`.
 

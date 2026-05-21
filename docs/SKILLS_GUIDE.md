@@ -9,7 +9,7 @@ Run any script with `--help` to see its full CLI options.
 
 ## Current inventory
 
-The repository currently has 115 standalone Skills. The quick reference below
+The repository currently has 116 standalone Skills. The quick reference below
 highlights the main workflow entry points; this full inventory keeps the
 complete script surface discoverable for future agents.
 
@@ -23,6 +23,7 @@ batch_scan.py
 binned_lc_exporter.py
 bootstrap_uncertainty.py
 build_combined_training_data.py
+build_cnn_training_data.py
 build_tess_training_data.py
 build_training_data.py
 bulk_priority_update.py
@@ -161,6 +162,7 @@ This table is intentionally workflow-oriented rather than exhaustive.
 | `injection_recovery.py` | Measure pipeline completeness via synthetic transit injection | `run_injection_recovery` |
 | `evaluate_scorer.py` | k-fold ROC-AUC, F1, reliability diagram | `evaluate_scorer` |
 | `build_training_data.py` | Map Kepler KOI table → CandidateFeatures pickle | `build_training_data` |
+| `build_cnn_training_data.py` | Assemble offline CNN train/validation/test snippet splits | `load_training_examples`, `write_training_splits` |
 | `build_tess_training_data.py` | Map TESS TOI table → CandidateFeatures pickle | `build_tess_training_data` |
 | `build_combined_training_data.py` | Merge Kepler + TESS training pickles | `build_combined_training_data` |
 | `train_xgboost.py` | Stratified k-fold XGBoost training with Platt calibration | `train_xgboost` |
