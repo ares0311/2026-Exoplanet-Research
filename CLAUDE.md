@@ -53,8 +53,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 146 test files. Local validation on 2026-05-22 passed with 2735 default tests, 2 `integration_live` tests deselected, and 6 skipped (matplotlib absent).
-**Skills:** 132 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
+**Current test surface:** 161 test files. Local validation on 2026-05-22 passed with 2993 default tests, 2 `integration_live` tests deselected, and 6 skipped (matplotlib absent).
+**Skills:** 147 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
 
@@ -756,6 +756,28 @@ All pipeline modules are complete.
 | `false_positive_score_aggregator.py` | `aggregate_fp_scores`, `format_fp_aggregate_result` — weighted geom-mean FP prob | 15 |
 | `candidate_csv_importer.py` | `import_candidates_csv`, `format_import_result` — CSV → ImportedCandidate | 13 |
 | `noise_model_fitter.py` | `fit_noise_model`, `format_noise_model_result` — white + red noise (beta factor) | 13 |
+
+### Completed (2026-05-22) — Milestone 21
+
+**15 new Skills + 258 new tests**: ✅
+
+| Skill | Key Functions | Tests |
+|---|---|---|
+| `polynomial_detrend.py` | `fit_polynomial_trend`, `apply_detrend` — piecewise polynomial detrending | 17 |
+| `autocorrelation_period_finder.py` | `compute_acf`, `find_acf_period` — stellar rotation via ACF | 18 |
+| `window_function_analyzer.py` | `compute_window_function`, `find_alias_periods` — spectral window / alias detection | 18 |
+| `exclusion_zone_calculator.py` | `compute_exclusion_zone` — angular separation to exclude background source | 13 |
+| `significance_threshold_calculator.py` | `compute_snr_threshold`, `compute_bls_threshold` — bootstrap significance thresholds | 19 |
+| `candidate_similarity_scorer.py` | `score_similarity` — period/depth/duration similarity + duplicate/alias detection | 15 |
+| `photometric_binary_checker.py` | `check_photometric_binary` — ellipsoidal variation at P/2 | 13 |
+| `flux_ratio_calculator.py` | `compute_flux_ratios` — dilution factors from neighbour magnitudes | 16 |
+| `period_refinement_calculator.py` | `refine_period_from_oc` — O-C grid search period refinement | 13 |
+| `background_source_probability.py` | `estimate_bg_source_prob` — galactic source density bgEB prior | 15 |
+| `observation_efficiency_calculator.py` | `compute_obs_efficiency` — phase coverage fraction from timestamps | 16 |
+| `signal_comparison_reporter.py` | `compare_signals`, `format_signal_comparison` — side-by-side Markdown table | 17 |
+| `tce_reliability_scorer.py` | `score_tce_reliability` — composite MES/n_transit/SES score | 16 |
+| `spectral_type_classifier.py` | `classify_spectral_type` — OBAFGKM + luminosity class from Teff/logg | 19 |
+| `barycentric_time_corrector.py` | `compute_barycentric_correction`, `apply_barycentric_correction` — BJD−JD Roemer delay | 16 |
 
 ### Next Step
 
