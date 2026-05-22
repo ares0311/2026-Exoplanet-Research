@@ -53,8 +53,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 131 test files. Local validation on 2026-05-21 passed with 2352 default tests, 2 `integration_live` tests deselected, and 33 warnings after restoring `xgboost` plus the macOS `libomp` runtime.
-**Skills:** 117 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
+**Current test surface:** 146 test files. Local validation on 2026-05-22 passed with 2735 default tests, 2 `integration_live` tests deselected, and 6 skipped (matplotlib absent).
+**Skills:** 132 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
 
@@ -734,6 +734,28 @@ All pipeline modules are complete.
 | Skill | Key Functions | Tests |
 |---|---|---|
 | `candidate_browser_ui.py` | `build_browser_ui`, `write_browser_ui`, optional plot previews | 20 |
+
+### Completed (2026-05-22) — Milestone 20
+
+**15 new Skills + 201 new tests**: ✅
+
+| Skill | Key Functions | Tests |
+|---|---|---|
+| `tess_sector_map.py` | `get_sector_map`, `format_sector_map` — ecliptic-coord sector model | 14 |
+| `period_grid_search.py` | `search_period_grid`, `format_period_grid_result` — BLS power profile | 13 |
+| `oot_rms_tracker.py` | `track_oot_rms`, `format_oot_rms_result` — per-sector OOT RMS + outlier flag | 13 |
+| `phase_bin_snr.py` | `compute_phase_bin_snr`, `format_phase_bin_snr_result` — phased SNR profile | 12 |
+| `centroid_offset_mapper.py` | `map_centroid_offsets`, `format_centroid_offset_result` — in-transit centroid shift | 13 |
+| `tce_comparison_report.py` | `compare_tce`, `format_tce_comparison` — TCE table cross-match | 13 |
+| `stellar_contamination_scorer.py` | `score_contamination`, `format_contamination_result` — composite aperture score | 15 |
+| `transit_model_residual_tester.py` | `test_model_residuals`, `format_residual_test_result` — DW + runs + chi2 | 14 |
+| `expected_depth_calculator.py` | `compute_expected_depth`, `format_expected_depth_result` — geometric + diluted depth | 15 |
+| `snr_vs_period_plotter.py` | `compute_period_snr`, `format_period_snr_result` — SNR vs period grid | 11 |
+| `multi_planet_period_checker.py` | `check_multi_planet_periods`, `format_multi_planet_check` — harmonic/alias detection | 13 |
+| `sector_baseline_normalizer.py` | `normalize_sector_baselines`, `format_baseline_norm_result` — additive/mult norm | 13 |
+| `false_positive_score_aggregator.py` | `aggregate_fp_scores`, `format_fp_aggregate_result` — weighted geom-mean FP prob | 15 |
+| `candidate_csv_importer.py` | `import_candidates_csv`, `format_import_result` — CSV → ImportedCandidate | 13 |
+| `noise_model_fitter.py` | `fit_noise_model`, `format_noise_model_result` — white + red noise (beta factor) | 13 |
 
 ### Next Step
 
