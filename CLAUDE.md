@@ -53,8 +53,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 176 test files. Local validation on 2026-05-23 passed with 3239 default tests, 2 `integration_live` tests deselected, and 6 skipped (matplotlib absent).
-**Skills:** 162 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
+**Current test surface:** 191 test files. Local validation on 2026-05-23 passed with 3469 default tests, 2 `integration_live` tests deselected, and 6 skipped (matplotlib absent).
+**Skills:** 177 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
 
@@ -800,6 +800,28 @@ All pipeline modules are complete.
 | `sector_completion_tracker.py` | `SectorCompletionLog.mark_complete/is_complete/export_incomplete`, `format_completion_report` | 15 |
 | `vetting_boolean_adapter.py` | `boolean_flags_to_entries`, `run_vetting_triage`, `format_triage_result` | 24 |
 | `folded_transit_stack.py` | `stack_transit_windows`, `format_stack_result` — phase-align + stack for SNR | 16 |
+
+### Completed (2026-05-23) — Milestone 23
+
+**15 new Skills + 230 new tests**: ✅
+
+| Skill | Key Functions | Tests |
+|---|---|---|
+| `votable_formatter.py` | `format_as_votable`, `format_votable_result` — VOTable 1.4 XML via stdlib ET | 16 |
+| `astroimagej_region_writer.py` | `write_aij_region`, `format_aij_region_result` — AIJ `.apertures` file | 13 |
+| `correlated_noise_estimator.py` | `estimate_correlated_noise`, `format_correlated_noise_result` — beta method red noise | 15 |
+| `parameter_sweep_runner.py` | `run_parameter_sweep`, `format_sweep_result` — Cartesian grid sweep | 14 |
+| `detection_efficiency_map.py` | `compute_detection_efficiency`, `format_efficiency_result` — 2-D period×depth grid | 13 |
+| `false_negative_rate_estimator.py` | `estimate_false_negative_rate`, `format_fnr_result` — Type II error at threshold | 14 |
+| `candidate_changelog_tracker.py` | `record_change`, `get_changelog`, `format_changelog_result` — field-level atomic JSON log | 13 |
+| `disposition_recorder.py` | `record_disposition`, `get_disposition_history`, `format_disposition_result` — PC/FP/CP/EB/IS/UNK | 18 |
+| `cadence_irregularity_scorer.py` | `score_cadence_irregularity`, `format_cadence_irregularity_result` — gap jitter scorer | 13 |
+| `saturation_level_checker.py` | `check_saturation`, `format_saturation_result` — analytic TESS saturation from Tmag | 15 |
+| `crowding_metric_calculator.py` | `compute_crowding_metric`, `format_crowding_result` — CROWDSAP-equivalent from catalog | 15 |
+| `transit_ingress_timer.py` | `compute_ingress_duration`, `format_ingress_result` — T14/T23 Seager & M-O (2003) | 16 |
+| `depth_period_correlation_scorer.py` | `score_depth_period_correlation`, `format_depth_period_result` — Pearson/Spearman/OLS | 15 |
+| `multi_observatory_coordinator.py` | `coordinate_observations`, `format_coordination_result` — multi-site airmass+Moon | 15 |
+| `fits_keyword_mapper.py` | `map_fits_keywords`, `format_keyword_map_result` — FITS header → canonical pipeline fields | 18 |
 
 ### Next Step
 
