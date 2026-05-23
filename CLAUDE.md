@@ -53,8 +53,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 161 test files. Local validation on 2026-05-22 passed with 2993 default tests, 2 `integration_live` tests deselected, and 6 skipped (matplotlib absent).
-**Skills:** 147 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
+**Current test surface:** 176 test files. Local validation on 2026-05-23 passed with 3239 default tests, 2 `integration_live` tests deselected, and 6 skipped (matplotlib absent).
+**Skills:** 162 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
 
@@ -778,6 +778,28 @@ All pipeline modules are complete.
 | `tce_reliability_scorer.py` | `score_tce_reliability` — composite MES/n_transit/SES score | 16 |
 | `spectral_type_classifier.py` | `classify_spectral_type` — OBAFGKM + luminosity class from Teff/logg | 19 |
 | `barycentric_time_corrector.py` | `compute_barycentric_correction`, `apply_barycentric_correction` — BJD−JD Roemer delay | 16 |
+
+### Completed (2026-05-23) — Milestone 22
+
+**15 new Skills + 246 new tests**: ✅
+
+| Skill | Key Functions | Tests |
+|---|---|---|
+| `transit_survey_planner.py` | `plan_transit_windows`, `format_survey_plan` — schedule upcoming transit windows | 13 |
+| `period_commensurability_checker.py` | `check_commensurability`, `format_commensurability_result` — near-MMR resonant pair detection | 14 |
+| `geometric_transit_probability.py` | `compute_transit_probability`, `format_transit_prob_result` — P_tr from Kepler 3rd law + ρ★ | 13 |
+| `flux_periodogram.py` | `compute_dft_periodogram`, `find_periodogram_peaks`, `format_periodogram_result` — stdlib DFT | 16 |
+| `kopparapu_hz_calculator.py` | `compute_hz_boundaries`, `classify_hz_position`, `format_hz_result` — Kopparapu (2013) HZ | 17 |
+| `ttv_significance_tester.py` | `test_ttv_significance`, `format_ttv_test_result` — chi-square O-C significance test | 14 |
+| `snr_sector_stacker.py` | `project_stacked_snr`, `format_stacked_snr_result` — √N SNR projection | 13 |
+| `candidate_summary_card.py` | `build_summary_card`, `format_summary_card` — compact Markdown card from candidate dict | 17 |
+| `multi_aperture_comparator.py` | `compare_apertures`, `format_aperture_compare_result` — depth/RMS discrepancy | 14 |
+| `epoch_folding_optimizer.py` | `optimize_epoch`, `format_epoch_opt_result` — grid-search T0 minimising O-C RMS | 14 |
+| `planet_occurrence_weight.py` | `compute_occurrence_weight`, `format_occurrence_weight_result` — w=1/(p_det×p_tr) | 15 |
+| `data_gap_interpolator.py` | `characterize_gaps`, `fill_gaps_linear`, `format_gap_stats` — gap characterisation + fill | 16 |
+| `sector_completion_tracker.py` | `SectorCompletionLog.mark_complete/is_complete/export_incomplete`, `format_completion_report` | 15 |
+| `vetting_boolean_adapter.py` | `boolean_flags_to_entries`, `run_vetting_triage`, `format_triage_result` | 24 |
+| `folded_transit_stack.py` | `stack_transit_windows`, `format_stack_result` — phase-align + stack for SNR | 16 |
 
 ### Next Step
 
