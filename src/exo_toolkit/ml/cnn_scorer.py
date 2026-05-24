@@ -1,0 +1,219 @@
+"""CNN scorer wrapper — same interface as XGBoostScorer.
+
+Wraps the CNN inference pipeline (``Skills/cnn_inference_batcher.py``) behind
+the same ``predict_proba`` / ``predict_proba_batch`` interface used by
+``XGBoostScorer``, so that ``StackingScorer`` can blend all three tiers without
+knowing which tier it is talking to.
+
+PyTorch is optional: if it is not installed, every method returns 0.5 and
+``is_available`` is ``False``.
+
+Public API
+----------
+``CnnScorer``
+    .predict_proba(snippet) → float
+    .predict_proba_batch(snippets) → list[float]
+    .from_checkpoint(path, *, calibration_path) (classmethod)
+    .is_available → bool
+    .checkpoint_path → Path | None
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+
+class CnnScorer:
+    """Wraps a trained CNN checkpoint for planet-candidate probability prediction.
+
+    Args:
+        checkpoint_path: Path to the ``.pt`` model file produced by ``train_cnn.py``.
+        calibration_path: Optional path to a Platt calibration JSON written by
+            ``cnn_calibrator.py``.  Applied post-softmax when present.
+        model_fn: Injectable callable ``(snippet: list[float]) -> float`` for
+            testing without PyTorch.  When provided, the checkpoint file is not
+            loaded.
+
+    Attributes:
+        is_available: ``True`` when PyTorch or a mock ``model_fn`` is usable.
+    """
+
+    def __init__(
+        self,
+        checkpoint_path: Path | None = None,
+        *,
+        calibration_path: Path | None = None,
+        model_fn: object | None = None,
+    ) -> None:
+        self._checkpoint_path = checkpoint_path
+        self._calibration_path = calibration_path
+        self._model_fn = model_fn
+        self._model: object | None = None
+        self._calibration: object | None = None
+        self._available: bool = False
+        self._load()
+
+    def _load(self) -> None:
+        if self._model_fn is not None:
+            self._available = True
+            return
+        if self._checkpoint_path is None:
+            return
+        try:
+            import torch  # type: ignore[import-untyped]  # noqa: F401
+            self._available = True
+            # Defer actual load to first call so we don't block import
+        except ImportError:
+            self._available = False
+
+        if self._calibration_path is not None and self._calibration_path.exists():
+            try:
+                import sys
+
+                sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "Skills"))
+                from cnn_calibrator import load_cnn_calibration  # type: ignore[import-not-found]
+
+                self._calibration = load_cnn_calibration(self._calibration_path)
+            except Exception:  # noqa: BLE001
+                pass
+
+    def _ensure_model(self) -> None:
+        if self._model_fn is not None or self._model is not None:
+            return
+        if self._checkpoint_path is None or not self._available:
+            return
+        try:
+            import torch  # type: ignore[import-untyped]
+
+            self._model = torch.load(  # type: ignore[attr-defined]
+                self._checkpoint_path, map_location="cpu", weights_only=True
+            )
+        except Exception:  # noqa: BLE001
+            self._available = False
+
+    def _apply_calibration(self, p: float) -> float:
+        if self._calibration is None:
+            return p
+        try:
+            import sys
+
+            sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "Skills"))
+            from cnn_calibrator import apply_cnn_calibration  # type: ignore[import-not-found]
+
+            return apply_cnn_calibration(p, self._calibration)
+        except Exception:  # noqa: BLE001
+            return p
+
+    # ------------------------------------------------------------------
+    # Properties
+    # ------------------------------------------------------------------
+
+    @property
+    def is_available(self) -> bool:
+        """True when this scorer can produce predictions."""
+        return self._available
+
+    @property
+    def checkpoint_path(self) -> Path | None:
+        """Path to the loaded checkpoint file."""
+        return self._checkpoint_path
+
+    # ------------------------------------------------------------------
+    # Prediction
+    # ------------------------------------------------------------------
+
+    def predict_proba(self, snippet: list[float]) -> float:
+        """Return P(planet_candidate) for a single phase-folded snippet.
+
+        Args:
+            snippet: 1-D list of normalised flux values (length 201).
+
+        Returns:
+            Probability in [0, 1]; returns 0.5 when CNN is not available.
+        """
+        if not self._available:
+            return 0.5
+        if self._model_fn is not None:
+            p = float(self._model_fn(snippet))  # type: ignore[call-arg]
+            return self._apply_calibration(max(0.0, min(1.0, p)))
+        self._ensure_model()
+        if self._model is None:
+            return 0.5
+        try:
+            import torch  # type: ignore[import-untyped]
+
+            tensor = torch.tensor([snippet], dtype=torch.float32).unsqueeze(1)
+            with torch.no_grad():  # type: ignore[attr-defined]
+                out = self._model(tensor)  # type: ignore[operator]
+                p = float(torch.sigmoid(out).squeeze())  # type: ignore[attr-defined]
+            p = max(0.0, min(1.0, p))
+            return self._apply_calibration(p)
+        except Exception:  # noqa: BLE001
+            return 0.5
+
+    def predict_proba_batch(self, snippets: list[list[float]]) -> list[float]:
+        """Return P(planet_candidate) for a batch of snippets.
+
+        Args:
+            snippets: List of 1-D flux arrays.
+
+        Returns:
+            List of probabilities, one per snippet.  Returns [0.5, ...] when
+            the CNN is not available.
+        """
+        if not snippets:
+            return []
+        if not self._available:
+            return [0.5] * len(snippets)
+        if self._model_fn is not None:
+            return [
+                self._apply_calibration(
+                    max(0.0, min(1.0, float(self._model_fn(s))))  # type: ignore[call-arg]
+                )
+                for s in snippets
+            ]
+        self._ensure_model()
+        if self._model is None:
+            return [0.5] * len(snippets)
+        try:
+            import torch  # type: ignore[import-untyped]
+
+            tensor = torch.tensor(snippets, dtype=torch.float32).unsqueeze(1)
+            with torch.no_grad():  # type: ignore[attr-defined]
+                out = self._model(tensor)  # type: ignore[operator]
+                probs = torch.sigmoid(out).squeeze(-1).tolist()  # type: ignore[attr-defined]
+            if isinstance(probs, float):
+                probs = [probs]
+            return [self._apply_calibration(max(0.0, min(1.0, float(p)))) for p in probs]
+        except Exception:  # noqa: BLE001
+            return [0.5] * len(snippets)
+
+    # ------------------------------------------------------------------
+    # Factory methods
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def from_checkpoint(
+        cls,
+        path: str | Path,
+        *,
+        calibration_path: str | Path | None = None,
+    ) -> CnnScorer:
+        """Load a ``CnnScorer`` from a saved checkpoint.
+
+        Args:
+            path: Path to the ``.pt`` checkpoint file.
+            calibration_path: Optional path to a Platt calibration JSON.
+
+        Returns:
+            A :class:`CnnScorer` ready for prediction.
+        """
+        cal = Path(calibration_path) if calibration_path is not None else None
+        return cls(Path(path), calibration_path=cal)
+
+    @classmethod
+    def unavailable(cls) -> CnnScorer:
+        """Return a no-op scorer that always returns 0.5.
+
+        Useful as a drop-in when no CNN checkpoint is available.
+        """
+        return cls(checkpoint_path=None)
