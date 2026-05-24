@@ -53,8 +53,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 191 test files. Local validation on 2026-05-23 passed with 3469 default tests, 2 `integration_live` tests deselected, and 6 skipped (matplotlib absent).
-**Skills:** 177 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
+**Current test surface:** 206 test files. Local validation on 2026-05-24 passed with 3680 default tests, 2 `integration_live` tests deselected, and 6 skipped (matplotlib absent).
+**Skills:** 192 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
 
@@ -822,6 +822,28 @@ All pipeline modules are complete.
 | `depth_period_correlation_scorer.py` | `score_depth_period_correlation`, `format_depth_period_result` — Pearson/Spearman/OLS | 15 |
 | `multi_observatory_coordinator.py` | `coordinate_observations`, `format_coordination_result` — multi-site airmass+Moon | 15 |
 | `fits_keyword_mapper.py` | `map_fits_keywords`, `format_keyword_map_result` — FITS header → canonical pipeline fields | 18 |
+
+### Completed (2026-05-24) — Milestone 24
+
+**15 new Skills + 211 new tests**: ✅
+
+| Skill | Key Functions | Tests |
+|---|---|---|
+| `stellar_luminosity_calculator.py` | `compute_stellar_luminosity`, `format_luminosity_result` — L/L☉ from Stefan-Boltzmann | 14 |
+| `contact_time_calculator.py` | `compute_contact_times`, `format_contact_times` — T1/T2/T3/T4 from T14/T23 | 14 |
+| `target_coordinates_converter.py` | `convert_coordinates`, `format_coordinate_result` — RA/Dec → ecliptic + galactic (IAU 1958) | 14 |
+| `stellar_surface_gravity_estimator.py` | `estimate_surface_gravity`, `format_surface_gravity_result` — log g + error propagation | 14 |
+| `planet_mass_estimator.py` | `estimate_planet_mass`, `format_planet_mass_result` — Chen & Kipping (2017) M-R | 14 |
+| `stellar_age_gyrochronology.py` | `estimate_stellar_age`, `format_gyro_result` — Barnes (2007) P_rot → age | 14 |
+| `observation_window_merger.py` | `merge_windows`, `format_merged_windows` — merge overlapping/adjacent intervals | 14 |
+| `rv_detectability_checker.py` | `check_rv_detectability`, `format_rv_detectability` — K amplitude + SNR decision | 14 |
+| `phase_fold_quality_checker.py` | `check_phase_fold_quality`, `format_phase_fold_quality` — coverage/SNR/symmetry/A–D grade | 13 |
+| `multi_band_depth_comparator.py` | `compare_multi_band_depths`, `format_multi_band_result` — chromaticity via inverse-variance mean | 14 |
+| `aperture_optimization_scorer.py` | `score_apertures`, `format_aperture_result` — Gaussian PSF SNR-optimal aperture | 13 |
+| `atmospheric_scale_height_calculator.py` | `compute_scale_height`, `format_scale_height_result` — H = kT/μg + transmission amplitude | 14 |
+| `seasonal_visibility_planner.py` | `plan_seasonal_visibility`, `format_seasonal_visibility` — monthly ground-based observability | 14 |
+| `rms_timescale_profiler.py` | `profile_rms_timescales`, `format_rms_timescale_result` — log-spaced RMS vs bin timescale | 13 |
+| `candidate_submission_formatter.py` | `format_submission` — TFOP WG / Planet Hunters structured submission record | 15 |
 
 ### Next Step
 
