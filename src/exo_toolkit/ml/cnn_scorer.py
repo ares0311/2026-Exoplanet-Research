@@ -19,7 +19,9 @@ Public API
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 
 class CnnScorer:
@@ -42,13 +44,13 @@ class CnnScorer:
         checkpoint_path: Path | None = None,
         *,
         calibration_path: Path | None = None,
-        model_fn: object | None = None,
+        model_fn: Callable[[list[float]], float] | None = None,
     ) -> None:
         self._checkpoint_path = checkpoint_path
         self._calibration_path = calibration_path
         self._model_fn = model_fn
-        self._model: object | None = None
-        self._calibration: object | None = None
+        self._model: Any = None
+        self._calibration: Any = None
         self._available: bool = False
         self._load()
 
@@ -59,9 +61,8 @@ class CnnScorer:
         if self._checkpoint_path is None:
             return
         try:
-            import torch  # type: ignore[import-untyped]  # noqa: F401
+            import torch  # type: ignore[import-not-found]  # noqa: F401
             self._available = True
-            # Defer actual load to first call so we don't block import
         except ImportError:
             self._available = False
 
@@ -82,9 +83,9 @@ class CnnScorer:
         if self._checkpoint_path is None or not self._available:
             return
         try:
-            import torch  # type: ignore[import-untyped]
+            import torch  # noqa: PLC0415
 
-            self._model = torch.load(  # type: ignore[attr-defined]
+            self._model = torch.load(
                 self._checkpoint_path, map_location="cpu", weights_only=True
             )
         except Exception:  # noqa: BLE001
@@ -97,9 +98,9 @@ class CnnScorer:
             import sys
 
             sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "Skills"))
-            from cnn_calibrator import apply_cnn_calibration  # type: ignore[import-not-found]
+            from cnn_calibrator import apply_cnn_calibration  # noqa: PLC0415
 
-            return apply_cnn_calibration(p, self._calibration)
+            return float(apply_cnn_calibration(p, self._calibration))
         except Exception:  # noqa: BLE001
             return p
 
@@ -133,18 +134,18 @@ class CnnScorer:
         if not self._available:
             return 0.5
         if self._model_fn is not None:
-            p = float(self._model_fn(snippet))  # type: ignore[call-arg]
+            p = float(self._model_fn(snippet))
             return self._apply_calibration(max(0.0, min(1.0, p)))
         self._ensure_model()
         if self._model is None:
             return 0.5
         try:
-            import torch  # type: ignore[import-untyped]
+            import torch  # noqa: PLC0415
 
             tensor = torch.tensor([snippet], dtype=torch.float32).unsqueeze(1)
-            with torch.no_grad():  # type: ignore[attr-defined]
-                out = self._model(tensor)  # type: ignore[operator]
-                p = float(torch.sigmoid(out).squeeze())  # type: ignore[attr-defined]
+            with torch.no_grad():
+                out = self._model(tensor)
+                p = float(torch.sigmoid(out).squeeze())
             p = max(0.0, min(1.0, p))
             return self._apply_calibration(p)
         except Exception:  # noqa: BLE001
@@ -166,21 +167,19 @@ class CnnScorer:
             return [0.5] * len(snippets)
         if self._model_fn is not None:
             return [
-                self._apply_calibration(
-                    max(0.0, min(1.0, float(self._model_fn(s))))  # type: ignore[call-arg]
-                )
+                self._apply_calibration(max(0.0, min(1.0, float(self._model_fn(s)))))
                 for s in snippets
             ]
         self._ensure_model()
         if self._model is None:
             return [0.5] * len(snippets)
         try:
-            import torch  # type: ignore[import-untyped]
+            import torch  # noqa: PLC0415
 
             tensor = torch.tensor(snippets, dtype=torch.float32).unsqueeze(1)
-            with torch.no_grad():  # type: ignore[attr-defined]
-                out = self._model(tensor)  # type: ignore[operator]
-                probs = torch.sigmoid(out).squeeze(-1).tolist()  # type: ignore[attr-defined]
+            with torch.no_grad():
+                out = self._model(tensor)
+                probs = torch.sigmoid(out).squeeze(-1).tolist()
             if isinstance(probs, float):
                 probs = [probs]
             return [self._apply_calibration(max(0.0, min(1.0, float(p)))) for p in probs]
