@@ -1,9 +1,9 @@
 """Tests for Skills/flux_periodogram.py."""
 import math
-import pytest
+
 from Skills.flux_periodogram import (
-    PeriodogramResult,
     PeriodogramPeak,
+    PeriodogramResult,
     compute_dft_periodogram,
     find_periodogram_peaks,
     format_periodogram_result,

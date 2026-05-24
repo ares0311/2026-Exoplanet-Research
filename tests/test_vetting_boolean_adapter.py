@@ -1,11 +1,10 @@
 """Tests for Skills/vetting_boolean_adapter.py."""
-import pytest
 from Skills.vetting_boolean_adapter import (
     FlagEntry,
     VettingTriageResult,
     boolean_flags_to_entries,
-    run_vetting_triage,
     format_triage_result,
+    run_vetting_triage,
 )
 
 

@@ -1,10 +1,9 @@
 """Tests for Skills/kopparapu_hz_calculator.py."""
-import pytest
 from Skills.kopparapu_hz_calculator import (
     HZBoundaries,
     HZClassification,
-    compute_hz_boundaries,
     classify_hz_position,
+    compute_hz_boundaries,
     format_hz_result,
 )
 

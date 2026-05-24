@@ -5,7 +5,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from crowding_metric_calculator import (
-    CrowdingResult,
     compute_crowding_metric,
     format_crowding_result,
 )
@@ -65,7 +64,7 @@ class TestComputeCrowdingMetric:
         result = compute_crowding_metric(12.0, [], [])
         try:
             result.crowding_metric = 0.5
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

@@ -1,17 +1,13 @@
 """Tests for Skills/candidate_changelog_tracker.py"""
-import json
 import sys
-import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from candidate_changelog_tracker import (
-    ChangeEntry,
-    ChangelogResult,
-    record_change,
-    get_changelog,
     format_changelog_result,
+    get_changelog,
+    record_change,
 )
 
 
@@ -88,7 +84,7 @@ class TestGetChangelog:
         result = get_changelog(42, store)
         try:
             result.n_changes = 99
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

@@ -1,10 +1,9 @@
 """Tests for Skills/transit_survey_planner.py."""
-import pytest
 from Skills.transit_survey_planner import (
-    SurveyWindow,
     SurveyPlanResult,
-    plan_transit_windows,
+    SurveyWindow,
     format_survey_plan,
+    plan_transit_windows,
 )
 
 
@@ -98,6 +97,8 @@ class TestFormatSurveyPlan:
         assert "Survey" in s
 
     def test_invalid_flag_in_output(self):
-        result = plan_transit_windows([{"period_days": 5.0, "epoch_bjd": 0.0}], 2460030.0, 2460000.0)
+        result = plan_transit_windows(
+            [{"period_days": 5.0, "epoch_bjd": 0.0}], 2460030.0, 2460000.0
+        )
         s = format_survey_plan(result)
         assert "INVALID" in s or result.flag == "INVALID"

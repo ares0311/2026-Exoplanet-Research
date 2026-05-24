@@ -1,5 +1,4 @@
 """Tests for Skills/multi_aperture_comparator.py."""
-import pytest
 from Skills.multi_aperture_comparator import (
     ApertureCompareResult,
     compare_apertures,

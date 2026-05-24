@@ -5,10 +5,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from parameter_sweep_runner import (
-    SweepPoint,
-    SweepResult,
-    run_parameter_sweep,
     format_sweep_result,
+    run_parameter_sweep,
 )
 
 
@@ -84,7 +82,7 @@ class TestRunParameterSweep:
         result = run_parameter_sweep(lambda x: x, {"x": [1.0]})
         try:
             result.best_value = 99.0
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

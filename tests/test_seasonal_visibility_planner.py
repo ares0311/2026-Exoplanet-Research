@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
-from seasonal_visibility_planner import plan_seasonal_visibility, format_seasonal_visibility
+from seasonal_visibility_planner import format_seasonal_visibility, plan_seasonal_visibility
 
 
 def test_basic_ok():

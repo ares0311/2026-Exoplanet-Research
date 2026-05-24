@@ -5,8 +5,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from detection_efficiency_map import (
-    EfficiencyCell,
-    DetectionEfficiencyResult,
     compute_detection_efficiency,
     format_efficiency_result,
 )
@@ -78,7 +76,7 @@ class TestComputeDetectionEfficiency:
         result = compute_detection_efficiency(inj, inj, [0.0, 10.0], [0.0, 1000.0])
         try:
             result.n_cells = 99
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

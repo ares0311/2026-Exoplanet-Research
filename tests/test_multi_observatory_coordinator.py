@@ -5,8 +5,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from multi_observatory_coordinator import (
-    ObservatorySlot,
-    CoordinationResult,
     coordinate_observations,
     format_coordination_result,
 )
@@ -62,7 +60,7 @@ class TestCoordinateObservations:
         result = coordinate_observations(None, 2460000.0, sites)
         try:
             result.best_site = "other"
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

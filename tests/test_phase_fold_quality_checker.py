@@ -1,5 +1,4 @@
 """Tests for Skills/phase_fold_quality_checker.py"""
-import math
 import sys
 from pathlib import Path
 

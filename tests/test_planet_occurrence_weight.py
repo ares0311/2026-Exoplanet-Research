@@ -1,5 +1,4 @@
 """Tests for Skills/planet_occurrence_weight.py."""
-import pytest
 from Skills.planet_occurrence_weight import (
     OccurrenceWeightResult,
     compute_occurrence_weight,

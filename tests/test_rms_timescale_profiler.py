@@ -1,11 +1,10 @@
 """Tests for Skills/rms_timescale_profiler.py"""
-import math
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
-from rms_timescale_profiler import profile_rms_timescales, format_rms_timescale_result
+from rms_timescale_profiler import format_rms_timescale_result, profile_rms_timescales
 
 
 def _white_noise(n=500, cadence_days=0.5 / 24.0, seed=42):

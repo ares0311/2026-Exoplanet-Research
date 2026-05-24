@@ -6,9 +6,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from astroimagej_region_writer import (
     RegionEntry,
-    AstroImageJRegionResult,
-    write_aij_region,
     format_aij_region_result,
+    write_aij_region,
 )
 
 
@@ -22,7 +21,7 @@ class TestRegionEntry:
         e = RegionEntry(ra_deg=1.0, dec_deg=2.0, radius_arcsec=3.0, label="X", color="red")
         try:
             e.ra_deg = 99.0
-            assert False, "Should be frozen"
+            raise AssertionError("Should be frozen")
         except Exception:
             pass
 

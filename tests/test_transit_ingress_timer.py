@@ -1,12 +1,10 @@
 """Tests for Skills/transit_ingress_timer.py"""
-import math
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from transit_ingress_timer import (
-    IngressResult,
     compute_ingress_duration,
     format_ingress_result,
 )
@@ -72,7 +70,7 @@ class TestComputeIngressDuration:
         result = compute_ingress_duration(10.0, 0.1, 0.0, 10.0)
         try:
             result.total_duration_hours = 99.0
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

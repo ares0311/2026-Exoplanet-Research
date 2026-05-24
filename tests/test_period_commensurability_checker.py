@@ -1,5 +1,4 @@
 """Tests for Skills/period_commensurability_checker.py."""
-import pytest
 from Skills.period_commensurability_checker import (
     CommensurabilityPair,
     CommensurabilityResult,

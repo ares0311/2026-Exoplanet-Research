@@ -1,9 +1,10 @@
 """Tests for Skills/ttv_significance_tester.py."""
-import pytest
 from Skills.ttv_significance_tester import (
     TTVTestResult,
-    test_ttv_significance as run_ttv_significance_test,
     format_ttv_test_result,
+)
+from Skills.ttv_significance_tester import (
+    test_ttv_significance as run_ttv_significance_test,
 )
 
 

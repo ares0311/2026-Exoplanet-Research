@@ -6,7 +6,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from candidate_submission_formatter import format_submission
 
-
 _GOOD_CANDIDATE = {
     "tic_id": 150428135,
     "period_days": 37.4228,
