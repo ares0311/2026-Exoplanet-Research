@@ -54,8 +54,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 221 test files. Local validation on 2026-05-25 passed with 3879 default tests, 2 `integration_live` tests deselected, and 6 skipped (matplotlib absent).
-**Skills:** 207 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
+**Current test surface:** 264 test files. Local validation on 2026-05-25 passed with 4275 default tests, 2 `integration_live` tests deselected, and 6 skipped (matplotlib absent).
+**Skills:** 250 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
 
@@ -889,6 +889,29 @@ All pipeline modules are complete.
 | `config_diff_tool.py` | `diff_configs`, `load_and_diff_configs`, `format_config_diff` — nested JSON config diff | 13 |
 | `stellar_activity_index.py` | `compute_activity_index`, `format_activity_index` — RMS/MAD/outlier composite | 13 |
 | `observation_log_parser.py` | `parse_obs_log`, `load_obs_log`, `format_obs_log` — CSV/TSV photometry log parser | 15 |
+
+
+### Completed (2026-05-25) — Milestone 27
+
+**15 new Skills + 199 new tests**: ✅
+
+| Skill | Key Functions | Tests |
+|---|---|---|
+| `cnn_model_config.py` | `CnnModelConfig`, `default_config`, `load_config`, `save_config` — 1D CNN architecture config | 13 |
+| `label_coverage_reporter.py` | `report_label_coverage`, `format_coverage_report` — label counts by class/period/depth/source | 13 |
+| `snippet_batch_progress.py` | `load_batch_progress`, `format_batch_progress` — checkpoint JSON progress tracker | 13 |
+| `training_curve_logger.py` | `TrainingCurveLogger.log_epoch`, `load_curves`, `format_curves` — JSONL epoch log | 13 |
+| `roc_auc_calculator.py` | `compute_roc_auc`, `format_roc_auc_result` — trapezoidal ROC-AUC + operating-point table | 13 |
+| `pr_auc_calculator.py` | `compute_pr_auc`, `format_pr_auc_result` — precision-recall AUC + threshold sweep | 13 |
+| `active_learning_scorer.py` | `score_active_learning`, `format_active_learning_result` — uncertainty sampling by \|score-0.5\| | 13 |
+| `stratified_dataset_splitter.py` | `split_dataset`, `format_split_result` — stratified train/val/test split | 13 |
+| `feature_importance_ranker.py` | `rank_feature_importance`, `format_importance_result` — permutation importance ranker | 13 |
+| `model_performance_comparator.py` | `compare_model_performance`, `format_comparison_result` — AUC/F1/Brier side-by-side table | 13 |
+| `model_registry.py` | `register`, `get_best`, `list_models`, `format_registry` — persistent JSON model registry | 13 |
+| `prediction_batch_exporter.py` | `export_predictions`, `load_predictions`, `format_export_summary` — JSONL prediction export | 13 |
+| `ensemble_weight_optimizer.py` | `optimize_weights`, `blend_scores`, `format_weight_result` — grid-search XGB/CNN/Bayes weights | 13 |
+| `calibration_curve_reporter.py` | `compute_calibration_curve`, `format_calibration_curve` — reliability diagram data | 13 |
+| `confusion_matrix_reporter.py` | `compute_confusion_matrix`, `format_confusion_matrix` — TP/FP/TN/FN + precision/recall/F1 | 13 |
 
 
 ### Next Step
