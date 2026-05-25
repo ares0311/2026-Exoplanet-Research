@@ -8,6 +8,7 @@ from pathlib import Path
 from Skills.candidate_api import (
     CandidateAPI,
     api_response,
+    artifact_payload,
     background_summary_payload,
     candidate_to_payload,
     summary_payload,
@@ -423,9 +424,50 @@ def test_background_latest_endpoint_returns_read_only_payload(tmp_path: Path) ->
     assert payload["read_only"] is True
 
 
+def test_artifact_payload_bundles_summary_candidates_and_background(tmp_path: Path) -> None:
+    db_path = _background_db(tmp_path)
+    _insert_run(db_path, run_id="run_latest", outcome="reviewed")
+    api = CandidateAPI([_row(candidate_id="A")], background_db_path=db_path)
+
+    payload = artifact_payload(api)
+
+    assert payload["artifact_type"] == "candidate_api_bundle"
+    assert payload["read_only"] is True
+    assert payload["live_services"] is False
+    assert payload["external_submission"] is False
+    assert payload["summary"]["n_candidates"] == 1
+    assert payload["candidates"][0]["candidate_id"] == "A"
+    assert payload["background"]["available"] is True
+
+
+def test_artifact_endpoint_returns_single_json_bundle(tmp_path: Path) -> None:
+    db_path = _background_db(tmp_path)
+    _insert_run(db_path, run_id="run_latest", outcome="reviewed")
+    api = CandidateAPI([_row(candidate_id="A")], background_db_path=db_path)
+
+    status, content_type, body = api_response(api, "/artifact.json")
+    payload = _json_body(body)
+
+    assert status == 200
+    assert content_type.startswith("application/json")
+    assert payload["artifact_type"] == "candidate_api_bundle"
+    assert payload["candidates"][0]["candidate_id"] == "A"
+
+
+def test_artifact_endpoint_preserves_guardrails() -> None:
+    status, _, body = api_response(CandidateAPI([_row()]), "/artifact.json")
+    text = body.decode("utf-8").lower()
+    payload = _json_body(body)
+
+    assert status == 200
+    assert "confirmed planet" not in text
+    assert payload["language_guardrail"].startswith("candidate signals")
+
+
 def test_root_endpoint_lists_background_endpoints() -> None:
     status, _, body = api_response(CandidateAPI([]), "/")
     payload = _json_body(body)
     assert status == 200
     assert "/background/summary" in payload["endpoints"]
     assert "/background/latest" in payload["endpoints"]
+    assert "/artifact.json" in payload["endpoints"]

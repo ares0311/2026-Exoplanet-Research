@@ -10,6 +10,7 @@ CandidateAPI(rows, *, title, source_label, background_db_path)
 candidate_to_payload(candidate) -> dict[str, Any]
 summary_payload(candidates) -> dict[str, Any]
 background_summary_payload(db_path) -> dict[str, Any]
+artifact_payload(api) -> dict[str, Any]
 api_response(api, path) -> tuple[int, str, bytes]
 run_server(rows, *, host, port, title, source_label, background_db_path) -> None
 """
@@ -170,6 +171,28 @@ def background_summary_payload(db_path: Path | None) -> dict[str, Any]:
     }
 
 
+def artifact_payload(api: CandidateAPI) -> dict[str, Any]:
+    """Build a single-file JSON artifact for local review bundles."""
+    return {
+        "artifact_type": "candidate_api_bundle",
+        "schema_version": 1,
+        "title": api.title,
+        "source_label": api.source_label,
+        "read_only": True,
+        "live_services": False,
+        "external_submission": False,
+        "language_guardrail": (
+            "candidate signals and follow-up targets only; no discovery claims"
+        ),
+        "summary": summary_payload(api.candidates),
+        "candidates": [
+            candidate_to_payload(candidate)
+            for candidate in api.candidates
+        ],
+        "background": background_summary_payload(api.background_db_path),
+    }
+
+
 def _json_response(
     status: int,
     payload: dict[str, Any] | list[dict[str, Any]],
@@ -215,6 +238,8 @@ def api_response(api: CandidateAPI, path: str) -> tuple[int, str, bytes]:
                 "language_guardrail": payload["language_guardrail"],
             },
         )
+    if route == "/artifact.json":
+        return _json_response(200, artifact_payload(api))
     if route == "/candidates":
         return _json_response(
             200,
@@ -248,6 +273,7 @@ def api_response(api: CandidateAPI, path: str) -> tuple[int, str, bytes]:
                     "/candidates",
                     "/candidates/<candidate_id>",
                     "/dashboard",
+                    "/artifact.json",
                     "/background/summary",
                     "/background/latest",
                 ],

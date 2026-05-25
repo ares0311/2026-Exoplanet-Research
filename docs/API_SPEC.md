@@ -53,6 +53,7 @@ service.
 | `/dashboard` | GET | HTML | Static dashboard view using the shared dashboard contract. |
 | `/background/summary` | GET | JSON | Read-only aggregate summary for an optional background SQLite log. |
 | `/background/latest` | GET | JSON | Latest background run alert state, reason, report paths, and approval state. |
+| `/artifact.json` | GET | JSON | Single-file local review bundle with summary, candidates, and background status. |
 | `/` | GET | JSON | Endpoint index. |
 
 All mutation methods are rejected. The API is read-only.
@@ -88,5 +89,6 @@ All mutation methods are rejected. The API is read-only.
 
 - Browser UI consuming the JSON endpoints. Implemented by
   `Skills/candidate_browser_ui.py`.
-- Static artifact mode for GitHub Actions or local report bundles.
+- Static artifact mode for GitHub Actions or local report bundles. Implemented
+  as `/artifact.json`.
 - CORS configuration if a separate local frontend is introduced.

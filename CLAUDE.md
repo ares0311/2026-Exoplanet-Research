@@ -54,7 +54,7 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 264 test files. Local validation on 2026-05-25 passed with 4279 default tests, 2 `integration_live` tests deselected, and 59 warnings.
+**Current test surface:** 264 test files. Local validation on 2026-05-25 passed with 4282 default tests, 2 `integration_live` tests deselected, and 59 warnings.
 **Skills:** 249 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
@@ -428,7 +428,9 @@ Gate order (spec §11):
 6. Fallback → `github_only_reproducibility`
 
 `None` feature scores **fail** gate conditions conservatively.
-`provenance_score` defaults to 0.0 (blocks `tfop_ready` in v0 — not yet computed).
+`provenance_score` is computed in `run_pipeline()` from fetch provenance and
+passed into pathway classification; callers that omit it still default to 0.0
+and therefore block `tfop_ready` conservatively.
 
 ---
 
@@ -727,7 +729,7 @@ All pipeline modules are complete.
 
 | Skill | Key Functions | Tests |
 |---|---|---|
-| `candidate_api.py` | `CandidateAPI`, `api_response`, `summary_payload`, `background_summary_payload` | 27 |
+| `candidate_api.py` | `CandidateAPI`, `api_response`, `summary_payload`, `background_summary_payload`, `artifact_payload` | 30 |
 
 ### Completed (2026-05-20) — Milestone 19d
 
@@ -922,9 +924,10 @@ All pipeline modules are complete.
 - Architecture spec: `docs/CNN_SPEC.md`
 - Full pipeline: `fetch_ctoi_table` → `assemble_labels` → `run_label_qc` → `normalize_batch` → `monitor_training_data` → `train_cnn` → `cnn_calibrator` → `CnnScorer`
 
-### Future Enhancement: ML Ensemble Scorer (agreed 2026-05-01)
+### ML Ensemble Scorer Status
 
-Replace or augment the Bayesian log-score model with a three-model ensemble once sufficient labeled data is available:
+The optional ML tiers now augment the Bayesian log-score model while preserving
+Bayesian scoring as the default fallback:
 
 **Tier 1 — XGBoost on tabular features (build first)** ✅ DONE
 **Tier 2 — 1D CNN on phase-folded flux (scaffold built; production checkpoint after 5,000+ TESS labels)**
@@ -932,9 +935,9 @@ Replace or augment the Bayesian log-score model with a three-model ensemble once
 - Learns transit morphology directly; proven architecture (Shallue & Vanderburg 2018)
 - Requires TESS-specific fine-tuning — Kepler-trained models are miscalibrated on TESS due to cadence, pixel scale, and systematics differences
 
-**Tier 3 — Stacking meta-learner**
-- Logistic regression (or simple average) over outputs of XGBoost + CNN + existing Bayesian log-score model
-- Requires a separate held-out calibration set (~500+ examples)
+**Tier 3 — Stacking meta-learner** ✅ DONE
+- Simple weighted blend over outputs of XGBoost + CNN + existing Bayesian log-score model
+- Production weights still require a separate held-out calibration set (~500+ examples)
 - Final probabilities pass through existing `calibration.py` (Platt / isotonic)
 
 **Architecture fit**
