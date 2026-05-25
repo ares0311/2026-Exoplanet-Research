@@ -54,8 +54,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 221 test files. Local validation on 2026-05-24 passed with 3871 default tests, 2 `integration_live` tests deselected, and 6 skipped (matplotlib absent).
-**Skills:** 204 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
+**Current test surface:** 221 test files. Local validation on 2026-05-25 passed with 3879 default tests, 2 `integration_live` tests deselected, and 6 skipped (matplotlib absent).
+**Skills:** 207 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
 
@@ -867,6 +867,29 @@ All pipeline modules are complete.
 | `src/exo_toolkit/ml/cnn_scorer.py` | `CnnScorer.predict_proba/batch`, `from_checkpoint`, `unavailable` | 21 |
 | `src/exo_toolkit/ml/stacking_scorer.py` | Updated: `from_model_paths`, 3-tier blend (XGB 0.35 + CNN 0.35 + Bayes 0.30) | 22 |
 | `src/exo_toolkit/cli.py` | Updated: `--scorer cnn/full-ensemble`, `--cnn-checkpoint` flag | — |
+
+### Completed (2026-05-25) — Milestone 26
+
+**15 new Skills + 199 new tests**: ✅
+
+| Skill | Key Functions | Tests |
+|---|---|---|
+| `snippet_quality_scorer.py` | `score_snippet_quality`, `score_snippet_batch` — CNN snippet coverage/depth_snr/noise composite | 13 |
+| `ephemeris_drift_projector.py` | `project_ephemeris_drift`, `format_ephemeris_drift` — σ_T(n) uncertainty growth | 13 |
+| `rv_phase_sampler.py` | `sample_rv_phases`, `format_rv_phases` — evenly spaced optimal RV phases | 13 |
+| `planet_radius_gap_classifier.py` | `classify_radius_gap`, `format_radius_gap` — Fulton+2017 radius gap boundaries | 13 |
+| `candidate_score_explainer.py` | `explain_candidate_score`, `format_score_explanation` — plain-English score breakdown | 13 |
+| `transit_duration_anomaly_checker.py` | `check_duration_anomaly`, `format_duration_anomaly` — T14 vs Kepler 3rd law | 13 |
+| `target_crowding_estimator.py` | `estimate_crowding`, `format_crowding` — flux_ratio + crowding_metric from neighbour mags | 13 |
+| `json_to_csv_exporter.py` | `flatten_candidate`, `export_to_csv`, `format_export_result` — nested JSON → flat CSV | 13 |
+| `toi_disposition_tracker.py` | `diff_toi_snapshots`, `format_toi_diff` — CSV snapshot diff (added/confirmed/FP/changed) | 13 |
+| `multi_run_diff_reporter.py` | `diff_pipeline_runs`, `load_and_diff`, `format_run_diff` — pipeline JSON diff | 13 |
+| `candidate_followup_prioritizer.py` | `prioritize_followup`, `format_followup_priorities` — composite priority scorer | 13 |
+| `pipeline_dependency_checker.py` | `check_dependencies`, `format_dependency_check` — importlib feature matrix | 13 |
+| `config_diff_tool.py` | `diff_configs`, `load_and_diff_configs`, `format_config_diff` — nested JSON config diff | 13 |
+| `stellar_activity_index.py` | `compute_activity_index`, `format_activity_index` — RMS/MAD/outlier composite | 13 |
+| `observation_log_parser.py` | `parse_obs_log`, `load_obs_log`, `format_obs_log` — CSV/TSV photometry log parser | 15 |
+
 
 ### Next Step
 
