@@ -8,7 +8,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from feature_importance_ranker import (
     FeatureImportanceEntry,
-    FeatureImportanceResult,
     format_feature_importance,
     load_and_rank,
     rank_features,

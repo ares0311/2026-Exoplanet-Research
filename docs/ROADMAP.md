@@ -45,7 +45,7 @@
 
 - [x] Rich-formatted candidate report via `exo <TIC-ID>` CLI
 - [x] JSON output via `--output`
-- [x] Scorer selection via `--scorer [bayesian|xgboost|ensemble]` and `--model-path`
+- [x] Scorer selection via `--scorer [bayesian|xgboost|ensemble|cnn|full-ensemble]`, `--model-path`, and `--cnn-checkpoint`
 
 ---
 
@@ -57,17 +57,18 @@
 
 ---
 
-## Milestone 7 — ML Ensemble Scorer ✓ COMPLETE (Tier-2 CNN gated)
+## Milestone 7 — ML Ensemble Scorer ✓ COMPLETE (production CNN model gated)
 
 - [x] Tier 1 — XGBoost on tabular features (`ml/xgboost_scorer.py`, 45 tests)
-- [x] Tier 3 — Stacking scorer blending XGBoost + Bayesian (`ml/stacking_scorer.py`, 22 tests)
+- [x] Tier 3 — Stacking scorer blending XGBoost + CNN + Bayesian (`ml/stacking_scorer.py`, 22 tests)
 - [x] Kepler training pipeline (`Skills/fetch_kepler_tce.py`, `build_training_data.py`, `train_xgboost.py`)
 - [x] TESS training pipeline (`Skills/fetch_tess_toi.py`, `build_tess_training_data.py`)
 - [x] Evaluation framework (`Skills/evaluate_scorer.py`, ROC-AUC, F1, reliability diagrams)
 - [x] Combined training data (`Skills/build_combined_training_data.py`)
 - [x] Offline CNN snippet split assembly (`Skills/build_cnn_training_data.py`, 13 tests)
 - [x] Offline CNN split validation (`Skills/cnn_split_validator.py`, 15 tests)
-- [ ] Tier 2 — 1D CNN on phase-folded flux (**BLOCKED: requires 5,000+ TESS labels**)
+- [x] Tier 2 scaffolding — CNN scorer wrapper, training loop, checkpoint/calibration helpers, and `cnn/full-ensemble` CLI modes
+- [ ] Production Tier 2 checkpoint — trained/calibrated 1D CNN on phase-folded flux (**BLOCKED: requires 5,000+ TESS labels**)
   - Architecture spec: `docs/CNN_SPEC.md`
   - Gate check: `Skills/count_tess_labels.py`
 
@@ -180,7 +181,7 @@
 
 - [x] `Skills/alert_filter.py` — `filter_candidates()` AND-logic threshold filter (FPP, pathway, signals, rank, SNR); `apply_filters()` loads + writes JSON
 - [x] `_fpp()` helper handles all dict shapes: `scores.false_positive_probability`, `best_fpp`, top-level
-- [x] `docs/SKILLS_GUIDE.md` — workflow reference plus current inventory for 117 Skills; CLI examples; library usage pattern; ML pipeline walkthrough
+- [x] `docs/SKILLS_GUIDE.md` — workflow reference plus current inventory for 249 Skills; CLI examples; library usage pattern; ML pipeline walkthrough
 - [x] 12 tests in `tests/test_alert_filter.py`
 
 ---
@@ -199,7 +200,7 @@
 
 ## Future
 
-- [ ] Tier 2 CNN once TESS label threshold is met (5,000+ CP labels)
+- [ ] Train, calibrate, and register a production Tier 2 CNN checkpoint once the TESS label threshold is met (5,000+ CP labels)
 
 ---
 

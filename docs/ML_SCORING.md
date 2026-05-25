@@ -7,15 +7,17 @@ transit candidates alongside the Bayesian log-score model.
 
 ## Overview
 
-The toolkit supports three scorer modes, selectable via the CLI:
+The toolkit supports five scorer modes, selectable via the CLI:
 
 | Mode | Flag | Description |
 |------|------|-------------|
 | Bayesian (default) | `--scorer bayesian` | Log-score model over 6 hypotheses |
 | XGBoost | `--scorer xgboost --model-path <path>` | Binary XGBoost on tabular features |
 | Ensemble | `--scorer ensemble --model-path <path>` | Weighted average of XGBoost + Bayesian |
+| CNN | `--scorer cnn --cnn-checkpoint <path>` | Experimental CNN checkpoint wrapper on phase-folded snippets |
+| Full ensemble | `--scorer full-ensemble --model-path <path> --cnn-checkpoint <path>` | Experimental XGBoost + CNN + Bayesian blend |
 
-The current local validation surface passes with 2352 default tests and 2 live
+The current local validation surface passes with 4275 default tests and 2 live
 integration tests deselected. On macOS, installing `xgboost` also requires the
 OpenMP runtime:
 
@@ -204,15 +206,29 @@ the output row but does not replace the Bayesian posterior.
 - Train only on confirmed planets vs. confirmed false positives
 - Kepler DR25 Robovetter labels (Thompson et al. 2018) are high-quality
 
-### Tier 2 (CNN on phase-folded flux)
+### Tier 2 — CNN on Phase-Folded Flux
 
-Not yet built. Requires 5,000+ TESS labels. Supporting utilities already exist
-for labelled snippet collection and augmentation:
+Implementation scaffolding is built, but production CNN use remains gated on
+5,000+ labeled TESS light curves plus calibration review. The default suite does
+not run the live ExoFOP gate check.
 
 - `Skills/labelled_lc_collector.py`
 - `Skills/cnn_feature_augmenter.py`
 - `Skills/build_cnn_training_data.py`
 - `Skills/cnn_split_validator.py`
+- `Skills/train_cnn.py`
+- `Skills/cnn_checkpoint_manager.py`
+- `Skills/cnn_calibrator.py`
+- `Skills/cnn_inference_batcher.py`
+- `src/exo_toolkit/ml/cnn_scorer.py`
+- `src/exo_toolkit/ml/stacking_scorer.py` 3-tier blend support
+- `src/exo_toolkit/cli.py` `cnn` and `full-ensemble` scorer flags
+
+The CNN wrapper is intentionally conservative when unavailable: without PyTorch,
+a usable checkpoint, or an injectable test model, it returns neutral 0.5
+probabilities and reports unavailable state. Current CLI CNN rows are
+experimental because the end-to-end pipeline still needs direct vetted-snippet
+wiring before CNN probabilities should influence candidate pathway decisions.
 
 See `docs/CNN_SPEC.md` and `docs/ROADMAP.md`.
 

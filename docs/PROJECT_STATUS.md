@@ -1,8 +1,8 @@
 # PROJECT STATUS
 
 ## Status: Active Development
-## Phase: Milestone 18 Complete — Background Automation And Skills Expansion
-## Last Updated: 2026-05-21
+## Phase: Milestone 27 Complete — CNN Training Infrastructure And Skills Expansion
+## Last Updated: 2026-05-25
 
 ---
 
@@ -14,9 +14,9 @@ The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit w
 - Bayesian log-score model over six hypotheses
 - Optional XGBoost and stacking scorer modes
 - SQLite-backed background automation with top-level logs
-- 117 standalone `Skills/` utility scripts
-- 131 test files
-- 26 package Python modules under `src/exo_toolkit/`
+- 249 standalone `Skills/` utility scripts
+- 264 test files
+- 27 package Python modules under `src/exo_toolkit/`
 
 Local validation note: after restoring the declared `xgboost` dependency and installing the macOS OpenMP runtime (`libomp`), the default test suite passes locally on Python 3.13.12.
 
@@ -36,8 +36,9 @@ Local validation note: after restoring the declared `xgboost` dependency and ins
 | Scoring prior config | `configs/scoring_priors_v0.json` — conservative default plus TESS/Kepler/K2 profiles | Complete |
 | Scheduler docs | `docs/SCHEDULER.md` — cron, launchd, systemd | Complete |
 | ML Tier 1 | `ml/xgboost_scorer.py` | Complete, requires `xgboost` dependency |
-| ML Tier 3 | `ml/stacking_scorer.py` | Complete |
-| Training/evaluation Skills | Kepler, TESS, combined training, offline CNN split assembly/validation, XGBoost training, scorer evaluation | Complete |
+| ML Tier 3 | `ml/stacking_scorer.py` | Complete, includes optional 3-tier XGBoost/CNN/Bayesian blend |
+| ML Tier 2 scaffolding | `ml/cnn_scorer.py`, `Skills/train_cnn.py`, CNN data utilities | Complete, production use gated on labeled TESS corpus |
+| Training/evaluation Skills | Kepler, TESS, combined training, CNN data assembly/validation/training support, XGBoost training, scorer evaluation | Complete |
 | Discovery workflow Skills | star scanner, batch scan, alert filter, ranking, watchlist, exports, reports | Complete |
 | Milestones 13-18 Skills | 87 additional analysis, vetting, observability, reporting, and follow-up utilities | Complete |
 | Milestone 19a Skill | `multi_sector_phase_compare.py` — offline per-sector phase-fold comparison | Complete |
@@ -77,12 +78,12 @@ reports/background/*.html
 
 ## Blocked
 
-**ML Tier 2 — 1D CNN on phase-folded flux**
+**Production ML Tier 2 — trained 1D CNN on phase-folded flux**
 
-- Gate: 5,000+ labeled TESS light curves required
+- Gate: 5,000+ labeled TESS light curves required before production training/use
 - Gate check: `python Skills/count_tess_labels.py`
 - Architecture spec: `docs/CNN_SPEC.md`
-- Supporting data utilities exist: `labelled_lc_collector.py`, `cnn_feature_augmenter.py`, `build_cnn_training_data.py`, `cnn_split_validator.py`
+- Supporting implementation exists: `ml/cnn_scorer.py`, `Skills/train_cnn.py`, `labelled_lc_collector.py`, `cnn_feature_augmenter.py`, `build_cnn_training_data.py`, `cnn_split_validator.py`, and related label/QC/checkpoint/calibration utilities.
 
 No active implementation blocker is known in the default local validation path.
 
@@ -90,8 +91,8 @@ No active implementation blocker is known in the default local validation path.
 
 ## Next Actions
 
-1. Run `python Skills/count_tess_labels.py` periodically to monitor the CNN gate.
-2. Once the CNN gate opens, implement Tier 2 per `docs/CNN_SPEC.md`.
+1. Run `python Skills/count_tess_labels.py` periodically to monitor the CNN production-data gate.
+2. Once the CNN gate opens, run the implemented CNN training/calibration pipeline per `docs/CNN_SPEC.md`.
 3. Use `toi_checker.py` before investing pipeline time on new live targets.
 4. Use `batch_scan.py` + `alert_filter.py` + `rank_candidates.py` + `watchlist.py` for systematic follow-up.
 5. Use `multi_sector_phase_compare.py` to inspect sector-to-sector depth and phase consistency before advancing multi-sector follow-up targets.
@@ -109,7 +110,7 @@ explicit approval in restricted environments.
 
 ## Latest Local Validation
 
-Validated on 2026-05-21:
+Validated on 2026-05-25:
 
 ```bash
 .venv/bin/ruff check .
@@ -117,7 +118,7 @@ Validated on 2026-05-21:
 .venv/bin/python -m pytest
 ```
 
-Result: ruff passed, mypy passed, pytest passed with 2352 passed, 2 deselected, and 33 warnings.
+Result: ruff passed, mypy passed, pytest passed with 4275 passed, 2 deselected, and 59 warnings.
 
 ---
 

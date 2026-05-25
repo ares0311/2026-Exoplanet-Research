@@ -3,13 +3,12 @@ import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
-
 import pytest
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from model_registry import (
     RegistryEntry,
-    RegistryResult,
     format_registry,
     get_best,
     list_models,

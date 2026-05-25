@@ -57,7 +57,7 @@
 
 ## Abstract
 
-This repository implements a complete, reproducible computational pipeline for the detection, vetting, and probabilistic classification of exoplanet transit candidates in photometric time-series data from the Transiting Exoplanet Survey Satellite (TESS) and the Kepler/K2 missions. The pipeline proceeds through six deterministic stages — data acquisition, preprocessing, Box Least Squares (BLS) periodicity search, signal vetting, Bayesian multi-hypothesis scoring, and submission pathway classification — and outputs calibrated posterior probabilities over six competing astrophysical and instrumental hypotheses. A conservative log-score approximation to Bayes' theorem is employed in lieu of generative likelihood models, with posterior calibration implemented via Platt scaling and isotonic regression (Pool Adjacent Violators Algorithm). An optional Tier-1 XGBoost classifier and Tier-3 stacking meta-learner augment the Bayesian scorer when labelled training data are available. The system is designed around scientific caution: it never labels an internally detected signal as a confirmed planet, exposes all false-positive evidence alongside each candidate score, and defers to authoritative external catalogs for confirmation status. The current implementation comprises 26 package modules, an autonomous background search engine with SQLite-backed durable state, an autonomous star-scanner for priority-ranked target discovery, 117 standalone Skills utility scripts, 131 test files, strict static typing (mypy), and continuous integration via GitHub Actions.
+This repository implements a complete, reproducible computational pipeline for the detection, vetting, and probabilistic classification of exoplanet transit candidates in photometric time-series data from the Transiting Exoplanet Survey Satellite (TESS) and the Kepler/K2 missions. The pipeline proceeds through six deterministic stages — data acquisition, preprocessing, Box Least Squares (BLS) periodicity search, signal vetting, Bayesian multi-hypothesis scoring, and submission pathway classification — and outputs calibrated posterior probabilities over six competing astrophysical and instrumental hypotheses. A conservative log-score approximation to Bayes' theorem is employed in lieu of generative likelihood models, with posterior calibration implemented via Platt scaling and isotonic regression (Pool Adjacent Violators Algorithm). An optional Tier-1 XGBoost classifier and Tier-3 stacking meta-learner augment the Bayesian scorer when labelled training data are available. The system is designed around scientific caution: it never labels an internally detected signal as a confirmed planet, exposes all false-positive evidence alongside each candidate score, and defers to authoritative external catalogs for confirmation status. The current implementation comprises 27 package modules, an autonomous background search engine with SQLite-backed durable state, an autonomous star-scanner for priority-ranked target discovery, 249 standalone Skills utility scripts, 264 test files, strict static typing (mypy), and continuous integration via GitHub Actions.
 
 ---
 
@@ -158,7 +158,7 @@ The detection of transiting exoplanets from space-based photometry has undergone
 
 A persistent challenge across both missions is the high false-positive rate among photometric transit candidates. Background eclipsing binaries, on-target eclipsing binaries diluted by the target's flux, stellar variability masquerading as periodic dimming, and instrumental systematics collectively account for the majority of transit-like signals detected by automated pipelines (Fressin et al.; Morton). Rigorous vetting — combining photometric diagnostics, centroid analysis, catalog matching, and probabilistic modeling — is therefore a prerequisite for responsible candidate reporting. The Kepler mission's Robovetter system (Coughlin et al.; Thompson et al.) demonstrated that automated multi-criterion vetting can achieve high completeness and reliability when trained on a large labeled corpus; the same principles apply to TESS data, with appropriate corrections for differences in cadence, pixel scale, and systematic noise.
 
-Deep-learning approaches have extended the automated vetting paradigm further. Shallue and Vanderburg showed that a convolutional neural network trained on Kepler TCEs can match or exceed human performance on the classification of folded light curves, recovering an eighth planet in the Kepler-90 system. However, such models are mission-specific and require thousands of labeled examples before they generalize reliably (Shallue and Vanderburg). This pipeline therefore implements the CNN as a gated Tier-2 component that is withheld until 5,000 or more TESS confirmed-planet labels become available, using the Bayesian log-score model and XGBoost tabular classifier as production-ready fallbacks in the interim.
+Deep-learning approaches have extended the automated vetting paradigm further. Shallue and Vanderburg showed that a convolutional neural network trained on Kepler TCEs can match or exceed human performance on the classification of folded light curves, recovering an eighth planet in the Kepler-90 system. However, such models are mission-specific and require thousands of labeled examples before they generalize reliably (Shallue and Vanderburg). This repository now includes CNN training, checkpoint, calibration, inference, CLI, and stacking scaffolding, but production CNN use remains gated until 5,000 or more TESS confirmed-planet labels and a calibrated checkpoint are available. The Bayesian log-score model and XGBoost tabular classifier remain the production-ready fallbacks in the interim.
 
 Citizen-science initiatives such as Planet Hunters have demonstrated that human inspection of phase-folded light curves can recover candidates missed by automated pipelines, particularly single-transit events and long-period systems (Fischer et al.). However, the volume of data produced by TESS renders manual inspection alone insufficient. A computational toolkit that automates the vetting and scoring workflow, while remaining interpretable and reproducible, occupies a productive niche between fully automated survey pipelines and ad hoc visual inspection.
 
@@ -185,19 +185,20 @@ Each stage produces a typed, immutable result object and preserves provenance me
 | `search.py` | Search | BLS periodicity search; iterative transit masking for multi-planet systems | 43 |
 | `vet.py` | Vet | Per-transit depth measurement, odd/even comparison, secondary eclipse, transit shape, data-gap fraction | 47 |
 | `scoring.py` | Score | Log-score posterior computation; mission-prior hook; derived scores (FPP, detection confidence, novelty) | 48 |
-| `pathway.py` | Classify | Ordered gate-based submission pathway classification | 35 |
+| `pathway.py` | Classify | Ordered gate-based submission pathway classification | 60 |
 | `schemas.py` | — | Immutable Pydantic data models for all pipeline types | 33 |
-| `features.py` | — | `RawDiagnostics` container; `extract_features()` mapping diagnostics to `[0,1]` scores; 37 features including `depth_scatter_chi2_score`, `transit_timing_variation_score` | 107 |
-| `hypotheses.py` | — | Per-hypothesis log-score functions; `depth_scatter_chi2_score` + `transit_timing_variation_score` wired into instrumental and planet hypotheses | 36 |
+| `features.py` | — | `RawDiagnostics` container; `extract_features()` mapping diagnostics to `[0,1]` scores; 37 features including `depth_scatter_chi2_score`, `transit_timing_variation_score` | 145 |
+| `hypotheses.py` | — | Per-hypothesis log-score functions; `depth_scatter_chi2_score` + `transit_timing_variation_score` wired into instrumental and planet hypotheses | 46 |
 | `priors.py` | — | Versioned conservative scoring-prior config loader and mission profile selection | 14 |
 | `calibration.py` | — | Platt scaling, PAVA isotonic regression, Brier score, reliability curves | 70 |
-| `cli.py` | — | `exo <TIC-ID>` entry point; `--scorer`, `--model-path`, `--output` options | 24 |
+| `cli.py` | — | `exo <TIC-ID>` entry point; `--scorer`, `--model-path`, `--cnn-checkpoint`, `--output` options | 50 |
 | `ml/xgboost_scorer.py` | — | XGBoost tabular classifier on 35 `OptScore` features | 45 |
-| `ml/stacking_scorer.py` | — | Weighted blend of XGBoost + Bayesian posteriors | 22 |
+| `ml/stacking_scorer.py` | — | Weighted blend of XGBoost + CNN + Bayesian posteriors | 22 |
+| `ml/cnn_scorer.py` | — | CNN checkpoint wrapper with neutral fallback when unavailable | 21 |
 | `background/` | — | SQLite-backed automation: one-shot runner, priority scoring, draft reports | 16 |
-| **Package subtotal** | | | **599** |
+| **Package subtotal** | | | **754** |
 
-The repository also contains 117 standalone `Skills/` utilities with dedicated tests. Current local validation passes 2352 default tests with the two live integration tests deselected; see `docs/PROJECT_STATUS.md` for the latest validation note.
+The repository also contains 249 standalone `Skills/` utilities with dedicated tests. Current local validation passes 4275 default tests with the two live integration tests deselected; see `docs/PROJECT_STATUS.md` for the latest validation note.
 
 ### Operating Modes
 
@@ -210,15 +211,19 @@ A third utility, `Skills/star_scanner.py`, provides a lighter-weight TIC-catalog
 
 ### ML Scoring Modes
 
-The `--scorer` flag selects among three backends:
+The `--scorer` flag selects among five backends:
 
 | Mode | Flag | Description |
 |---|---|---|
 | Bayesian (default) | `--scorer bayesian` | Log-score softmax posterior; no labels required |
 | XGBoost Tier-1 | `--scorer xgboost --model-path model.json` | Tabular classifier on 35 feature scores |
 | Ensemble Tier-3 | `--scorer ensemble --model-path model.json` | Weighted blend `w·P_xgb + (1-w)·P_bayes` |
+| CNN Tier-2 | `--scorer cnn --cnn-checkpoint best.pt` | Experimental CNN checkpoint wrapper; production use gated |
+| Full ensemble | `--scorer full-ensemble --model-path model.json --cnn-checkpoint best.pt` | Experimental XGBoost + CNN + Bayesian blend |
 
-The Tier-2 CNN (1D convolution on phase-folded flux) is gated on 5,000+ TESS confirmed-planet labels. Check the current label count:
+The CNN implementation scaffolding is present, but production CNN training/use
+is gated on 5,000+ TESS confirmed-planet labels and calibration review. Check
+the current label count:
 
 ```bash
 python Skills/count_tess_labels.py
@@ -661,15 +666,16 @@ python Skills/evaluate_scorer.py \
 │       ├── cli.py               # `exo <TIC-ID>` Rich-formatted CLI
 │       └── ml/
 │           ├── xgboost_scorer.py    # XGBoost binary classifier (Tier-1)
+│           ├── cnn_scorer.py        # CNN checkpoint wrapper (Tier-2 scaffold)
 │           └── stacking_scorer.py   # Weighted blend scorer (Tier-3)
-├── tests/                       # 2352 default tests plus 2 live tests
+├── tests/                       # 4275 default tests plus 2 live tests
 │   ├── test_schemas.py          # 33 tests
 │   ├── test_features.py         # 145 tests
 │   ├── test_hypotheses.py       # 46 tests
 │   ├── test_priors.py           # 14 tests
 │   ├── test_scoring.py          # 48 tests
-│   ├── test_pathway.py          # 35 tests
-│   ├── test_fetch.py            # 40 tests (+2 live)
+│   ├── test_pathway.py          # 60 tests
+│   ├── test_fetch.py            # 55 tests (+2 live)
 │   ├── test_clean.py            # 39 tests
 │   ├── test_search.py           # 43 tests
 │   ├── test_vet.py              # 47 tests
@@ -677,6 +683,7 @@ python Skills/evaluate_scorer.py \
 │   ├── test_cli.py              # 50 tests
 │   ├── test_xgboost_scorer.py   # 45 tests
 │   ├── test_stacking_scorer.py  # 22 tests
+│   ├── test_cnn_scorer.py       # 21 tests
 │   ├── test_background_automation.py  # 16 tests
 │   └── ...                      # Skills tests
 ├── Skills/                      # Reusable standalone utility scripts
@@ -723,7 +730,7 @@ python Skills/evaluate_scorer.py \
 │   ├── DASHBOARD_SPEC.md        # Static candidate dashboard contract
 │   ├── ROADMAP.md               # Milestones and future work
 │   ├── PROJECT_STATUS.md        # Current implementation status
-│   └── SKILLS_GUIDE.md          # User reference and inventory for 117 Skills scripts
+│   └── SKILLS_GUIDE.md          # User reference and inventory for 249 Skills scripts
 ├── data/                        # Local data cache (not tracked by git)
 ├── pyproject.toml
 └── requirements.txt
@@ -760,22 +767,23 @@ PYTHONPATH=src python -m pytest -m integration_live
 | Module | Tests |
 |---|---|
 | `schemas.py` | 33 |
-| `features.py` | 107 |
-| `hypotheses.py` | 36 |
+| `features.py` | 145 |
+| `hypotheses.py` | 46 |
 | `priors.py` | 14 |
 | `scoring.py` | 48 |
-| `pathway.py` | 35 |
+| `pathway.py` | 60 |
 | `fetch.py` | 55 (+2 live) |
 | `clean.py` | 39 |
 | `search.py` | 43 |
 | `vet.py` | 47 |
 | `calibration.py` | 70 |
-| `cli.py` | 24 |
+| `cli.py` | 50 |
 | `ml/xgboost_scorer.py` | 45 |
 | `ml/stacking_scorer.py` | 22 |
+| `ml/cnn_scorer.py` | 21 |
 | `background/` module | 16 |
-| Skills utilities | 117 scripts with dedicated tests |
-| **Current default suite** | **2352 passed, 2 live tests deselected** |
+| Skills utilities | 249 scripts with dedicated tests |
+| **Current default suite** | **4275 passed, 2 live tests deselected** |
 
 ---
 
@@ -876,7 +884,7 @@ The candidate does not meet external submission criteria (high FPP, missing diag
 | ✅ | **Injection-recovery** | Synthetic transit injection; completeness maps vs. period and radius |
 | ✅ | **CLI entry point** | `exo <TIC-ID>` single-command pipeline invocation with Rich output |
 | ✅ | **ML Tier 1 — XGBoost** | Tabular classifier on 35 `CandidateFeatures` scores |
-| ✅ | **ML Tier 3 — Stacking** | Weighted blend of XGBoost + Bayesian posteriors |
+| ✅ | **ML Tier 3 — Stacking** | Weighted blend of XGBoost + CNN + Bayesian posteriors |
 | ✅ | **Platt calibration in training** | OOF predictions → `(a, b)` saved to model metadata JSON |
 | ✅ | **Training data pipeline** | Kepler DR25 KOIs + TESS TOI dispositions → labelled feature pickles |
 | ✅ | **Combined training dataset** | Merged Kepler + TESS pickle with stratified per-source capping |
@@ -884,6 +892,7 @@ The candidate does not meet external submission criteria (high FPP, missing diag
 | ✅ | **CNN Tier-2 gate** | `count_tess_labels.py`; `CNN_SPEC.md` architecture document |
 | ✅ | **Offline CNN split assembly** | `Skills/build_cnn_training_data.py` — deterministic train/validation/test JSON splits from existing snippets |
 | ✅ | **Offline CNN split validation** | `Skills/cnn_split_validator.py` — local manifest and train/validation/test artifact checks before training |
+| ✅ | **CNN scaffolding** | `ml/cnn_scorer.py`, `Skills/train_cnn.py`, CNN calibration/checkpoint/inference utilities, and CLI `cnn/full-ensemble` modes |
 | ✅ | **Background automation** | `background/` — SQLite state, one-shot runner, priority scoring, draft reports; 16 subcommands |
 | ✅ | **Star scanner** | `Skills/star_scanner.py` — TIC priority ranking, TOI exclusion, JSON scan log, background loop |
 | ✅ | **Provenance score** | `compute_provenance_score()` in `fetch.py`; wired into `tfop_ready` pathway gate |
@@ -902,8 +911,8 @@ The candidate does not meet external submission criteria (high FPP, missing diag
 | ✅ | **TOI checker** | `Skills/toi_checker.py` — ExoFOP TOI lookup before investing pipeline time |
 | ✅ | **Export candidates** | `Skills/export_candidates.py` — CSV and Markdown table export with summary stats |
 | ✅ | **Alert filter** | `Skills/alert_filter.py` — AND-logic threshold filter over FPP/pathway/signals/SNR |
-| ✅ | **Skills guide** | `docs/SKILLS_GUIDE.md` — workflow reference and current inventory for all 117 Skills |
-| 🔴 | **ML Tier 2 — 1D CNN** | Phase-folded flux classifier; gated on ≥5,000 TESS CP labels (Shallue and Vanderburg) |
+| ✅ | **Skills guide** | `docs/SKILLS_GUIDE.md` — workflow reference and current inventory for all 249 Skills |
+| 🔴 | **Production CNN checkpoint** | Train, calibrate, and register a CNN model once ≥5,000 TESS CP labels are available |
 | ✅ | **Mission-specific priors** | Versioned conservative TESS/Kepler/K2 prior profiles in `configs/scoring_priors_v0.json` |
 | 🔴 | **Regime-specific priors** | Period-, radius-, stellar-type-, and completeness-dependent priors replacing mission-only defaults |
 

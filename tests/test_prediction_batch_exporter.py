@@ -3,13 +3,11 @@ import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
-
 import pytest
 
+sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
+
 from prediction_batch_exporter import (
-    ExportResult,
-    PredictionRow,
     export_predictions,
     format_export_result,
     load_predictions,

@@ -54,8 +54,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 264 test files. Local validation on 2026-05-25 passed with 4275 default tests, 2 `integration_live` tests deselected, and 6 skipped (matplotlib absent).
-**Skills:** 250 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
+**Current test surface:** 264 test files. Local validation on 2026-05-25 passed with 4275 default tests, 2 `integration_live` tests deselected, and 59 warnings.
+**Skills:** 249 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
 
@@ -354,8 +354,9 @@ Complete user reference for all 24 Skills scripts (updated Milestone 12).
 - **Conservative priors**: built-in defaults remain planet_candidate = 0.10, EB/BEB/stellar/instrumental = 0.20 each, known_object = 0.10
 - **Mission prior profiles**: `configs/scoring_priors_v0.json` defines opt-in conservative TESS/Kepler/K2 profiles loaded by `priors.py`
 - **ML Tier 1 (XGBoost) is built** — `ml/xgboost_scorer.py` ships as an optional alternative scorer; Bayesian log-score model remains the default fallback when labels are unavailable
-- **ML Tier 3 (stacking) is built** — `ml/stacking_scorer.py` blends XGBoost + Bayesian P(planet) with configurable weight; falls back to Bayesian-only when no model loaded
-- **CLI scorer options**: `exo <TIC-ID> --scorer [bayesian|xgboost|ensemble] --model-path <path>`
+- **ML Tier 2 scaffolding is built** — `ml/cnn_scorer.py`, `Skills/train_cnn.py`, checkpoint/calibration utilities, and CLI wiring exist; production CNN use remains gated on 5,000+ labeled TESS light curves and calibration review
+- **ML Tier 3 (stacking) is built** — `ml/stacking_scorer.py` blends XGBoost + CNN + Bayesian P(planet) when models are supplied; falls back conservatively when optional models are unavailable
+- **CLI scorer options**: `exo <TIC-ID> --scorer [bayesian|xgboost|ensemble|cnn|full-ensemble] --model-path <path> --cnn-checkpoint <path>`
 - **Never output "confirmed planet"** — use "candidate signal" or "follow-up target"
 - **Numerically stable softmax**: subtract max before exponentiation
 
@@ -515,9 +516,9 @@ All pipeline modules are complete.
 - 45 tests in `tests/test_xgboost_scorer.py`
 
 **ML Ensemble Scorer — Tier 3: Stacking scorer** (`src/exo_toolkit/ml/stacking_scorer.py`): ✅
-- Weighted average of XGBoost + Bayesian P(planet_candidate); weight configurable
-- Falls back to Bayesian-only when no XGBoost model available
-- `StackingScorer.from_model_path(path)` / `StackingScorer.bayesian_only()` factory methods
+- Weighted average of XGBoost + CNN + Bayesian P(planet_candidate); weights configurable
+- Falls back conservatively when optional XGBoost or CNN models are unavailable
+- `StackingScorer.from_model_paths(...)` / `StackingScorer.bayesian_only()` factory methods
 - 22 tests in `tests/test_stacking_scorer.py`
 
 **Kepler training pipeline** (`Skills/`): ✅
@@ -537,9 +538,9 @@ All pipeline modules are complete.
 - 14 tests in `tests/test_evaluate_scorer.py`
 
 **CLI scorer options** (`src/exo_toolkit/cli.py`): ✅
-- `--scorer [bayesian|xgboost|ensemble]`, `--model-path <path>`
-- xgboost adds `xgb_planet_probability`; ensemble adds `ensemble_planet_probability`
-- 20 tests in `tests/test_cli.py`
+- `--scorer [bayesian|xgboost|ensemble|cnn|full-ensemble]`, `--model-path <path>`, `--cnn-checkpoint <path>`
+- xgboost adds `xgb_planet_probability`; ensemble adds `ensemble_planet_probability`; CNN modes add CNN/full-ensemble metadata when a checkpoint path is supplied
+- 50 tests in `tests/test_cli.py`
 
 **ML Scoring Architecture docs** (`docs/ML_SCORING.md`): ✅
 - Documents all scorer modes, training pipeline, column mappings, design decisions

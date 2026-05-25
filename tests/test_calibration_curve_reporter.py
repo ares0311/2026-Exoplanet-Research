@@ -1,12 +1,10 @@
 """Tests for Skills/calibration_curve_reporter.py"""
-import math
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from calibration_curve_reporter import (
-    CalibrationCurveResult,
     compute_calibration_curve,
     format_calibration_curve,
 )

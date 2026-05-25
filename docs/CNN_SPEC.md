@@ -1,11 +1,18 @@
 # ML Tier-2 — 1D CNN Architecture Specification
 
-**Status: NOT YET BUILT — gated on 5,000+ labeled TESS light curves**
+**Status: IMPLEMENTATION SCAFFOLD BUILT — production training/use remains gated on 5,000+ labeled TESS light curves**
 
-Check gate: `python Skills/count_tess_labels.py`
+Check the production-data gate with: `python Skills/count_tess_labels.py`
 
 Do not run the live gate check in default validation. It queries ExoFOP and
 should be run only when live network access is intentionally approved.
+
+The repository now includes the CNN wrapper, training loop, checkpoint helpers,
+calibration helpers, inference batcher, CLI flags, and 3-tier stacking support.
+Those pieces are tested with offline fixtures and injectable models. They do
+not imply that a production CNN checkpoint is available or that the CNN should
+be used for scientific claims before the TESS label gate and calibration checks
+are satisfied.
 
 ---
 
@@ -60,7 +67,7 @@ to fit the smaller TESS dataset.
 
 | Parameter | Value |
 |-----------|-------|
-| Framework | PyTorch (preferred) or pure NumPy for portability |
+| Framework | PyTorch when installed; graceful no-op/unavailable paths when absent |
 | Loss | Binary cross-entropy |
 | Optimizer | Adam, lr=1e-3 |
 | Batch size | 64 |
@@ -93,17 +100,32 @@ P_blend = w_xgb * P_xgb + w_cnn * P_cnn + w_bayes * P_bayesian
 
 Default weights (to be calibrated after training): `0.35 / 0.35 / 0.30`.
 
+CLI integration is available through:
+
+```bash
+exo TIC-150428135 --scorer cnn --cnn-checkpoint path/to/best.pt
+exo TIC-150428135 --scorer full-ensemble --model-path model.json --cnn-checkpoint path/to/best.pt
+```
+
+Current limitation: the CLI scorer path can load and call a CNN checkpoint, but
+the pipeline does not yet pass vetted phase-folded snippets from `vet.py` into
+the CNN scorer. Until that wiring and a calibrated checkpoint exist, CNN CLI
+probabilities should be treated as experimental review metadata, not
+submission-driving evidence.
+
 ---
 
 ## Implementation Checklist
 
-- [ ] `src/exo_toolkit/ml/cnn_scorer.py` — model definition, train, predict
+- [x] `src/exo_toolkit/ml/cnn_scorer.py` — checkpoint wrapper and predict/batch interface
 - [x] `Skills/labelled_lc_collector.py` — extract, phase-fold, bin, and store labelled snippets
 - [x] `Skills/cnn_feature_augmenter.py` — noise, shift, scale, and reverse snippets for augmentation
 - [x] `Skills/build_cnn_training_data.py` — assemble offline train/val/test splits from existing labelled snippet artifacts
 - [x] `Skills/cnn_split_validator.py` — validate offline split manifests and train/val/test artifacts before training
-- [ ] `tests/test_cnn_scorer.py` — ≥ 30 tests
-- [ ] Update `ml/stacking_scorer.py` — add CNN weight
-- [ ] Update `docs/ML_SCORING.md` — document CNN mode
-- [ ] Update CLI `--scorer` to accept `cnn` and `full-ensemble`
-- [ ] `Skills/train_cnn.py` — training script with early stopping
+- [x] `tests/test_cnn_scorer.py` — offline wrapper and stacking integration tests
+- [x] Update `ml/stacking_scorer.py` — add CNN weight for 3-tier blends
+- [x] Update `docs/ML_SCORING.md` — document CNN mode and production gate
+- [x] Update CLI `--scorer` to accept `cnn` and `full-ensemble`
+- [x] `Skills/train_cnn.py` — PyTorch training script with early stopping and graceful `NO_TORCH`
+- [ ] Wire vetted phase-folded snippets from the pipeline into CNN inference rows
+- [ ] Train, calibrate, and register a production CNN checkpoint after the label gate opens

@@ -5,8 +5,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from model_performance_comparator import (
-    ComparisonResult,
-    ModelMetrics,
     compare_models,
     format_comparison,
 )
