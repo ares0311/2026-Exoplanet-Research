@@ -28,6 +28,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -70,6 +71,7 @@ app = typer.Typer(
 )
 
 _VALID_SCORERS = ("bayesian", "xgboost", "ensemble", "cnn", "full-ensemble")
+CNN_SNIPPET_BINS = 201
 
 
 def _version_callback(value: bool) -> None:
@@ -89,6 +91,94 @@ def _git_commit_short() -> str | None:
         return result.stdout.strip() or None
     except Exception:
         return None
+
+
+def _median(values: Sequence[float]) -> float:
+    ordered = sorted(float(v) for v in values)
+    n = len(ordered)
+    mid = n // 2
+    if n % 2 == 0:
+        return (ordered[mid - 1] + ordered[mid]) / 2.0
+    return ordered[mid]
+
+
+def _mad(values: Sequence[float], center: float) -> float:
+    return _median([abs(float(v) - center) for v in values])
+
+
+def _build_cnn_snippet(
+    lc: Any,
+    signal: CandidateSignal,
+    *,
+    n_bins: int = CNN_SNIPPET_BINS,
+    min_oot_bins: int = 10,
+) -> tuple[list[float] | None, dict[str, Any]]:
+    """Build a normalized phase-folded snippet for experimental CNN scoring."""
+    meta: dict[str, Any] = {
+        "status": "unavailable",
+        "n_bins": n_bins,
+        "normalization": "phase_fold_median_mad",
+    }
+    if signal.period_days <= 0.0 or signal.duration_hours <= 0.0:
+        meta["unavailable_reason"] = "invalid_signal_timing"
+        return None, meta
+
+    try:
+        time_bjd = np.asarray(lc.time.jd, dtype=float)
+        flux = np.asarray(lc.flux.value, dtype=float)
+    except (AttributeError, TypeError, ValueError):
+        meta["unavailable_reason"] = "missing_lightcurve_arrays"
+        return None, meta
+
+    finite = np.isfinite(time_bjd) & np.isfinite(flux)
+    time_bjd = time_bjd[finite]
+    flux = flux[finite]
+    meta["n_input_points"] = int(len(time_bjd))
+    if len(time_bjd) < max(min_oot_bins * 2, n_bins // 2) or len(time_bjd) != len(flux):
+        meta["unavailable_reason"] = "insufficient_lightcurve_points"
+        return None, meta
+
+    phase = ((time_bjd - signal.epoch_bjd) % signal.period_days) / signal.period_days
+    phase = np.where(phase >= 0.5, phase - 1.0, phase)
+
+    bins: list[list[float]] = [[] for _ in range(n_bins)]
+    for ph, fl in zip(phase, flux, strict=False):
+        idx = int((float(ph) + 0.5) * n_bins)
+        idx = max(0, min(n_bins - 1, idx))
+        bins[idx].append(float(fl))
+
+    bin_centers = [-0.5 + (i + 0.5) / n_bins for i in range(n_bins)]
+    binned_flux = [_median(values) if values else None for values in bins]
+    populated_bins = sum(value is not None for value in binned_flux)
+    meta["n_populated_bins"] = populated_bins
+
+    transit_half_width_phase = signal.duration_hours / 24.0 / signal.period_days / 2.0
+    transit_half_width_phase = max(0.01, min(0.20, transit_half_width_phase))
+    meta["transit_half_width_phase"] = transit_half_width_phase
+
+    oot_values = [
+        float(value)
+        for center, value in zip(bin_centers, binned_flux, strict=False)
+        if value is not None and abs(center) > transit_half_width_phase
+    ]
+    if len(oot_values) < min_oot_bins:
+        meta["unavailable_reason"] = "insufficient_out_of_transit_bins"
+        return None, meta
+
+    oot_median = _median(oot_values)
+    oot_scatter = _mad(oot_values, oot_median) * 1.4826
+    meta["n_oot_bins"] = len(oot_values)
+    meta["oot_scatter"] = oot_scatter
+    if oot_scatter <= 0.0:
+        meta["unavailable_reason"] = "zero_out_of_transit_scatter"
+        return None, meta
+
+    snippet = [
+        ((float(value) if value is not None else oot_median) - oot_median) / oot_scatter
+        for value in binned_flux
+    ]
+    meta["status"] = "available"
+    return snippet, meta
 
 
 # ---------------------------------------------------------------------------
@@ -239,12 +329,42 @@ def run_pipeline(
                 )
 
         if cnn_scorer is not None:
-            cnn_prob = cnn_scorer.predict_proba([])  # snippet not available from vet
+            cnn_snippet, cnn_input_meta = _build_cnn_snippet(clean_result.light_curve, signal)
+            cnn_meta: dict[str, Any] = {
+                "checkpoint_path": (
+                    str(cnn_scorer.checkpoint_path)
+                    if cnn_scorer.checkpoint_path is not None
+                    else None
+                ),
+                "scorer_available": cnn_scorer.is_available,
+                "input": cnn_input_meta,
+                "experimental": True,
+                "production_gate_satisfied": False,
+                "scientific_use": "review_metadata_only",
+            }
+            cnn_prob = 0.5
+            cnn_probability_status = "neutral_fallback"
+            if cnn_scorer.is_available and cnn_snippet is not None:
+                cnn_prob = cnn_scorer.predict_proba(cnn_snippet)
+                cnn_probability_status = "computed"
+            elif not cnn_scorer.is_available:
+                cnn_meta["unavailable_reason"] = "cnn_scorer_unavailable"
+            else:
+                cnn_meta["unavailable_reason"] = cnn_input_meta.get(
+                    "unavailable_reason", "cnn_input_unavailable"
+                )
+            cnn_meta["probability_status"] = cnn_probability_status
+            row["meta"]["cnn"] = cnn_meta
             row["cnn_planet_probability"] = cnn_prob
             if scorer == "full-ensemble":
                 xgb_p = row.get("xgb_planet_probability", posterior.planet_candidate)
+                cnn_weight = 0.35 if cnn_probability_status == "computed" else 0.0
+                xgb_weight = 0.35
+                bayes_weight = 1.0 - xgb_weight - cnn_weight
                 row["full_ensemble_planet_probability"] = (
-                    0.35 * xgb_p + 0.35 * cnn_prob + 0.30 * posterior.planet_candidate
+                    xgb_weight * xgb_p
+                    + cnn_weight * cnn_prob
+                    + bayes_weight * posterior.planet_candidate
                 )
 
         if calibration_result is not None:

@@ -39,6 +39,23 @@ def _mock_lc(n: int = 500) -> MagicMock:
     return lc
 
 
+def _mock_transit_lc(n: int = 1000) -> MagicMock:
+    """LightCurve mock with finite OOT scatter and a shallow periodic dip."""
+    period = 3.0
+    epoch = 2458001.0
+    duration_days = 2.0 / 24.0
+    time = np.linspace(2458000.0, 2458027.0, n)
+    flux = 1.0 + 1e-4 * np.sin(np.arange(n, dtype=float) * 0.37)
+    phase_days = ((time - epoch + 0.5 * period) % period) - 0.5 * period
+    flux[np.abs(phase_days) <= duration_days / 2.0] -= 1e-3
+    flux_err = np.full(n, 1e-4)
+    lc = MagicMock()
+    lc.time.jd = time
+    lc.flux.value = flux
+    lc.flux_err.value = flux_err
+    return lc
+
+
 def _make_provenance(
     *,
     cadence_seconds: float = 120.0,
@@ -455,6 +472,156 @@ class TestScorerOption:
         assert len(result) == 1
         assert "xgb_planet_probability" in result[0]
         assert abs(result[0]["xgb_planet_probability"] - 0.77) < 1e-9
+
+    def test_run_pipeline_cnn_uses_phase_folded_snippet(self, tmp_path: Path) -> None:
+        lc = _mock_transit_lc()
+        signal = _make_signal()
+        posterior = _uniform_posterior()
+        scores = _make_scores()
+        mock_cnn = MagicMock()
+        mock_cnn.is_available = True
+        mock_cnn.checkpoint_path = tmp_path / "cnn.pt"
+        mock_cnn.predict_proba.return_value = 0.82
+
+        with (
+            patch("exo_toolkit.cli.search_lightcurve", return_value=[signal]),
+            patch(
+                "exo_toolkit.cli.vet_signal",
+                return_value=MagicMock(features=CandidateFeatures()),
+            ),
+            patch("exo_toolkit.cli.score_candidate", return_value=(posterior, scores)),
+            patch(
+                "exo_toolkit.cli.classify_submission_pathway",
+                return_value="planet_hunters_discussion",
+            ),
+            patch("exo_toolkit.ml.cnn_scorer.CnnScorer.from_checkpoint", return_value=mock_cnn),
+        ):
+            result = run_pipeline(
+                "TIC 0",
+                "TESS",
+                scorer="cnn",
+                cnn_checkpoint_path=tmp_path / "cnn.pt",
+                fetch_fn=lambda *_: _make_fetch_result(lc),
+                clean_fn=lambda *_: MagicMock(light_curve=lc),
+            )
+
+        snippet = mock_cnn.predict_proba.call_args.args[0]
+        assert len(snippet) == 201
+        assert result[0]["cnn_planet_probability"] == pytest.approx(0.82)
+        assert result[0]["meta"]["cnn"]["probability_status"] == "computed"
+
+    def test_run_pipeline_cnn_metadata_marks_experimental(self, tmp_path: Path) -> None:
+        lc = _mock_transit_lc()
+        signal = _make_signal()
+        posterior = _uniform_posterior()
+        scores = _make_scores()
+        mock_cnn = MagicMock()
+        mock_cnn.is_available = True
+        mock_cnn.checkpoint_path = tmp_path / "cnn.pt"
+        mock_cnn.predict_proba.return_value = 0.61
+
+        with (
+            patch("exo_toolkit.cli.search_lightcurve", return_value=[signal]),
+            patch(
+                "exo_toolkit.cli.vet_signal",
+                return_value=MagicMock(features=CandidateFeatures()),
+            ),
+            patch("exo_toolkit.cli.score_candidate", return_value=(posterior, scores)),
+            patch(
+                "exo_toolkit.cli.classify_submission_pathway",
+                return_value="planet_hunters_discussion",
+            ),
+            patch("exo_toolkit.ml.cnn_scorer.CnnScorer.from_checkpoint", return_value=mock_cnn),
+        ):
+            result = run_pipeline(
+                "TIC 0",
+                "TESS",
+                scorer="cnn",
+                cnn_checkpoint_path=tmp_path / "cnn.pt",
+                fetch_fn=lambda *_: _make_fetch_result(lc),
+                clean_fn=lambda *_: MagicMock(light_curve=lc),
+            )
+
+        cnn_meta = result[0]["meta"]["cnn"]
+        assert cnn_meta["experimental"] is True
+        assert cnn_meta["production_gate_satisfied"] is False
+        assert cnn_meta["scientific_use"] == "review_metadata_only"
+
+    def test_run_pipeline_cnn_missing_snippet_neutral_fallback(self, tmp_path: Path) -> None:
+        lc = _mock_lc(n=20)
+        signal = _make_signal()
+        posterior = _uniform_posterior()
+        scores = _make_scores()
+        mock_cnn = MagicMock()
+        mock_cnn.is_available = True
+        mock_cnn.checkpoint_path = tmp_path / "cnn.pt"
+
+        with (
+            patch("exo_toolkit.cli.search_lightcurve", return_value=[signal]),
+            patch(
+                "exo_toolkit.cli.vet_signal",
+                return_value=MagicMock(features=CandidateFeatures()),
+            ),
+            patch("exo_toolkit.cli.score_candidate", return_value=(posterior, scores)),
+            patch(
+                "exo_toolkit.cli.classify_submission_pathway",
+                return_value="planet_hunters_discussion",
+            ),
+            patch("exo_toolkit.ml.cnn_scorer.CnnScorer.from_checkpoint", return_value=mock_cnn),
+        ):
+            result = run_pipeline(
+                "TIC 0",
+                "TESS",
+                scorer="cnn",
+                cnn_checkpoint_path=tmp_path / "cnn.pt",
+                fetch_fn=lambda *_: _make_fetch_result(lc),
+                clean_fn=lambda *_: MagicMock(light_curve=lc),
+            )
+
+        assert result[0]["cnn_planet_probability"] == pytest.approx(0.5)
+        assert result[0]["meta"]["cnn"]["probability_status"] == "neutral_fallback"
+        mock_cnn.predict_proba.assert_not_called()
+
+    def test_run_pipeline_full_ensemble_excludes_missing_cnn_weight(
+        self, tmp_path: Path
+    ) -> None:
+        lc = _mock_lc(n=20)
+        signal = _make_signal()
+        posterior = _uniform_posterior()
+        scores = _make_scores()
+        mock_xgb = MagicMock()
+        mock_xgb.predict_proba.return_value = 0.8
+        mock_cnn = MagicMock()
+        mock_cnn.is_available = True
+        mock_cnn.checkpoint_path = tmp_path / "cnn.pt"
+
+        with (
+            patch("exo_toolkit.cli.search_lightcurve", return_value=[signal]),
+            patch(
+                "exo_toolkit.cli.vet_signal",
+                return_value=MagicMock(features=CandidateFeatures()),
+            ),
+            patch("exo_toolkit.cli.score_candidate", return_value=(posterior, scores)),
+            patch(
+                "exo_toolkit.cli.classify_submission_pathway",
+                return_value="planet_hunters_discussion",
+            ),
+            patch("exo_toolkit.ml.xgboost_scorer.XGBoostScorer.load", return_value=mock_xgb),
+            patch("exo_toolkit.ml.cnn_scorer.CnnScorer.from_checkpoint", return_value=mock_cnn),
+        ):
+            result = run_pipeline(
+                "TIC 0",
+                "TESS",
+                scorer="full-ensemble",
+                model_path=tmp_path / "model.json",
+                cnn_checkpoint_path=tmp_path / "cnn.pt",
+                fetch_fn=lambda *_: _make_fetch_result(lc),
+                clean_fn=lambda *_: MagicMock(light_curve=lc),
+            )
+
+        expected = 0.35 * 0.8 + 0.65 * posterior.planet_candidate
+        assert result[0]["full_ensemble_planet_probability"] == pytest.approx(expected)
+        mock_cnn.predict_proba.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

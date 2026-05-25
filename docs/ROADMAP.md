@@ -67,7 +67,7 @@
 - [x] Combined training data (`Skills/build_combined_training_data.py`)
 - [x] Offline CNN snippet split assembly (`Skills/build_cnn_training_data.py`, 13 tests)
 - [x] Offline CNN split validation (`Skills/cnn_split_validator.py`, 15 tests)
-- [x] Tier 2 scaffolding — CNN scorer wrapper, training loop, checkpoint/calibration helpers, and `cnn/full-ensemble` CLI modes
+- [x] Tier 2 scaffolding — CNN scorer wrapper, training loop, checkpoint/calibration helpers, phase-folded snippet wiring, and `cnn/full-ensemble` CLI modes
 - [ ] Production Tier 2 checkpoint — trained/calibrated 1D CNN on phase-folded flux (**BLOCKED: requires 5,000+ TESS labels**)
   - Architecture spec: `docs/CNN_SPEC.md`
   - Gate check: `Skills/count_tess_labels.py`

@@ -48,13 +48,13 @@ CI: `.github/workflows/ci.yml`
 | `search.py` | **done** | `test_search.py` (43) |
 | `vet.py` | **done** | `test_vet.py` (47) |
 | `calibration.py` | **done** | `test_calibration.py` (70) — now includes `save_calibration`/`load_calibration` |
-| `cli.py` | **done** | `test_cli.py` (50) — version flag, meta output, calibration integration |
+| `cli.py` | **done** | `test_cli.py` (54) — version flag, meta output, calibration/CNN snippet integration |
 | `ml/xgboost_scorer.py` | **done** | `test_xgboost_scorer.py` (45) |
 | `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) — updated for 3-tier CNN blend |
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 264 test files. Local validation on 2026-05-25 passed with 4275 default tests, 2 `integration_live` tests deselected, and 59 warnings.
+**Current test surface:** 264 test files. Local validation on 2026-05-25 passed with 4279 default tests, 2 `integration_live` tests deselected, and 59 warnings.
 **Skills:** 249 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
@@ -539,8 +539,8 @@ All pipeline modules are complete.
 
 **CLI scorer options** (`src/exo_toolkit/cli.py`): ✅
 - `--scorer [bayesian|xgboost|ensemble|cnn|full-ensemble]`, `--model-path <path>`, `--cnn-checkpoint <path>`
-- xgboost adds `xgb_planet_probability`; ensemble adds `ensemble_planet_probability`; CNN modes add CNN/full-ensemble metadata when a checkpoint path is supplied
-- 50 tests in `tests/test_cli.py`
+- xgboost adds `xgb_planet_probability`; ensemble adds `ensemble_planet_probability`; CNN modes build phase-folded snippets when available and add experimental CNN/full-ensemble metadata when a checkpoint path is supplied
+- 54 tests in `tests/test_cli.py`
 
 **ML Scoring Architecture docs** (`docs/ML_SCORING.md`): ✅
 - Documents all scorer modes, training pipeline, column mappings, design decisions
@@ -927,7 +927,7 @@ All pipeline modules are complete.
 Replace or augment the Bayesian log-score model with a three-model ensemble once sufficient labeled data is available:
 
 **Tier 1 — XGBoost on tabular features (build first)** ✅ DONE
-**Tier 2 — 1D CNN on phase-folded flux (add after 5,000+ TESS labels)**
+**Tier 2 — 1D CNN on phase-folded flux (scaffold built; production checkpoint after 5,000+ TESS labels)**
 - Input: phase-folded, normalized flux array (treat as 1D image)
 - Learns transit morphology directly; proven architecture (Shallue & Vanderburg 2018)
 - Requires TESS-specific fine-tuning — Kepler-trained models are miscalibrated on TESS due to cadence, pixel scale, and systematics differences

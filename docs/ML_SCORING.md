@@ -17,7 +17,7 @@ The toolkit supports five scorer modes, selectable via the CLI:
 | CNN | `--scorer cnn --cnn-checkpoint <path>` | Experimental CNN checkpoint wrapper on phase-folded snippets |
 | Full ensemble | `--scorer full-ensemble --model-path <path> --cnn-checkpoint <path>` | Experimental XGBoost + CNN + Bayesian blend |
 
-The current local validation surface passes with 4275 default tests and 2 live
+The current local validation surface passes with 4279 default tests and 2 live
 integration tests deselected. On macOS, installing `xgboost` also requires the
 OpenMP runtime:
 
@@ -222,13 +222,14 @@ not run the live ExoFOP gate check.
 - `Skills/cnn_inference_batcher.py`
 - `src/exo_toolkit/ml/cnn_scorer.py`
 - `src/exo_toolkit/ml/stacking_scorer.py` 3-tier blend support
-- `src/exo_toolkit/cli.py` `cnn` and `full-ensemble` scorer flags
+- `src/exo_toolkit/cli.py` `cnn` and `full-ensemble` scorer flags plus phase-folded snippet wiring
 
 The CNN wrapper is intentionally conservative when unavailable: without PyTorch,
 a usable checkpoint, or an injectable test model, it returns neutral 0.5
 probabilities and reports unavailable state. Current CLI CNN rows are
-experimental because the end-to-end pipeline still needs direct vetted-snippet
-wiring before CNN probabilities should influence candidate pathway decisions.
+experimental review metadata; production use still requires the TESS label gate,
+calibration review, and a registered checkpoint before CNN probabilities should
+influence candidate pathway decisions.
 
 See `docs/CNN_SPEC.md` and `docs/ROADMAP.md`.
 

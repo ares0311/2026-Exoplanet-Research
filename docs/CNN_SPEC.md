@@ -107,11 +107,11 @@ exo TIC-150428135 --scorer cnn --cnn-checkpoint path/to/best.pt
 exo TIC-150428135 --scorer full-ensemble --model-path model.json --cnn-checkpoint path/to/best.pt
 ```
 
-Current limitation: the CLI scorer path can load and call a CNN checkpoint, but
-the pipeline does not yet pass vetted phase-folded snippets from `vet.py` into
-the CNN scorer. Until that wiring and a calibrated checkpoint exist, CNN CLI
-probabilities should be treated as experimental review metadata, not
-submission-driving evidence.
+The CLI scorer path can load a CNN checkpoint and builds a normalized
+phase-folded snippet from the cleaned light curve plus vetted
+`CandidateSignal`. CNN probabilities remain experimental review metadata until
+the production label gate opens and a calibrated checkpoint is registered; they
+must not drive formal submission pathways.
 
 ---
 
@@ -127,5 +127,5 @@ submission-driving evidence.
 - [x] Update `docs/ML_SCORING.md` — document CNN mode and production gate
 - [x] Update CLI `--scorer` to accept `cnn` and `full-ensemble`
 - [x] `Skills/train_cnn.py` — PyTorch training script with early stopping and graceful `NO_TORCH`
-- [ ] Wire vetted phase-folded snippets from the pipeline into CNN inference rows
+- [x] Wire vetted phase-folded snippets from the pipeline into CNN inference rows with neutral fallback when unavailable
 - [ ] Train, calibrate, and register a production CNN checkpoint after the label gate opens

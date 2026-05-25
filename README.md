@@ -191,14 +191,14 @@ Each stage produces a typed, immutable result object and preserves provenance me
 | `hypotheses.py` | — | Per-hypothesis log-score functions; `depth_scatter_chi2_score` + `transit_timing_variation_score` wired into instrumental and planet hypotheses | 46 |
 | `priors.py` | — | Versioned conservative scoring-prior config loader and mission profile selection | 14 |
 | `calibration.py` | — | Platt scaling, PAVA isotonic regression, Brier score, reliability curves | 70 |
-| `cli.py` | — | `exo <TIC-ID>` entry point; `--scorer`, `--model-path`, `--cnn-checkpoint`, `--output` options | 50 |
+| `cli.py` | — | `exo <TIC-ID>` entry point; `--scorer`, `--model-path`, `--cnn-checkpoint`, `--output` options | 54 |
 | `ml/xgboost_scorer.py` | — | XGBoost tabular classifier on 35 `OptScore` features | 45 |
 | `ml/stacking_scorer.py` | — | Weighted blend of XGBoost + CNN + Bayesian posteriors | 22 |
 | `ml/cnn_scorer.py` | — | CNN checkpoint wrapper with neutral fallback when unavailable | 21 |
 | `background/` | — | SQLite-backed automation: one-shot runner, priority scoring, draft reports | 16 |
-| **Package subtotal** | | | **754** |
+| **Package subtotal** | | | **758** |
 
-The repository also contains 249 standalone `Skills/` utilities with dedicated tests. Current local validation passes 4275 default tests with the two live integration tests deselected; see `docs/PROJECT_STATUS.md` for the latest validation note.
+The repository also contains 249 standalone `Skills/` utilities with dedicated tests. Current local validation passes 4279 default tests with the two live integration tests deselected; see `docs/PROJECT_STATUS.md` for the latest validation note.
 
 ### Operating Modes
 
@@ -668,7 +668,7 @@ python Skills/evaluate_scorer.py \
 │           ├── xgboost_scorer.py    # XGBoost binary classifier (Tier-1)
 │           ├── cnn_scorer.py        # CNN checkpoint wrapper (Tier-2 scaffold)
 │           └── stacking_scorer.py   # Weighted blend scorer (Tier-3)
-├── tests/                       # 4275 default tests plus 2 live tests
+├── tests/                       # 4279 default tests plus 2 live tests
 │   ├── test_schemas.py          # 33 tests
 │   ├── test_features.py         # 145 tests
 │   ├── test_hypotheses.py       # 46 tests
@@ -680,7 +680,7 @@ python Skills/evaluate_scorer.py \
 │   ├── test_search.py           # 43 tests
 │   ├── test_vet.py              # 47 tests
 │   ├── test_calibration.py      # 70 tests
-│   ├── test_cli.py              # 50 tests
+│   ├── test_cli.py              # 54 tests
 │   ├── test_xgboost_scorer.py   # 45 tests
 │   ├── test_stacking_scorer.py  # 22 tests
 │   ├── test_cnn_scorer.py       # 21 tests
@@ -777,13 +777,13 @@ PYTHONPATH=src python -m pytest -m integration_live
 | `search.py` | 43 |
 | `vet.py` | 47 |
 | `calibration.py` | 70 |
-| `cli.py` | 50 |
+| `cli.py` | 54 |
 | `ml/xgboost_scorer.py` | 45 |
 | `ml/stacking_scorer.py` | 22 |
 | `ml/cnn_scorer.py` | 21 |
 | `background/` module | 16 |
 | Skills utilities | 249 scripts with dedicated tests |
-| **Current default suite** | **4275 passed, 2 live tests deselected** |
+| **Current default suite** | **4279 passed, 2 live tests deselected** |
 
 ---
 
@@ -892,7 +892,7 @@ The candidate does not meet external submission criteria (high FPP, missing diag
 | ✅ | **CNN Tier-2 gate** | `count_tess_labels.py`; `CNN_SPEC.md` architecture document |
 | ✅ | **Offline CNN split assembly** | `Skills/build_cnn_training_data.py` — deterministic train/validation/test JSON splits from existing snippets |
 | ✅ | **Offline CNN split validation** | `Skills/cnn_split_validator.py` — local manifest and train/validation/test artifact checks before training |
-| ✅ | **CNN scaffolding** | `ml/cnn_scorer.py`, `Skills/train_cnn.py`, CNN calibration/checkpoint/inference utilities, and CLI `cnn/full-ensemble` modes |
+| ✅ | **CNN scaffolding** | `ml/cnn_scorer.py`, `Skills/train_cnn.py`, CNN calibration/checkpoint/inference utilities, phase-folded snippet wiring, and CLI `cnn/full-ensemble` modes |
 | ✅ | **Background automation** | `background/` — SQLite state, one-shot runner, priority scoring, draft reports; 16 subcommands |
 | ✅ | **Star scanner** | `Skills/star_scanner.py` — TIC priority ranking, TOI exclusion, JSON scan log, background loop |
 | ✅ | **Provenance score** | `compute_provenance_score()` in `fetch.py`; wired into `tfop_ready` pathway gate |
