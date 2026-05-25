@@ -69,7 +69,7 @@ app = typer.Typer(
     add_completion=False,
 )
 
-_VALID_SCORERS = ("bayesian", "xgboost", "ensemble")
+_VALID_SCORERS = ("bayesian", "xgboost", "ensemble", "cnn", "full-ensemble")
 
 
 def _version_callback(value: bool) -> None:
@@ -104,6 +104,7 @@ def run_pipeline(
     max_peaks: int = 5,
     scorer: str = "bayesian",
     model_path: Path | None = None,
+    cnn_checkpoint_path: Path | None = None,
     calibration_path: Path | None = None,
     fetch_fn: Any = None,
     clean_fn: Any = None,
@@ -143,13 +144,22 @@ def run_pipeline(
     _clean = clean_fn if clean_fn is not None else clean_lightcurve
 
     xgb_scorer = None
-    if scorer in ("xgboost", "ensemble"):
+    if scorer in ("xgboost", "ensemble", "full-ensemble"):
         if model_path is None:
             raise ValueError(
                 f"model_path is required when scorer='{scorer}'"
             )
         from exo_toolkit.ml.xgboost_scorer import XGBoostScorer
         xgb_scorer = XGBoostScorer.load(model_path)
+
+    cnn_scorer = None
+    if scorer in ("cnn", "full-ensemble"):
+        if cnn_checkpoint_path is None:
+            raise ValueError(
+                f"cnn_checkpoint_path is required when scorer='{scorer}'"
+            )
+        from exo_toolkit.ml.cnn_scorer import CnnScorer
+        cnn_scorer = CnnScorer.from_checkpoint(cnn_checkpoint_path)
 
     calibration_result = None
     if calibration_path is not None:
@@ -228,6 +238,15 @@ def run_pipeline(
                     0.5 * posterior.planet_candidate + 0.5 * xgb_prob
                 )
 
+        if cnn_scorer is not None:
+            cnn_prob = cnn_scorer.predict_proba([])  # snippet not available from vet
+            row["cnn_planet_probability"] = cnn_prob
+            if scorer == "full-ensemble":
+                xgb_p = row.get("xgb_planet_probability", posterior.planet_candidate)
+                row["full_ensemble_planet_probability"] = (
+                    0.35 * xgb_p + 0.35 * cnn_prob + 0.30 * posterior.planet_candidate
+                )
+
         if calibration_result is not None:
             cal_post = apply_calibration(posterior, calibration_result)
             row["calibrated_posterior"] = {
@@ -295,12 +314,17 @@ def scan(
     scorer: str = typer.Option(
         "bayesian",
         "--scorer",
-        help="Scoring model: bayesian (default), xgboost, or ensemble",
+        help="Scoring model: bayesian (default), xgboost, ensemble, cnn, or full-ensemble",
     ),
     model_path: Path | None = typer.Option(
         None,
         "--model-path",
-        help="Path to XGBoost model JSON (required for xgboost/ensemble scorers)",
+        help="Path to XGBoost model JSON (required for xgboost/ensemble/full-ensemble)",
+    ),
+    cnn_checkpoint_path: Path | None = typer.Option(
+        None,
+        "--cnn-checkpoint",
+        help="Path to CNN .pt checkpoint (required for cnn/full-ensemble scorers)",
     ),
     output: Path | None = typer.Option(
         None, "--output", "-o", help="Write JSON results to this file"
@@ -328,8 +352,12 @@ def scan(
         typer.echo(f"Invalid scorer '{scorer}'. Choose from: {_VALID_SCORERS}", err=True)
         raise typer.Exit(code=1)
 
-    if scorer in ("xgboost", "ensemble") and model_path is None:
+    if scorer in ("xgboost", "ensemble", "full-ensemble") and model_path is None:
         typer.echo(f"--model-path is required when --scorer={scorer}", err=True)
+        raise typer.Exit(code=1)
+
+    if scorer in ("cnn", "full-ensemble") and cnn_checkpoint_path is None:
+        typer.echo(f"--cnn-checkpoint is required when --scorer={scorer}", err=True)
         raise typer.Exit(code=1)
 
     typer.echo(f"Scanning {target_id} ({mission}) [scorer={scorer}] ...")
@@ -342,6 +370,7 @@ def scan(
             max_peaks=max_peaks,
             scorer=scorer,
             model_path=model_path,
+            cnn_checkpoint_path=cnn_checkpoint_path,
         )
     except Exception as exc:  # noqa: BLE001
         typer.echo(f"Pipeline error: {exc}", err=True)

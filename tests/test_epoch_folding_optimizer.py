@@ -1,9 +1,8 @@
 """Tests for Skills/epoch_folding_optimizer.py."""
-import pytest
 from Skills.epoch_folding_optimizer import (
     EpochOptResult,
-    optimize_epoch,
     format_epoch_opt_result,
+    optimize_epoch,
 )
 
 

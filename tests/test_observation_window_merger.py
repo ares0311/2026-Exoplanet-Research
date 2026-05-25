@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
-from observation_window_merger import merge_windows, format_merged_windows, TimeWindow
+from observation_window_merger import TimeWindow, format_merged_windows, merge_windows
 
 
 def test_single_window():

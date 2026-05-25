@@ -1,12 +1,10 @@
 """Tests for Skills/correlated_noise_estimator.py"""
-import math
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from correlated_noise_estimator import (
-    CorrelatedNoiseResult,
     estimate_correlated_noise,
     format_correlated_noise_result,
 )
@@ -90,7 +88,7 @@ class TestEstimateCorrelatedNoise:
         result = estimate_correlated_noise(t, f)
         try:
             result.beta_factor = 99.0
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

@@ -5,9 +5,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from cadence_irregularity_scorer import (
-    CadenceIrregularityResult,
-    score_cadence_irregularity,
     format_cadence_irregularity_result,
+    score_cadence_irregularity,
 )
 
 
@@ -73,7 +72,7 @@ class TestScoreCadenceIrregularity:
         result = score_cadence_irregularity(t)
         try:
             result.irregularity_score = 99.0
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

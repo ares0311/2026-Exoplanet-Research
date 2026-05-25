@@ -1,12 +1,10 @@
 """Tests for Skills/saturation_level_checker.py"""
-import math
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from saturation_level_checker import (
-    SaturationResult,
     check_saturation,
     format_saturation_result,
 )
@@ -68,7 +66,7 @@ class TestCheckSaturation:
         result = check_saturation(12.0)
         try:
             result.is_saturated = True
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

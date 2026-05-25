@@ -6,11 +6,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from disposition_recorder import (
     VALID_STATUSES,
-    Disposition,
-    DispositionResult,
-    record_disposition,
-    get_disposition_history,
     format_disposition_result,
+    get_disposition_history,
+    record_disposition,
 )
 
 
@@ -100,7 +98,7 @@ class TestGetDispositionHistory:
         result = get_disposition_history(42, store)
         try:
             result.n_records = 99
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

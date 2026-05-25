@@ -1,10 +1,10 @@
 """Tests for Skills/snr_sector_stacker.py."""
 import math
-import pytest
+
 from Skills.snr_sector_stacker import (
     StackedSNRResult,
-    project_stacked_snr,
     format_stacked_snr_result,
+    project_stacked_snr,
 )
 
 

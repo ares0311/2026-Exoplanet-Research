@@ -5,7 +5,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from votable_formatter import (
-    VOTableResult,
     format_as_votable,
     format_votable_result,
 )

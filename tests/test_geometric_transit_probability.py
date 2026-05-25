@@ -1,5 +1,4 @@
 """Tests for Skills/geometric_transit_probability.py."""
-import pytest
 from Skills.geometric_transit_probability import (
     TransitProbResult,
     compute_transit_probability,

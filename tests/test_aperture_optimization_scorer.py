@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
-from aperture_optimization_scorer import score_apertures, format_aperture_result
+from aperture_optimization_scorer import format_aperture_result, score_apertures
 
 
 def test_basic_ok():

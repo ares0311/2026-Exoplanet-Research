@@ -1,5 +1,4 @@
 """Tests for Skills/target_coordinates_converter.py"""
-import math
 import sys
 from pathlib import Path
 

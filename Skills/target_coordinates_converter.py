@@ -59,8 +59,6 @@ def _eq_to_gal(ra_deg: float, dec_deg: float) -> tuple[float, float]:
     dec = math.radians(dec_deg)
     pole_ra = math.radians(_POLE_RA_DEG)
     pole_dec = math.radians(_POLE_DEC_DEG)
-    asc = math.radians(_ASC_NODE_DEG)
-
     sin_b = (math.sin(dec) * math.sin(pole_dec)
              + math.cos(dec) * math.cos(pole_dec) * math.cos(ra - pole_ra))
     b = math.asin(max(-1.0, min(1.0, sin_b)))

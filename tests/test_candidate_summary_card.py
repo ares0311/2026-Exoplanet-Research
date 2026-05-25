@@ -1,5 +1,4 @@
 """Tests for Skills/candidate_summary_card.py."""
-import pytest
 from Skills.candidate_summary_card import (
     SummaryCardResult,
     build_summary_card,

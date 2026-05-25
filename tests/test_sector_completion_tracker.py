@@ -1,10 +1,7 @@
 """Tests for Skills/sector_completion_tracker.py."""
-import json
-import pytest
-from pathlib import Path
 from Skills.sector_completion_tracker import (
-    SectorCompletionLog,
     PIPELINE_STAGES,
+    SectorCompletionLog,
     format_completion_report,
 )
 

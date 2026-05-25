@@ -5,9 +5,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from depth_period_correlation_scorer import (
-    DepthPeriodResult,
-    score_depth_period_correlation,
     format_depth_period_result,
+    score_depth_period_correlation,
 )
 
 
@@ -89,7 +88,7 @@ class TestScoreDepthPeriodCorrelation:
         result = score_depth_period_correlation([1.0, 2.0, 3.0], [100.0, 200.0, 300.0])
         try:
             result.pearson_r = 99.0
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

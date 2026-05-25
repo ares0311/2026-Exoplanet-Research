@@ -5,12 +5,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from fits_keyword_mapper import (
-    KeywordMapping,
-    KeywordMapResult,
-    TESS_MAPPINGS,
     KEPLER_MAPPINGS,
-    map_fits_keywords,
+    TESS_MAPPINGS,
     format_keyword_map_result,
+    map_fits_keywords,
 )
 
 
@@ -33,7 +31,7 @@ class TestMappingTables:
         m = TESS_MAPPINGS[0]
         try:
             m.fits_key = "OTHER"
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 
@@ -115,7 +113,7 @@ class TestMapFitsKeywords:
         result = map_fits_keywords({}, mission="TESS")
         try:
             result.mission = "other"
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

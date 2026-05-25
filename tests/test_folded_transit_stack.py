@@ -1,10 +1,8 @@
 """Tests for Skills/folded_transit_stack.py."""
-import math
-import pytest
 from Skills.folded_transit_stack import (
     StackedTransit,
-    stack_transit_windows,
     format_stack_result,
+    stack_transit_windows,
 )
 
 
@@ -14,7 +12,6 @@ class TestStackTransitWindows:
         time = []
         flux = []
         midpoints = []
-        t = 0.0
         for k in range(n_transits):
             mid = k * period
             midpoints.append(mid)

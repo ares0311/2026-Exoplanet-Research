@@ -50,11 +50,12 @@ CI: `.github/workflows/ci.yml`
 | `calibration.py` | **done** | `test_calibration.py` (70) — now includes `save_calibration`/`load_calibration` |
 | `cli.py` | **done** | `test_cli.py` (50) — version flag, meta output, calibration integration |
 | `ml/xgboost_scorer.py` | **done** | `test_xgboost_scorer.py` (45) |
-| `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) |
+| `ml/stacking_scorer.py` | **done** | `test_stacking_scorer.py` (22) — updated for 3-tier CNN blend |
+| `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 206 test files. Local validation on 2026-05-24 passed with 3680 default tests, 2 `integration_live` tests deselected, and 6 skipped (matplotlib absent).
-**Skills:** 192 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
+**Current test surface:** 221 test files. Local validation on 2026-05-24 passed with 3871 default tests, 2 `integration_live` tests deselected, and 6 skipped (matplotlib absent).
+**Skills:** 204 standalone scripts live in `Skills/`. See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
 
@@ -845,13 +846,34 @@ All pipeline modules are complete.
 | `rms_timescale_profiler.py` | `profile_rms_timescales`, `format_rms_timescale_result` — log-spaced RMS vs bin timescale | 13 |
 | `candidate_submission_formatter.py` | `format_submission` — TFOP WG / Planet Hunters structured submission record | 15 |
 
+### Completed (2026-05-24) — Milestone 25
+
+**12 new Skills + 3 src modules updated + 191 new tests**: ✅
+
+| Skill / Module | Key Functions | Tests |
+|---|---|---|
+| `fetch_exofop_ctoi.py` | `fetch_ctoi_table`, `CtoisResult` — ExoFOP CTOI CSV download | 13 |
+| `fetch_nea_koi_lc_index.py` | `fetch_koi_lc_index`, `KoiRecord` — NASA TAP ephemeris index | 13 |
+| `multi_source_label_assembler.py` | `assemble_labels`, `LabelManifest`, `LabelRecord` — merge/dedup labels | 13 |
+| `lc_snippet_batch_builder.py` | `build_snippet_batch`, checkpoint/resume batch extraction | 13 |
+| `label_quality_controller.py` | `run_label_qc` — source agreement + ephemeris + confidence QC | 13 |
+| `snippet_normalizer.py` | `normalize_snippet`, `normalize_batch` — Shallue & Vanderburg normalization | 13 |
+| `training_data_monitor.py` | `monitor_training_data`, gate check (5000-label threshold) | 13 |
+| `cnn_training_config.py` | `default_config`, `load_config`, `save_config`, `validate_config` | 18 |
+| `train_cnn.py` | `train_cnn`, `CnnTrainingResult`, AUC via trapezoidal rule | 13 |
+| `cnn_checkpoint_manager.py` | `list_checkpoints`, `select_best`, `prune_checkpoints` | 13 |
+| `cnn_calibrator.py` | `fit_cnn_calibration`, `apply_cnn_calibration` — Platt scaling | 15 |
+| `cnn_inference_batcher.py` | `run_cnn_inference`, injectable model_fn | 13 |
+| `src/exo_toolkit/ml/cnn_scorer.py` | `CnnScorer.predict_proba/batch`, `from_checkpoint`, `unavailable` | 21 |
+| `src/exo_toolkit/ml/stacking_scorer.py` | Updated: `from_model_paths`, 3-tier blend (XGB 0.35 + CNN 0.35 + Bayes 0.30) | 22 |
+| `src/exo_toolkit/cli.py` | Updated: `--scorer cnn/full-ensemble`, `--cnn-checkpoint` flag | — |
+
 ### Next Step
 
-**ML Ensemble Scorer — Tier 2: 1D CNN on phase-folded flux**
-- Requires 5,000+ TESS labels before building
+**Collect 5,000+ TESS labeled examples** — then run CNN training pipeline
 - Gate check: `python Skills/count_tess_labels.py`
 - Architecture spec: `docs/CNN_SPEC.md`
-- Training data infrastructure now available via `labelled_lc_collector.py`, `cnn_feature_augmenter.py`, `build_cnn_training_data.py`, and `cnn_split_validator.py`
+- Full pipeline: `fetch_ctoi_table` → `assemble_labels` → `run_label_qc` → `normalize_batch` → `monitor_training_data` → `train_cnn` → `cnn_calibrator` → `CnnScorer`
 
 ### Future Enhancement: ML Ensemble Scorer (agreed 2026-05-01)
 

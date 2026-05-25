@@ -1,8 +1,7 @@
 """Tests for Skills/data_gap_interpolator.py."""
-import pytest
 from Skills.data_gap_interpolator import (
-    GapStats,
     FilledLCResult,
+    GapStats,
     characterize_gaps,
     fill_gaps_linear,
     format_gap_stats,
@@ -100,7 +99,6 @@ class TestFillGapsLinear:
     def test_invalid_length_mismatch(self):
         t = [0.0, 0.02, 0.04]
         f = [1.0, 1.0]
-        from Skills.data_gap_interpolator import GapStats
         dummy_stats = characterize_gaps(t)
         result = fill_gaps_linear(t, f, dummy_stats)
         assert result.flag == "INVALID"

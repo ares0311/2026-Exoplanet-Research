@@ -7,7 +7,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from false_negative_rate_estimator import (
-    FNRResult,
     estimate_false_negative_rate,
     format_fnr_result,
 )
@@ -73,7 +72,7 @@ class TestEstimateFalseNegativeRate:
         result = estimate_false_negative_rate([0.8, 0.2], [1, 0])
         try:
             result.false_negative_rate = 99.0
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

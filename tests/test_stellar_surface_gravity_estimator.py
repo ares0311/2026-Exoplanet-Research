@@ -5,7 +5,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
-from stellar_surface_gravity_estimator import estimate_surface_gravity, format_surface_gravity_result
+from stellar_surface_gravity_estimator import (
+    estimate_surface_gravity,
+    format_surface_gravity_result,
+)
 
 
 def test_solar_logg():

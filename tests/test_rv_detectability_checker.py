@@ -89,6 +89,5 @@ def test_snr_formula():
     # SNR = K * sqrt(N) / sigma
     r = check_rv_detectability(10.0, 1.0, 10.0, rv_precision_ms=1.0, n_obs=9)
     assert r.snr_rv is not None
-    import math
     expected = r.k_ms * math.sqrt(9) / 1.0
     assert abs(r.snr_rv - expected) < 0.01

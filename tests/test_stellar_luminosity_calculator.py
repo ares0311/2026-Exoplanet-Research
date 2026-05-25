@@ -1,5 +1,4 @@
 """Tests for Skills/stellar_luminosity_calculator.py"""
-import math
 import sys
 from pathlib import Path
 
