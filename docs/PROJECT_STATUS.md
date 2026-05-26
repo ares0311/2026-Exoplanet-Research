@@ -99,6 +99,7 @@ No active implementation blocker is known in the default local validation path.
 6. Use `candidate_dashboard_export.py` to build static local review dashboards from existing candidate JSON outputs, including optional phase-fold plot artifact paths when available.
 7. Use `candidate_api.py` to serve existing local candidate JSON, optional read-only background SQLite summaries, `/artifact.json` review bundles, and opt-in CORS for separate local frontends.
 8. Use `candidate_browser_ui.py` for an interactive local browser UI with embedded-data/API modes and optional phase-fold plot previews.
+9. Keep CTOI/community candidate ingestion documentation-only until a stable, fixture-backed source contract is ready.
 
 Live-network note: the CNN gate check was not run during the latest local
 maintenance pass because it queries ExoFOP and requires intentional live network

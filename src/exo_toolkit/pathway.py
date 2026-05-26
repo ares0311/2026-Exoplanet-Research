@@ -4,10 +4,12 @@ Routes a scored candidate to one of the six SubmissionPathways defined in
 SCORING_MODEL.md §10-11 based on posterior probabilities, derived scores,
 raw signal parameters, and feature diagnostics.
 
-Three inputs are not yet computed by the v0 pipeline:
-  - provenance_score       (blocks tfop_ready when absent; default 0.0)
-  - multi_planet_interest  (used for paper/preprint gate; default 0.0)
-  - methodological_novelty (used for paper/preprint gate; default 0.0)
+The main CLI computes provenance_score from fetch metadata and passes it into
+this classifier. Direct callers that omit it still get a conservative 0.0,
+which blocks tfop_ready. Two paper/preprint inputs remain optional and default
+to 0.0:
+  - multi_planet_interest  (used for paper/preprint gate)
+  - methodological_novelty (used for paper/preprint gate)
 
 Callers with access to these values may supply them explicitly.  The
 conservative defaults ensure that v0 never grants a higher-tier pathway
@@ -80,9 +82,9 @@ def classify_submission_pathway(
             they are assumed to *fail* any threshold gate that requires them.
         posterior: Normalised hypothesis posterior from compute_posterior().
         scores: Derived scores from compute_scores().
-        provenance_score: Completeness of the data provenance record.  Not
-            yet computed by the v0 pipeline; defaults to 0.0 (blocks
-            tfop_ready).
+        provenance_score: Completeness of the data provenance record.  The
+            main CLI computes this from fetch provenance; direct callers that
+            omit it default to 0.0, which blocks tfop_ready.
         multi_planet_interest: Evidence of additional transiting planets.
             Not yet computed in v0; defaults to 0.0.
         methodological_novelty: Scientific novelty of the detection method.
