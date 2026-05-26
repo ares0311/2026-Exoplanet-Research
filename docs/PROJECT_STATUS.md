@@ -119,7 +119,7 @@ Validated on 2026-05-26:
 .venv/bin/python -m pytest
 ```
 
-Result: ruff passed, mypy passed, pytest passed with 4285 passed, 2 deselected, and 7 warnings. The remaining warnings come from Astropy Lomb-Scargle internals exercised by stellar rotation tests.
+Result: ruff passed, mypy passed, pytest passed with 4287 passed, 2 deselected, and no warnings.
 
 ---
 

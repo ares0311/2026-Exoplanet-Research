@@ -31,6 +31,14 @@ class TestDetectRotation:
         result = detect_rotation(t, f)
         assert isinstance(result, RotationResult)
 
+    def test_flat_lc_returns_safe_defaults(self) -> None:
+        t, f = _flat_lc()
+        result = detect_rotation(t, f)
+        assert result.rotation_period_days is None
+        assert result.rotation_power == 0.0
+        assert result.false_alarm_probability == 1.0
+        assert not result.is_significant
+
     def test_rotation_detected_in_sinusoidal_lc(self) -> None:
         t, f = _rotating_lc(period=10.0, amplitude=0.05)
         result = detect_rotation(t, f, period_range=(5.0, 20.0), fap_threshold=0.01)
@@ -72,6 +80,15 @@ class TestDetectRotation:
         result = detect_rotation([1.0, 2.0], [1.0, 1.0])
         assert not result.is_significant
         assert result.rotation_period_days is None
+
+    def test_nonfinite_samples_return_safe_defaults(self) -> None:
+        result = detect_rotation(
+            [1.0, 2.0, math.nan, 4.0, 5.0, math.inf, 7.0, 8.0, 9.0, 10.0],
+            [1.0, math.nan, 1.0, 1.0, 1.0, 1.0, math.inf, 1.0, 1.0, 1.0],
+        )
+        assert not result.is_significant
+        assert result.rotation_period_days is None
+        assert result.false_alarm_probability == 1.0
 
     def test_period_range_respected(self) -> None:
         t, f = _rotating_lc(period=3.0, amplitude=0.05)

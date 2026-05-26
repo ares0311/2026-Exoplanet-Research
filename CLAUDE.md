@@ -54,7 +54,7 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 264 test files. Local validation on 2026-05-26 passed with 4285 default tests, 2 `integration_live` tests deselected, and 7 warnings.
+**Current test surface:** 264 test files. Local validation on 2026-05-26 passed with 4287 default tests and 2 `integration_live` tests deselected.
 **Skills:** 249 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
@@ -611,7 +611,7 @@ All pipeline modules are complete.
 | `follow_up_scheduler.py` | `build_schedule`, `format_schedule` | 13 |
 | `config_manager.py` | `load_config`, `validate_config`, `default_config` | 12 |
 | `signal_statistics.py` | `compute_signal_stats`, `format_signal_stats` | 11 |
-| `stellar_rotation.py` | `detect_rotation`, `format_rotation_result` | 12 |
+| `stellar_rotation.py` | `detect_rotation`, `format_rotation_result` | 14 |
 | `archive_lookup.py` | `check_archive`, `format_archive_status` | 12 |
 | `vetting_scorecard.py` | `build_scorecard`, `format_scorecard` | 15 |
 | `period_recovery_validator.py` | `validate_period`, `format_validation_result` | 11 |

@@ -38,20 +38,38 @@ def _lomb_scargle(
     import numpy as np
     from astropy.timeseries import LombScargle
 
-    t = np.asarray(time)
-    f = np.asarray(flux) - float(np.median(flux))
-    e = np.asarray(flux_err) if flux_err is not None else None
+    t = np.asarray(time, dtype=float)
+    raw_f = np.asarray(flux, dtype=float)
+    finite_mask = np.isfinite(t) & np.isfinite(raw_f)
+    e = None
+    if flux_err is not None:
+        e = np.asarray(flux_err, dtype=float)
+        finite_mask &= np.isfinite(e) & (e > 0.0)
+
+    t = t[finite_mask]
+    raw_f = raw_f[finite_mask]
+    if e is not None:
+        e = e[finite_mask]
+    if len(t) < 10:
+        return 0.0, 0.0, 1.0
+
+    f = raw_f - float(np.median(raw_f))
+    if float(np.var(f)) <= 0.0:
+        return 0.0, 0.0, 1.0
 
     freq_min = 1.0 / period_max
     freq_max = 1.0 / period_min
     freqs = np.linspace(freq_min, freq_max, n_freqs)
 
     ls = LombScargle(t, f, e)
-    power = ls.power(freqs)
+    power = np.nan_to_num(ls.power(freqs), nan=0.0, posinf=0.0, neginf=0.0)
     best_idx = int(np.argmax(power))
     best_freq = float(freqs[best_idx])
-    best_power = float(power[best_idx])
-    fap = float(ls.false_alarm_probability(best_power))
+    best_power = min(max(float(power[best_idx]), 0.0), 1.0)
+    fap_power = min(best_power, float(np.nextafter(1.0, 0.0)))
+    fap = float(ls.false_alarm_probability(fap_power))
+    if not np.isfinite(fap):
+        fap = 1.0
     return 1.0 / best_freq, best_power, fap
 
 

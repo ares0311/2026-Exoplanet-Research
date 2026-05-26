@@ -198,7 +198,7 @@ Each stage produces a typed, immutable result object and preserves provenance me
 | `background/` | — | SQLite-backed automation: one-shot runner, priority scoring, draft reports | 16 |
 | **Package subtotal** | | | **758** |
 
-The repository also contains 249 standalone `Skills/` utilities with dedicated tests. Current local validation passes 4285 default tests with the two live integration tests deselected; see `docs/PROJECT_STATUS.md` for the latest validation note.
+The repository also contains 249 standalone `Skills/` utilities with dedicated tests. Current local validation passes 4287 default tests with the two live integration tests deselected; see `docs/PROJECT_STATUS.md` for the latest validation note.
 
 ### Operating Modes
 
@@ -668,7 +668,7 @@ python Skills/evaluate_scorer.py \
 │           ├── xgboost_scorer.py    # XGBoost binary classifier (Tier-1)
 │           ├── cnn_scorer.py        # CNN checkpoint wrapper (Tier-2 scaffold)
 │           └── stacking_scorer.py   # Weighted blend scorer (Tier-3)
-├── tests/                       # 4285 default tests plus 2 live tests
+├── tests/                       # 4287 default tests plus 2 live tests
 │   ├── test_schemas.py          # 33 tests
 │   ├── test_features.py         # 145 tests
 │   ├── test_hypotheses.py       # 46 tests
@@ -783,7 +783,7 @@ PYTHONPATH=src python -m pytest -m integration_live
 | `ml/cnn_scorer.py` | 21 |
 | `background/` module | 16 |
 | Skills utilities | 249 scripts with dedicated tests |
-| **Current default suite** | **4285 passed, 2 live tests deselected** |
+| **Current default suite** | **4287 passed, 2 live tests deselected** |
 
 ---
 
