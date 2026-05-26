@@ -97,7 +97,7 @@ No active implementation blocker is known in the default local validation path.
 4. Use `batch_scan.py` + `alert_filter.py` + `rank_candidates.py` + `watchlist.py` for systematic follow-up.
 5. Use `multi_sector_phase_compare.py` to inspect sector-to-sector depth and phase consistency before advancing multi-sector follow-up targets.
 6. Use `candidate_dashboard_export.py` to build static local review dashboards from existing candidate JSON outputs, including optional phase-fold plot artifact paths when available.
-7. Use `candidate_api.py` to serve existing local candidate JSON, optional read-only background SQLite summaries, and `/artifact.json` review bundles for local browsing or artifact export.
+7. Use `candidate_api.py` to serve existing local candidate JSON, optional read-only background SQLite summaries, `/artifact.json` review bundles, and opt-in CORS for separate local frontends.
 8. Use `candidate_browser_ui.py` for an interactive local browser UI with embedded-data/API modes and optional phase-fold plot previews.
 
 Live-network note: the CNN gate check was not run during the latest local
@@ -118,7 +118,7 @@ Validated on 2026-05-25:
 .venv/bin/python -m pytest
 ```
 
-Result: ruff passed, mypy passed, pytest passed with 4282 passed, 2 deselected, and 59 warnings.
+Result: ruff passed, mypy passed, pytest passed with 4285 passed, 2 deselected, and 59 warnings.
 
 ---
 

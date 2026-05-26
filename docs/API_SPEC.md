@@ -23,6 +23,13 @@ read-only:
 python Skills/candidate_api.py results.json --background-db-path logs/background_search.sqlite3
 ```
 
+If a separate local frontend needs browser access, CORS can be enabled
+explicitly for one origin:
+
+```bash
+python Skills/candidate_api.py results.json --cors-origin http://127.0.0.1:9000
+```
+
 This keeps the API dependency-free, local-first, and compatible with macOS and
 portable Python environments.
 
@@ -91,4 +98,5 @@ All mutation methods are rejected. The API is read-only.
   `Skills/candidate_browser_ui.py`.
 - Static artifact mode for GitHub Actions or local report bundles. Implemented
   as `/artifact.json`.
-- CORS configuration if a separate local frontend is introduced.
+- CORS configuration if a separate local frontend is introduced. Implemented as
+  opt-in `--cors-origin` support for `GET`/`OPTIONS`.

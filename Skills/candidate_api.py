@@ -6,13 +6,14 @@ view. It never queries live services and never mutates source data.
 
 Public API
 ----------
-CandidateAPI(rows, *, title, source_label, background_db_path)
+CandidateAPI(rows, *, title, source_label, background_db_path, cors_origin)
 candidate_to_payload(candidate) -> dict[str, Any]
 summary_payload(candidates) -> dict[str, Any]
 background_summary_payload(db_path) -> dict[str, Any]
 artifact_payload(api) -> dict[str, Any]
 api_response(api, path) -> tuple[int, str, bytes]
-run_server(rows, *, host, port, title, source_label, background_db_path) -> None
+response_headers(api, content_type, content_length) -> list[tuple[str, str]]
+run_server(rows, *, host, port, title, source_label, background_db_path, cors_origin) -> None
 """
 from __future__ import annotations
 
@@ -42,11 +43,13 @@ class CandidateAPI:
         title: str = "Candidate Review Dashboard",
         source_label: str = "local JSON",
         background_db_path: Path | None = None,
+        cors_origin: str | None = None,
     ) -> None:
         self.rows = list(rows)
         self.title = title
         self.source_label = source_label
         self.background_db_path = background_db_path
+        self.cors_origin = cors_origin if cors_origin else None
         self.candidates = sorted(
             (normalize_candidate(row) for row in self.rows),
             key=lambda c: (
@@ -282,6 +285,28 @@ def api_response(api: CandidateAPI, path: str) -> tuple[int, str, bytes]:
     return _json_response(404, {"error": "not found", "path": route})
 
 
+def response_headers(
+    api: CandidateAPI,
+    content_type: str,
+    content_length: int,
+) -> list[tuple[str, str]]:
+    """Return standard HTTP response headers for the local API."""
+    headers = [
+        ("Content-Type", content_type),
+        ("Content-Length", str(content_length)),
+    ]
+    if api.cors_origin is not None:
+        headers.extend(
+            [
+                ("Access-Control-Allow-Origin", api.cors_origin),
+                ("Access-Control-Allow-Methods", "GET, OPTIONS"),
+                ("Access-Control-Allow-Headers", "Content-Type"),
+                ("Vary", "Origin"),
+            ]
+        )
+    return headers
+
+
 def make_handler(api: CandidateAPI) -> type[BaseHTTPRequestHandler]:
     """Create a request handler bound to a ``CandidateAPI`` instance."""
 
@@ -289,10 +314,16 @@ def make_handler(api: CandidateAPI) -> type[BaseHTTPRequestHandler]:
         def do_GET(self) -> None:  # noqa: N802
             status, content_type, body = api_response(api, self.path)
             self.send_response(status)
-            self.send_header("Content-Type", content_type)
-            self.send_header("Content-Length", str(len(body)))
+            for name, value in response_headers(api, content_type, len(body)):
+                self.send_header(name, value)
             self.end_headers()
             self.wfile.write(body)
+
+        def do_OPTIONS(self) -> None:  # noqa: N802
+            self.send_response(204)
+            for name, value in response_headers(api, "text/plain; charset=utf-8", 0):
+                self.send_header(name, value)
+            self.end_headers()
 
         def do_POST(self) -> None:  # noqa: N802
             body = json.dumps(
@@ -300,9 +331,11 @@ def make_handler(api: CandidateAPI) -> type[BaseHTTPRequestHandler]:
                 sort_keys=True,
             ).encode("utf-8")
             self.send_response(405)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Allow", "GET")
-            self.send_header("Content-Length", str(len(body)))
+            for name, value in response_headers(
+                api, "application/json; charset=utf-8", len(body)
+            ):
+                self.send_header(name, value)
             self.end_headers()
             self.wfile.write(body)
 
@@ -320,6 +353,7 @@ def run_server(
     title: str = "Candidate Review Dashboard",
     source_label: str = "local JSON",
     background_db_path: Path | None = None,
+    cors_origin: str | None = None,
 ) -> None:
     """Run the local read-only HTTP server until interrupted."""
     api = CandidateAPI(
@@ -327,6 +361,7 @@ def run_server(
         title=title,
         source_label=source_label,
         background_db_path=background_db_path,
+        cors_origin=cors_origin,
     )
     server = ThreadingHTTPServer((host, port), make_handler(api))
     print(f"Serving read-only candidate API at http://{host}:{port}")
@@ -346,6 +381,11 @@ def _cli(argv: list[str] | None = None) -> int:
     parser.add_argument("--title", default="Candidate Review Dashboard")
     parser.add_argument("--source-label", default="local JSON")
     parser.add_argument(
+        "--cors-origin",
+        default=None,
+        help="Optional Access-Control-Allow-Origin value for a separate local frontend.",
+    )
+    parser.add_argument(
         "--background-db-path",
         type=Path,
         default=None,
@@ -361,6 +401,7 @@ def _cli(argv: list[str] | None = None) -> int:
         title=args.title,
         source_label=args.source_label,
         background_db_path=args.background_db_path,
+        cors_origin=args.cors_origin,
     )
     return 0
 

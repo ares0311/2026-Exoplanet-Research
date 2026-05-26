@@ -17,7 +17,7 @@ The toolkit supports five scorer modes, selectable via the CLI:
 | CNN | `--scorer cnn --cnn-checkpoint <path>` | Experimental CNN checkpoint wrapper on phase-folded snippets |
 | Full ensemble | `--scorer full-ensemble --model-path <path> --cnn-checkpoint <path>` | Experimental XGBoost + CNN + Bayesian blend |
 
-The current local validation surface passes with 4282 default tests and 2 live
+The current local validation surface passes with 4285 default tests and 2 live
 integration tests deselected. On macOS, installing `xgboost` also requires the
 OpenMP runtime:
 

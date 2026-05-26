@@ -54,7 +54,7 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 264 test files. Local validation on 2026-05-25 passed with 4282 default tests, 2 `integration_live` tests deselected, and 59 warnings.
+**Current test surface:** 264 test files. Local validation on 2026-05-25 passed with 4285 default tests, 2 `integration_live` tests deselected, and 59 warnings.
 **Skills:** 249 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
@@ -729,7 +729,7 @@ All pipeline modules are complete.
 
 | Skill | Key Functions | Tests |
 |---|---|---|
-| `candidate_api.py` | `CandidateAPI`, `api_response`, `summary_payload`, `background_summary_payload`, `artifact_payload` | 30 |
+| `candidate_api.py` | `CandidateAPI`, `api_response`, `summary_payload`, `background_summary_payload`, `artifact_payload`, opt-in CORS headers | 33 |
 
 ### Completed (2026-05-20) — Milestone 19d
 

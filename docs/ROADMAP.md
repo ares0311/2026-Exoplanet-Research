@@ -228,9 +228,10 @@
 - [x] `Skills/candidate_api.py` — standard-library read-only HTTP API for local candidate JSON rows
 - [x] Endpoints: `/health`, `/summary`, `/candidates`, `/candidates/<id>`, `/dashboard`, `/background/summary`, `/background/latest`
 - [x] Static local review bundle endpoint: `/artifact.json`
+- [x] Opt-in CORS headers for separate local frontends (`--cors-origin`)
 - [x] Optional background SQLite summaries are read-only and do not create or mutate runtime databases
 - [x] Candidate payloads carry optional phase-fold plot artifact paths
-- [x] 30 tests in `tests/test_candidate_api.py`
+- [x] 33 tests in `tests/test_candidate_api.py`
 
 ---
 

@@ -11,6 +11,7 @@ from Skills.candidate_api import (
     artifact_payload,
     background_summary_payload,
     candidate_to_payload,
+    response_headers,
     summary_payload,
 )
 
@@ -188,6 +189,31 @@ def test_summary_payload_counts_blocked_rows() -> None:
     payload = summary_payload(api.candidates)
     assert payload["blocked_count"] == 1
     assert payload["risk_counts"]["blocked"] == 1
+
+
+def test_candidate_api_cors_origin_defaults_none() -> None:
+    api = CandidateAPI([_row()])
+    assert api.cors_origin is None
+
+
+def test_candidate_api_stores_cors_origin_when_configured() -> None:
+    api = CandidateAPI([_row()], cors_origin="http://127.0.0.1:9000")
+    assert api.cors_origin == "http://127.0.0.1:9000"
+
+
+def test_response_headers_include_cors_only_when_configured() -> None:
+    no_cors = dict(response_headers(CandidateAPI([]), "application/json", 2))
+    with_cors = dict(
+        response_headers(
+            CandidateAPI([], cors_origin="http://127.0.0.1:9000"),
+            "application/json",
+            2,
+        )
+    )
+
+    assert "Access-Control-Allow-Origin" not in no_cors
+    assert with_cors["Access-Control-Allow-Origin"] == "http://127.0.0.1:9000"
+    assert with_cors["Access-Control-Allow-Methods"] == "GET, OPTIONS"
 
 
 def test_health_endpoint() -> None:
