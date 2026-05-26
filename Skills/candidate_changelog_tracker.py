@@ -16,11 +16,11 @@ format_changelog_result(result) -> str
 from __future__ import annotations
 
 import contextlib
-import datetime
 import json
 import os
 import tempfile
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -98,7 +98,7 @@ def record_change(
         "field": field,
         "old_value": None if old_val is None else str(old_val),
         "new_value": None if new_val is None else str(new_val),
-        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.now(UTC).replace(tzinfo=None).isoformat() + "Z",
         "author": author,
     }
     data[key].append(entry)

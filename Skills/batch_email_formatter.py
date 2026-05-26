@@ -13,8 +13,8 @@ format_single_candidate_email(row, *, sender, recipients) -> EmailMessage
 """
 from __future__ import annotations
 
-import datetime
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 
 @dataclass(frozen=True)
@@ -45,7 +45,7 @@ def _fpp(row: dict) -> float | None:
 
 
 def _fmt_date() -> str:
-    return datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    return datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
 
 
 _HTML_TEMPLATE = """\

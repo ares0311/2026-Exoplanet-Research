@@ -19,11 +19,11 @@ format_disposition_result(result) -> str
 from __future__ import annotations
 
 import contextlib
-import datetime
 import json
 import os
 import tempfile
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 VALID_STATUSES: frozenset[str] = frozenset({
@@ -116,7 +116,7 @@ def record_disposition(
         "status": status,
         "confidence": round(confidence, 4),
         "note": note,
-        "recorded_at": datetime.datetime.utcnow().isoformat() + "Z",
+        "recorded_at": datetime.now(UTC).replace(tzinfo=None).isoformat() + "Z",
         "author": author,
     }
     data[key].append(entry)

@@ -2,7 +2,7 @@
 
 ## Status: Active Development
 ## Phase: Milestone 27 Complete — CNN Training Infrastructure And Skills Expansion
-## Last Updated: 2026-05-25
+## Last Updated: 2026-05-26
 
 ---
 
@@ -111,7 +111,7 @@ explicit approval in restricted environments.
 
 ## Latest Local Validation
 
-Validated on 2026-05-25:
+Validated on 2026-05-26:
 
 ```bash
 .venv/bin/ruff check .
@@ -119,7 +119,7 @@ Validated on 2026-05-25:
 .venv/bin/python -m pytest
 ```
 
-Result: ruff passed, mypy passed, pytest passed with 4285 passed, 2 deselected, and 59 warnings.
+Result: ruff passed, mypy passed, pytest passed with 4285 passed, 2 deselected, and 7 warnings. The remaining warnings come from Astropy Lomb-Scargle internals exercised by stellar rotation tests.
 
 ---
 

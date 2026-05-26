@@ -17,8 +17,8 @@ format_leaderboard(result) -> str
 """
 from __future__ import annotations
 
-import datetime
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 
 @dataclass(frozen=True)
@@ -167,7 +167,7 @@ def generate_leaderboard(
 
 
 def _now() -> str:
-    return datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def format_leaderboard(result: LeaderboardResult) -> str:
