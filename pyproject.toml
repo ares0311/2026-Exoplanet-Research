@@ -111,8 +111,6 @@ files = ["src"]
 [[tool.mypy.overrides]]
 module = [
   "lightkurve.*",
-  "astroquery.*",
-  "matplotlib.*",
   "astropy.*",
   "typer.*",
   "rich.*"
