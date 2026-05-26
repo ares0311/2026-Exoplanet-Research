@@ -72,7 +72,7 @@ Added in Weekly cleanup (2026-05-10). Implements one-shot, scheduler-friendly ba
 | `followup.py` | `mandatory_follow_up_tests()`, `trigger_reason_codes()` |
 | `runner.py` | `background_run_once(db_path, ...)` — single bounded run; dry_run mode |
 | `reports.py` | `build_draft_report()`, `export_draft_report()`, `build_submission_recommendations()` |
-| `storage.py` | `BackgroundStore` — SQLite with 6 tables; schema v2 with v1→v2 migration |
+| `storage.py` | `BackgroundStore` — SQLite schema v2 for the run ledger, priority evaluations, outcomes, follow-up tests, reports, approvals, locks, and migrations |
 | `reason_codes.py` | `ReasonCode` enum — stable string values for audit trails |
 
 **CLI subcommands** (via `exo <subcommand>`):

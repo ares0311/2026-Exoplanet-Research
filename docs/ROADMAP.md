@@ -79,7 +79,7 @@
 - [x] `background/` module — SQLite-backed durable state (run ledger, reviewed/needs-follow-up logs, follow-up tests, reports, approvals)
 - [x] `background/runner.py` — `background_run_once()` — one-shot scheduler-friendly invocation
 - [x] `background/priority.py` — composite priority scoring (8 factors) with reason codes
-- [x] `background/storage.py` — `BackgroundStore` with 6 SQLite tables; schema v2 with migration
+- [x] `background/storage.py` — `BackgroundStore` with schema v2 tables for the run ledger, priority evaluations, outcomes, follow-up tests, reports, approvals, locks, and migrations
 - [x] `background/reports.py` — draft Markdown/HTML reports; human-approval gate enforced
 - [x] `background/fixtures.py` + `fixtures/known_tess_examples.json` — deterministic offline target pool
 - [x] CLI subcommands: `exo background-run-once`, `run-summary`, `sqlite-integrity`, `target-priority-summary`, and 13 others
