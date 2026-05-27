@@ -307,7 +307,7 @@ This table is intentionally workflow-oriented rather than exhaustive.
 | `train_xgboost.py` | Stratified k-fold XGBoost training with Platt calibration | `train_xgboost` |
 | `fetch_kepler_tce.py` | Download Kepler KOI cumulative table | `fetch_kepler_tce` |
 | `fetch_tess_toi.py` | Download TESS TOI table from ExoFOP | `fetch_tess_toi` |
-| `fetch_exofop_ctoi.py` | Parse opt-in ExoFOP CTOI rows and fixture-backed label rows | `fetch_ctoi_table`, `ctoi_rows_to_label_rows` |
+| `fetch_exofop_ctoi.py` | Parse opt-in ExoFOP CTOI rows and export fixture-backed label rows with `--labels-output` | `fetch_ctoi_table`, `ctoi_rows_to_label_rows` |
 | `count_tess_labels.py` | Check CNN Tier-2 label gate (≥5,000 CP) | (script) |
 
 ---

@@ -1,6 +1,7 @@
 """Tests for Skills/fetch_exofop_ctoi.py."""
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -8,6 +9,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
 
+import fetch_exofop_ctoi
 from fetch_exofop_ctoi import (
     ctoi_rows_to_label_rows,
     fetch_ctoi_table,
@@ -165,3 +167,45 @@ def test_ctoi_label_rows_include_manifest_fields():
     assert row["period_days"] == pytest.approx(3.5)
     assert row["epoch"] == pytest.approx(2458000.5)
     assert row["duration_hours"] == pytest.approx(2.1)
+
+
+def test_cli_labels_output_writes_assembler_rows(tmp_path, monkeypatch):
+    result = fetch_ctoi_table(fetch_fn=_make_fetch(_GOOD_CSV), min_ratings=1)
+    monkeypatch.setattr(fetch_exofop_ctoi, "fetch_ctoi_table", lambda **kwargs: result)
+
+    out = tmp_path / "ctoi_labels.json"
+    code = fetch_exofop_ctoi._cli(["--labels-output", str(out)])
+
+    assert code == 0
+    rows = json.loads(out.read_text())
+    assert len(rows) == 3
+    assert rows[0]["source"] == "ctoi"
+    assert {"tic_id", "label", "confidence", "period_days", "epoch"} <= set(rows[0])
+
+
+def test_cli_labels_output_excludes_pc_rows(tmp_path, monkeypatch):
+    result = fetch_ctoi_table(fetch_fn=_make_fetch(_GOOD_CSV), min_ratings=1)
+    monkeypatch.setattr(fetch_exofop_ctoi, "fetch_ctoi_table", lambda **kwargs: result)
+
+    out = tmp_path / "ctoi_labels.json"
+    fetch_exofop_ctoi._cli(["--labels-output", str(out)])
+
+    rows = json.loads(out.read_text())
+    assert {row["ctoi"] for row in rows} == {"1234.01", "5678.01", "9999.01"}
+    assert "8888.01" not in {row["ctoi"] for row in rows}
+
+
+def test_cli_raw_output_still_writes_parsed_payload(tmp_path, monkeypatch):
+    result = fetch_ctoi_table(fetch_fn=_make_fetch(_GOOD_CSV), min_ratings=1)
+    monkeypatch.setattr(fetch_exofop_ctoi, "fetch_ctoi_table", lambda **kwargs: result)
+
+    out = tmp_path / "ctoi_raw.json"
+    code = fetch_exofop_ctoi._cli(["--output", str(out)])
+
+    assert code == 0
+    payload = json.loads(out.read_text())
+    assert payload["flag"] == "OK"
+    assert payload["n_cp"] == 1
+    assert payload["n_fp"] == 2
+    assert payload["n_pc"] == 1
+    assert len(payload["rows"]) == 4

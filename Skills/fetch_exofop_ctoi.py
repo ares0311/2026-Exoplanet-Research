@@ -9,6 +9,7 @@ Public API
 CtoisResult(rows, n_cp, n_fp, n_pc, fetched_at, flag)
 fetch_ctoi_table(*, ctoi_url, min_ratings, fetch_fn) -> CtoisResult
 ctoi_rows_to_label_rows(rows) -> tuple[dict, ...]
+write_json(path, payload) -> Path
 format_ctoi_result(result) -> str
 """
 from __future__ import annotations
@@ -272,6 +273,20 @@ def ctoi_rows_to_label_rows(
     return tuple(label_rows)
 
 
+def write_json(path: str | Path, payload: object) -> Path:
+    """Write JSON payload to path and return the resolved Path."""
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json_dumps(payload))
+    return out
+
+
+def json_dumps(payload: object) -> str:
+    import json
+
+    return json.dumps(payload, indent=2)
+
+
 def format_ctoi_result(result: CtoisResult) -> str:
     """Return a Markdown summary of a :class:`CtoisResult`."""
     lines = [
@@ -311,7 +326,6 @@ def format_ctoi_result(result: CtoisResult) -> str:
 
 def _cli(argv: list[str] | None = None) -> int:
     import argparse
-    import json
 
     parser = argparse.ArgumentParser(
         prog="fetch_exofop_ctoi",
@@ -323,28 +337,36 @@ def _cli(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--output", type=str, default=None,
                         help="Optional path to save JSON output")
+    parser.add_argument(
+        "--labels-output",
+        type=str,
+        default=None,
+        help="Optional path to save assembler-compatible CP/FP label rows",
+    )
     args = parser.parse_args(argv)
 
     result = fetch_ctoi_table(min_ratings=args.min_ratings)
     print(format_ctoi_result(result))
 
     if args.output:
-        out = Path(args.output)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(
-            json.dumps(
-                {
-                    "flag": result.flag,
-                    "fetched_at": result.fetched_at,
-                    "n_cp": result.n_cp,
-                    "n_fp": result.n_fp,
-                    "n_pc": result.n_pc,
-                    "rows": list(result.rows),
-                },
-                indent=2,
-            )
+        out = write_json(
+            args.output,
+            {
+                "flag": result.flag,
+                "fetched_at": result.fetched_at,
+                "n_cp": result.n_cp,
+                "n_fp": result.n_fp,
+                "n_pc": result.n_pc,
+                "rows": list(result.rows),
+            },
         )
         print(f"\nSaved to {out}")
+    if args.labels_output:
+        labels_out = write_json(
+            args.labels_output,
+            list(ctoi_rows_to_label_rows(result.rows)),
+        )
+        print(f"\nSaved label rows to {labels_out}")
     return 0 if result.flag == "OK" else 1
 
 

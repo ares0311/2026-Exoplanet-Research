@@ -54,7 +54,7 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 264 test files. Local validation on 2026-05-27 passed with 4291 default tests and 2 `integration_live` tests deselected.
+**Current test surface:** 264 test files. Local validation on 2026-05-27 passed with 4294 default tests and 2 `integration_live` tests deselected.
 **Skills:** 249 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
@@ -855,7 +855,7 @@ All pipeline modules are complete.
 
 | Skill / Module | Key Functions | Tests |
 |---|---|---|
-| `fetch_exofop_ctoi.py` | `fetch_ctoi_table`, `ctoi_rows_to_label_rows`, `CtoisResult` — ExoFOP CTOI CSV download and opt-in label rows | 17 |
+| `fetch_exofop_ctoi.py` | `fetch_ctoi_table`, `ctoi_rows_to_label_rows`, `CtoisResult` — ExoFOP CTOI CSV download and opt-in label rows | 20 |
 | `fetch_nea_koi_lc_index.py` | `fetch_koi_lc_index`, `KoiRecord` — NASA TAP ephemeris index | 13 |
 | `multi_source_label_assembler.py` | `assemble_labels`, `LabelManifest`, `LabelRecord` — merge/dedup labels | 13 |
 | `lc_snippet_batch_builder.py` | `build_snippet_batch`, checkpoint/resume batch extraction | 13 |

@@ -27,7 +27,7 @@ jobs:
         run: ruff check .
 
       - name: Type check
-        run: python -m mypy src
+        run: mypy src
 
       - name: Test
         run: pytest --cov=exo_toolkit --cov-report=term-missing

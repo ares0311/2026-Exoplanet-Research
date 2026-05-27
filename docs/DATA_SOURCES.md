@@ -85,6 +85,8 @@ Source contract status before any default-training integration:
 - labels map only externally reviewed dispositions into training labels
 - uncertain/community-only candidate labels remain excluded from default
   supervised training
+- opt-in label export uses
+  `python Skills/fetch_exofop_ctoi.py --labels-output data/exofop_ctoi_labels.json`
 - fetched tables are cached under `data/` and are not committed unless promoted
   as explicit fixtures
 - docs record provider URL, auth requirements, rate-limit expectations, and

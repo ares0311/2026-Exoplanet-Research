@@ -120,7 +120,7 @@ Validated on 2026-05-27:
 .venv/bin/python -m pytest
 ```
 
-Result: ruff passed, mypy passed, pytest passed with 4291 passed, 2 deselected, and no warnings.
+Result: ruff passed, mypy passed, pytest passed with 4294 passed, 2 deselected, and no warnings.
 
 ---
 

@@ -20,10 +20,29 @@ assembly steps.
 
 - Live fetched tables should be cached under `data/`, for example
   `data/exofop_ctoi.csv`.
+- Opt-in assembler-compatible label rows can be written under `data/`, for
+  example `data/exofop_ctoi_labels.json`.
 - Live fetched tables are runtime data and should not be committed unless a
   future decision explicitly promotes a frozen copy as a fixture.
 - Default tests use `tests/fixtures/exofop_ctoi_sample.csv` or injected fetch
   functions.
+
+## Opt-In Commands
+
+Fetch and cache the raw parsed CTOI payload:
+
+```bash
+python Skills/fetch_exofop_ctoi.py --output data/exofop_ctoi.json
+```
+
+Fetch and cache only assembler-compatible reviewed label rows:
+
+```bash
+python Skills/fetch_exofop_ctoi.py --labels-output data/exofop_ctoi_labels.json
+```
+
+Both commands perform live network access and should be run intentionally, not
+as part of default validation.
 
 ## Accepted Columns
 
