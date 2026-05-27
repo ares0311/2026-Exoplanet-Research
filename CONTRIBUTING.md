@@ -31,7 +31,7 @@ Run these before handing work to another agent or opening a pull request:
 ```bash
 pytest --cov=exo_toolkit --cov-report=term-missing
 ruff check .
-mypy src
+python -m mypy src
 ```
 
 The local `.venv` invocation used for the latest validation was:

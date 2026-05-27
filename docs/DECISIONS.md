@@ -301,3 +301,26 @@ for external submission.
 - Keeps false-positive hypotheses prominent.
 - Leaves room for future period-, radius-, stellar-type-, and completeness-
   dependent priors after calibration evidence exists.
+
+---
+
+## DECISION-012: Invoke Mypy Through Python Module Execution
+
+**Date:** 2026-05-27
+**Status:** Accepted
+
+### Context
+
+Local validation now runs inside the active Python environment, commonly through `.venv/bin/python`.
+Bare `mypy` can resolve to a different executable or dependency context than the interpreter used for tests and project tooling.
+
+### Decision
+
+Use `python -m mypy src` for the standard type-check command, and `.venv/bin/python -m mypy src` when invoking the project virtual environment directly.
+The older bare `mypy src` form is superseded for current local and CI validation guidance.
+
+### Rationale
+
+- Keeps type checking tied to the same interpreter and installed packages used by the rest of validation.
+- Reduces cross-agent ambiguity when multiple shells, virtual environments, or package managers are present.
+- Aligns contributor docs, CI, and handoff validation evidence.
