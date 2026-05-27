@@ -198,7 +198,7 @@ Each stage produces a typed, immutable result object and preserves provenance me
 | `background/` | — | SQLite-backed automation: one-shot runner, priority scoring, draft reports | 16 |
 | **Package subtotal** | | | **758** |
 
-The repository also contains 249 standalone `Skills/` utilities with dedicated tests. Current local validation passes 4287 default tests with the two live integration tests deselected; see `docs/PROJECT_STATUS.md` for the latest validation note.
+The repository also contains 249 standalone `Skills/` utilities with dedicated tests. Current local validation passes 4291 default tests with the two live integration tests deselected; see `docs/PROJECT_STATUS.md` for the latest validation note.
 
 ### Operating Modes
 
@@ -668,7 +668,7 @@ python Skills/evaluate_scorer.py \
 │           ├── xgboost_scorer.py    # XGBoost binary classifier (Tier-1)
 │           ├── cnn_scorer.py        # CNN checkpoint wrapper (Tier-2 scaffold)
 │           └── stacking_scorer.py   # Weighted blend scorer (Tier-3)
-├── tests/                       # 4287 default tests plus 2 live tests
+├── tests/                       # 4291 default tests plus 2 live tests
 │   ├── test_schemas.py          # 33 tests
 │   ├── test_features.py         # 145 tests
 │   ├── test_hypotheses.py       # 46 tests
@@ -721,6 +721,7 @@ python Skills/evaluate_scorer.py \
 │   ├── ML_SCORING.md            # ML scorer modes, training pipeline, column maps
 │   ├── CNN_SPEC.md              # Tier-2 CNN architecture spec (gated)
 │   ├── DATA_SOURCES.md          # MAST, ExoFOP, NExSci endpoints and caching
+│   ├── CTOI_SOURCE_CONTRACT.md  # Fixture-backed opt-in CTOI label-source contract
 │   ├── DECISIONS.md             # Durable design decisions with rationale
 │   ├── BACKGROUND_SEARCH_AUTOMATION_BLUEPRINT.md  # Background automation design
 │   ├── BACKGROUND_SEARCH_SQLITE_SCHEMA.md  # SQLite schema reference
@@ -783,7 +784,7 @@ PYTHONPATH=src python -m pytest -m integration_live
 | `ml/cnn_scorer.py` | 21 |
 | `background/` module | 16 |
 | Skills utilities | 249 scripts with dedicated tests |
-| **Current default suite** | **4287 passed, 2 live tests deselected** |
+| **Current default suite** | **4291 passed, 2 live tests deselected** |
 
 ---
 
@@ -796,7 +797,7 @@ PYTHONPATH=src python -m pytest -m integration_live
 | TESS Input Catalog (TIC) | `astroquery.mast.Catalogs` | Stellar parameters, contamination ratio |
 | TESS TOI catalog | ExoFOP-TESS (`exofop.ipac.caltech.edu`) | Known-object matching; training labels |
 | Kepler KOI cumulative table | NASA Exoplanet Archive DR25 (Thompson et al.) | Training labels (confirmed vs. FP) |
-| CTOI catalog | NASA Exoplanet Archive | Community TOI cross-matching |
+| CTOI catalog | ExoFOP-TESS CTOI CSV | Opt-in community label source; fixture-backed contract in `docs/CTOI_SOURCE_CONTRACT.md` |
 | Gaia DR3 | `astroquery.gaia` | Crowding, centroid analysis |
 
 Rate limits and caching guidance are documented in `docs/DATA_SOURCES.md`. The TESS TOI table is downloaded as a CSV from ExoFOP-TESS and filtered to CP (confirmed planet), FP (false positive), and EB (eclipsing binary) dispositions. PC (planet candidate) entries are excluded from training labels due to label noise. The Kepler DR25 Robovetter outputs (Thompson et al.; Coughlin et al.) are used as training labels for the XGBoost classifier, restricting to `koi_disposition ∈ {CONFIRMED, FALSE POSITIVE}`.

@@ -8,6 +8,7 @@ Public API
 ----------
 CtoisResult(rows, n_cp, n_fp, n_pc, fetched_at, flag)
 fetch_ctoi_table(*, ctoi_url, min_ratings, fetch_fn) -> CtoisResult
+ctoi_rows_to_label_rows(rows) -> tuple[dict, ...]
 format_ctoi_result(result) -> str
 """
 from __future__ import annotations
@@ -16,10 +17,11 @@ import csv
 import io
 import sys
 import urllib.request
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TypeAlias
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
@@ -39,6 +41,10 @@ _COL_PERIOD = ("Period (days)", "period_days", "Period")
 _COL_DURATION = ("Duration (hours)", "duration_hours", "Duration (hrs)")
 _COL_EPOCH = ("Epoch (BJD)", "epoch_bjd", "Epoch")
 _COL_NREPORTS = ("Num Reports", "n_ratings", "Num Ratings", "num_reports")
+
+FetchFn: TypeAlias = Callable[[str], str]
+CtoiRow: TypeAlias = dict[str, object | None]
+LabelRow: TypeAlias = dict[str, object | None]
 
 
 def _find_col(header: list[str], candidates: tuple[str, ...]) -> str | None:
@@ -69,6 +75,29 @@ def _safe_float(row: dict, col: str | None) -> float | None:
         return None
 
 
+def _coerce_float(value: object) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_int(value: object, *, default: int = 0) -> int:
+    if value is None:
+        return default
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return default
+
+
+def _label_confidence(n_ratings: int) -> float:
+    """Return a deterministic conflict-resolution weight, not a probability."""
+    return min(0.90, 0.65 + 0.05 * max(n_ratings, 0))
+
+
 def _default_fetch(url: str) -> str:
     with urllib.request.urlopen(url, timeout=30) as resp:  # noqa: S310
         return resp.read().decode("utf-8", errors="replace")
@@ -93,7 +122,7 @@ class CtoisResult:
         flag: "OK" | "EMPTY" | "FETCH_ERROR"
     """
 
-    rows: tuple[dict, ...]
+    rows: tuple[CtoiRow, ...]
     n_cp: int
     n_fp: int
     n_pc: int
@@ -110,7 +139,7 @@ def fetch_ctoi_table(
     *,
     ctoi_url: str = _CTOI_URL,
     min_ratings: int = 1,
-    fetch_fn: Callable | None = None,
+    fetch_fn: FetchFn | None = None,
 ) -> CtoisResult:
     """Download and parse the ExoFOP CTOI table.
 
@@ -147,7 +176,7 @@ def fetch_ctoi_table(
     col_epoch = _find_col(list(header), _COL_EPOCH)
     col_nrep = _find_col(list(header), _COL_NREPORTS)
 
-    rows: list[dict] = []
+    rows: list[CtoiRow] = []
     n_cp = n_fp = n_pc = 0
 
     for raw_row in reader:
@@ -198,6 +227,49 @@ def fetch_ctoi_table(
         fetched_at=now,
         flag="OK",
     )
+
+
+def ctoi_rows_to_label_rows(
+    rows: Iterable[Mapping[str, object]],
+    *,
+    source: str = "ctoi",
+) -> tuple[LabelRow, ...]:
+    """Convert eligible CTOI rows into opt-in training label rows.
+
+    Only externally dispositioned `CP`, `FP`, and `EB` rows become supervised
+    labels. `PC` and other uncertain/community-only candidate rows are skipped
+    so the default training flow does not learn from unresolved candidates.
+    """
+    label_rows: list[LabelRow] = []
+    for row in rows:
+        disposition = str(row.get("disposition", "")).strip().lower()
+        if disposition == "cp":
+            label = 1
+        elif disposition == "fp":
+            label = 0
+        else:
+            continue
+
+        tic_id = str(row.get("tic_id", "")).strip()
+        if not tic_id:
+            continue
+
+        n_ratings = _coerce_int(row.get("n_ratings"))
+        label_rows.append(
+            {
+                "tic_id": tic_id,
+                "label": label,
+                "source": source,
+                "confidence": _label_confidence(n_ratings),
+                "period_days": _coerce_float(row.get("period_days")),
+                "epoch": _coerce_float(row.get("epoch_bjd")),
+                "duration_hours": _coerce_float(row.get("duration_hours")),
+                "ctoi": str(row.get("toi", "")).strip(),
+                "disposition": disposition,
+                "n_ratings": n_ratings,
+            }
+        )
+    return tuple(label_rows)
 
 
 def format_ctoi_result(result: CtoisResult) -> str:

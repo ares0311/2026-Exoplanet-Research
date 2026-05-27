@@ -1,4 +1,4 @@
-"""Tests for Skills/fetch_exofop_ctoi.py (13 tests)."""
+"""Tests for Skills/fetch_exofop_ctoi.py."""
 from __future__ import annotations
 
 import sys
@@ -8,7 +8,11 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
 
-from fetch_exofop_ctoi import fetch_ctoi_table, format_ctoi_result
+from fetch_exofop_ctoi import (
+    ctoi_rows_to_label_rows,
+    fetch_ctoi_table,
+    format_ctoi_result,
+)
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
@@ -26,6 +30,10 @@ _EMPTY_CSV = ""
 _COMMENT_CSV = """# This is a comment
 # Another comment
 """
+
+_FIXTURE_CSV = (
+    Path(__file__).resolve().parent / "fixtures" / "exofop_ctoi_sample.csv"
+).read_text()
 
 
 def _make_fetch(csv_text: str):
@@ -123,3 +131,37 @@ def test_formatter_on_error():
     result = fetch_ctoi_table(fetch_fn=_raise_fetch)
     text = format_ctoi_result(result)
     assert "FETCH_ERROR" in text
+
+
+def test_committed_fixture_matches_source_contract():
+    result = fetch_ctoi_table(fetch_fn=_make_fetch(_FIXTURE_CSV), min_ratings=1)
+    assert result.flag == "OK"
+    assert result.n_cp == 1
+    assert result.n_fp == 2
+    assert result.n_pc == 1
+
+
+def test_ctoi_label_rows_skip_uncertain_candidates():
+    result = fetch_ctoi_table(fetch_fn=_make_fetch(_GOOD_CSV), min_ratings=1)
+    label_rows = ctoi_rows_to_label_rows(result.rows)
+    assert len(label_rows) == 3
+    assert {row["ctoi"] for row in label_rows} == {"1234.01", "5678.01", "9999.01"}
+    assert "8888.01" not in {row["ctoi"] for row in label_rows}
+
+
+def test_ctoi_label_rows_map_reviewed_dispositions():
+    result = fetch_ctoi_table(fetch_fn=_make_fetch(_GOOD_CSV), min_ratings=1)
+    by_ctoi = {row["ctoi"]: row for row in ctoi_rows_to_label_rows(result.rows)}
+    assert by_ctoi["1234.01"]["label"] == 1
+    assert by_ctoi["5678.01"]["label"] == 0
+    assert by_ctoi["9999.01"]["label"] == 0
+
+
+def test_ctoi_label_rows_include_manifest_fields():
+    result = fetch_ctoi_table(fetch_fn=_make_fetch(_GOOD_CSV), min_ratings=1)
+    row = ctoi_rows_to_label_rows(result.rows)[0]
+    assert row["source"] == "ctoi"
+    assert row["confidence"] == pytest.approx(0.90)
+    assert row["period_days"] == pytest.approx(3.5)
+    assert row["epoch"] == pytest.approx(2458000.5)
+    assert row["duration_hours"] == pytest.approx(2.1)

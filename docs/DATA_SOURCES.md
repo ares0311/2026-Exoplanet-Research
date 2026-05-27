@@ -68,14 +68,18 @@ Gate check: `python Skills/count_tess_labels.py` monitors CP count for CNN Tier-
 
 ## CTOI / Community TOI
 
-Not yet integrated into the default training pipeline. Treat CTOI/community
-candidate tables as a future opt-in source for citizen-science transit
-candidates that can augment the TESS TOI training set after a stable, mockable
-source contract exists.
+Not integrated into the default training pipeline. Treat CTOI/community
+candidate tables as an opt-in source for citizen-science transit candidates
+that can augment the TESS TOI training set only after an intentional fetch and
+label assembly step.
 
-Minimum source contract before implementation:
+The fixture-backed source contract is documented in
+`docs/CTOI_SOURCE_CONTRACT.md`.
 
-- fetch command lives under `Skills/`
+Source contract status before any default-training integration:
+
+- fetch command lives under `Skills/` — implemented by
+  `Skills/fetch_exofop_ctoi.py`
 - default tests use committed fixtures or injected fetch functions, not live
   network calls
 - labels map only externally reviewed dispositions into training labels

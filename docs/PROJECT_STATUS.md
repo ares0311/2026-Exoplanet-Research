@@ -2,7 +2,7 @@
 
 ## Status: Active Development
 ## Phase: Milestone 27 Complete — CNN Training Infrastructure And Skills Expansion
-## Last Updated: 2026-05-26
+## Last Updated: 2026-05-27
 
 ---
 
@@ -45,6 +45,7 @@ Local validation note: after restoring the declared `xgboost` dependency and ins
 | Milestone 19b Skill | `candidate_dashboard_export.py` — static conservative candidate dashboard with optional plot artifacts | Complete |
 | Milestone 19c Skill | `candidate_api.py` — local read-only candidate API plus optional background SQLite summaries | Complete |
 | Milestone 19d Skill | `candidate_browser_ui.py` — interactive local candidate browser with optional plot previews | Complete |
+| CTOI source contract | `docs/CTOI_SOURCE_CONTRACT.md`, `Skills/fetch_exofop_ctoi.py`, `tests/fixtures/exofop_ctoi_sample.csv` — opt-in fixture-backed community candidate labels | Complete, excluded from default training |
 | Docs | `README.md`, `docs/`, `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md` | Active maintenance |
 
 ---
@@ -99,7 +100,7 @@ No active implementation blocker is known in the default local validation path.
 6. Use `candidate_dashboard_export.py` to build static local review dashboards from existing candidate JSON outputs, including optional phase-fold plot artifact paths when available.
 7. Use `candidate_api.py` to serve existing local candidate JSON, optional read-only background SQLite summaries, `/artifact.json` review bundles, and opt-in CORS for separate local frontends.
 8. Use `candidate_browser_ui.py` for an interactive local browser UI with embedded-data/API modes and optional phase-fold plot previews.
-9. Keep CTOI/community candidate ingestion documentation-only until a stable, fixture-backed source contract is ready.
+9. Keep CTOI/community candidate ingestion opt-in and outside default training; the fixture-backed source contract now lives in `docs/CTOI_SOURCE_CONTRACT.md`.
 
 Live-network note: the CNN gate check was not run during the latest local
 maintenance pass because it queries ExoFOP and requires intentional live network
@@ -111,7 +112,7 @@ explicit approval in restricted environments.
 
 ## Latest Local Validation
 
-Validated on 2026-05-26:
+Validated on 2026-05-27:
 
 ```bash
 .venv/bin/ruff check .
@@ -119,7 +120,7 @@ Validated on 2026-05-26:
 .venv/bin/python -m pytest
 ```
 
-Result: ruff passed, mypy passed, pytest passed with 4287 passed, 2 deselected, and no warnings.
+Result: ruff passed, mypy passed, pytest passed with 4291 passed, 2 deselected, and no warnings.
 
 ---
 
