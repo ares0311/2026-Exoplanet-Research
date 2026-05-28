@@ -54,8 +54,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 264 test files. Local validation on 2026-05-27 passed with 4294 default tests and 2 `integration_live` tests deselected.
-**Skills:** 249 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
+**Current test surface:** 279 test files. Local validation on 2026-05-28 passed with 4463 default tests and 2 `integration_live` tests deselected.
+**Skills:** 264 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
 
@@ -893,6 +893,28 @@ All pipeline modules are complete.
 | `stellar_activity_index.py` | `compute_activity_index`, `format_activity_index` — RMS/MAD/outlier composite | 13 |
 | `observation_log_parser.py` | `parse_obs_log`, `load_obs_log`, `format_obs_log` — CSV/TSV photometry log parser | 15 |
 
+
+### Completed (2026-05-28) — Milestone 28
+
+**15 new Skills + 188 new tests (Tier 2 data pipeline + CNN bridge tools)**: ✅
+
+| Skill | Key Functions | Tests |
+|---|---|---|
+| `tess_tce_fetcher.py` | `fetch_tce_table`, `tce_to_label_rows`, `format_tce_summary` — SPOC TCE table from ExoMAST | 13 |
+| `label_balance_analyzer.py` | `analyze_label_balance`, `format_balance_report` — class balance + weights | 13 |
+| `snippet_deduplicator.py` | `deduplicate_snippets`, `apply_deduplication` — period-aware dedup | 13 |
+| `validation_set_curator.py` | `curate_validation_set`, `format_curation_report` — leakage-free val split | 13 |
+| `transfer_learning_config.py` | `TransferConfig`, `default_transfer_config`, `save/load`, `validate` — Kepler→TESS transfer | 12 |
+| `cnn_prediction_uncertainty.py` | `estimate_uncertainty`, `batch_uncertainty` — MC dropout uncertainty | 13 |
+| `training_data_stats_reporter.py` | `compute_training_stats`, `format_training_stats` — corpus statistics | 13 |
+| `cnn_hyperparameter_config.py` | `HyperparamGrid`, `generate_candidates`, `save/load_grid` — arch search grid | 12 |
+| `label_propagator.py` | `propagate_labels`, `format_propagation_report` — harmonic period propagation | 13 |
+| `snippet_cache_manager.py` | `SnippetCacheManager.stats/contains/prune/export_manifest` — cache ops | 13 |
+| `deployment_readiness_checker.py` | `check_deployment_readiness`, `format_readiness_report` — Tier 2 gate check | 11 |
+| `cnn_threshold_optimizer.py` | `optimize_threshold`, `format_threshold_result` — F1/BA/Youden threshold sweep | 13 |
+| `model_ensemble_evaluator.py` | `evaluate_ensemble`, `format_ensemble_eval` — AUC/PR/F1/Brier/ECE per tier | 13 |
+| `training_resumption_manager.py` | `find_latest_checkpoint`, `plan_resumption` — resume from latest checkpoint | 13 |
+| `tier2_progress_reporter.py` | `build_tier2_status`, `format_tier2_report` — unified Tier 2 progress dashboard | 13 |
 
 ### Completed (2026-05-25) — Milestone 27
 
