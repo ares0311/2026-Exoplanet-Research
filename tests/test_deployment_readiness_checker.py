@@ -6,7 +6,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from deployment_readiness_checker import (
-    ReadinessReport,
     check_deployment_readiness,
     format_readiness_report,
 )

@@ -5,7 +5,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from label_balance_analyzer import (
-    LabelBalanceResult,
     analyze_label_balance,
     format_balance_report,
 )

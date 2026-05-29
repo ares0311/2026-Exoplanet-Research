@@ -5,7 +5,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from cnn_threshold_optimizer import (
-    ThresholdResult,
     format_threshold_result,
     optimize_threshold,
 )

@@ -5,7 +5,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from training_data_stats_reporter import (
-    TrainingDataStats,
     compute_training_stats,
     format_training_stats,
 )

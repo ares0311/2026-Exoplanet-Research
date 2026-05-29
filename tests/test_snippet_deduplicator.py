@@ -5,7 +5,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from snippet_deduplicator import (
-    DeduplicationResult,
     apply_deduplication,
     deduplicate_snippets,
     format_dedup_report,
