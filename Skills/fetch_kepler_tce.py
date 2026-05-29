@@ -57,7 +57,7 @@ def fetch_koi_table(output_path: str | Path = "data/kepler_koi.csv") -> Path:
     Returns:
         Path to the written CSV file.
     """
-    from astroquery.ipac.nexsci.nea_exoplanet import NasaExoplanetArchive
+    from astroquery.ipac.nexsci.nasa_exoplanet_archive import NasaExoplanetArchive
 
     print("Querying NASA Exoplanet Archive (KOI cumulative table) …")
     table = NasaExoplanetArchive.query_criteria(
