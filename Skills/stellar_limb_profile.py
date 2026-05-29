@@ -74,7 +74,7 @@ def format_limb_profile(result: LimbProfileResult) -> str:
         "| mu   | I(mu)/I(0) |",
         "|------|------------|",
     ]
-    for mu, intensity in zip(result.mu_values, result.intensity_values):
+    for mu, intensity in zip(result.mu_values, result.intensity_values, strict=False):
         lines.append(f"| {mu:.3f} | {intensity:.6f}   |")
     return "\n".join(lines) + "\n"
 

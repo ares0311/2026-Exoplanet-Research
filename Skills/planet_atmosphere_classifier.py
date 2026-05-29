@@ -63,7 +63,9 @@ def classify_atmosphere(
         else:
             label = "sub_neptune"
             conf = "medium"
-            rationale = "High insolation may strip volatiles; likely a sub-Neptune or volatile-rich world."
+            rationale = (
+                "High insolation may strip volatiles; likely a sub-Neptune or volatile-rich world."
+            )
     else:
         # r < 1.5
         if s > 10.0:
