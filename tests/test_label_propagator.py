@@ -5,7 +5,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from label_propagator import (
-    PropagationResult,
     format_propagation_report,
     propagate_labels,
 )

@@ -6,7 +6,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from tier2_progress_reporter import (
-    Tier2Status,
     build_tier2_status,
     format_tier2_report,
 )

@@ -5,7 +5,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from cnn_prediction_uncertainty import (
-    UncertaintyResult,
     batch_uncertainty,
     estimate_uncertainty,
     format_uncertainty_report,

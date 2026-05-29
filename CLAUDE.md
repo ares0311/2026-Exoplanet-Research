@@ -54,8 +54,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 279 test files. Local validation on 2026-05-28 passed with 4463 default tests and 2 `integration_live` tests deselected.
-**Skills:** 264 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
+**Current test surface:** 294 test files. Local validation on 2026-05-29 passed with 4651 default tests and 2 `integration_live` tests deselected.
+**Skills:** 279 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
 
@@ -938,6 +938,28 @@ All pipeline modules are complete.
 | `calibration_curve_reporter.py` | `compute_calibration_curve`, `format_calibration_curve` — reliability diagram data | 13 |
 | `confusion_matrix_reporter.py` | `compute_confusion_matrix`, `format_confusion_matrix` — TP/FP/TN/FN + precision/recall/F1 | 13 |
 
+
+### Completed (2026-05-29) — Milestone 29
+
+**15 new Skills + 188 new tests (pipeline operations + session planning tools)**: ✅
+
+| Skill | Key Functions | Tests |
+|---|---|---|
+| `pipeline_health_monitor.py` | `check_pipeline_health`, `format_health_report` — label/snippet/registry/calibration health dashboard | 15 |
+| `candidate_significance_ranker.py` | `rank_by_significance`, `format_significance_table` — SNR+FPP+novelty composite significance rank | 13 |
+| `data_freshness_checker.py` | `check_data_freshness`, `format_freshness_report` — artifact age vs configurable limits | 11 |
+| `follow_up_checklist_generator.py` | `generate_checklist`, `format_checklist` — auto-generated prioritised observation checklist | 13 |
+| `model_drift_detector.py` | `compute_baseline_stats`, `detect_drift`, `format_drift_report` — mean-shift + std-ratio drift detection | 12 |
+| `candidate_cross_reference.py` | `cross_reference`, `format_cross_ref_result` — TIC+period catalog matching | 13 |
+| `pipeline_throughput_tracker.py` | `ThroughputTracker.record/stats/clear`, `format_throughput_stats` — atomic JSON throughput log | 11 |
+| `science_case_builder.py` | `build_science_case`, `format_science_case` — structured Markdown science case document | 14 |
+| `lightcurve_segment_extractor.py` | `extract_transit_segments`, `format_segment_summary` — symmetric windows around transit mid-times | 12 |
+| `multi_period_power_analyzer.py` | `analyze_multi_period_power`, `format_multi_period_result` — phase-fold SNR ranking over period grid | 12 |
+| `target_selection_optimizer.py` | `optimize_target_selection`, `format_selection_result` — science/obs/stellar/pipeline composite scorer | 13 |
+| `stellar_neighbor_vetter.py` | `vet_stellar_neighbors`, `format_neighbor_vetting` — aperture contamination from catalog neighbours | 13 |
+| `period_alias_resolver.py` | `resolve_period_alias`, `format_alias_resolution` — harmonic/sub-harmonic alias detection | 12 |
+| `candidate_prioritization_report.py` | `build_prioritization_report`, `write_prioritization_report` — full ranked Markdown planning report | 12 |
+| `batch_result_archiver.py` | `archive_batch_results`, `format_archive_result` — dated archive dir + manifest for pipeline outputs | 12 |
 
 ### Next Step
 

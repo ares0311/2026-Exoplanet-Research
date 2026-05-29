@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
-from snippet_cache_manager import SnippetCacheManager, SnippetCacheStats, format_cache_stats
+from snippet_cache_manager import SnippetCacheManager, format_cache_stats
 
 
 def _write_snippet(cache_dir: Path, tic_id: int, period: float) -> Path:

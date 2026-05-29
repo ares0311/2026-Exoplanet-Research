@@ -5,8 +5,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from tess_tce_fetcher import (
-    TceFetchResult,
-    TceRecord,
     fetch_tce_table,
     format_tce_summary,
     tce_to_label_rows,

@@ -6,8 +6,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from training_resumption_manager import (
-    CheckpointInfo,
-    ResumptionState,
     find_latest_checkpoint,
     format_resumption_state,
     plan_resumption,
