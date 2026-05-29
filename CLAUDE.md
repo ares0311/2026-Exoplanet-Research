@@ -54,8 +54,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 294 test files. Local validation on 2026-05-29 passed with 4651 default tests and 2 `integration_live` tests deselected.
-**Skills:** 279 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
+**Current test surface:** 309 test files. Local validation on 2026-05-29 passed with 4842 default tests and 2 `integration_live` tests deselected.
+**Skills:** 294 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). See `docs/SKILLS_GUIDE.md` for the current inventory and workflow-oriented quick reference instead of relying on this file for per-script counts.
 
 ---
 
@@ -960,6 +960,28 @@ All pipeline modules are complete.
 | `period_alias_resolver.py` | `resolve_period_alias`, `format_alias_resolution` — harmonic/sub-harmonic alias detection | 12 |
 | `candidate_prioritization_report.py` | `build_prioritization_report`, `write_prioritization_report` — full ranked Markdown planning report | 12 |
 | `batch_result_archiver.py` | `archive_batch_results`, `format_archive_result` — dated archive dir + manifest for pipeline outputs | 12 |
+
+### Completed (2026-05-29) — Milestone 30
+
+**15 new Skills + 191 new tests**: ✅
+
+| Skill | Key Functions | Tests |
+|---|---|---|
+| `signal_quality_grader.py` | `grade_signal_quality`, A–F grade from SNR/FPP/DC/novelty | 14 |
+| `session_summary_generator.py` | `build_session_summary`, `format_session_summary` — session stats + next steps | 13 |
+| `data_provenance_tracker.py` | `ProvenanceLog.record/get/history/summary`, MD5 checksums | 12 |
+| `candidate_label_exporter.py` | `export_for_labeling`, `load_labeled`, suggested PC/FP labels | 12 |
+| `pipeline_config_validator.py` | `validate_pipeline_config`, `load_and_validate` — required keys + ranges | 15 |
+| `transit_baseline_comparator.py` | `compare_transit_baseline`, in-transit vs OOT depth ratio | 11 |
+| `multi_mission_comparator.py` | `compare_multi_mission`, period/depth consistency across TESS/Kepler/K2 | 13 |
+| `flux_anomaly_detector.py` | `detect_flux_anomalies`, OUTLIER/STEP/RAMP via median+MAD | 12 |
+| `candidate_confidence_tracker.py` | `CandidateConfidenceTracker.record/trend/all_trends`, IMPROVING/DEGRADING | 13 |
+| `observation_metadata_recorder.py` | `MetadataStore.record/get/list_by_tic/all_records` | 13 |
+| `stellar_properties_reporter.py` | `build_stellar_report`, luminosity/HZ/spectral type from TIC params | 15 |
+| `transit_ephemeris_updater.py` | `update_ephemeris`, linear O-C fit to refine period + epoch | 13 |
+| `uncertainty_propagator.py` | `propagate_uncertainty`, finite-difference quadrature error propagation | 12 |
+| `multi_target_scheduler.py` | `schedule_targets`, greedy priority-ordered nightly scheduler | 13 |
+| `candidate_archive.py` | `CandidateArchive.insert/latest/history/search/export_csv` | 13 |
 
 ### Next Step
 
