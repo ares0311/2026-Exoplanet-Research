@@ -5,7 +5,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from target_selection_optimizer import (
-    TargetScore,
     format_selection_result,
     optimize_target_selection,
 )

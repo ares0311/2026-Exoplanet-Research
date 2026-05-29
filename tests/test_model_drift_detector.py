@@ -6,7 +6,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from model_drift_detector import (
     BaselineStats,
-    DriftResult,
     compute_baseline_stats,
     detect_drift,
     format_drift_report,

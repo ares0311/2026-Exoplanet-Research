@@ -5,9 +5,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from stellar_neighbor_vetter import (
-    NeighborVettingResult,
-    vet_stellar_neighbors,
     format_neighbor_vetting,
+    vet_stellar_neighbors,
 )
 
 _NEIGHBORS_CLEAN = [

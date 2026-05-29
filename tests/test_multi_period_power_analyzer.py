@@ -6,19 +6,16 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from multi_period_power_analyzer import (
     MultiPeriodResult,
-    PeriodPower,
     analyze_multi_period_power,
     format_multi_period_result,
 )
-
-import math
 
 # Synthetic light curve with a 5-day transit
 _T = [i * 0.02083 for i in range(1440)]
 _F_FLAT = [1.0] * len(_T)
 # Inject box transit at P=5, epoch=0, width=0.1 days
 _F_TRANSIT = [
-    0.999 if abs((t % 5.0)) < 0.05 or abs((t % 5.0) - 5.0) < 0.05 else 1.0
+    0.999 if abs(t % 5.0) < 0.05 or abs((t % 5.0) - 5.0) < 0.05 else 1.0
     for t in _T
 ]
 

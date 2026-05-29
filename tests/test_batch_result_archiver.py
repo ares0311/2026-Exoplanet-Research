@@ -6,7 +6,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from batch_result_archiver import (
-    ArchiveResult,
     archive_batch_results,
     format_archive_result,
 )

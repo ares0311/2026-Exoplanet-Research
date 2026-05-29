@@ -5,7 +5,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from candidate_prioritization_report import (
-    CandidatePriority,
     build_prioritization_report,
     write_prioritization_report,
 )
@@ -44,7 +43,7 @@ def test_title_in_report():
 def test_top_n_limits():
     report = build_prioritization_report(_ROWS, top_n=2)
     # Should only contain 2 ranked entries
-    lines = [l for l in report.split("\n") if l.startswith("| ") and "Rank" not in l]
+    lines = [ln for ln in report.split("\n") if ln.startswith("| ") and "Rank" not in ln]
     assert len(lines) <= 2
 
 

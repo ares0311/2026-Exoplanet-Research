@@ -5,7 +5,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from lightcurve_segment_extractor import (
-    TransitSegment,
     extract_transit_segments,
     format_segment_summary,
 )

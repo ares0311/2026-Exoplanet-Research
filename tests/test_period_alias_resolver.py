@@ -5,9 +5,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from period_alias_resolver import (
-    AliasResolution,
-    resolve_period_alias,
     format_alias_resolution,
+    resolve_period_alias,
 )
 
 

@@ -6,8 +6,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from follow_up_checklist_generator import (
     FollowUpChecklist,
-    generate_checklist,
     format_checklist,
+    generate_checklist,
 )
 
 

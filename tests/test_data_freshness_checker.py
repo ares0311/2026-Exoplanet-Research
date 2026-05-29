@@ -7,7 +7,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from data_freshness_checker import (
-    FreshnessReport,
     check_data_freshness,
     format_freshness_report,
 )

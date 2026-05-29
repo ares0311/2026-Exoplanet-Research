@@ -5,7 +5,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from candidate_significance_ranker import (
-    SignificanceResult,
     format_significance_table,
     rank_by_significance,
 )
