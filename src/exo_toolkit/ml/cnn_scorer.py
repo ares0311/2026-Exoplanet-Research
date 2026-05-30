@@ -179,8 +179,7 @@ class CnnScorer:
             tensor = torch.tensor(snippets, dtype=torch.float32).unsqueeze(1)
             with torch.no_grad():
                 out = self._model(tensor)
-                raw = torch.sigmoid(out).squeeze(-1).tolist()
-                probs: list[float] = [raw] if isinstance(raw, float) else raw  # type: ignore[unreachable]
+                probs: list[float] = torch.sigmoid(out).flatten().tolist()
             return [self._apply_calibration(max(0.0, min(1.0, float(p)))) for p in probs]
         except Exception:  # noqa: BLE001
             return [0.5] * len(snippets)
