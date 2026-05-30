@@ -1,6 +1,7 @@
 """Tests for Skills/mean_motion_resonance_checker.py"""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from mean_motion_resonance_checker import MMRResult, check_mmr, format_mmr_result
@@ -18,7 +19,7 @@ class TestMMRResult:
                       delta_fraction=0.01, is_near_mmr=True)
         try:
             r.is_near_mmr = False
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 
@@ -54,7 +55,6 @@ class TestCheckMMR:
 
     def test_tolerance_respected(self):
         # Candidate slightly off from 2:1
-        r_tight = check_mmr(20.5, [10.0], tolerance=0.01)
         r_loose = check_mmr(20.5, [10.0], tolerance=0.05)
         # Loose should be near, tight may not be
         assert r_loose.is_near_mmr is True

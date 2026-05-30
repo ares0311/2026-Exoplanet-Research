@@ -6,10 +6,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from guiding_star_selector import (  # noqa: E402
     GuideStarResult,
-    select_guide_star,
     format_guide_star,
+    select_guide_star,
 )
-
 
 STARS = [
     {"mag": 11.0, "sep_arcsec": 120.0},

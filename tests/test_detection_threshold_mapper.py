@@ -1,11 +1,15 @@
-import sys
 import math
+import sys
 from pathlib import Path
+
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
-from detection_threshold_mapper import ThresholdMapResult, map_detection_thresholds, format_threshold_map
-
+from detection_threshold_mapper import (
+    ThresholdMapResult,
+    format_threshold_map,
+    map_detection_thresholds,
+)
 
 # --- happy path ---
 

@@ -1,6 +1,7 @@
 """Tests for Skills/stellar_limb_profile.py"""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from stellar_limb_profile import LimbProfileResult, compute_limb_profile, format_limb_profile
@@ -22,7 +23,7 @@ class TestLimbProfileResult:
         )
         try:
             r.u1 = 0
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

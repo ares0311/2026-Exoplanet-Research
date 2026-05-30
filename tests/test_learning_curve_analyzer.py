@@ -1,10 +1,14 @@
 import sys
 from pathlib import Path
+
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
-from learning_curve_analyzer import LearningCurveResult, analyze_learning_curve, format_learning_curve
-
+from learning_curve_analyzer import (
+    LearningCurveResult,
+    analyze_learning_curve,
+    format_learning_curve,
+)
 
 # --- happy path ---
 

@@ -1,10 +1,14 @@
 import sys
 from pathlib import Path
+
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
-from spatial_correlation_checker import SpatialCorrResult, check_spatial_correlation, format_spatial_corr
-
+from spatial_correlation_checker import (
+    SpatialCorrResult,
+    check_spatial_correlation,
+    format_spatial_corr,
+)
 
 # --- happy path ---
 

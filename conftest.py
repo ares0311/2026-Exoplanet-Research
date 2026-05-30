@@ -6,5 +6,5 @@ lazy ``from astroquery.exceptions import …`` inside _query_mast fails with
 """
 import astroquery  # noqa: F401
 import astroquery.exceptions  # noqa: F401
-import astroquery.mast  # noqa: F401
 import astroquery.ipac.nexsci.nasa_exoplanet_archive  # noqa: F401
+import astroquery.mast  # noqa: F401

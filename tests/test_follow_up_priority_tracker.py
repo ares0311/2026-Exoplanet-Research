@@ -6,8 +6,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from follow_up_priority_tracker import (  # noqa: E402
-    PriorityRecord,
     FollowUpPriorityTracker,
+    PriorityRecord,
     format_priority_tracker,
 )
 

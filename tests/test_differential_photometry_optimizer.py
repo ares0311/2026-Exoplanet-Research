@@ -6,10 +6,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from differential_photometry_optimizer import (  # noqa: E402
     DiffPhotResult,
-    optimize_diff_photometry,
     format_diff_phot,
+    optimize_diff_photometry,
 )
-
 
 STARS = [
     {"mag": 12.0, "variable": False, "in_field": True},

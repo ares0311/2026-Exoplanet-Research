@@ -1,10 +1,10 @@
 import sys
 from pathlib import Path
+
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 from flux_gradient_analyzer import GradientResult, analyze_flux_gradient, format_gradient
-
 
 # --- happy path ---
 

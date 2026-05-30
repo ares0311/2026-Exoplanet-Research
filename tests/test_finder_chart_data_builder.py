@@ -10,7 +10,6 @@ from finder_chart_data_builder import (  # noqa: E402
     format_finder_chart_data,
 )
 
-
 STARS = [
     {"ra_deg": 180.01, "dec_deg": 30.01, "mag": 12.0},
     {"ra_deg": 180.05, "dec_deg": 30.05, "mag": 11.0},

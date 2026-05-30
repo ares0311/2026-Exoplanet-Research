@@ -1,10 +1,15 @@
 """Tests for Skills/photo_distance_estimator.py"""
-import sys
 import math
+import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
-from photo_distance_estimator import PhotoDistanceResult, estimate_photo_distance, format_photo_distance
+from photo_distance_estimator import (
+    PhotoDistanceResult,
+    estimate_photo_distance,
+    format_photo_distance,
+)
 
 
 class TestPhotoDistanceResult:
@@ -23,7 +28,7 @@ class TestPhotoDistanceResult:
         )
         try:
             r.distance_pc = 0
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

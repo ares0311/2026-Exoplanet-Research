@@ -12,7 +12,6 @@ format_outlier_impact(result) -> str
 """
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 
 
@@ -73,10 +72,7 @@ def assess_outlier_impact(flux: list[float], n_sigma: float = 3.0) -> OutlierImp
 
     # Depth without outliers
     cleaned = [f for i, f in enumerate(flux) if i not in outlier_indices]
-    if len(cleaned) >= 2:
-        depth_without = (max(cleaned) - min(cleaned)) * 1e6
-    else:
-        depth_without = depth_with
+    depth_without = (max(cleaned) - min(cleaned)) * 1e6 if len(cleaned) >= 2 else depth_with
 
     if depth_with > 0:
         depth_change_pct = abs(depth_with - depth_without) / depth_with * 100.0

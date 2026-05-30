@@ -1,10 +1,14 @@
 """Tests for Skills/planet_escape_velocity.py"""
 import sys
-import math
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
-from planet_escape_velocity import EscapeVelocityResult, compute_escape_velocity, format_escape_velocity
+from planet_escape_velocity import (
+    EscapeVelocityResult,
+    compute_escape_velocity,
+    format_escape_velocity,
+)
 
 
 class TestEscapeVelocityResult:
@@ -17,7 +21,7 @@ class TestEscapeVelocityResult:
         r = EscapeVelocityResult(v_esc_kms=11.2, can_retain_h2=True, can_retain_h2o=True, flag="OK")
         try:
             r.v_esc_kms = 0
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

@@ -1,11 +1,14 @@
 import sys
-import math
 from pathlib import Path
+
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
-from stellar_variability_scorer import VariabilityResult, score_stellar_variability, format_variability
-
+from stellar_variability_scorer import (
+    VariabilityResult,
+    format_variability,
+    score_stellar_variability,
+)
 
 # --- happy path ---
 

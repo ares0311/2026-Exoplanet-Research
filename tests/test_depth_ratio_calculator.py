@@ -1,10 +1,10 @@
 import sys
 from pathlib import Path
+
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 from depth_ratio_calculator import DepthRatioResult, compute_depth_ratio, format_depth_ratio
-
 
 # --- happy path ---
 

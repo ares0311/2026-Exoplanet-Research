@@ -1,9 +1,14 @@
 """Tests for Skills/system_architecture_summarizer.py"""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
-from system_architecture_summarizer import SystemArchResult, summarize_system_architecture, format_system_arch
+from system_architecture_summarizer import (
+    SystemArchResult,
+    format_system_arch,
+    summarize_system_architecture,
+)
 
 
 class TestSystemArchResult:
@@ -24,7 +29,7 @@ class TestSystemArchResult:
         )
         try:
             r.n_planets = 0
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

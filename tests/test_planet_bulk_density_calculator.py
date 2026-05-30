@@ -1,10 +1,14 @@
 """Tests for Skills/planet_bulk_density_calculator.py"""
 import sys
-import math
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
-from planet_bulk_density_calculator import BulkDensityResult, compute_bulk_density, format_bulk_density_result
+from planet_bulk_density_calculator import (
+    BulkDensityResult,
+    compute_bulk_density,
+    format_bulk_density_result,
+)
 
 
 class TestBulkDensityResult:
@@ -17,7 +21,7 @@ class TestBulkDensityResult:
         r = BulkDensityResult(density_gcc=5.5, composition_hint="rocky")
         try:
             r.density_gcc = 0
-            assert False, "Should be frozen"
+            raise AssertionError("Should be frozen")
         except Exception:
             pass
 

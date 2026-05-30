@@ -39,10 +39,7 @@ def analyze_bias_variance(
     mean_pred = sum(fold_predictions) / n
     bias_sq = (mean_pred - true_label) ** 2
 
-    if n > 1:
-        variance = sum((p - mean_pred) ** 2 for p in fold_predictions) / (n - 1)
-    else:
-        variance = 0.0
+    variance = sum((p - mean_pred) ** 2 for p in fold_predictions) / (n - 1) if n > 1 else 0.0
 
     total_error = bias_sq + variance
     flag = "HIGH_VARIANCE" if variance > 0.1 else "OK"
@@ -60,8 +57,8 @@ def format_bias_variance(result: BiasVarianceResult) -> str:
     lines = [
         "## Bias-Variance Analysis",
         "",
-        f"| Metric | Value |",
-        f"|--------|-------|",
+        "| Metric | Value |",
+        "|--------|-------|",
         f"| Mean prediction | {result.mean_pred:.4f} |",
         f"| Bias² | {result.bias_sq:.4f} |",
         f"| Variance | {result.variance:.4f} |",

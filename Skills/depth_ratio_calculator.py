@@ -58,8 +58,8 @@ def format_depth_ratio(result: DepthRatioResult) -> str:
     lines = [
         "## Depth Ratio Calculator",
         "",
-        f"| Metric | Value |",
-        f"|--------|-------|",
+        "| Metric | Value |",
+        "|--------|-------|",
         f"| Primary depth (ppm) | {result.primary_depth_ppm:.1f} |",
         f"| Secondary depth (ppm) | {result.secondary_depth_ppm:.1f} |",
         f"| Depth ratio (sec/pri) | {result.depth_ratio:.4f} |",

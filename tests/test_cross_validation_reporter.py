@@ -1,10 +1,10 @@
 import sys
 from pathlib import Path
+
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
-from cross_validation_reporter import CVReport, report_cross_validation, format_cv_report
-
+from cross_validation_reporter import CVReport, format_cv_report, report_cross_validation
 
 # --- happy path ---
 

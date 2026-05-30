@@ -61,7 +61,7 @@ class CnnScorer:
         if self._checkpoint_path is None:
             return
         try:
-            import torch  # type: ignore[import-not-found]  # noqa: F401
+            import torch  # noqa: F401
             self._available = True
         except ImportError:
             self._available = False
@@ -179,9 +179,8 @@ class CnnScorer:
             tensor = torch.tensor(snippets, dtype=torch.float32).unsqueeze(1)
             with torch.no_grad():
                 out = self._model(tensor)
-                probs = torch.sigmoid(out).squeeze(-1).tolist()
-            if isinstance(probs, float):
-                probs = [probs]
+                raw = torch.sigmoid(out).squeeze(-1).tolist()
+                probs: list[float] = [raw] if isinstance(raw, float) else raw  # type: ignore[unreachable]
             return [self._apply_calibration(max(0.0, min(1.0, float(p)))) for p in probs]
         except Exception:  # noqa: BLE001
             return [0.5] * len(snippets)

@@ -63,8 +63,8 @@ def format_noise_floor(result: NoiseFloorResult) -> str:
     lines = [
         "## Transit Noise Floor Estimate",
         "",
-        f"| Metric | Value |",
-        f"|--------|-------|",
+        "| Metric | Value |",
+        "|--------|-------|",
         f"| OOT points | {result.n_points} |",
         f"| Cadence (min) | {result.cadence_minutes:.1f} |",
         f"| OOT RMS (ppm) | {result.oot_rms_ppm:.1f} |",

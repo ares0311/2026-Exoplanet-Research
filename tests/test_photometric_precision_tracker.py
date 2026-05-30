@@ -1,11 +1,15 @@
-import sys
 import math
+import sys
 from pathlib import Path
+
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
-from photometric_precision_tracker import PrecisionTrackResult, track_precision, format_precision_track
-
+from photometric_precision_tracker import (
+    PrecisionTrackResult,
+    format_precision_track,
+    track_precision,
+)
 
 # --- happy path ---
 

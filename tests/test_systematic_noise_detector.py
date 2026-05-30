@@ -1,11 +1,14 @@
 import sys
-import math
 from pathlib import Path
+
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
-from systematic_noise_detector import SystematicNoiseResult, detect_systematic_noise, format_systematic_noise
-
+from systematic_noise_detector import (
+    SystematicNoiseResult,
+    detect_systematic_noise,
+    format_systematic_noise,
+)
 
 # --- happy path ---
 

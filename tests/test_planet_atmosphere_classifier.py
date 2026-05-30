@@ -1,9 +1,14 @@
 """Tests for Skills/planet_atmosphere_classifier.py"""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
-from planet_atmosphere_classifier import AtmosphereClassResult, classify_atmosphere, format_atmosphere_class
+from planet_atmosphere_classifier import (
+    AtmosphereClassResult,
+    classify_atmosphere,
+    format_atmosphere_class,
+)
 
 
 class TestAtmosphereClassResult:
@@ -18,7 +23,7 @@ class TestAtmosphereClassResult:
                                   rationale="test", flag="OK")
         try:
             r.class_label = "gas_giant"
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

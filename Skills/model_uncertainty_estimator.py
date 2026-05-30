@@ -37,10 +37,7 @@ def estimate_model_uncertainty(predictions: list[float]) -> UncertaintyResult:
 
     mean_pred = sum(predictions) / n
 
-    if n > 1:
-        std_pred = (sum((p - mean_pred) ** 2 for p in predictions) / (n - 1)) ** 0.5
-    else:
-        std_pred = 0.0
+    std_pred = (sum((p - mean_pred) ** 2 for p in predictions) / (n - 1)) ** 0.5 if n > 1 else 0.0
 
     sorted_preds = sorted(predictions)
     # Q1 and Q3 via linear interpolation on the sorted list

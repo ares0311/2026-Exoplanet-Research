@@ -1,10 +1,10 @@
 import sys
 from pathlib import Path
+
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 from event_rate_calculator import EventRateResult, calculate_event_rate, format_event_rate
-
 
 # --- happy path ---
 

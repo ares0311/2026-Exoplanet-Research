@@ -6,10 +6,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from weather_window_scorer import (  # noqa: E402
     WeatherWindowResult,
-    score_weather_windows,
     format_weather_window,
+    score_weather_windows,
 )
-
 
 GOOD_CONDITIONS = [
     {"seeing_arcsec": 1.5, "cloud_cover_pct": 0.0, "humidity_pct": 40.0, "wind_kph": 10.0}

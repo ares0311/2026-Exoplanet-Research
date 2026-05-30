@@ -6,8 +6,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from ground_photometry_planner import (  # noqa: E402
     GroundPhotPlan,
-    plan_ground_photometry,
     format_ground_phot_plan,
+    plan_ground_photometry,
 )
 
 

@@ -64,8 +64,8 @@ def format_precision_track(result: PrecisionTrackResult) -> str:
     lines = [
         "## Photometric Precision Tracker",
         "",
-        f"| Metric | Value |",
-        f"|--------|-------|",
+        "| Metric | Value |",
+        "|--------|-------|",
         f"| Nights | {result.n_nights} |",
         f"| Mean RMS (mmag) | {result.mean_rms_mmag:.3f} |",
         f"| Std RMS (mmag) | {result.std_rms_mmag:.3f} |",

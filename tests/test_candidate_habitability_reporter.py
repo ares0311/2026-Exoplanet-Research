@@ -1,10 +1,13 @@
 """Tests for Skills/candidate_habitability_reporter.py"""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from candidate_habitability_reporter import (
-    HabitabilityReport, assess_habitability, format_habitability_report
+    HabitabilityReport,
+    assess_habitability,
+    format_habitability_report,
 )
 
 
@@ -24,7 +27,7 @@ class TestHabitabilityReport:
         )
         try:
             r.overall_score = 0
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

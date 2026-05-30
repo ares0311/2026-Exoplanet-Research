@@ -1,7 +1,8 @@
 """Tests for Skills/transit_chord_calculator.py"""
-import sys
 import math
+import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from transit_chord_calculator import TransitChordResult, compute_transit_chord, format_transit_chord
@@ -17,7 +18,7 @@ class TestTransitChordResult:
         r = TransitChordResult(chord_rstar=2.0, b_used=0.0, grazing=False, flag="OK")
         try:
             r.chord_rstar = 0
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

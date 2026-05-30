@@ -5,12 +5,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from telescope_network_planner import (  # noqa: E402
-    SiteObservability,
     NetworkPlanResult,
-    plan_network_coverage,
+    SiteObservability,
     format_network_plan,
+    plan_network_coverage,
 )
-
 
 SITES = [
     {"name": "Site-A", "lat_deg": 30.0, "lon_deg": -70.0},

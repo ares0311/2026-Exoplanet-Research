@@ -6,7 +6,8 @@ given SNR threshold given the white noise and number of transits available.
 Public API
 ----------
 ThresholdMapResult(periods_days, min_depths_ppm, n_transits, snr_threshold, flag)
-map_detection_thresholds(periods_days, white_noise_ppm, n_transits_list, snr_threshold) -> ThresholdMapResult
+map_detection_thresholds(periods_days, white_noise_ppm, n_transits_list, snr_threshold)
+    -> ThresholdMapResult
 format_threshold_map(result) -> str
 """
 from __future__ import annotations
@@ -79,7 +80,7 @@ def format_threshold_map(result: ThresholdMapResult) -> str:
         "| Period (d) | N transits | Min depth (ppm) |",
         "|---|---|---|",
     ]
-    for p, n, d in zip(result.periods_days, result.n_transits, result.min_depths_ppm):
+    for p, n, d in zip(result.periods_days, result.n_transits, result.min_depths_ppm, strict=False):
         lines.append(f"| {p:.3f} | {n} | {d:.1f} |")
     return "\n".join(lines) + "\n"
 

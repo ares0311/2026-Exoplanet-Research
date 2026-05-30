@@ -53,8 +53,8 @@ def format_event_rate(result: EventRateResult) -> str:
     lines = [
         "## Transit Event Rate",
         "",
-        f"| Metric | Value |",
-        f"|--------|-------|",
+        "| Metric | Value |",
+        "|--------|-------|",
         f"| Period (days) | {result.period_days:.4f} |",
         f"| Coverage (days) | {result.coverage_days:.1f} |",
         f"| Expected events | {result.n_events} |",

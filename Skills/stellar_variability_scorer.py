@@ -56,8 +56,8 @@ def format_variability(result: VariabilityResult) -> str:
     lines = [
         "## Stellar Variability Score",
         "",
-        f"| Metric | Value |",
-        f"|--------|-------|",
+        "| Metric | Value |",
+        "|--------|-------|",
         f"| Peak-to-peak (ppm) | {result.peak_to_peak_ppm:.1f} |",
         f"| RMS (ppm) | {result.rms_ppm:.1f} |",
         f"| Variability score | {result.variability_score:.4f} |",

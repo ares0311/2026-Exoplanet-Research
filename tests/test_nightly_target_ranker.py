@@ -6,10 +6,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from nightly_target_ranker import (  # noqa: E402
     NightlyRankResult,
-    rank_nightly_targets,
     format_nightly_rank_result,
+    rank_nightly_targets,
 )
-
 
 TARGETS = [
     {"name": "TIC-1", "airmass": 1.2, "mag": 11.0, "transit_tonight": True},

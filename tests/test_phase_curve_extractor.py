@@ -1,7 +1,8 @@
 """Tests for Skills/phase_curve_extractor.py"""
-import sys
 import math
+import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from phase_curve_extractor import PhaseCurveResult, extract_phase_curve, format_phase_curve_result
@@ -21,7 +22,7 @@ class TestPhaseCurveResult:
                              baseline_flux=1.0, n_bins=50)
         try:
             r.amplitude_ppm = 0
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

@@ -46,14 +46,11 @@ def check_spatial_correlation(
     dx = [v - mean_x for v in x]
     dy = [v - mean_y for v in y]
 
-    numerator = sum(a * b for a, b in zip(dx, dy))
+    numerator = sum(a * b for a, b in zip(dx, dy, strict=False))
     denom_x = math.sqrt(sum(a ** 2 for a in dx))
     denom_y = math.sqrt(sum(b ** 2 for b in dy))
 
-    if denom_x == 0.0 or denom_y == 0.0:
-        pearson_r = 0.0
-    else:
-        pearson_r = numerator / (denom_x * denom_y)
+    pearson_r = 0.0 if denom_x == 0.0 or denom_y == 0.0 else numerator / (denom_x * denom_y)
 
     abs_r = abs(pearson_r)
     correlated = abs_r > 0.5
@@ -72,8 +69,8 @@ def format_spatial_corr(result: SpatialCorrResult) -> str:
     lines = [
         "## Spatial Correlation Check",
         "",
-        f"| Metric | Value |",
-        f"|--------|-------|",
+        "| Metric | Value |",
+        "|--------|-------|",
         f"| Points | {result.n_points} |",
         f"| Pearson r | {result.pearson_r:.4f} |",
         f"| |r| | {result.abs_r:.4f} |",

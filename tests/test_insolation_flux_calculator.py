@@ -1,9 +1,14 @@
 """Tests for Skills/insolation_flux_calculator.py"""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
-from insolation_flux_calculator import InsolationResult, compute_insolation, format_insolation_result
+from insolation_flux_calculator import (
+    InsolationResult,
+    compute_insolation,
+    format_insolation_result,
+)
 
 
 class TestInsolationResult:
@@ -17,7 +22,7 @@ class TestInsolationResult:
         r = InsolationResult(insolation_earth_units=1.0, hz_class="inner_hz", flag="OK")
         try:
             r.flag = "FAIL"
-            assert False, "Should be frozen"
+            raise AssertionError("Should be frozen")
         except Exception:
             pass
 

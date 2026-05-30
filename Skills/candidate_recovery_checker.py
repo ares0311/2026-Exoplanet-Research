@@ -1,5 +1,5 @@
 """
-Checks whether a known list of candidates (period, epoch) is recovered in a list of detected signals.
+Checks whether known candidates (period, epoch) are recovered in a list of detected signals.
 
 Public API:
     RecoveryCheckResult   -- frozen dataclass holding recovery statistics
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -76,8 +76,8 @@ def format_recovery_check(result: RecoveryCheckResult) -> str:
     lines = [
         "## Candidate Recovery Check",
         "",
-        f"| Metric | Value |",
-        f"|--------|-------|",
+        "| Metric | Value |",
+        "|--------|-------|",
         f"| Known candidates | {result.n_known} |",
         f"| Recovered | {result.n_recovered} |",
         f"| Missed | {result.n_missed} |",
@@ -92,8 +92,13 @@ def _cli() -> int:
     parser = argparse.ArgumentParser(
         description="Check recovery of known candidates in detected signals."
     )
-    parser.add_argument("known_file", help="JSON file with list of known {period_days, epoch_bjd} dicts")
-    parser.add_argument("detected_file", help="JSON file with list of detected {period_days, epoch_bjd} dicts")
+    parser.add_argument(
+        "known_file", help="JSON file with list of known {period_days, epoch_bjd} dicts"
+    )
+    parser.add_argument(
+        "detected_file",
+        help="JSON file with list of detected {period_days, epoch_bjd} dicts",
+    )
     parser.add_argument(
         "--period-tol-frac",
         type=float,

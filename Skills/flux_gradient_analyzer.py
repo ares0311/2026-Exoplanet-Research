@@ -58,8 +58,8 @@ def format_gradient(result: GradientResult) -> str:
     lines = [
         "## Flux Gradient Analysis",
         "",
-        f"| Metric | Value |",
-        f"|--------|-------|",
+        "| Metric | Value |",
+        "|--------|-------|",
         f"| Max gradient (ppm/step) | {result.max_gradient_ppm_per_step:.1f} |",
         f"| Mean |gradient| (ppm/step) | {result.mean_abs_gradient_ppm:.1f} |",
         f"| Steep steps (above threshold) | {result.n_steep_steps} |",

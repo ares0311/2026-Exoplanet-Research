@@ -1,9 +1,14 @@
 """Tests for Skills/orbital_period_from_density.py"""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
-from orbital_period_from_density import OrbitalPeriodResult, compute_orbital_distance, format_orbital_period
+from orbital_period_from_density import (
+    OrbitalPeriodResult,
+    compute_orbital_distance,
+    format_orbital_period,
+)
 
 
 class TestOrbitalPeriodResult:
@@ -16,7 +21,7 @@ class TestOrbitalPeriodResult:
         r = OrbitalPeriodResult(a_rstar=5.0, a_au=0.05, period_days=10.0, flag="OK")
         try:
             r.a_rstar = 0
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

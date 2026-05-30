@@ -1,6 +1,7 @@
 """Tests for Skills/hill_sphere_calculator.py"""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from hill_sphere_calculator import HillSphereResult, compute_hill_sphere, format_hill_sphere_result
@@ -16,7 +17,7 @@ class TestHillSphereResult:
         r = HillSphereResult(r_hill_au=0.01, r_hill_rp=100.0, stability_flag="stable")
         try:
             r.r_hill_au = 0
-            assert False, "Should be frozen"
+            raise AssertionError("Should be frozen")
         except Exception:
             pass
 

@@ -1,9 +1,14 @@
 """Tests for Skills/tidal_locking_estimator.py"""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
-from tidal_locking_estimator import TidalLockResult, estimate_tidal_locking, format_tidal_lock_result
+from tidal_locking_estimator import (
+    TidalLockResult,
+    estimate_tidal_locking,
+    format_tidal_lock_result,
+)
 
 
 class TestTidalLockResult:
@@ -16,7 +21,7 @@ class TestTidalLockResult:
         r = TidalLockResult(t_lock_yr=1e9, is_likely_locked=False)
         try:
             r.t_lock_yr = 0
-            assert False, "Should be frozen"
+            raise AssertionError("Should be frozen")
         except Exception:
             pass
 

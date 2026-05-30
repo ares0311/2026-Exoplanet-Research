@@ -1,10 +1,14 @@
 import sys
 from pathlib import Path
+
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
-from model_uncertainty_estimator import UncertaintyResult, estimate_model_uncertainty, format_uncertainty
-
+from model_uncertainty_estimator import (
+    UncertaintyResult,
+    estimate_model_uncertainty,
+    format_uncertainty,
+)
 
 # --- happy path ---
 

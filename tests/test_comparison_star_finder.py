@@ -1,10 +1,14 @@
 """Tests for Skills/comparison_star_finder.py"""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from comparison_star_finder import (
-    ComparisonStarResult, NeighbourStar, find_comparison_stars, format_comparison_star_result
+    ComparisonStarResult,
+    NeighbourStar,
+    find_comparison_stars,
+    format_comparison_star_result,
 )
 
 
@@ -14,7 +18,7 @@ class TestNeighbourStar:
         assert s.mag == 10.0
         try:
             s.mag = 0.0
-            assert False
+            raise AssertionError()
         except Exception:
             pass
 

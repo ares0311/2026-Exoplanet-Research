@@ -67,8 +67,8 @@ def format_learning_curve(result: LearningCurveResult) -> str:
     lines = [
         "## Learning Curve Analysis",
         "",
-        f"| Metric | Value |",
-        f"|--------|-------|",
+        "| Metric | Value |",
+        "|--------|-------|",
         f"| Points in curve | {result.n_points} |",
         f"| Final train score | {result.final_train_score:.4f} |",
         f"| Final val score | {result.final_val_score:.4f} |",

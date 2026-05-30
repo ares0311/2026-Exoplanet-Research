@@ -1,11 +1,10 @@
 import sys
-import math
 from pathlib import Path
+
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 from transit_noise_floor_estimator import NoiseFloorResult, estimate_noise_floor, format_noise_floor
-
 
 # --- happy path ---
 
