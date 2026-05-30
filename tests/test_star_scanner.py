@@ -221,33 +221,38 @@ class TestSelectTargets:
             {"ID": 300, "Tmag": 13.5, "Teff": 3800.0, "contratio": 0.0},
         ]
 
-    def test_returns_list_of_dicts(self) -> None:
-        _mock_astroquery_mast.Catalogs.query_criteria.return_value = self._catalog_rows()
+    @patch("astroquery.mast.Catalogs")
+    def test_returns_list_of_dicts(self, mock_catalogs: MagicMock) -> None:
+        mock_catalogs.query_criteria.return_value = self._catalog_rows()
         results = select_targets(n=10)
         assert isinstance(results, list)
         assert all("tic_id" in r and "priority" in r for r in results)
 
-    def test_sorted_by_priority_descending(self) -> None:
-        _mock_astroquery_mast.Catalogs.query_criteria.return_value = self._catalog_rows()
+    @patch("astroquery.mast.Catalogs")
+    def test_sorted_by_priority_descending(self, mock_catalogs: MagicMock) -> None:
+        mock_catalogs.query_criteria.return_value = self._catalog_rows()
         results = select_targets(n=10)
         priorities = [r["priority"] for r in results]
         assert priorities == sorted(priorities, reverse=True)
 
-    def test_excludes_specified_ids(self) -> None:
-        _mock_astroquery_mast.Catalogs.query_criteria.return_value = self._catalog_rows()
+    @patch("astroquery.mast.Catalogs")
+    def test_excludes_specified_ids(self, mock_catalogs: MagicMock) -> None:
+        mock_catalogs.query_criteria.return_value = self._catalog_rows()
         results = select_targets(n=10, exclude_tic_ids={100, 200})
         tic_ids = {r["tic_id"] for r in results}
         assert 100 not in tic_ids
         assert 200 not in tic_ids
 
-    def test_respects_n_limit(self) -> None:
-        _mock_astroquery_mast.Catalogs.query_criteria.return_value = self._catalog_rows()
+    @patch("astroquery.mast.Catalogs")
+    def test_respects_n_limit(self, mock_catalogs: MagicMock) -> None:
+        mock_catalogs.query_criteria.return_value = self._catalog_rows()
         results = select_targets(n=2)
         assert len(results) <= 2
 
-    def test_handles_missing_teff_gracefully(self) -> None:
+    @patch("astroquery.mast.Catalogs")
+    def test_handles_missing_teff_gracefully(self, mock_catalogs: MagicMock) -> None:
         rows = [{"ID": 500, "Tmag": 12.0, "Teff": None, "contratio": None}]
-        _mock_astroquery_mast.Catalogs.query_criteria.return_value = rows
+        mock_catalogs.query_criteria.return_value = rows
         results = select_targets(n=5)
         assert len(results) == 1
         assert results[0]["teff"] is None
