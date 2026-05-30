@@ -48,8 +48,8 @@ dependencies = [
 dev = [
   "pytest",
   "pytest-cov",
-  "ruff",
-  "mypy",
+  "ruff==0.15.15",
+  "mypy==2.1.0",
   "pre-commit",
   "types-PyYAML"
 ]
@@ -113,6 +113,8 @@ module = [
   "lightkurve.*",
   "astropy.*",
   "typer.*",
-  "rich.*"
+  "rich.*",
+  "torch.*",
+  "torch"
 ]
 ignore_missing_imports = true
