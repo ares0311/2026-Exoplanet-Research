@@ -113,6 +113,8 @@ module = [
   "lightkurve.*",
   "astropy.*",
   "typer.*",
-  "rich.*"
+  "rich.*",
+  "torch.*",
+  "torch"
 ]
 ignore_missing_imports = true
