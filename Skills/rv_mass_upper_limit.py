@@ -1,130 +1,137 @@
+"""Compute RV semi-amplitude and planet mass upper limit from orbital parameters."""
 from __future__ import annotations
 
 import argparse
-import json
 import math
 from dataclasses import dataclass
+
+# Physical constants (SI)
+_G = 6.674e-11          # m^3 kg^-1 s^-2
+_MSUN_KG = 1.989e30     # kg
+_MEARTH_KG = 5.972e24   # kg
+_MEARTH_MSUN = 3.003e-6
+_AU_M = 1.496e11        # m
+_DAY_S = 86400.0
 
 
 @dataclass(frozen=True)
 class RvMassLimitResult:
-    mass_upper_limit_mjup: float
-    k_amplitude_ms: float
     period_days: float
+    stellar_mass_msun: float
+    rv_precision_ms: float
+    k_amplitude_ms: float
+    mass_sini_mearth: float
+    mass_upper_limit_mearth: float
     flag: str
 
 
-def compute_rv_upper_limit(
-    rv_precision_ms: float,
+def compute_rv_mass_limit(
     period_days: float,
     stellar_mass_msun: float,
-    *,
-    n_sigma: float = 3.0,
+    rv_precision_ms: float,
+    n_obs: int = 10,
+    eccentricity: float = 0.0,
     inclination_deg: float = 90.0,
 ) -> RvMassLimitResult:
-    """Compute an upper limit on planet mass from RV precision.
-
-    Uses the RV semi-amplitude relation:
-        K [m/s] ≈ 203.3 * (M_p/M_jup) * sin(i) / (P[days]^(1/3) * (M★/M☉)^(2/3))
-
-    Rearranged:
-        M_p = K * P^(1/3) * M★^(2/3) / (203.3 * sin(i))
     """
-    if rv_precision_ms <= 0:
+    Compute the detectable RV semi-amplitude K and implied planet mass upper limit.
+
+    K = (2πG/P)^(1/3) * Mp·sin(i) / ((Ms + Mp)^(2/3) * sqrt(1-e²))
+
+    Linearized (Mp << Ms):
+        K ≈ (2πG/P)^(1/3) * Mp·sin(i) / Ms^(2/3) / sqrt(1-e²)
+
+    mass_upper_limit: smallest mass detectable at SNR=3 with n_obs observations.
+    k_amplitude: K for mass_upper_limit.
+    """
+    for name, val in [
+        ("period_days", period_days),
+        ("stellar_mass_msun", stellar_mass_msun),
+        ("rv_precision_ms", rv_precision_ms),
+    ]:
+        if not math.isfinite(val) or val <= 0.0:
+            return RvMassLimitResult(
+                period_days=period_days,
+                stellar_mass_msun=stellar_mass_msun,
+                rv_precision_ms=rv_precision_ms,
+                k_amplitude_ms=float("nan"),
+                mass_sini_mearth=float("nan"),
+                mass_upper_limit_mearth=float("nan"),
+                flag=f"INVALID_{name.upper()}",
+            )
+    if not math.isfinite(eccentricity) or not (0.0 <= eccentricity < 1.0):
         return RvMassLimitResult(
-            mass_upper_limit_mjup=0.0,
-            k_amplitude_ms=0.0,
             period_days=period_days,
-            flag="INVALID_PRECISION",
+            stellar_mass_msun=stellar_mass_msun,
+            rv_precision_ms=rv_precision_ms,
+            k_amplitude_ms=float("nan"),
+            mass_sini_mearth=float("nan"),
+            mass_upper_limit_mearth=float("nan"),
+            flag="INVALID_ECCENTRICITY",
         )
 
-    if period_days <= 0:
-        return RvMassLimitResult(
-            mass_upper_limit_mjup=0.0,
-            k_amplitude_ms=0.0,
-            period_days=period_days,
-            flag="INVALID_PERIOD",
-        )
+    period_s = period_days * _DAY_S
+    ms_kg = stellar_mass_msun * _MSUN_KG
+    sin_i = math.sin(math.radians(inclination_deg))
 
-    if stellar_mass_msun <= 0:
-        return RvMassLimitResult(
-            mass_upper_limit_mjup=0.0,
-            k_amplitude_ms=0.0,
-            period_days=period_days,
-            flag="INVALID_STELLAR_MASS",
-        )
-
-    k_amplitude_ms = rv_precision_ms * n_sigma
-    sin_i = math.sin(inclination_deg * math.pi / 180.0)
-
-    mass_upper_limit_mjup = (
-        k_amplitude_ms
-        * (period_days ** (1.0 / 3.0))
-        * (stellar_mass_msun ** (2.0 / 3.0))
-        / (203.3 * sin_i)
+    # Effective K per unit Mp*sin(i) [m/s per kg]
+    k_per_mp_sini = (
+        (2.0 * math.pi * _G / period_s) ** (1.0 / 3.0)
+        / ms_kg ** (2.0 / 3.0)
+        / math.sqrt(1.0 - eccentricity**2)
     )
 
+    # Detection threshold: K > 3 * rv_precision / sqrt(n_obs)
+    k_threshold = 3.0 * rv_precision_ms / math.sqrt(max(n_obs, 1))
+
+    # Mass upper limit: smallest Mp detectable
+    mp_limit_kg = k_threshold / (k_per_mp_sini * sin_i) if sin_i > 0 else float("inf")
+    mp_limit_mearth = mp_limit_kg / _MEARTH_KG
+
+    # K for the limit mass
+    k_amplitude = k_threshold
+
+    # Mp*sin(i) for the limit (same as limit since we solved for it)
+    mass_sini_mearth = mp_limit_mearth * sin_i
+
     return RvMassLimitResult(
-        mass_upper_limit_mjup=mass_upper_limit_mjup,
-        k_amplitude_ms=k_amplitude_ms,
         period_days=period_days,
+        stellar_mass_msun=stellar_mass_msun,
+        rv_precision_ms=rv_precision_ms,
+        k_amplitude_ms=round(k_amplitude, 4),
+        mass_sini_mearth=round(mass_sini_mearth, 4),
+        mass_upper_limit_mearth=round(mp_limit_mearth, 4),
         flag="OK",
     )
 
 
-def format_rv_mass_limit(result: RvMassLimitResult) -> str:
-    """Return a Markdown table summarising the RV mass upper limit result."""
-    lines = [
-        "| Field | Value |",
-        "| --- | --- |",
-        f"| Mass Upper Limit (M_Jup) | {result.mass_upper_limit_mjup:.4f} |",
-        f"| K Amplitude (m/s) | {result.k_amplitude_ms:.4f} |",
-        f"| Period (days) | {result.period_days:.4f} |",
-        f"| Flag | {result.flag} |",
-    ]
-    return "\n".join(lines)
+def format_rv_mass_limit(r: RvMassLimitResult) -> str:
+    return (
+        f"| Parameter | Value |\n"
+        f"|---|---|\n"
+        f"| Period (days) | {r.period_days:.4f} |\n"
+        f"| Stellar mass (M☉) | {r.stellar_mass_msun:.3f} |\n"
+        f"| RV precision (m/s) | {r.rv_precision_ms:.2f} |\n"
+        f"| Detectable K (m/s) | {r.k_amplitude_ms:.4f} |\n"
+        f"| Mp·sin(i) upper limit (M⊕) | {r.mass_sini_mearth:.4f} |\n"
+        f"| Mp upper limit (M⊕) | {r.mass_upper_limit_mearth:.4f} |\n"
+        f"| Flag | {r.flag} |\n"
+    )
 
 
 def _cli() -> int:
-    parser = argparse.ArgumentParser(
-        description="Compute RV-based planet mass upper limit."
+    p = argparse.ArgumentParser(description="Compute RV mass upper limit.")
+    p.add_argument("period_days", type=float)
+    p.add_argument("stellar_mass_msun", type=float)
+    p.add_argument("rv_precision_ms", type=float)
+    p.add_argument("--n-obs", type=int, default=10)
+    p.add_argument("--eccentricity", type=float, default=0.0)
+    args = p.parse_args()
+    r = compute_rv_mass_limit(
+        args.period_days, args.stellar_mass_msun, args.rv_precision_ms,
+        n_obs=args.n_obs, eccentricity=args.eccentricity,
     )
-    parser.add_argument(
-        "rv_precision_ms", type=float, help="RV measurement precision in m/s."
-    )
-    parser.add_argument("period_days", type=float, help="Orbital period in days.")
-    parser.add_argument(
-        "stellar_mass_msun", type=float, help="Stellar mass in solar masses."
-    )
-    parser.add_argument(
-        "--n-sigma",
-        type=float,
-        default=3.0,
-        help="Detection threshold in sigma (default 3.0).",
-    )
-    parser.add_argument(
-        "--inclination-deg",
-        type=float,
-        default=90.0,
-        help="Orbital inclination in degrees (default 90.0).",
-    )
-    parser.add_argument("--json", action="store_true", help="Output raw JSON.")
-    args = parser.parse_args()
-
-    result = compute_rv_upper_limit(
-        args.rv_precision_ms,
-        args.period_days,
-        args.stellar_mass_msun,
-        n_sigma=args.n_sigma,
-        inclination_deg=args.inclination_deg,
-    )
-
-    if args.json:
-        import dataclasses
-        print(json.dumps(dataclasses.asdict(result), indent=2))
-    else:
-        print(format_rv_mass_limit(result))
-
+    print(format_rv_mass_limit(r))
     return 0
 
 

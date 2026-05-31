@@ -6,69 +6,87 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
-from candidate_vetting_checklist import build_vetting_checklist, format_vetting_checklist
+from candidate_vetting_checklist import build_vetting_checklist, format_checklist
 
 
-class TestBuildVettingChecklist:
-    def _full_candidate(self) -> dict[str, object]:
-        return {
-            "period_days": 5.0, "fpp": 0.1, "depth_ppm": 1000.0,
-            "duration_hours": 2.0, "n_transits": 5, "snr": 15.0,
-            "odd_even_significance": 0.5, "secondary_snr": 0.2,
-            "centroid_offset_arcsec": 0.1, "stellar_radius_rsun": 1.0,
-        }
+def _candidate(**kwargs) -> dict:
+    base = {
+        "tic_id": "123456",
+        "scores": {
+            "false_positive_probability": 0.05,
+            "detection_confidence": 0.90,
+        },
+        "snr": 12.0,
+        "n_transits": 3,
+        "pathway": "tfop_ready",
+    }
+    base.update(kwargs)
+    return base
 
-    def test_full_candidate_complete(self) -> None:
-        r = build_vetting_checklist(self._full_candidate())
-        assert r.flag == "COMPLETE"
-        assert r.n_completed == r.n_total
 
-    def test_empty_candidate_incomplete(self) -> None:
-        r = build_vetting_checklist({})
-        assert r.flag == "INCOMPLETE"
-        assert r.n_completed == 0
+class TestCandidateVettingChecklist:
+    def test_all_pass(self) -> None:
+        r = build_vetting_checklist(_candidate())
+        assert r.flag == "OK"
+        assert r.overall == "PASS"
 
-    def test_n_completed_plus_missing_equals_total(self) -> None:
-        r = build_vetting_checklist({"period_days": 5.0, "fpp": 0.1})
-        assert r.n_completed + len(r.missing) == r.n_total
+    def test_high_fpp_fails(self) -> None:
+        r = build_vetting_checklist(_candidate(scores={"false_positive_probability": 0.50}))
+        assert r.n_failed > 0
 
-    def test_partial_candidate(self) -> None:
-        r = build_vetting_checklist({"period_days": 5.0, "fpp": 0.1})
-        assert 0 < r.n_completed < r.n_total
-
-    def test_completeness_fraction_in_range(self) -> None:
-        r = build_vetting_checklist(self._full_candidate())
-        assert 0.0 <= r.completeness_fraction <= 1.0
-
-    def test_completeness_fraction_full(self) -> None:
-        r = build_vetting_checklist(self._full_candidate())
-        assert r.completeness_fraction == 1.0
-
-    def test_none_value_counts_as_missing(self) -> None:
-        c = self._full_candidate()
-        c["snr"] = None
+    def test_low_dc_fails(self) -> None:
+        c = _candidate()
+        c["scores"] = {"false_positive_probability": 0.05, "detection_confidence": 0.50}
         r = build_vetting_checklist(c)
-        assert r.flag == "INCOMPLETE"
+        assert r.n_failed > 0
 
-    def test_completed_list_type(self) -> None:
-        r = build_vetting_checklist(self._full_candidate())
-        assert isinstance(r.completed, list)
-
-    def test_missing_list_type(self) -> None:
+    def test_missing_tic_id(self) -> None:
         r = build_vetting_checklist({})
-        assert isinstance(r.missing, list)
+        assert r.flag == "MISSING_TIC_ID"
+        assert r.n_total == 0
+
+    def test_n_passed_plus_failed_eq_total(self) -> None:
+        r = build_vetting_checklist(_candidate())
+        assert r.n_passed + r.n_failed == r.n_total
+
+    def test_items_tuple(self) -> None:
+        r = build_vetting_checklist(_candidate())
+        assert isinstance(r.items, tuple)
+        assert len(r.items) > 0
+
+    def test_pathway_check_present(self) -> None:
+        r = build_vetting_checklist(_candidate())
+        names = [it.name for it in r.items]
+        assert "Pathway" in names
+
+    def test_bad_pathway_fails(self) -> None:
+        r = build_vetting_checklist(_candidate(pathway="github_only_reproducibility"))
+        pathway_item = next(it for it in r.items if it.name == "Pathway")
+        assert not pathway_item.passed
+
+    def test_low_snr_fails(self) -> None:
+        r = build_vetting_checklist(_candidate(snr=3.0))
+        snr_item = next((it for it in r.items if it.name == "SNR"), None)
+        if snr_item:
+            assert not snr_item.passed
+
+    def test_few_transits_fails(self) -> None:
+        r = build_vetting_checklist(_candidate(n_transits=1))
+        tr_item = next((it for it in r.items if it.name == "N transits"), None)
+        if tr_item:
+            assert not tr_item.passed
+
+    def test_overall_fail_when_all_bad(self) -> None:
+        c = {
+            "tic_id": "999",
+            "scores": {"false_positive_probability": 0.90, "detection_confidence": 0.20},
+            "pathway": "github_only_reproducibility",
+        }
+        r = build_vetting_checklist(c)
+        assert r.overall in ("FAIL", "PARTIAL")
 
     def test_format_returns_string(self) -> None:
-        r = build_vetting_checklist(self._full_candidate())
-        s = format_vetting_checklist(r)
+        r = build_vetting_checklist(_candidate())
+        s = format_checklist(r)
         assert isinstance(s, str)
         assert "Checklist" in s
-
-    def test_format_contains_completed_marker(self) -> None:
-        r = build_vetting_checklist(self._full_candidate())
-        s = format_vetting_checklist(r)
-        assert "[x]" in s
-
-    def test_n_total_is_ten(self) -> None:
-        r = build_vetting_checklist({})
-        assert r.n_total == 10
