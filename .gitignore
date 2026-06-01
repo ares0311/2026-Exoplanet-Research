@@ -42,6 +42,9 @@ dmypy.json
 # Data files (raw downloads — committed intentionally via DVC or similar)
 data/raw/
 data/processed/
+data/*.csv
+data/*.pkl
+data/*.pickle
 
 # IDE / editor
 .vscode/

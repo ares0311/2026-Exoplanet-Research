@@ -1,8 +1,8 @@
 # PROJECT STATUS
 
 ## Status: Active Development
-## Phase: Milestone 30 Complete — Diagnostics, Scheduling, and XGBoost Model Trained
-## Last Updated: 2026-05-29
+## Phase: Milestone 39 Complete — Physics, Vetting, Planning, and XGBoost Model Trained
+## Last Updated: 2026-06-01
 
 ---
 
@@ -14,8 +14,8 @@ The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit w
 - Bayesian log-score model over six hypotheses
 - Optional XGBoost and stacking scorer modes (Tier 1 model trained: Kepler KOI AUC=0.992)
 - SQLite-backed background automation with top-level logs
-- 294 standalone `Skills/` utility scripts
-- 309 test files, 4,861 tests passing
+- 413 standalone `Skills/` utility scripts
+- 427 top-level test files, 6,354 default tests passing
 - 27 package Python modules under `src/exo_toolkit/`
 
 Local validation note: after restoring the declared `xgboost` dependency and installing the macOS OpenMP runtime (`libomp`), the default test suite passes locally on Python 3.13.12.
@@ -40,12 +40,13 @@ Local validation note: after restoring the declared `xgboost` dependency and ins
 | ML Tier 2 scaffolding | `ml/cnn_scorer.py`, `Skills/train_cnn.py`, CNN data utilities | Complete, production use gated on labeled TESS corpus |
 | Training/evaluation Skills | Kepler, TESS, combined training, CNN data assembly/validation/training support, XGBoost training, scorer evaluation | Complete |
 | Discovery workflow Skills | star scanner, batch scan, alert filter, ranking, watchlist, exports, reports | Complete |
-| Milestones 13-30 Skills | 219 additional analysis, vetting, observability, ML, reporting, scheduling, and follow-up utilities | Complete |
+| Milestones 13-39 Skills | 354 additional analysis, vetting, observability, ML, physics, reporting, scheduling, and follow-up utilities | Complete |
 | Milestone 19a Skill | `multi_sector_phase_compare.py` — offline per-sector phase-fold comparison | Complete |
 | Milestone 19b Skill | `candidate_dashboard_export.py` — static conservative candidate dashboard with optional plot artifacts | Complete |
 | Milestone 19c Skill | `candidate_api.py` — local read-only candidate API plus optional background SQLite summaries | Complete |
 | Milestone 19d Skill | `candidate_browser_ui.py` — interactive local candidate browser with optional plot previews | Complete |
 | Milestone 30 Skills | 15 diagnostics + scheduling tools including `flux_anomaly_detector`, `candidate_confidence_tracker`, `uncertainty_propagator`, `multi_target_scheduler`, `candidate_archive`, and 10 more | Complete |
+| Milestones 34-39 Skills | 90 additional ML evaluation, photometry quality, transit vetting, noise budget, orbit simulation, stellar physics, TTV, occurrence-rate, and planning utilities | Complete |
 | CTOI source contract | `docs/CTOI_SOURCE_CONTRACT.md`, `Skills/fetch_exofop_ctoi.py`, `tests/fixtures/exofop_ctoi_sample.csv` — opt-in fixture-backed community candidate labels | Complete, excluded from default training |
 | Docs | `README.md`, `docs/`, `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md` | Active maintenance |
 
@@ -113,7 +114,7 @@ explicit approval in restricted environments.
 
 ## Latest Local Validation
 
-Validated on 2026-05-27:
+Validated on 2026-06-01:
 
 ```bash
 .venv/bin/ruff check .
@@ -121,7 +122,7 @@ Validated on 2026-05-27:
 .venv/bin/python -m pytest
 ```
 
-Result: ruff passed, mypy passed, pytest passed with 4294 passed, 2 deselected, and no warnings.
+Result: ruff passed, mypy passed, pytest passed with 6354 passed, 2 deselected, and no warnings.
 
 ---
 

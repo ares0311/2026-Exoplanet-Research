@@ -57,7 +57,7 @@
 
 ## Abstract
 
-This repository implements a complete, reproducible computational pipeline for the detection, vetting, and probabilistic classification of exoplanet transit candidates in photometric time-series data from the Transiting Exoplanet Survey Satellite (TESS) and the Kepler/K2 missions. The pipeline proceeds through six deterministic stages — data acquisition, preprocessing, Box Least Squares (BLS) periodicity search, signal vetting, Bayesian multi-hypothesis scoring, and submission pathway classification — and outputs calibrated posterior probabilities over six competing astrophysical and instrumental hypotheses. A conservative log-score approximation to Bayes' theorem is employed in lieu of generative likelihood models, with posterior calibration implemented via Platt scaling and isotonic regression (Pool Adjacent Violators Algorithm). An optional Tier-1 XGBoost classifier and Tier-3 stacking meta-learner augment the Bayesian scorer when labelled training data are available. The system is designed around scientific caution: it never labels an internally detected signal as a confirmed planet, exposes all false-positive evidence alongside each candidate score, and defers to authoritative external catalogs for confirmation status. The current implementation comprises 27 package modules, an autonomous background search engine with SQLite-backed durable state, an autonomous star-scanner for priority-ranked target discovery, 249 standalone Skills utility scripts, 264 test files, strict static typing (mypy), and continuous integration via GitHub Actions.
+This repository implements a complete, reproducible computational pipeline for the detection, vetting, and probabilistic classification of exoplanet transit candidates in photometric time-series data from the Transiting Exoplanet Survey Satellite (TESS) and the Kepler/K2 missions. The pipeline proceeds through six deterministic stages — data acquisition, preprocessing, Box Least Squares (BLS) periodicity search, signal vetting, Bayesian multi-hypothesis scoring, and submission pathway classification — and outputs calibrated posterior probabilities over six competing astrophysical and instrumental hypotheses. A conservative log-score approximation to Bayes' theorem is employed in lieu of generative likelihood models, with posterior calibration implemented via Platt scaling and isotonic regression (Pool Adjacent Violators Algorithm). An optional Tier-1 XGBoost classifier and Tier-3 stacking meta-learner augment the Bayesian scorer when labelled training data are available. The system is designed around scientific caution: it never labels an internally detected signal as a confirmed planet, exposes all false-positive evidence alongside each candidate score, and defers to authoritative external catalogs for confirmation status. The current implementation comprises 27 package modules, an autonomous background search engine with SQLite-backed durable state, an autonomous star-scanner for priority-ranked target discovery, 413 standalone Skills utility scripts, 427 top-level test files, strict static typing (mypy), and continuous integration via GitHub Actions.
 
 ---
 
@@ -198,7 +198,7 @@ Each stage produces a typed, immutable result object and preserves provenance me
 | `background/` | — | SQLite-backed automation: one-shot runner, priority scoring, draft reports | 16 |
 | **Package subtotal** | | | **758** |
 
-The repository also contains 249 standalone `Skills/` utilities with dedicated tests. Current local validation passes 4294 default tests with the two live integration tests deselected; see `docs/PROJECT_STATUS.md` for the latest validation note.
+The repository also contains 413 standalone `Skills/` utilities with dedicated tests. See `docs/PROJECT_STATUS.md` for the latest validation note.
 
 ### Operating Modes
 
@@ -668,7 +668,7 @@ python Skills/evaluate_scorer.py \
 │           ├── xgboost_scorer.py    # XGBoost binary classifier (Tier-1)
 │           ├── cnn_scorer.py        # CNN checkpoint wrapper (Tier-2 scaffold)
 │           └── stacking_scorer.py   # Weighted blend scorer (Tier-3)
-├── tests/                       # 4294 default tests plus 2 live tests
+├── tests/                       # 427 top-level test files plus marked live tests
 │   ├── test_schemas.py          # 33 tests
 │   ├── test_features.py         # 145 tests
 │   ├── test_hypotheses.py       # 46 tests
@@ -731,7 +731,7 @@ python Skills/evaluate_scorer.py \
 │   ├── DASHBOARD_SPEC.md        # Static candidate dashboard contract
 │   ├── ROADMAP.md               # Milestones and future work
 │   ├── PROJECT_STATUS.md        # Current implementation status
-│   └── SKILLS_GUIDE.md          # User reference and inventory for 249 Skills scripts
+│   └── SKILLS_GUIDE.md          # User reference and quick inventory for Skills scripts
 ├── data/                        # Local data cache (not tracked by git)
 ├── pyproject.toml
 └── requirements.txt
@@ -783,8 +783,8 @@ PYTHONPATH=src python -m pytest -m integration_live
 | `ml/stacking_scorer.py` | 22 |
 | `ml/cnn_scorer.py` | 21 |
 | `background/` module | 16 |
-| Skills utilities | 249 scripts with dedicated tests |
-| **Current default suite** | **4294 passed, 2 live tests deselected** |
+| Skills utilities | 413 scripts with dedicated tests |
+| **Current default suite** | See `docs/PROJECT_STATUS.md` |
 
 ---
 

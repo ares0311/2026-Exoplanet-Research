@@ -9,9 +9,9 @@ Run any script with `--help` to see its full CLI options.
 
 ## Current inventory
 
-The repository currently has 249 standalone Skills. The quick reference below
-highlights the main workflow entry points; this full inventory keeps the
-complete script surface discoverable for future agents.
+The repository currently has 413 standalone Skills. The quick reference below
+highlights many established workflow entry points, but it is not exhaustive.
+For the exact current script surface, run `find Skills -maxdepth 1 -name '*.py'`.
 
 ```text
 active_learning_scorer.py
