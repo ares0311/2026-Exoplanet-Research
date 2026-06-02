@@ -309,6 +309,7 @@ This table is intentionally workflow-oriented rather than exhaustive.
 | `fetch_tess_toi.py` | Download TESS TOI table from ExoFOP | `fetch_tess_toi` |
 | `fetch_exofop_ctoi.py` | Parse opt-in ExoFOP CTOI rows and export fixture-backed label rows with `--labels-output` | `fetch_ctoi_table`, `ctoi_rows_to_label_rows` |
 | `count_tess_labels.py` | Check CNN Tier-2 label gate (≥5,000 CP) | (script) |
+| `tier2_progress_reporter.py` | Build offline Tier-2 readiness reports and JSON status artifacts | `build_tier2_status`, `write_status_outputs` |
 
 ---
 
@@ -473,6 +474,17 @@ python Skills/injection_recovery.py \
 ---
 
 ## CNN Tier-2 gate check
+
+Offline status artifacts:
+
+```bash
+python Skills/tier2_progress_reporter.py \
+  --labels data/exofop_ctoi_labels.json \
+  --output reports/tier2_status.md \
+  --json-output reports/tier2_status.json
+```
+
+Live ExoFOP gate count, when network access is intentionally approved:
 
 ```bash
 python Skills/count_tess_labels.py

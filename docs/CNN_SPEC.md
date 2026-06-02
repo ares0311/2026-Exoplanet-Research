@@ -2,10 +2,18 @@
 
 **Status: IMPLEMENTATION SCAFFOLD BUILT — production training/use remains gated on 5,000+ labeled TESS light curves**
 
-Check the production-data gate with: `python Skills/count_tess_labels.py`
+Track local Tier-2 readiness with the offline reporter:
 
-Do not run the live gate check in default validation. It queries ExoFOP and
-should be run only when live network access is intentionally approved.
+```bash
+python Skills/tier2_progress_reporter.py \
+  --labels data/exofop_ctoi_labels.json \
+  --output reports/tier2_status.md \
+  --json-output reports/tier2_status.json
+```
+
+Check the live production-data gate with `python Skills/count_tess_labels.py`
+only when live network access is intentionally approved. It queries ExoFOP and
+must not run in default validation.
 
 The repository now includes the CNN wrapper, training loop, checkpoint helpers,
 calibration helpers, inference batcher, CLI flags, and 3-tier stacking support.

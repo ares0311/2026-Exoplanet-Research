@@ -6,8 +6,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from tier2_progress_reporter import (
+    _cli,
     build_tier2_status,
     format_tier2_report,
+    status_to_dict,
+    write_status_outputs,
 )
 
 
@@ -107,3 +110,51 @@ def test_result_frozen():
         raise AssertionError("Should be frozen")
     except Exception:
         pass
+
+
+def test_numeric_label_rows_count_for_ctoi_contract(tmp_path):
+    rows = [{"label": 1}, {"label": 0}, {"label": "pc"}, {"label": None}]
+    p = tmp_path / "ctoi_labels.json"
+    p.write_text(json.dumps(rows))
+    s = build_tier2_status(label_json=p, min_labels=2)
+    assert s.n_labels == 2
+    assert s.gate_passed
+
+
+def test_wrapped_label_rows_count(tmp_path):
+    p = tmp_path / "labels.json"
+    p.write_text(json.dumps({"rows": [{"label": "CP"}, {"label": "EB"}, {"label": "PC"}]}))
+    s = build_tier2_status(label_json=p, min_labels=2)
+    assert s.n_labels == 2
+    assert s.flag == "IN_PROGRESS"
+
+
+def test_status_to_dict_contains_next_actions():
+    d = status_to_dict(build_tier2_status())
+    assert d["flag"] == "BLOCKED"
+    assert isinstance(d["next_actions"], list)
+
+
+def test_write_status_outputs(tmp_path):
+    s = build_tier2_status()
+    md = tmp_path / "tier2.md"
+    js = tmp_path / "tier2.json"
+    written = write_status_outputs(s, markdown_path=md, json_path=js)
+    assert written == (md, js)
+    assert "Tier 2" in md.read_text()
+    assert json.loads(js.read_text())["flag"] == "BLOCKED"
+
+
+def test_cli_writes_outputs(tmp_path):
+    labels = _make_labels(tmp_path, 3, 2)
+    md = tmp_path / "report.md"
+    js = tmp_path / "status.json"
+    code = _cli([
+        "--labels", str(labels),
+        "--min-labels", "5",
+        "--output", str(md),
+        "--json-output", str(js),
+    ])
+    assert code == 0
+    assert md.exists()
+    assert json.loads(js.read_text())["gate_passed"] is True

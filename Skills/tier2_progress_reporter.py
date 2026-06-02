@@ -10,6 +10,8 @@ Tier2Status(n_labels, n_snippets, gate_passed, training_complete,
 build_tier2_status(*, label_json, snippet_dir, training_log,
                    checkpoint_path, calibration_path, registry_path,
                    min_labels) -> Tier2Status
+status_to_dict(status) -> dict
+write_status_outputs(status, *, markdown_path, json_path) -> tuple[Path, ...]
 format_tier2_report(status) -> str
 """
 from __future__ import annotations
@@ -29,6 +31,40 @@ class Tier2Status:
     registered: bool           # CNN entry in model registry
     next_actions: tuple[str, ...]
     flag: str  # "READY" | "IN_PROGRESS" | "BLOCKED"
+
+
+def _is_supervised_label(value: object) -> bool:
+    if value in (0, 1):
+        return True
+    if isinstance(value, str):
+        return value.strip().lower() in {
+            "0",
+            "1",
+            "cp",
+            "fp",
+            "eb",
+            "planet_candidate",
+            "false_positive",
+        }
+    return False
+
+
+def _load_label_rows(path: Path) -> list[dict[str, object]]:
+    payload = json.loads(path.read_text())
+    if isinstance(payload, dict):
+        rows = payload.get("rows") or payload.get("records") or payload.get("labels") or []
+    else:
+        rows = payload
+    if not isinstance(rows, list):
+        return []
+    return [row for row in rows if isinstance(row, dict)]
+
+
+def _count_labels(path: Path) -> int:
+    try:
+        return sum(1 for row in _load_label_rows(path) if _is_supervised_label(row.get("label")))
+    except Exception:
+        return 0
 
 
 def build_tier2_status(
@@ -58,14 +94,7 @@ def build_tier2_status(
     # Label count
     n_labels = 0
     if label_json is not None and Path(label_json).exists():
-        try:
-            rows = json.loads(Path(label_json).read_text())
-            n_labels = sum(
-                1 for r in rows
-                if r.get("label") in ("planet_candidate", "false_positive")
-            )
-        except Exception:
-            pass
+        n_labels = _count_labels(Path(label_json))
 
     # Snippet count
     n_snippets = 0
@@ -139,6 +168,39 @@ def build_tier2_status(
     )
 
 
+def status_to_dict(status: Tier2Status) -> dict[str, object]:
+    """Convert status to a JSON-serializable mapping."""
+    return {
+        "n_labels": status.n_labels,
+        "n_snippets": status.n_snippets,
+        "gate_passed": status.gate_passed,
+        "training_complete": status.training_complete,
+        "calibrated": status.calibrated,
+        "registered": status.registered,
+        "next_actions": list(status.next_actions),
+        "flag": status.flag,
+    }
+
+
+def write_status_outputs(
+    status: Tier2Status,
+    *,
+    markdown_path: Path | None = None,
+    json_path: Path | None = None,
+) -> tuple[Path, ...]:
+    """Write optional Markdown and JSON status artifacts."""
+    written: list[Path] = []
+    if markdown_path is not None:
+        markdown_path.parent.mkdir(parents=True, exist_ok=True)
+        markdown_path.write_text(format_tier2_report(status))
+        written.append(markdown_path)
+    if json_path is not None:
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        json_path.write_text(json.dumps(status_to_dict(status), indent=2))
+        written.append(json_path)
+    return tuple(written)
+
+
 def format_tier2_report(status: Tier2Status) -> str:
     """Format a Markdown Tier 2 progress report.
 
@@ -195,6 +257,8 @@ def _cli(argv: list[str] | None = None) -> int:
     parser.add_argument("--calibration", help="Path to calibration JSON.")
     parser.add_argument("--registry", help="Path to model registry JSON.")
     parser.add_argument("--min-labels", type=int, default=5000)
+    parser.add_argument("--output", help="Optional Markdown report path.")
+    parser.add_argument("--json-output", help="Optional JSON status path.")
     args = parser.parse_args(argv)
 
     status = build_tier2_status(
@@ -207,6 +271,11 @@ def _cli(argv: list[str] | None = None) -> int:
         min_labels=args.min_labels,
     )
     print(format_tier2_report(status))
+    write_status_outputs(
+        status,
+        markdown_path=Path(args.output) if args.output else None,
+        json_path=Path(args.json_output) if args.json_output else None,
+    )
     return 0 if status.flag in ("READY", "IN_PROGRESS") else 1
 
 

@@ -84,7 +84,8 @@ reports/background/*.html
 **Production ML Tier 2 — trained 1D CNN on phase-folded flux**
 
 - Gate: 5,000+ labeled TESS light curves required before production training/use
-- Gate check: `python Skills/count_tess_labels.py`
+- Offline readiness check: `python Skills/tier2_progress_reporter.py --labels data/exofop_ctoi_labels.json --output reports/tier2_status.md --json-output reports/tier2_status.json`
+- Live gate check: `python Skills/count_tess_labels.py` when network access is intentionally approved
 - Architecture spec: `docs/CNN_SPEC.md`
 - Supporting implementation exists: `ml/cnn_scorer.py`, `Skills/train_cnn.py`, `labelled_lc_collector.py`, `cnn_feature_augmenter.py`, `build_cnn_training_data.py`, `cnn_split_validator.py`, and related label/QC/checkpoint/calibration utilities.
 
@@ -94,15 +95,16 @@ No active implementation blocker is known in the default local validation path.
 
 ## Next Actions
 
-1. Run `python Skills/count_tess_labels.py` periodically to monitor the CNN production-data gate.
-2. Once the CNN gate opens, run the implemented CNN training/calibration pipeline per `docs/CNN_SPEC.md`.
-3. Use `toi_checker.py` before investing pipeline time on new live targets.
-4. Use `batch_scan.py` + `alert_filter.py` + `rank_candidates.py` + `watchlist.py` for systematic follow-up.
-5. Use `multi_sector_phase_compare.py` to inspect sector-to-sector depth and phase consistency before advancing multi-sector follow-up targets.
-6. Use `candidate_dashboard_export.py` to build static local review dashboards from existing candidate JSON outputs, including optional phase-fold plot artifact paths when available.
-7. Use `candidate_api.py` to serve existing local candidate JSON, optional read-only background SQLite summaries, `/artifact.json` review bundles, and opt-in CORS for separate local frontends.
-8. Use `candidate_browser_ui.py` for an interactive local browser UI with embedded-data/API modes and optional phase-fold plot previews.
-9. Keep CTOI/community candidate ingestion opt-in and outside default training; the fixture-backed source contract now lives in `docs/CTOI_SOURCE_CONTRACT.md`.
+1. Run `python Skills/tier2_progress_reporter.py --labels data/exofop_ctoi_labels.json --output reports/tier2_status.md --json-output reports/tier2_status.json` to produce offline CNN readiness artifacts.
+2. Run `python Skills/count_tess_labels.py` only when live ExoFOP access is intentionally approved.
+3. Once the CNN gate opens, run the implemented CNN training/calibration pipeline per `docs/CNN_SPEC.md`.
+4. Use `toi_checker.py` before investing pipeline time on new live targets.
+5. Use `batch_scan.py` + `alert_filter.py` + `rank_candidates.py` + `watchlist.py` for systematic follow-up.
+6. Use `multi_sector_phase_compare.py` to inspect sector-to-sector depth and phase consistency before advancing multi-sector follow-up targets.
+7. Use `candidate_dashboard_export.py` to build static local review dashboards from existing candidate JSON outputs, including optional phase-fold plot artifact paths when available.
+8. Use `candidate_api.py` to serve existing local candidate JSON, optional read-only background SQLite summaries, `/artifact.json` review bundles, and opt-in CORS for separate local frontends.
+9. Use `candidate_browser_ui.py` for an interactive local browser UI with embedded-data/API modes and optional phase-fold plot previews.
+10. Keep CTOI/community candidate ingestion opt-in and outside default training; the fixture-backed source contract now lives in `docs/CTOI_SOURCE_CONTRACT.md`.
 
 Live-network note: the CNN gate check was not run during the latest local
 maintenance pass because it queries ExoFOP and requires intentional live network
@@ -114,7 +116,7 @@ explicit approval in restricted environments.
 
 ## Latest Local Validation
 
-Validated on 2026-06-01:
+Validated on 2026-06-02:
 
 ```bash
 .venv/bin/ruff check .
@@ -122,7 +124,7 @@ Validated on 2026-06-01:
 .venv/bin/python -m pytest
 ```
 
-Result: ruff passed, mypy passed, pytest passed with 6354 passed, 2 deselected, and no warnings.
+Result: ruff passed, mypy passed, pytest passed with 6359 passed, 2 deselected, and no warnings.
 
 ---
 

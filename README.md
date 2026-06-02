@@ -222,8 +222,18 @@ The `--scorer` flag selects among five backends:
 | Full ensemble | `--scorer full-ensemble --model-path model.json --cnn-checkpoint best.pt` | Experimental XGBoost + CNN + Bayesian blend |
 
 The CNN implementation scaffolding is present, but production CNN training/use
-is gated on 5,000+ TESS confirmed-planet labels and calibration review. Check
-the current label count:
+is gated on 5,000+ TESS confirmed-planet labels and calibration review. Write
+offline readiness artifacts:
+
+```bash
+python Skills/tier2_progress_reporter.py \
+  --labels data/exofop_ctoi_labels.json \
+  --output reports/tier2_status.md \
+  --json-output reports/tier2_status.json
+```
+
+Check the live ExoFOP label count only when network access is intentionally
+approved:
 
 ```bash
 python Skills/count_tess_labels.py
@@ -885,7 +895,7 @@ validated counts and active blockers.
 | ✅ | **Milestone 29 — Pipeline operations** | Pipeline health/freshness/drift/throughput monitors, candidate cross-reference, follow-up checklist generation, target selection optimization, prioritization reports, and batch archiving. | `Skills/pipeline_health_monitor.py`, `Skills/model_drift_detector.py`, `Skills/batch_result_archiver.py` |
 | ✅ | **Milestone 30 — Session planning and local model training** | Signal quality grading, session summaries, provenance logs, labeling export, config validation, confidence tracking, metadata stores, ephemeris updates, multi-target scheduling, archive support, and trained Kepler XGBoost model artifacts. | `models/xgboost_koi.json`, `models/xgboost_koi.xgb.json`, `Skills/session_summary_generator.py`, `Skills/candidate_archive.py` |
 | ✅ | **Milestones 34-39 — Physics, vetting, and planning utilities** | ML evaluation, photometry quality, transit vetting, noise budget, orbit simulation, stellar physics, TTV, occurrence-rate, contamination, RV, and observing-planning utilities. | Recent Milestone 34-39 commits; `Skills/`; `tests/` |
-| 🟡 | **Production CNN checkpoint** | Train, calibrate, and register a production 1D CNN on phase-folded flux once the TESS label gate opens. | Gate: `python Skills/count_tess_labels.py`; spec: `docs/CNN_SPEC.md` |
+| 🟡 | **Production CNN checkpoint** | Train, calibrate, and register a production 1D CNN on phase-folded flux once the TESS label gate opens. | Offline status: `Skills/tier2_progress_reporter.py`; live gate: `Skills/count_tess_labels.py`; spec: `docs/CNN_SPEC.md` |
 | 🟡 | **TESS-specific calibration set** | Build a held-out TESS calibration set for CNN/full-ensemble probabilities and final operating thresholds. | `Skills/validation_set_curator.py`, `Skills/cnn_calibrator.py`, `Skills/model_ensemble_evaluator.py` |
 | 🟡 | **Regime-specific priors** | Extend mission-level priors into period-, radius-, stellar-type-, and completeness-dependent profiles after calibration evidence exists. | Future update to `configs/scoring_priors_v0.json` and `docs/SCORING_MODEL.md` |
 | 🟡 | **Live target operations** | Use TOI checks, batch scans, ranking, watchlists, dashboards, and browser/API review surfaces for systematic follow-up while preserving human approval gates. | `Skills/toi_checker.py`, `Skills/batch_scan.py`, `Skills/watchlist.py`, `Skills/candidate_api.py` |
@@ -954,6 +964,17 @@ Open `reports/calibration.png`. The x-axis is the model's predicted probability;
 If the XGBoost curve deviates significantly from the diagonal, recalibrate the model (see §13).
 
 ### Check how many TESS labels exist (CNN Tier-2 gate)
+
+Offline readiness report:
+
+```bash
+python Skills/tier2_progress_reporter.py \
+  --labels data/exofop_ctoi_labels.json \
+  --output reports/tier2_status.md \
+  --json-output reports/tier2_status.json
+```
+
+Live ExoFOP count, when network access is intentionally approved:
 
 ```bash
 python Skills/count_tess_labels.py
