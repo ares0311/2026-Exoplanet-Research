@@ -67,6 +67,23 @@ def test_label_count_fail(tmp_path):
     assert not lc.passed
 
 
+def test_numeric_label_rows_count_for_ctoi_contract(tmp_path):
+    p = tmp_path / "ctoi_labels.json"
+    p.write_text(json.dumps([{"label": 1}, {"label": 0}, {"label": "pc"}]))
+    r = check_deployment_readiness(label_json=p, min_labels=2)
+    lc = next(c for c in r.checks if c.name == "label_count")
+    assert lc.passed
+    assert lc.detail.startswith("2 usable labels")
+
+
+def test_wrapped_label_rows_count(tmp_path):
+    p = tmp_path / "labels.json"
+    p.write_text(json.dumps({"rows": [{"label": "CP"}, {"label": "EB"}]}))
+    r = check_deployment_readiness(label_json=p, min_labels=2)
+    lc = next(c for c in r.checks if c.name == "label_count")
+    assert lc.passed
+
+
 def test_missing_splits(tmp_path):
     r = check_deployment_readiness(
         split_dir=tmp_path / "no_such_dir",

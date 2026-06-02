@@ -39,6 +39,38 @@ class ReadinessReport:
     flag: str  # "READY" | "NOT_READY" | "INVALID"
 
 
+def _is_supervised_label(value: object) -> bool:
+    if value in (0, 1):
+        return True
+    if isinstance(value, str):
+        return value.strip().lower() in {
+            "0",
+            "1",
+            "cp",
+            "fp",
+            "eb",
+            "planet_candidate",
+            "false_positive",
+        }
+    return False
+
+
+def _load_label_rows(path: Path) -> list[dict[str, object]]:
+    payload = json.loads(path.read_text())
+    if isinstance(payload, dict):
+        rows = payload.get("rows") or payload.get("records") or payload.get("labels") or []
+    else:
+        rows = payload
+    if not isinstance(rows, list):
+        return []
+    return [row for row in rows if isinstance(row, dict)]
+
+
+def _count_usable_labels(path: Path) -> int:
+    rows = _load_label_rows(path)
+    return sum(1 for row in rows if _is_supervised_label(row.get("label")))
+
+
 def check_deployment_readiness(
     *,
     label_json: Path | None = None,
@@ -68,11 +100,7 @@ def check_deployment_readiness(
         lp = Path(label_json)
         if lp.exists():
             try:
-                rows = json.loads(lp.read_text())
-                usable = sum(
-                    1 for r in rows
-                    if r.get("label") in ("planet_candidate", "false_positive")
-                )
+                usable = _count_usable_labels(lp)
                 passed = usable >= min_labels
                 detail = f"{usable} usable labels (threshold: {min_labels})"
             except Exception as exc:
