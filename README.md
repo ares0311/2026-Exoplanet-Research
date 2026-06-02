@@ -869,55 +869,28 @@ The candidate does not meet external submission criteria (high FPP, missing diag
 
 ## 11. Project Roadmap
 
-| Status | Milestone | Details |
-|:---:|---|---|
-| ✅ | **Core data models** | Immutable Pydantic schemas for all pipeline types (`schemas.py`) |
-| ✅ | **Feature extraction** | 35 normalized diagnostic scores; `RawDiagnostics` container (`features.py`) |
-| ✅ | **Hypothesis scoring** | Per-hypothesis log-score functions for all 6 hypotheses (`hypotheses.py`) |
-| ✅ | **Bayesian scorer** | Softmax posterior, configurable conservative priors, FPP, detection confidence, novelty score (`scoring.py`, `priors.py`) |
-| ✅ | **Submission classifier** | Ordered gate logic → 6 submission pathways (`pathway.py`) |
-| ✅ | **Data acquisition** | MAST retrieval via Lightkurve; provenance tracking (`fetch.py`) |
-| ✅ | **Light curve cleaning** | Sigma clipping, normalization, windowed detrending (`clean.py`) |
-| ✅ | **Transit search** | BLS periodicity search; iterative multi-planet masking (`search.py`) |
-| ✅ | **Signal vetting** | Odd/even, secondary eclipse, transit shape, data-gap diagnostics (`vet.py`) |
-| ✅ | **Posterior calibration** | Platt scaling, PAVA isotonic regression, Brier score (`calibration.py`) |
-| ✅ | **End-to-end notebook** | Full pipeline demo on TOI-700 (TIC 150428135); candidate report |
-| ✅ | **Injection-recovery** | Synthetic transit injection; completeness maps vs. period and radius |
-| ✅ | **CLI entry point** | `exo <TIC-ID>` single-command pipeline invocation with Rich output |
-| ✅ | **ML Tier 1 — XGBoost** | Tabular classifier on 35 `CandidateFeatures` scores |
-| ✅ | **ML Tier 3 — Stacking** | Weighted blend of XGBoost + CNN + Bayesian posteriors |
-| ✅ | **Platt calibration in training** | OOF predictions → `(a, b)` saved to model metadata JSON |
-| ✅ | **Training data pipeline** | Kepler DR25 KOIs + TESS TOI dispositions → labelled feature pickles |
-| ✅ | **Combined training dataset** | Merged Kepler + TESS pickle with stratified per-source capping |
-| ✅ | **Scorer evaluation** | k-fold ROC-AUC, F1, precision, recall; ROC and calibration diagram export |
-| ✅ | **CNN Tier-2 gate** | `count_tess_labels.py`; `CNN_SPEC.md` architecture document |
-| ✅ | **Offline CNN split assembly** | `Skills/build_cnn_training_data.py` — deterministic train/validation/test JSON splits from existing snippets |
-| ✅ | **Offline CNN split validation** | `Skills/cnn_split_validator.py` — local manifest and train/validation/test artifact checks before training |
-| ✅ | **CNN scaffolding** | `ml/cnn_scorer.py`, `Skills/train_cnn.py`, CNN calibration/checkpoint/inference utilities, phase-folded snippet wiring, and CLI `cnn/full-ensemble` modes |
-| ✅ | **Background automation** | `background/` — SQLite state, one-shot runner, priority scoring, draft reports; 16 subcommands |
-| ✅ | **Star scanner** | `Skills/star_scanner.py` — TIC priority ranking, TOI exclusion, JSON scan log, background loop |
-| ✅ | **Provenance score** | `compute_provenance_score()` in `fetch.py`; wired into `tfop_ready` pathway gate |
-| ✅ | **Candidate ranking** | `Skills/rank_candidates.py` — composite rank score, Rich table, `--top N` |
-| ✅ | **Batch scan** | `Skills/batch_scan.py` — text/CSV input, incremental JSON output, `--resume` |
-| ✅ | **Sector coverage** | `Skills/sector_coverage.py` — query TESS sector availability without download |
-| ✅ | **Depth chi-square score** | `depth_scatter_chi2_score` — error-weighted depth scatter test wired into hypothesis scoring |
-| ✅ | **Phase-fold plots** | `Skills/plot_lc.py` — phase-folded PNG from candidate JSON |
-| ✅ | **Multi-sector phase comparison** | `Skills/multi_sector_phase_compare.py` — depth and phase consistency across sectors |
-| ✅ | **Static candidate dashboard** | `Skills/candidate_dashboard_export.py` — local HTML review dashboard preserving false-positive evidence with optional phase-fold plot artifacts |
-| ✅ | **Local candidate API** | `Skills/candidate_api.py` — standard-library read-only endpoints for local candidate JSON, artifact bundles, optional CORS, plus optional background SQLite summaries |
-| ✅ | **Interactive browser UI** | `Skills/candidate_browser_ui.py` — dependency-free local candidate browser with optional plot previews |
-| ✅ | **Watchlist** | `Skills/watchlist.py` — persistent JSON watchlist with add/remove/list/scan |
-| ✅ | **Summary report** | `Skills/summary_report.py` — Markdown report from batch_scan JSON output |
-| ✅ | **Transit timing variation** | `transit_timing_variation_score` — O-C RMS test; wired into planet/instrumental hypotheses |
-| ✅ | **TOI checker** | `Skills/toi_checker.py` — ExoFOP TOI lookup before investing pipeline time |
-| ✅ | **Export candidates** | `Skills/export_candidates.py` — CSV and Markdown table export with summary stats |
-| ✅ | **Alert filter** | `Skills/alert_filter.py` — AND-logic threshold filter over FPP/pathway/signals/SNR |
-| ✅ | **Skills guide** | `docs/SKILLS_GUIDE.md` — workflow reference and current inventory for all 249 Skills |
-| 🔴 | **Production CNN checkpoint** | Train, calibrate, and register a CNN model once ≥5,000 TESS CP labels are available |
-| ✅ | **Mission-specific priors** | Versioned conservative TESS/Kepler/K2 prior profiles in `configs/scoring_priors_v0.json` |
-| 🔴 | **Regime-specific priors** | Period-, radius-, stellar-type-, and completeness-dependent priors replacing mission-only defaults |
+This table is the public progress tracker. `docs/ROADMAP.md` keeps the long
+historical milestone log, while `docs/PROJECT_STATUS.md` records the latest
+validated counts and active blockers.
 
-✅ Complete &nbsp;&nbsp; 🔴 Planned / Gated
+| Status | Increment | Scope | Tracking Evidence |
+|:---:|---|---|---|
+| ✅ | **Milestones 1-5 — Core pipeline** | Immutable schemas, normalized features, six-hypothesis Bayesian scoring, pathway classification, fetch/clean/search/vet stages, calibration, reporting, and CLI entry point. | `src/exo_toolkit/`, `tests/test_*`, `docs/SCORING_MODEL.md`, `docs/PIPELINE_SPEC.md` |
+| ✅ | **Milestones 6-8 — Validation and automation** | Injection-recovery, ML scorer foundation, background automation with top-level SQLite logs, scheduler docs, and deterministic known-TESS fixtures. | `Skills/injection_recovery.py`, `src/exo_toolkit/background/`, `docs/SCHEDULER.md` |
+| ✅ | **Milestones 8b-11 — Discovery workflow** | Star scanner, provenance scoring, candidate ranking, batch scans, sector coverage, phase-fold plots, watchlists, TOI checking, exports, and alert filtering. | `Skills/star_scanner.py`, `Skills/batch_scan.py`, `Skills/rank_candidates.py`, `Skills/toi_checker.py` |
+| ✅ | **Milestones 12-18 — Diagnostics and operations expansion** | Additional diagnostic scores, follow-up preparation, false-positive vetting, caching, period aliases, centroid checks, transit modeling, reporting, observability, and run-diff utilities. | `Skills/`, `tests/`, `docs/SKILLS_GUIDE.md` |
+| ✅ | **Milestones 19a-19d — Review surfaces** | Multi-sector phase comparison, static candidate dashboard, local read-only candidate API, and dependency-free browser UI. | `docs/DASHBOARD_SPEC.md`, `docs/API_SPEC.md`, `Skills/candidate_dashboard_export.py`, `Skills/candidate_api.py`, `Skills/candidate_browser_ui.py` |
+| ✅ | **Milestones 24-27 — CNN and label infrastructure** | CTOI/KOI/TOI label sources, multi-source label assembly, snippet building and normalization, CNN config/training/checkpoint/calibration/inference helpers, and model registry/evaluation utilities. | `docs/CTOI_SOURCE_CONTRACT.md`, `docs/CNN_SPEC.md`, `Skills/train_cnn.py`, `Skills/cnn_*`, `Skills/*label*` |
+| ✅ | **Milestone 28 — Tier-2 bridge tools** | TESS TCE ingestion, label balance and leakage checks, snippet cache management, deployment readiness, threshold optimization, ensemble evaluation, and Tier-2 status reporting. | `Skills/tess_tce_fetcher.py`, `Skills/deployment_readiness_checker.py`, `Skills/tier2_progress_reporter.py` |
+| ✅ | **Milestone 29 — Pipeline operations** | Pipeline health/freshness/drift/throughput monitors, candidate cross-reference, follow-up checklist generation, target selection optimization, prioritization reports, and batch archiving. | `Skills/pipeline_health_monitor.py`, `Skills/model_drift_detector.py`, `Skills/batch_result_archiver.py` |
+| ✅ | **Milestone 30 — Session planning and local model training** | Signal quality grading, session summaries, provenance logs, labeling export, config validation, confidence tracking, metadata stores, ephemeris updates, multi-target scheduling, archive support, and trained Kepler XGBoost model artifacts. | `models/xgboost_koi.json`, `models/xgboost_koi.xgb.json`, `Skills/session_summary_generator.py`, `Skills/candidate_archive.py` |
+| ✅ | **Milestones 34-39 — Physics, vetting, and planning utilities** | ML evaluation, photometry quality, transit vetting, noise budget, orbit simulation, stellar physics, TTV, occurrence-rate, contamination, RV, and observing-planning utilities. | Recent Milestone 34-39 commits; `Skills/`; `tests/` |
+| 🟡 | **Production CNN checkpoint** | Train, calibrate, and register a production 1D CNN on phase-folded flux once the TESS label gate opens. | Gate: `python Skills/count_tess_labels.py`; spec: `docs/CNN_SPEC.md` |
+| 🟡 | **TESS-specific calibration set** | Build a held-out TESS calibration set for CNN/full-ensemble probabilities and final operating thresholds. | `Skills/validation_set_curator.py`, `Skills/cnn_calibrator.py`, `Skills/model_ensemble_evaluator.py` |
+| 🟡 | **Regime-specific priors** | Extend mission-level priors into period-, radius-, stellar-type-, and completeness-dependent profiles after calibration evidence exists. | Future update to `configs/scoring_priors_v0.json` and `docs/SCORING_MODEL.md` |
+| 🟡 | **Live target operations** | Use TOI checks, batch scans, ranking, watchlists, dashboards, and browser/API review surfaces for systematic follow-up while preserving human approval gates. | `Skills/toi_checker.py`, `Skills/batch_scan.py`, `Skills/watchlist.py`, `Skills/candidate_api.py` |
+
+✅ Complete &nbsp;&nbsp; 🟡 Planned / gated
 
 ---
 
