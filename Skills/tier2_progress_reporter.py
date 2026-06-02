@@ -7,6 +7,9 @@ Public API
 ----------
 Tier2Status(n_labels, n_snippets, gate_passed, training_complete,
             calibrated, registered, next_actions, flag)
+is_supervised_label(value) -> bool
+load_label_rows(path) -> list[dict]
+count_supervised_labels(path) -> int
 build_tier2_status(*, label_json, snippet_dir, training_log,
                    checkpoint_path, calibration_path, registry_path,
                    min_labels) -> Tier2Status
@@ -33,7 +36,8 @@ class Tier2Status:
     flag: str  # "READY" | "IN_PROGRESS" | "BLOCKED"
 
 
-def _is_supervised_label(value: object) -> bool:
+def is_supervised_label(value: object) -> bool:
+    """Return True when a label value can participate in supervised gates."""
     if value in (0, 1):
         return True
     if isinstance(value, str):
@@ -49,7 +53,8 @@ def _is_supervised_label(value: object) -> bool:
     return False
 
 
-def _load_label_rows(path: Path) -> list[dict[str, object]]:
+def load_label_rows(path: Path) -> list[dict[str, object]]:
+    """Load flat or wrapped label rows from JSON."""
     payload = json.loads(path.read_text())
     if isinstance(payload, dict):
         rows = payload.get("rows") or payload.get("records") or payload.get("labels") or []
@@ -60,9 +65,13 @@ def _load_label_rows(path: Path) -> list[dict[str, object]]:
     return [row for row in rows if isinstance(row, dict)]
 
 
-def _count_labels(path: Path) -> int:
+def count_supervised_labels(path: Path) -> int:
+    """Count supervised label rows in a flat or wrapped JSON label file."""
     try:
-        return sum(1 for row in _load_label_rows(path) if _is_supervised_label(row.get("label")))
+        return sum(
+            1 for row in load_label_rows(path)
+            if is_supervised_label(row.get("label"))
+        )
     except Exception:
         return 0
 
@@ -94,7 +103,7 @@ def build_tier2_status(
     # Label count
     n_labels = 0
     if label_json is not None and Path(label_json).exists():
-        n_labels = _count_labels(Path(label_json))
+        n_labels = count_supervised_labels(Path(label_json))
 
     # Snippet count
     n_snippets = 0

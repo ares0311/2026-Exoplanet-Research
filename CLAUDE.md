@@ -54,7 +54,7 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 427 top-level test files. Local validation on 2026-06-02 passed with 6364 default tests and 2 `integration_live` tests deselected.
+**Current test surface:** 427 top-level test files. Local validation on 2026-06-02 passed with 6365 default tests and 2 `integration_live` tests deselected.
 **Skills:** 413 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). See `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference instead of relying on this file for exhaustive per-script counts.
 
 ---
@@ -914,7 +914,7 @@ All pipeline modules are complete.
 | `cnn_threshold_optimizer.py` | `optimize_threshold`, `format_threshold_result` — F1/BA/Youden threshold sweep | 13 |
 | `model_ensemble_evaluator.py` | `evaluate_ensemble`, `format_ensemble_eval` — AUC/PR/F1/Brier/ECE per tier | 13 |
 | `training_resumption_manager.py` | `find_latest_checkpoint`, `plan_resumption` — resume from latest checkpoint | 13 |
-| `tier2_progress_reporter.py` | `build_tier2_status`, `status_to_dict`, `write_status_outputs`, `format_tier2_report` — unified Tier 2 progress dashboard | 18 |
+| `tier2_progress_reporter.py` | `count_supervised_labels`, `build_tier2_status`, `status_to_dict`, `write_status_outputs`, `format_tier2_report` — unified Tier 2 progress dashboard | 19 |
 
 ### Completed (2026-05-25) — Milestone 27
 

@@ -8,7 +8,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 from tier2_progress_reporter import (
     _cli,
     build_tier2_status,
+    count_supervised_labels,
     format_tier2_report,
+    is_supervised_label,
     status_to_dict,
     write_status_outputs,
 )
@@ -135,6 +137,13 @@ def test_committed_ctoi_label_fixture_counts_for_status():
     s = build_tier2_status(label_json=_FIXTURE_LABELS, min_labels=3)
     assert s.n_labels == 3
     assert s.gate_passed
+
+
+def test_public_label_contract_helpers_count_fixture():
+    assert is_supervised_label(1)
+    assert is_supervised_label("CP")
+    assert not is_supervised_label("PC")
+    assert count_supervised_labels(_FIXTURE_LABELS) == 3
 
 
 def test_status_to_dict_contains_next_actions():

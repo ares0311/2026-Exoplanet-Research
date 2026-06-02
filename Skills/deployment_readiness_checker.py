@@ -22,6 +22,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from tier2_progress_reporter import count_supervised_labels
+
 
 @dataclass(frozen=True)
 class ReadinessCheck:
@@ -37,38 +39,6 @@ class ReadinessReport:
     n_failed: int
     ready: bool
     flag: str  # "READY" | "NOT_READY" | "INVALID"
-
-
-def _is_supervised_label(value: object) -> bool:
-    if value in (0, 1):
-        return True
-    if isinstance(value, str):
-        return value.strip().lower() in {
-            "0",
-            "1",
-            "cp",
-            "fp",
-            "eb",
-            "planet_candidate",
-            "false_positive",
-        }
-    return False
-
-
-def _load_label_rows(path: Path) -> list[dict[str, object]]:
-    payload = json.loads(path.read_text())
-    if isinstance(payload, dict):
-        rows = payload.get("rows") or payload.get("records") or payload.get("labels") or []
-    else:
-        rows = payload
-    if not isinstance(rows, list):
-        return []
-    return [row for row in rows if isinstance(row, dict)]
-
-
-def _count_usable_labels(path: Path) -> int:
-    rows = _load_label_rows(path)
-    return sum(1 for row in rows if _is_supervised_label(row.get("label")))
 
 
 def check_deployment_readiness(
@@ -100,7 +70,7 @@ def check_deployment_readiness(
         lp = Path(label_json)
         if lp.exists():
             try:
-                usable = _count_usable_labels(lp)
+                usable = count_supervised_labels(lp)
                 passed = usable >= min_labels
                 detail = f"{usable} usable labels (threshold: {min_labels})"
             except Exception as exc:
