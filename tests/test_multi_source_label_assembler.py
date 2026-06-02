@@ -1,6 +1,7 @@
 """Tests for Skills/multi_source_label_assembler.py (13 tests)."""
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -11,6 +12,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
 from multi_source_label_assembler import (
     assemble_labels,
     format_label_manifest,
+)
+
+_CTOI_LABELS = json.loads(
+    (
+        Path(__file__).resolve().parent
+        / "fixtures"
+        / "exofop_ctoi_labels_sample.json"
+    ).read_text()
 )
 
 # ---------------------------------------------------------------------------
@@ -111,6 +120,16 @@ def test_optional_fields_preserved():
     assert rec.period_days == pytest.approx(3.5)
     assert rec.epoch == pytest.approx(2458000.0)
     assert rec.duration_hours == pytest.approx(2.1)
+
+
+def test_ctoi_label_fixture_assembles_numeric_labels():
+    manifest = assemble_labels(_CTOI_LABELS)
+    assert manifest.flag == "OK"
+    assert manifest.n_positive == 1
+    assert manifest.n_negative == 2
+    assert manifest.sources == ("ctoi",)
+    assert {record.label for record in manifest.records} == {0, 1}
+    assert all(record.confidence >= 0.75 for record in manifest.records)
 
 
 def test_output_path_writes_file(tmp_path):

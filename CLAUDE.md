@@ -54,7 +54,7 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 427 top-level test files. Local validation on 2026-06-02 passed with 6365 default tests and 2 `integration_live` tests deselected.
+**Current test surface:** 427 top-level test files. Local validation on 2026-06-02 passed with 6367 default tests and 2 `integration_live` tests deselected.
 **Skills:** 413 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). See `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference instead of relying on this file for exhaustive per-script counts.
 
 ---
@@ -857,9 +857,9 @@ All pipeline modules are complete.
 |---|---|---|
 | `fetch_exofop_ctoi.py` | `fetch_ctoi_table`, `ctoi_rows_to_label_rows`, `CtoisResult` — ExoFOP CTOI CSV download and opt-in label rows | 21 |
 | `fetch_nea_koi_lc_index.py` | `fetch_koi_lc_index`, `KoiRecord` — NASA TAP ephemeris index | 13 |
-| `multi_source_label_assembler.py` | `assemble_labels`, `LabelManifest`, `LabelRecord` — merge/dedup labels | 13 |
+| `multi_source_label_assembler.py` | `assemble_labels`, `LabelManifest`, `LabelRecord` — merge/dedup labels | 14 |
 | `lc_snippet_batch_builder.py` | `build_snippet_batch`, checkpoint/resume batch extraction | 13 |
-| `label_quality_controller.py` | `run_label_qc` — source agreement + ephemeris + confidence QC | 13 |
+| `label_quality_controller.py` | `run_label_qc` — source agreement + ephemeris + confidence QC | 14 |
 | `snippet_normalizer.py` | `normalize_snippet`, `normalize_batch` — Shallue & Vanderburg normalization | 13 |
 | `training_data_monitor.py` | `monitor_training_data`, gate check (5000-label threshold) | 13 |
 | `cnn_training_config.py` | `default_config`, `load_config`, `save_config`, `validate_config` | 18 |

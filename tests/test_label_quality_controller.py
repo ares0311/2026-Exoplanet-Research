@@ -1,13 +1,22 @@
 """Tests for Skills/label_quality_controller.py (13 tests)."""
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
 
 from label_quality_controller import format_qc_result, run_label_qc
-from multi_source_label_assembler import LabelManifest, LabelRecord
+from multi_source_label_assembler import LabelManifest, LabelRecord, assemble_labels
+
+_CTOI_LABELS = json.loads(
+    (
+        Path(__file__).resolve().parent
+        / "fixtures"
+        / "exofop_ctoi_labels_sample.json"
+    ).read_text()
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -103,6 +112,14 @@ def test_passed_manifest_counts():
     manifest = _make_manifest(records)
     result = run_label_qc(manifest)
     assert result.passed_manifest.n_positive + result.passed_manifest.n_negative == result.n_passed
+
+
+def test_ctoi_label_fixture_passes_qc():
+    manifest = assemble_labels(_CTOI_LABELS)
+    result = run_label_qc(manifest)
+    assert result.flag == "OK"
+    assert result.n_passed == 3
+    assert result.passed_manifest.sources == ("ctoi",)
 
 
 def test_invalid_manifest():
