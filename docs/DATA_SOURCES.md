@@ -82,6 +82,8 @@ Source contract status before any default-training integration:
   `Skills/fetch_exofop_ctoi.py`
 - default tests use committed fixtures or injected fetch functions, not live
   network calls
+- the committed label-row fixture is
+  `tests/fixtures/exofop_ctoi_labels_sample.json`
 - labels map only externally reviewed dispositions into training labels
 - uncertain/community-only candidate labels remain excluded from default
   supervised training

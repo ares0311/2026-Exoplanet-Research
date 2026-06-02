@@ -54,7 +54,7 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 427 top-level test files. Local validation on 2026-06-02 passed with 6361 default tests and 2 `integration_live` tests deselected.
+**Current test surface:** 427 top-level test files. Local validation on 2026-06-02 passed with 6364 default tests and 2 `integration_live` tests deselected.
 **Skills:** 413 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). See `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference instead of relying on this file for exhaustive per-script counts.
 
 ---
@@ -855,7 +855,7 @@ All pipeline modules are complete.
 
 | Skill / Module | Key Functions | Tests |
 |---|---|---|
-| `fetch_exofop_ctoi.py` | `fetch_ctoi_table`, `ctoi_rows_to_label_rows`, `CtoisResult` — ExoFOP CTOI CSV download and opt-in label rows | 20 |
+| `fetch_exofop_ctoi.py` | `fetch_ctoi_table`, `ctoi_rows_to_label_rows`, `CtoisResult` — ExoFOP CTOI CSV download and opt-in label rows | 21 |
 | `fetch_nea_koi_lc_index.py` | `fetch_koi_lc_index`, `KoiRecord` — NASA TAP ephemeris index | 13 |
 | `multi_source_label_assembler.py` | `assemble_labels`, `LabelManifest`, `LabelRecord` — merge/dedup labels | 13 |
 | `lc_snippet_batch_builder.py` | `build_snippet_batch`, checkpoint/resume batch extraction | 13 |
@@ -910,11 +910,11 @@ All pipeline modules are complete.
 | `cnn_hyperparameter_config.py` | `HyperparamGrid`, `generate_candidates`, `save/load_grid` — arch search grid | 12 |
 | `label_propagator.py` | `propagate_labels`, `format_propagation_report` — harmonic period propagation | 13 |
 | `snippet_cache_manager.py` | `SnippetCacheManager.stats/contains/prune/export_manifest` — cache ops | 13 |
-| `deployment_readiness_checker.py` | `check_deployment_readiness`, `format_readiness_report` — Tier 2 gate check | 13 |
+| `deployment_readiness_checker.py` | `check_deployment_readiness`, `format_readiness_report` — Tier 2 gate check | 14 |
 | `cnn_threshold_optimizer.py` | `optimize_threshold`, `format_threshold_result` — F1/BA/Youden threshold sweep | 13 |
 | `model_ensemble_evaluator.py` | `evaluate_ensemble`, `format_ensemble_eval` — AUC/PR/F1/Brier/ECE per tier | 13 |
 | `training_resumption_manager.py` | `find_latest_checkpoint`, `plan_resumption` — resume from latest checkpoint | 13 |
-| `tier2_progress_reporter.py` | `build_tier2_status`, `status_to_dict`, `write_status_outputs`, `format_tier2_report` — unified Tier 2 progress dashboard | 17 |
+| `tier2_progress_reporter.py` | `build_tier2_status`, `status_to_dict`, `write_status_outputs`, `format_tier2_report` — unified Tier 2 progress dashboard | 18 |
 
 ### Completed (2026-05-25) — Milestone 27
 

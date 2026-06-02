@@ -1,0 +1,38 @@
+[
+  {
+    "tic_id": "111222333",
+    "label": 1,
+    "source": "ctoi",
+    "confidence": 0.9,
+    "period_days": 3.5,
+    "epoch": 2458000.5,
+    "duration_hours": 2.1,
+    "ctoi": "1234.01",
+    "disposition": "cp",
+    "n_ratings": 5
+  },
+  {
+    "tic_id": "444555666",
+    "label": 0,
+    "source": "ctoi",
+    "confidence": 0.8,
+    "period_days": 7.0,
+    "epoch": 2458001.0,
+    "duration_hours": 1.8,
+    "ctoi": "5678.01",
+    "disposition": "fp",
+    "n_ratings": 3
+  },
+  {
+    "tic_id": "777888999",
+    "label": 0,
+    "source": "ctoi",
+    "confidence": 0.75,
+    "period_days": 1.2,
+    "epoch": 2458002.0,
+    "duration_hours": 0.9,
+    "ctoi": "9999.01",
+    "disposition": "fp",
+    "n_ratings": 2
+  }
+]

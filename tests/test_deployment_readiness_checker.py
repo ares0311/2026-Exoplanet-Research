@@ -10,6 +10,8 @@ from deployment_readiness_checker import (
     format_readiness_report,
 )
 
+_FIXTURE_LABELS = Path(__file__).resolve().parent / "fixtures" / "exofop_ctoi_labels_sample.json"
+
 
 def _make_label_file(tmp_path: Path, n_pc: int, n_fp: int) -> Path:
     rows = [{"label": "planet_candidate"}] * n_pc + [{"label": "false_positive"}] * n_fp
@@ -82,6 +84,13 @@ def test_wrapped_label_rows_count(tmp_path):
     r = check_deployment_readiness(label_json=p, min_labels=2)
     lc = next(c for c in r.checks if c.name == "label_count")
     assert lc.passed
+
+
+def test_committed_ctoi_label_fixture_counts_for_readiness():
+    r = check_deployment_readiness(label_json=_FIXTURE_LABELS, min_labels=3)
+    lc = next(c for c in r.checks if c.name == "label_count")
+    assert lc.passed
+    assert lc.detail.startswith("3 usable labels")
 
 
 def test_missing_splits(tmp_path):

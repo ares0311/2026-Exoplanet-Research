@@ -24,8 +24,8 @@ assembly steps.
   example `data/exofop_ctoi_labels.json`.
 - Live fetched tables are runtime data and should not be committed unless a
   future decision explicitly promotes a frozen copy as a fixture.
-- Default tests use `tests/fixtures/exofop_ctoi_sample.csv` or injected fetch
-  functions.
+- Default tests use `tests/fixtures/exofop_ctoi_sample.csv`,
+  `tests/fixtures/exofop_ctoi_labels_sample.json`, or injected fetch functions.
 
 ## Opt-In Commands
 
@@ -72,6 +72,11 @@ The CTOI fetcher normalizes raw dispositions as:
 `ctoi_rows_to_label_rows()` emits labels only for normalized `cp` and `fp`
 rows. It excludes `pc` rows because unresolved community candidates should not
 be treated as supervised labels in the default training flow.
+
+The committed fixture `tests/fixtures/exofop_ctoi_labels_sample.json` is the
+stable offline example for readiness checks. It mirrors the labels emitted from
+`tests/fixtures/exofop_ctoi_sample.csv` and uses numeric labels (`1` for CP,
+`0` for FP/EB).
 
 The emitted `confidence` value is a deterministic conflict-resolution weight
 derived from `n_ratings`; it is not a calibrated astrophysical probability.

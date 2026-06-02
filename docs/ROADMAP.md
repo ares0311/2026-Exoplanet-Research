@@ -70,7 +70,8 @@
 - [x] Tier 2 scaffolding — CNN scorer wrapper, training loop, checkpoint/calibration helpers, phase-folded snippet wiring, and `cnn/full-ensemble` CLI modes
 - [ ] Production Tier 2 checkpoint — trained/calibrated 1D CNN on phase-folded flux (**BLOCKED: requires 5,000+ TESS labels**)
   - Architecture spec: `docs/CNN_SPEC.md`
-  - Gate check: `Skills/count_tess_labels.py`
+  - Offline status: `Skills/tier2_progress_reporter.py`
+  - Live gate check: `Skills/count_tess_labels.py` when network access is intentionally approved
 
 ---
 

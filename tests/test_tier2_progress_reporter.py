@@ -13,6 +13,8 @@ from tier2_progress_reporter import (
     write_status_outputs,
 )
 
+_FIXTURE_LABELS = Path(__file__).resolve().parent / "fixtures" / "exofop_ctoi_labels_sample.json"
+
 
 def _make_labels(tmp_path: Path, n_pc: int, n_fp: int) -> Path:
     rows = [{"label": "planet_candidate"}] * n_pc + [{"label": "false_positive"}] * n_fp
@@ -127,6 +129,12 @@ def test_wrapped_label_rows_count(tmp_path):
     s = build_tier2_status(label_json=p, min_labels=2)
     assert s.n_labels == 2
     assert s.flag == "IN_PROGRESS"
+
+
+def test_committed_ctoi_label_fixture_counts_for_status():
+    s = build_tier2_status(label_json=_FIXTURE_LABELS, min_labels=3)
+    assert s.n_labels == 3
+    assert s.gate_passed
 
 
 def test_status_to_dict_contains_next_actions():

@@ -37,6 +37,14 @@ _FIXTURE_CSV = (
     Path(__file__).resolve().parent / "fixtures" / "exofop_ctoi_sample.csv"
 ).read_text()
 
+_FIXTURE_LABELS = json.loads(
+    (
+        Path(__file__).resolve().parent
+        / "fixtures"
+        / "exofop_ctoi_labels_sample.json"
+    ).read_text()
+)
+
 
 def _make_fetch(csv_text: str):
     def _fn(url: str) -> str:
@@ -157,6 +165,12 @@ def test_ctoi_label_rows_map_reviewed_dispositions():
     assert by_ctoi["1234.01"]["label"] == 1
     assert by_ctoi["5678.01"]["label"] == 0
     assert by_ctoi["9999.01"]["label"] == 0
+
+
+def test_committed_label_fixture_matches_csv_contract():
+    result = fetch_ctoi_table(fetch_fn=_make_fetch(_FIXTURE_CSV), min_ratings=1)
+    label_rows = [dict(row) for row in ctoi_rows_to_label_rows(result.rows)]
+    assert label_rows == _FIXTURE_LABELS
 
 
 def test_ctoi_label_rows_include_manifest_fields():
