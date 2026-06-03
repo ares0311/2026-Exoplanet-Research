@@ -210,7 +210,9 @@ the output row but does not replace the Bayesian posterior.
 
 Implementation scaffolding is built, but production CNN use remains gated on
 5,000+ labeled TESS light curves plus calibration review. The default suite does
-not run the live ExoFOP gate check.
+not run the live ExoFOP gate check. When the live gate check is intentionally
+run with `python Skills/count_tess_labels.py`, it records a local SQLite audit
+entry in `logs/tess_label_check.sqlite3`.
 
 - `Skills/labelled_lc_collector.py`
 - `Skills/cnn_feature_augmenter.py`
