@@ -12,7 +12,11 @@ from mcp_bootstrap_server import handle_request, is_allowed_project_path, projec
 
 
 def test_project_root_defaults_to_repository() -> None:
-    assert project_root().name == "2026 Exoplanet Research"
+    root = project_root()
+    # Name varies by OS/clone method; verify it is the real repo root instead.
+    assert root.is_dir()
+    assert (root / "CLAUDE.md").is_file()
+    assert (root / "Skills").is_dir()
 
 
 def test_project_files_reject_runtime_artifacts() -> None:

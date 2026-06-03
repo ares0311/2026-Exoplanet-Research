@@ -11,6 +11,20 @@ It contains the facts a coding agent needs to work productively without re-readi
 
 ---
 
+## Project-Scoped MCP Servers
+
+Three MCP servers are bootstrapped in `.mcp.json` and `.codex/config.toml`. All are implemented in `Skills/mcp_bootstrap_server.py`. Claude Code loads them automatically from `.mcp.json` at the project root.
+
+| Server | Mode arg | Capabilities |
+|---|---|---|
+| `exo_project_files` | `project_files` | Read-only access to source, docs, tests, configs. Blocks `logs/`, `data/`, `.git`, `.venv`, secrets. |
+| `exo_git_read` | `git_read` | Fixed read-only git commands: `status`, `diff`, `diff_staged`, `log_recent`, `branch_current`. |
+| `exo_guard` | `exo_guard` | Fixed validation commands: `ruff_check`, `mypy_src`, `pytest_default`, `pytest_cov`, `background_run_once_dry_run`, `run_summary`, `sqlite_integrity`. |
+
+**Safety contract**: No arbitrary shell execution. No live-network commands in defaults. No secrets or runtime artifacts exposed. No external submission without human approval. Full spec: `docs/Exoplanet_Research_MCP_BOOTSTRAP.md`.
+
+---
+
 ## Project
 
 **2026 Exoplanet Research**
