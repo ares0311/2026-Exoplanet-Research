@@ -9,7 +9,7 @@ Run any script with `--help` to see its full CLI options.
 
 ## Current inventory
 
-The repository currently has 413 standalone Skills. The quick reference below
+The repository currently has 415 standalone Skills. The quick reference below
 highlights many established workflow entry points, but it is not exhaustive.
 For the exact current script surface, run `find Skills -maxdepth 1 -name '*.py'`.
 
@@ -309,6 +309,7 @@ This table is intentionally workflow-oriented rather than exhaustive.
 | `fetch_tess_toi.py` | Download TESS TOI table from ExoFOP | `fetch_tess_toi` |
 | `fetch_exofop_ctoi.py` | Parse opt-in ExoFOP CTOI rows and export fixture-backed label rows with `--labels-output` | `fetch_ctoi_table`, `ctoi_rows_to_label_rows` |
 | `count_tess_labels.py` | Check CNN Tier-2 label gate (≥5,000 CP) | (script) |
+| `tess_label_check_summary.py` | Read-only summary of live label-check SQLite audit logs | `build_summary`, `format_summary` |
 | `tier2_progress_reporter.py` | Build offline Tier-2 readiness reports and expose the shared supervised-label counter | `count_supervised_labels`, `build_tier2_status`, `write_status_outputs` |
 
 ---
@@ -493,6 +494,13 @@ Live ExoFOP gate count, when network access is intentionally approved:
 ```bash
 python Skills/count_tess_labels.py
 # Prints the current CP count and writes logs/tess_label_check.sqlite3.
+```
+
+Summarize local live-check history without a network call:
+
+```bash
+python Skills/tess_label_check_summary.py
+python Skills/tess_label_check_summary.py --json
 ```
 
 ---

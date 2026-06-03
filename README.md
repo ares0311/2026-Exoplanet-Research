@@ -3,7 +3,7 @@
 [![CI](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml/badge.svg)](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-2100%2B%20collected-informational.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-6300%2B%20collected-informational.svg)](tests/)
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 ---
@@ -57,7 +57,7 @@
 
 ## Abstract
 
-This repository implements a complete, reproducible computational pipeline for the detection, vetting, and probabilistic classification of exoplanet transit candidates in photometric time-series data from the Transiting Exoplanet Survey Satellite (TESS) and the Kepler/K2 missions. The pipeline proceeds through six deterministic stages — data acquisition, preprocessing, Box Least Squares (BLS) periodicity search, signal vetting, Bayesian multi-hypothesis scoring, and submission pathway classification — and outputs calibrated posterior probabilities over six competing astrophysical and instrumental hypotheses. A conservative log-score approximation to Bayes' theorem is employed in lieu of generative likelihood models, with posterior calibration implemented via Platt scaling and isotonic regression (Pool Adjacent Violators Algorithm). An optional Tier-1 XGBoost classifier and Tier-3 stacking meta-learner augment the Bayesian scorer when labelled training data are available. The system is designed around scientific caution: it never labels an internally detected signal as a confirmed planet, exposes all false-positive evidence alongside each candidate score, and defers to authoritative external catalogs for confirmation status. The current implementation comprises 27 package modules, an autonomous background search engine with SQLite-backed durable state, an autonomous star-scanner for priority-ranked target discovery, 413 standalone Skills utility scripts, 427 top-level test files, strict static typing (mypy), and continuous integration via GitHub Actions.
+This repository implements a complete, reproducible computational pipeline for the detection, vetting, and probabilistic classification of exoplanet transit candidates in photometric time-series data from the Transiting Exoplanet Survey Satellite (TESS) and the Kepler/K2 missions. The pipeline proceeds through six deterministic stages — data acquisition, preprocessing, Box Least Squares (BLS) periodicity search, signal vetting, Bayesian multi-hypothesis scoring, and submission pathway classification — and outputs calibrated posterior probabilities over six competing astrophysical and instrumental hypotheses. A conservative log-score approximation to Bayes' theorem is employed in lieu of generative likelihood models, with posterior calibration implemented via Platt scaling and isotonic regression (Pool Adjacent Violators Algorithm). An optional Tier-1 XGBoost classifier and Tier-3 stacking meta-learner augment the Bayesian scorer when labelled training data are available. The system is designed around scientific caution: it never labels an internally detected signal as a confirmed planet, exposes all false-positive evidence alongside each candidate score, and defers to authoritative external catalogs for confirmation status. The current implementation comprises 27 package modules, an autonomous background search engine with SQLite-backed durable state, an autonomous star-scanner for priority-ranked target discovery, 415 standalone Skills utility scripts, 432 top-level test files, strict static typing (mypy), and continuous integration via GitHub Actions.
 
 ---
 
@@ -198,7 +198,7 @@ Each stage produces a typed, immutable result object and preserves provenance me
 | `background/` | — | SQLite-backed automation: one-shot runner, priority scoring, draft reports | 16 |
 | **Package subtotal** | | | **758** |
 
-The repository also contains 413 standalone `Skills/` utilities with dedicated tests. See `docs/PROJECT_STATUS.md` for the latest validation note.
+The repository also contains 415 standalone `Skills/` utilities with dedicated tests. See `docs/PROJECT_STATUS.md` for the latest validation note.
 
 ### Operating Modes
 
@@ -678,7 +678,7 @@ python Skills/evaluate_scorer.py \
 │           ├── xgboost_scorer.py    # XGBoost binary classifier (Tier-1)
 │           ├── cnn_scorer.py        # CNN checkpoint wrapper (Tier-2 scaffold)
 │           └── stacking_scorer.py   # Weighted blend scorer (Tier-3)
-├── tests/                       # 427 top-level test files plus marked live tests
+├── tests/                       # 432 top-level test files plus marked live tests
 │   ├── test_schemas.py          # 33 tests
 │   ├── test_features.py         # 145 tests
 │   ├── test_hypotheses.py       # 46 tests
@@ -706,6 +706,7 @@ python Skills/evaluate_scorer.py \
 │   ├── evaluate_scorer.py       # Bayesian vs XGBoost comparison (ROC, F1)
 │   ├── injection_recovery.py    # Synthetic transit injection completeness maps
 │   ├── count_tess_labels.py     # Check CNN Tier-2 label gate (≥5,000 CP)
+│   ├── tess_label_check_summary.py  # Summarize live label-check SQLite logs
 │   ├── star_scanner.py          # TIC priority ranking and background scan loop
 │   ├── rank_candidates.py       # Composite rank scoring and Rich table output
 │   ├── batch_scan.py            # Bulk TIC-ID scanning with resume and JSON output
@@ -793,7 +794,7 @@ PYTHONPATH=src python -m pytest -m integration_live
 | `ml/stacking_scorer.py` | 22 |
 | `ml/cnn_scorer.py` | 21 |
 | `background/` module | 16 |
-| Skills utilities | 413 scripts with dedicated tests |
+| Skills utilities | 415 scripts with dedicated tests |
 | **Current default suite** | See `docs/PROJECT_STATUS.md` |
 
 ---
@@ -991,6 +992,13 @@ Inspect the latest local run without modifying the log:
 ```bash
 sqlite3 logs/tess_label_check.sqlite3 \
   "SELECT started_at, cp, fp, eb, total, gate_open, exit_code, status, error_message FROM tess_label_checks ORDER BY id DESC LIMIT 1;"
+```
+
+Or use the read-only summary helper:
+
+```bash
+python Skills/tess_label_check_summary.py
+python Skills/tess_label_check_summary.py --json
 ```
 
 Sample output:
