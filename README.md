@@ -980,6 +980,19 @@ Live ExoFOP count, when network access is intentionally approved:
 python Skills/count_tess_labels.py
 ```
 
+Each live check writes a top-level SQLite audit log by default:
+
+```text
+logs/tess_label_check.sqlite3
+```
+
+Inspect the latest local run without modifying the log:
+
+```bash
+sqlite3 logs/tess_label_check.sqlite3 \
+  "SELECT started_at, cp, fp, eb, total, gate_open, exit_code, status, error_message FROM tess_label_checks ORDER BY id DESC LIMIT 1;"
+```
+
 Sample output:
 
 ```

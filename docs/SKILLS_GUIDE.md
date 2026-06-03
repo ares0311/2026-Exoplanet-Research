@@ -492,7 +492,7 @@ Live ExoFOP gate count, when network access is intentionally approved:
 
 ```bash
 python Skills/count_tess_labels.py
-# Prints the current CP count and whether the 5,000-label gate is open.
+# Prints the current CP count and writes logs/tess_label_check.sqlite3.
 ```
 
 ---

@@ -12,8 +12,9 @@ python Skills/tier2_progress_reporter.py \
 ```
 
 Check the live production-data gate with `python Skills/count_tess_labels.py`
-only when live network access is intentionally approved. It queries ExoFOP and
-must not run in default validation.
+only when live network access is intentionally approved. It queries ExoFOP,
+uses a bounded request timeout, writes a top-level SQLite audit log at
+`logs/tess_label_check.sqlite3`, and must not run in default validation.
 
 The repository now includes the CNN wrapper, training loop, checkpoint helpers,
 calibration helpers, inference batcher, CLI flags, and 3-tier stacking support.
