@@ -1,0 +1,34 @@
+{
+  "mcpServers": {
+    "exo_project_files": {
+      "command": "python3",
+      "args": [
+        "Skills/mcp_bootstrap_server.py",
+        "project_files"
+      ],
+      "env": {
+        "EXO_RESEARCH_ROOT": "."
+      }
+    },
+    "exo_git_read": {
+      "command": "python3",
+      "args": [
+        "Skills/mcp_bootstrap_server.py",
+        "git_read"
+      ],
+      "env": {
+        "EXO_RESEARCH_ROOT": "."
+      }
+    },
+    "exo_guard": {
+      "command": "python3",
+      "args": [
+        "Skills/mcp_bootstrap_server.py",
+        "exo_guard"
+      ],
+      "env": {
+        "EXO_RESEARCH_ROOT": "."
+      }
+    }
+  }
+}
