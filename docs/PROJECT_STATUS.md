@@ -2,7 +2,7 @@
 
 ## Status: Active Development
 ## Phase: Milestone 39 Complete — Physics, Vetting, Planning, and XGBoost Model Trained
-## Last Updated: 2026-06-02
+## Last Updated: 2026-06-03
 
 ---
 
@@ -14,8 +14,8 @@ The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit w
 - Bayesian log-score model over six hypotheses
 - Optional XGBoost and stacking scorer modes (Tier 1 model trained: Kepler KOI AUC=0.992)
 - SQLite-backed background automation with top-level logs
-- 413 standalone `Skills/` utility scripts
-- 427 top-level test files, 6,367 default tests passing
+- 415 standalone `Skills/` utility scripts
+- 432 top-level test files, 6,385 default tests passing
 - 27 package Python modules under `src/exo_toolkit/`
 
 Local validation note: after restoring the declared `xgboost` dependency and installing the macOS OpenMP runtime (`libomp`), the default test suite passes locally on Python 3.13.12.
@@ -48,6 +48,8 @@ Local validation note: after restoring the declared `xgboost` dependency and ins
 | Milestone 30 Skills | 15 diagnostics + scheduling tools including `flux_anomaly_detector`, `candidate_confidence_tracker`, `uncertainty_propagator`, `multi_target_scheduler`, `candidate_archive`, and 10 more | Complete |
 | Milestones 34-39 Skills | 90 additional ML evaluation, photometry quality, transit vetting, noise budget, orbit simulation, stellar physics, TTV, occurrence-rate, and planning utilities | Complete |
 | CTOI source contract | `docs/CTOI_SOURCE_CONTRACT.md`, `Skills/fetch_exofop_ctoi.py`, `tests/fixtures/exofop_ctoi_sample.csv`, `tests/fixtures/exofop_ctoi_labels_sample.json` — opt-in fixture-backed community candidate labels | Complete, excluded from default training |
+| Project MCP bootstrap | `.mcp.json`, `.codex/config.toml`, `Skills/mcp_bootstrap_server.py` — project-scoped file, git-read, and fixed validation MCP servers | Complete, offline by default |
+| Live label-check audit | `Skills/count_tess_labels.py`, `Skills/tess_label_check_summary.py` — opt-in live ExoFOP gate check plus read-only SQLite log summary | Complete, live access requires intentional approval |
 | Docs | `README.md`, `docs/`, `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md` | Active maintenance |
 
 ---
@@ -85,7 +87,7 @@ reports/background/*.html
 
 - Gate: 5,000+ labeled TESS light curves required before production training/use
 - Offline readiness check: `python Skills/tier2_progress_reporter.py --labels data/exofop_ctoi_labels.json --output reports/tier2_status.md --json-output reports/tier2_status.json`
-- Live gate check: `python Skills/count_tess_labels.py` when network access is intentionally approved
+- Live gate check: `python Skills/count_tess_labels.py` when network access is intentionally approved; summarize local audit history with `python Skills/tess_label_check_summary.py`
 - Architecture spec: `docs/CNN_SPEC.md`
 - Supporting implementation exists: `ml/cnn_scorer.py`, `Skills/train_cnn.py`, `labelled_lc_collector.py`, `cnn_feature_augmenter.py`, `build_cnn_training_data.py`, `cnn_split_validator.py`, and related label/QC/checkpoint/calibration utilities.
 
@@ -96,7 +98,7 @@ No active implementation blocker is known in the default local validation path.
 ## Next Actions
 
 1. Run `python Skills/tier2_progress_reporter.py --labels data/exofop_ctoi_labels.json --output reports/tier2_status.md --json-output reports/tier2_status.json` to produce offline CNN readiness artifacts.
-2. Run `python Skills/count_tess_labels.py` only when live ExoFOP access is intentionally approved.
+2. Run `python Skills/count_tess_labels.py` only when live ExoFOP access is intentionally approved, then run `python Skills/tess_label_check_summary.py` to inspect the local SQLite audit history.
 3. Once the CNN gate opens, run the implemented CNN training/calibration pipeline per `docs/CNN_SPEC.md`.
 4. Use `toi_checker.py` before investing pipeline time on new live targets.
 5. Use `batch_scan.py` + `alert_filter.py` + `rank_candidates.py` + `watchlist.py` for systematic follow-up.
@@ -116,7 +118,7 @@ handoff.
 
 ## Latest Local Validation
 
-Validated on 2026-06-02:
+Validated on 2026-06-03:
 
 ```bash
 .venv/bin/ruff check .
@@ -124,7 +126,7 @@ Validated on 2026-06-02:
 .venv/bin/python -m pytest
 ```
 
-Result: ruff passed, mypy passed, pytest passed with 6367 passed, 2 deselected, and no warnings.
+Result: ruff passed, mypy passed, pytest passed with 6385 passed, 2 deselected, and no warnings.
 
 ---
 

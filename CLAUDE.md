@@ -54,8 +54,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 427 top-level test files. Local validation on 2026-06-02 passed with 6367 default tests and 2 `integration_live` tests deselected.
-**Skills:** 413 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). See `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference instead of relying on this file for exhaustive per-script counts.
+**Current test surface:** 432 top-level test files. Local validation on 2026-06-03 passed with 6385 default tests and 2 `integration_live` tests deselected.
+**Skills:** 415 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). See `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference instead of relying on this file for exhaustive per-script counts.
 
 ---
 
@@ -562,7 +562,8 @@ All pipeline modules are complete.
 - 11 unit tests using monkeypatch to avoid live HTTP calls
 
 **CNN Tier-2 gate tools**: ✅
-- `Skills/count_tess_labels.py` — queries ExoFOP CP count, prints gate status
+- `Skills/count_tess_labels.py` — queries ExoFOP CP count, prints gate status, and writes `logs/tess_label_check.sqlite3`
+- `Skills/tess_label_check_summary.py` — read-only local summary of the live-check SQLite audit log
 - `docs/CNN_SPEC.md` — full architecture spec (1D CNN, input format, training params)
 - `docs/DATA_SOURCES.md` — MAST, ExoFOP, NExSci endpoints and caching guide
 - `Skills/__init__.py` — makes Skills a proper Python package
