@@ -85,7 +85,11 @@ class TestDetectStellarFlares:
         assert r.flag in ("OK", "NO_FLARES", "INSUFFICIENT")
 
     def test_high_threshold_no_detection(self):
+        # Add noise so baseline RMS is non-zero; tiny flare + high sigma => no detection
+        import random
+        random.seed(42)
         time, flux = _flare_lc(flare_amp=0.05)
+        flux = [f + random.gauss(0, 0.01) for f in flux]
         r = detect_stellar_flares(time, flux, sigma_threshold=100.0)
         assert r.n_flares == 0
 

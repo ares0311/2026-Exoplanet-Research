@@ -11,7 +11,6 @@ from planet_insolation_calculator import compute_insolation, format_insolation_r
 
 class TestComputeInsolation:
     def test_earth_insolation(self) -> None:
-        # L=1, a=1 AU => S=1 S_earth
         r = compute_insolation(1.0, 1.0)
         assert r.flag == "OK"
         assert abs(r.insolation_earth - 1.0) < 1e-6
@@ -51,7 +50,6 @@ class TestComputeInsolation:
         assert isinstance(r.insolation_earth, float)
 
     def test_teff_affects_hz_boundaries(self) -> None:
-        # Different Teff shifts HZ; just check it runs
         r = compute_insolation(0.1, 0.3, teff_k=3700.0)
         assert r.flag == "OK"
 
