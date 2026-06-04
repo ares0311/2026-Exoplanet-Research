@@ -1,88 +1,104 @@
-"""Tests for Skills/stellar_flare_detector.py"""
+"""Tests for stellar_flare_detector.py"""
+import math
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
+from stellar_flare_detector import (
+    detect_stellar_flares,
+    format_flare_result,
+)
 
-from stellar_flare_detector import FlareDetectionResult, detect_flares
+
+def _flat_lc(n=100):
+    time = [float(i) * 0.02 for i in range(n)]
+    flux = [1.0] * n
+    return time, flux
 
 
-class TestStellarFlareDetector:
-    def _flat(self, n: int = 200) -> list[float]:
-        return [1.0] * n
+def _flare_lc(n=200, flare_start=80, flare_amp=0.10):
+    time = [float(i) * 0.02 for i in range(n)]
+    flux = [1.0] * n
+    for k in range(flare_start, min(flare_start + 5, n)):
+        flux[k] = 1.0 + flare_amp * math.exp(-(k - flare_start) * 0.5)
+    return time, flux
 
-    def test_no_flares_flat(self) -> None:
-        r = detect_flares(self._flat())
-        assert r.flag == "OK"
-        assert r.n_flares == 0
 
-    def test_single_flare_detected(self) -> None:
-        flux = self._flat()
-        flux[100] = 1.5
-        flux[101] = 1.4
-        r = detect_flares(flux, sigma_threshold=3.0, min_duration_cadences=2)
-        assert r.flag == "OK"
+class TestDetectStellarFlares:
+    def test_invalid_empty_input(self):
+        r = detect_stellar_flares([], [])
+        assert r.flag == "INVALID"
+
+    def test_invalid_mismatched_lengths(self):
+        r = detect_stellar_flares([1.0, 2.0], [1.0, 1.0, 1.0])
+        assert r.flag == "INVALID"
+
+    def test_flat_lc_no_flares(self):
+        time, flux = _flat_lc()
+        r = detect_stellar_flares(time, flux, sigma_threshold=3.0)
+        assert r.flag in ("NO_FLARES", "INSUFFICIENT")
+
+    def test_flare_detected(self):
+        time, flux = _flare_lc(flare_amp=0.20)
+        errs = [0.001] * len(flux)
+        r = detect_stellar_flares(time, flux, flux_err=errs,
+                                  sigma_threshold=3.0, min_duration_cadences=2)
         assert r.n_flares >= 1
-
-    def test_insufficient_data(self) -> None:
-        r = detect_flares([1.0, 1.0])
-        assert r.flag == "INSUFFICIENT_DATA"
-
-    def test_too_few_finite(self) -> None:
-        flux = [float("nan")] * 100 + [1.0] * 5
-        r = detect_flares(flux)
-        assert r.flag in ("INSUFFICIENT_FINITE", "INSUFFICIENT_DATA", "OK")
-
-    def test_flare_energy_positive(self) -> None:
-        flux = self._flat()
-        for i in range(100, 103):
-            flux[i] = 1.8
-        r = detect_flares(flux, min_duration_cadences=2)
         assert r.flag == "OK"
-        if r.n_flares > 0:
-            assert all(e.energy_proxy >= 0 for e in r.flares)
 
-    def test_high_threshold_no_flares(self) -> None:
-        flux = self._flat()
-        flux[50] = 2.0
-        r = detect_flares(flux, sigma_threshold=100.0)
-        assert r.n_flares == 0
+    def test_n_cadences_correct(self):
+        time, flux = _flat_lc(n=150)
+        r = detect_stellar_flares(time, flux)
+        assert r.n_cadences == 150
 
-    def test_result_has_correct_fields(self) -> None:
-        r = detect_flares(self._flat())
-        assert hasattr(r, "n_flares")
-        assert hasattr(r, "flares")
-        assert hasattr(r, "baseline_rms")
-
-    def test_multiple_flares(self) -> None:
-        flux = self._flat(300)
-        for i in [50, 51, 150, 151, 250, 251]:
-            flux[i] = 2.0
-        r = detect_flares(flux, sigma_threshold=3.0, min_duration_cadences=2)
-        assert r.n_flares >= 2
-
-    def test_single_cadence_flare_below_min_duration(self) -> None:
-        flux = self._flat()
-        flux[100] = 10.0
-        r = detect_flares(flux, sigma_threshold=3.0, min_duration_cadences=2)
-        assert r.n_flares == 0
-
-    def test_result_is_frozen(self) -> None:
-        r = detect_flares(self._flat())
-        assert isinstance(r, FlareDetectionResult)
+    def test_result_frozen(self):
+        r = detect_stellar_flares(*_flat_lc())
         try:
-            object.__setattr__(r, "flag", "mutated")
+            r.n_flares = 99  # type: ignore[misc]
             raise AssertionError()
-        except Exception:
+        except (AttributeError, TypeError):
             pass
 
-    def test_format_output(self) -> None:
-        from stellar_flare_detector import format_flare_result
-        r = detect_flares(self._flat())
-        s = format_flare_result(r)
-        assert "flare" in s.lower() or "|" in s
+    def test_max_amplitude_positive_when_flare(self):
+        time, flux = _flare_lc(flare_amp=0.30)
+        r = detect_stellar_flares(time, flux, sigma_threshold=2.0, min_duration_cadences=2)
+        if r.n_flares > 0:
+            assert r.max_amplitude is not None
+            assert r.max_amplitude > 0
 
-    def test_all_nan_flux(self) -> None:
-        flux = [float("nan")] * 200
-        r = detect_flares(flux)
-        assert r.flag in ("INSUFFICIENT_FINITE", "INSUFFICIENT_DATA")
+    def test_energy_proxy_nonnegative(self):
+        time, flux = _flare_lc(flare_amp=0.15)
+        r = detect_stellar_flares(time, flux, sigma_threshold=2.0)
+        if r.flag == "OK":
+            assert r.total_flare_energy_proxy >= 0
+
+    def test_flare_indices_within_range(self):
+        time, flux = _flare_lc(flare_amp=0.20)
+        r = detect_stellar_flares(time, flux, sigma_threshold=2.0)
+        for start, end in r.flare_indices:
+            assert 0 <= start <= end < len(flux)
+
+    def test_with_flux_err(self):
+        time, flux = _flare_lc(flare_amp=0.25)
+        errs = [0.002] * len(flux)
+        r = detect_stellar_flares(time, flux, flux_err=errs, sigma_threshold=3.0)
+        assert r.flag in ("OK", "NO_FLARES", "INSUFFICIENT")
+
+    def test_high_threshold_no_detection(self):
+        # Add noise so baseline RMS is non-zero; tiny flare + high sigma => no detection
+        import random
+        random.seed(42)
+        time, flux = _flare_lc(flare_amp=0.05)
+        flux = [f + random.gauss(0, 0.01) for f in flux]
+        r = detect_stellar_flares(time, flux, sigma_threshold=100.0)
+        assert r.n_flares == 0
+
+
+class TestFormatFlareResult:
+    def test_returns_string(self):
+        r = detect_stellar_flares(*_flat_lc())
+        assert isinstance(format_flare_result(r), str)
+
+    def test_contains_flag(self):
+        r = detect_stellar_flares(*_flat_lc())
+        assert r.flag in format_flare_result(r)

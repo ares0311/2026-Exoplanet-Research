@@ -1,68 +1,64 @@
 """Tests for Skills/planet_insolation_calculator.py"""
+from __future__ import annotations
+
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
-from planet_insolation_calculator import InsolationResult, compute_insolation
+from planet_insolation_calculator import compute_insolation, format_insolation_result
 
 
-class TestPlanetInsolationCalculator:
-    def test_earth_like_insolation(self) -> None:
-        r = compute_insolation(luminosity_lsun=1.0, semi_major_axis_au=1.0, albedo=0.3)
+class TestComputeInsolation:
+    def test_earth_insolation(self) -> None:
+        r = compute_insolation(1.0, 1.0)
         assert r.flag == "OK"
-        assert abs(r.insolation_searth - 1.0) < 0.1
+        assert abs(r.insolation_earth - 1.0) < 1e-6
 
-    def test_earth_like_teq(self) -> None:
-        r = compute_insolation(luminosity_lsun=1.0, semi_major_axis_au=1.0, albedo=0.3)
-        assert 250 < r.equilibrium_temp_k < 300
+    def test_earth_hz_class(self) -> None:
+        r = compute_insolation(1.0, 1.0)
+        assert r.hz_class == "HABITABLE_ZONE"
 
-    def test_invalid_luminosity_zero(self) -> None:
-        r = compute_insolation(luminosity_lsun=0.0, semi_major_axis_au=1.0)
+    def test_hot_jupiter_too_hot(self) -> None:
+        r = compute_insolation(1.0, 0.05)
+        assert r.hz_class == "TOO_HOT"
+
+    def test_cold_outer_planet(self) -> None:
+        r = compute_insolation(1.0, 10.0)
+        assert r.hz_class == "TOO_COLD"
+
+    def test_invalid_luminosity(self) -> None:
+        r = compute_insolation(0.0, 1.0)
         assert r.flag == "INVALID_LUMINOSITY"
 
-    def test_invalid_luminosity_negative(self) -> None:
-        r = compute_insolation(luminosity_lsun=-1.0, semi_major_axis_au=1.0)
-        assert r.flag == "INVALID_LUMINOSITY"
+    def test_invalid_sma(self) -> None:
+        r = compute_insolation(1.0, 0.0)
+        assert r.flag == "INVALID_SMA"
 
-    def test_invalid_sma_zero(self) -> None:
-        r = compute_insolation(luminosity_lsun=1.0, semi_major_axis_au=0.0)
-        assert r.flag == "INVALID_SEMI_MAJOR_AXIS"
+    def test_insolation_inverse_square(self) -> None:
+        r1 = compute_insolation(1.0, 1.0)
+        r2 = compute_insolation(1.0, 2.0)
+        assert abs(r2.insolation_earth - r1.insolation_earth / 4.0) < 1e-5
 
-    def test_invalid_albedo_negative(self) -> None:
-        r = compute_insolation(luminosity_lsun=1.0, semi_major_axis_au=1.0, albedo=-0.1)
-        assert r.flag == "INVALID_ALBEDO"
+    def test_higher_luminosity_more_flux(self) -> None:
+        r1 = compute_insolation(1.0, 1.0)
+        r2 = compute_insolation(2.0, 1.0)
+        assert r2.insolation_earth > r1.insolation_earth
 
-    def test_invalid_albedo_one(self) -> None:
-        r = compute_insolation(luminosity_lsun=1.0, semi_major_axis_au=1.0, albedo=1.0)
-        assert r.flag == "INVALID_ALBEDO"
+    def test_insolation_is_float(self) -> None:
+        r = compute_insolation(1.0, 1.0)
+        assert isinstance(r.insolation_earth, float)
 
-    def test_hz_classification_inner(self) -> None:
-        r = compute_insolation(luminosity_lsun=1.0, semi_major_axis_au=0.5, albedo=0.3)
+    def test_teff_affects_hz_boundaries(self) -> None:
+        r = compute_insolation(0.1, 0.3, teff_k=3700.0)
         assert r.flag == "OK"
-        assert isinstance(r.in_hz, bool)
 
-    def test_brighter_star_higher_insolation(self) -> None:
-        r1 = compute_insolation(luminosity_lsun=1.0, semi_major_axis_au=1.0)
-        r2 = compute_insolation(luminosity_lsun=4.0, semi_major_axis_au=1.0)
-        assert r2.insolation_searth > r1.insolation_searth
-
-    def test_closer_orbit_higher_insolation(self) -> None:
-        r1 = compute_insolation(luminosity_lsun=1.0, semi_major_axis_au=1.0)
-        r2 = compute_insolation(luminosity_lsun=1.0, semi_major_axis_au=0.5)
-        assert r2.insolation_searth > r1.insolation_searth
-
-    def test_result_is_frozen(self) -> None:
-        r = compute_insolation(luminosity_lsun=1.0, semi_major_axis_au=1.0)
-        assert isinstance(r, InsolationResult)
-        try:
-            object.__setattr__(r, "flag", "mutated")
-            raise AssertionError()
-        except Exception:
-            pass
-
-    def test_format_not_empty(self) -> None:
-        from planet_insolation_calculator import format_insolation_result
-        r = compute_insolation(luminosity_lsun=1.0, semi_major_axis_au=1.0)
+    def test_format_returns_string(self) -> None:
+        r = compute_insolation(1.0, 1.0)
         s = format_insolation_result(r)
-        assert len(s) > 10
+        assert isinstance(s, str)
+        assert "Insolation" in s
+
+    def test_negative_sma_invalid(self) -> None:
+        r = compute_insolation(1.0, -1.0)
+        assert r.flag == "INVALID_SMA"
