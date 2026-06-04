@@ -1,182 +1,132 @@
-"""Detect stellar flares in a light curve via flux derivative thresholding.
-
-A flare is identified as a group of consecutive cadences where the flux
-rises sharply above a rolling median baseline by more than ``sigma_threshold``
-standard deviations, followed by an exponential-like decay.  The detector
-operates purely in the time-domain without external dependencies.
-
-Public API
-----------
-StellarFlareResult(n_cadences, n_flares, flare_indices, max_amplitude,
-                   total_flare_energy_proxy, flag)
-detect_stellar_flares(time, flux, *, flux_err, sigma_threshold,
-                      min_duration_cadences, window) -> StellarFlareResult
-format_flare_result(result) -> str
-"""
+"""Detect stellar flares in a TESS light curve using sigma-clipping."""
 from __future__ import annotations
 
+import argparse
+import math
 from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class StellarFlareResult:
-    n_cadences: int
+class FlareEvent:
+    start_index: int
+    peak_index: int
+    end_index: int
+    peak_flux_excess: float
+    duration_cadences: int
+    energy_proxy: float
+
+
+@dataclass(frozen=True)
+class FlareDetectionResult:
     n_flares: int
-    flare_indices: tuple[tuple[int, int], ...]  # (start, end) index pairs
-    max_amplitude: float | None                  # max flux excess / baseline
-    total_flare_energy_proxy: float | None       # sum of excess flux over all flares
-    flag: str  # "OK" | "NO_FLARES" | "INSUFFICIENT" | "INVALID"
+    flares: tuple[FlareEvent, ...]
+    baseline_rms: float
+    sigma_threshold: float
+    flag: str
 
 
-def _rolling_median(values: list[float], window: int) -> list[float]:
-    """Simple centred rolling median; edges use available data."""
-    n = len(values)
-    half = window // 2
-    result = []
-    for i in range(n):
-        lo = max(0, i - half)
-        hi = min(n, i + half + 1)
-        chunk = sorted(values[lo:hi])
-        m = len(chunk)
-        if m == 0:
-            result.append(0.0)
-        elif m % 2 == 1:
-            result.append(chunk[m // 2])
-        else:
-            result.append((chunk[m // 2 - 1] + chunk[m // 2]) / 2.0)
-    return result
-
-
-def _mad(values: list[float], median: float) -> float:
-    devs = sorted(abs(v - median) for v in values)
-    n = len(devs)
-    if n == 0:
-        return 0.0
-    if n % 2 == 1:
-        return devs[n // 2]
-    return (devs[n // 2 - 1] + devs[n // 2]) / 2.0
-
-
-def detect_stellar_flares(
-    time: list[float],
+def detect_flares(
     flux: list[float],
-    *,
-    flux_err: list[float] | None = None,
     sigma_threshold: float = 3.0,
     min_duration_cadences: int = 2,
-    window: int = 51,
-) -> StellarFlareResult:
-    """Detect stellar flares via rolling-baseline thresholding.
+) -> FlareDetectionResult:
+    """
+    Detect stellar flares from normalised flux time series.
 
-    Args:
-        time: Time array (arbitrary units, same length as flux).
-        flux: Normalised flux array.
-        flux_err: Per-point uncertainties (optional, used for sigma scaling).
-        sigma_threshold: Detection threshold in units of baseline MAD.
-        min_duration_cadences: Minimum run length to count as a flare.
-        window: Rolling-median window size (cadences).
-
-    Returns:
-        :class:`StellarFlareResult`.
+    Algorithm:
+    1. Compute median and robust RMS (1.4826 x MAD).
+    2. Flag cadences where flux > median + sigma_threshold x RMS.
+    3. Group consecutive flagged cadences; keep runs >= min_duration_cadences.
     """
     n = len(flux)
-    if n < 10 or len(time) != n:
-        return StellarFlareResult(n, 0, (), None, None, "INVALID")
-    if sigma_threshold <= 0:
-        return StellarFlareResult(n, 0, (), None, None, "INVALID")
+    if n < 10:
+        return FlareDetectionResult(
+            n_flares=0, flares=(), baseline_rms=float("nan"),
+            sigma_threshold=sigma_threshold, flag="INSUFFICIENT_DATA",
+        )
 
-    baseline = _rolling_median(flux, max(3, window))
+    finite = [f for f in flux if math.isfinite(f)]
+    if len(finite) < 5:
+        return FlareDetectionResult(
+            n_flares=0, flares=(), baseline_rms=float("nan"),
+            sigma_threshold=sigma_threshold, flag="INSUFFICIENT_FINITE",
+        )
 
-    residuals = [flux[i] - baseline[i] for i in range(n)]
+    sorted_f = sorted(finite)
+    mid = len(sorted_f) // 2
+    median = sorted_f[mid] if len(sorted_f) % 2 else (sorted_f[mid - 1] + sorted_f[mid]) / 2.0
+    mad = sorted([abs(f - median) for f in finite])[len(finite) // 2]
+    rms = 1.4826 * mad if mad > 0 else 1e-9
 
-    # Use flux_err or MAD-based sigma
-    if flux_err is not None and len(flux_err) == n:
-        sigma = [max(e, 1e-12) for e in flux_err]
-    else:
-        all_res = sorted(residuals)
-        med_res = all_res[n // 2] if n % 2 == 1 else (all_res[n // 2 - 1] + all_res[n // 2]) / 2.0
-        mad_val = _mad(residuals, med_res) * 1.4826
-        if mad_val < 1e-12:
-            return StellarFlareResult(n, 0, (), None, None, "INSUFFICIENT")
-        sigma = [mad_val] * n
+    threshold = median + sigma_threshold * rms
+    flagged = [i for i, f in enumerate(flux) if math.isfinite(f) and f > threshold]
 
-    above = [residuals[i] / sigma[i] >= sigma_threshold for i in range(n)]
+    events: list[FlareEvent] = []
+    if flagged:
+        groups: list[list[int]] = [[flagged[0]]]
+        for idx in flagged[1:]:
+            if idx == groups[-1][-1] + 1:
+                groups[-1].append(idx)
+            else:
+                groups.append([idx])
 
-    # Group consecutive above-threshold cadences
-    flare_indices: list[tuple[int, int]] = []
-    i = 0
-    while i < n:
-        if above[i]:
-            j = i
-            while j < n and above[j]:
-                j += 1
-            if j - i >= min_duration_cadences:
-                flare_indices.append((i, j - 1))
-            i = j
-        else:
-            i += 1
+        for grp in groups:
+            if len(grp) < min_duration_cadences:
+                continue
+            peak_idx = max(grp, key=lambda i: flux[i])
+            peak_excess = flux[peak_idx] - median
+            energy = sum(flux[i] - median for i in grp if math.isfinite(flux[i]))
+            events.append(FlareEvent(
+                start_index=grp[0],
+                peak_index=peak_idx,
+                end_index=grp[-1],
+                peak_flux_excess=round(peak_excess, 6),
+                duration_cadences=len(grp),
+                energy_proxy=round(energy, 6),
+            ))
 
-    if not flare_indices:
-        return StellarFlareResult(n, 0, (), None, None, "NO_FLARES")
-
-    # Compute amplitude and energy proxy
-    amplitudes = []
-    energy_proxy = 0.0
-    for start, end in flare_indices:
-        amp = max(residuals[start:end + 1])
-        ref_sigma = sigma[start]
-        amplitudes.append(amp / ref_sigma)
-        energy_proxy += sum(max(0.0, residuals[k]) for k in range(start, end + 1))
-
-    max_amp = max(amplitudes) if amplitudes else None
-
-    return StellarFlareResult(
-        n_cadences=n,
-        n_flares=len(flare_indices),
-        flare_indices=tuple(flare_indices),
-        max_amplitude=round(max_amp, 4) if max_amp is not None else None,
-        total_flare_energy_proxy=round(energy_proxy, 6),
+    return FlareDetectionResult(
+        n_flares=len(events),
+        flares=tuple(events),
+        baseline_rms=round(rms, 6),
+        sigma_threshold=sigma_threshold,
         flag="OK",
     )
 
 
-def format_flare_result(result: StellarFlareResult) -> str:
-    """Format flare detection result as Markdown."""
+def format_flare_result(r: FlareDetectionResult) -> str:
+    def _f(v: float) -> str:
+        return f"{v:.6f}" if math.isfinite(v) else "N/A"
+
+    header = (
+        f"**Flare Detection** -- {r.n_flares} flare(s), "
+        f"baseline RMS={_f(r.baseline_rms)}, threshold={r.sigma_threshold}sigma\n\n"
+    )
+    if not r.flares:
+        return header + "No flares detected.\n"
     lines = [
-        "## Stellar Flare Detection",
-        "",
-        f"- Cadences analysed: {result.n_cadences}",
-        f"- Flares detected: {result.n_flares}",
-        f"- Max amplitude (σ): {result.max_amplitude}",
-        f"- Total energy proxy: {result.total_flare_energy_proxy}",
-        f"- **Flag: {result.flag}**",
+        header,
+        "| # | Start | Peak | End | Peak excess | Duration | Energy proxy |",
+        "|---|---|---|---|---|---|---|",
     ]
-    if result.flare_indices:
-        lines += ["", "| Flare | Start idx | End idx |", "|---|---|---|"]
-        for k, (s, e) in enumerate(result.flare_indices, 1):
-            lines.append(f"| {k} | {s} | {e} |")
-    return "\n".join(lines) + "\n"
+    for i, ev in enumerate(r.flares, 1):
+        lines.append(
+            f"| {i} | {ev.start_index} | {ev.peak_index} | {ev.end_index} | "
+            f"{ev.peak_flux_excess:.6f} | {ev.duration_cadences} | {ev.energy_proxy:.6f} |"
+        )
+    return "\n".join(lines)
 
 
-def _cli(argv: list[str] | None = None) -> int:
-    import argparse
-
-    parser = argparse.ArgumentParser(
-        prog="stellar_flare_detector",
-        description="Detect stellar flares in a light curve.",
-    )
-    parser.add_argument("--sigma-threshold", type=float, default=3.0)
-    parser.add_argument("--min-duration", type=int, default=2)
-    parser.add_argument("--window", type=int, default=51)
-    args = parser.parse_args(argv)
-
-    result = detect_stellar_flares(
-        [], [],
-        sigma_threshold=args.sigma_threshold,
-        min_duration_cadences=args.min_duration,
-        window=args.window,
-    )
-    print(format_flare_result(result))
+def _cli() -> int:
+    p = argparse.ArgumentParser(description="Detect stellar flares in normalised flux.")
+    p.add_argument("flux_json", help="JSON array of flux values")
+    p.add_argument("--sigma-threshold", type=float, default=3.0)
+    p.add_argument("--min-duration-cadences", type=int, default=2)
+    args = p.parse_args()
+    import json
+    flux = json.loads(args.flux_json)
+    r = detect_flares(flux, args.sigma_threshold, args.min_duration_cadences)
+    print(format_flare_result(r))
     return 0
 
 
