@@ -1,12 +1,14 @@
 """Tests for Skills/photoevaporation_timescale.py"""
 from __future__ import annotations
 
-import math
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
-from photoevaporation_timescale import compute_photoevaporation_timescale, format_photoevaporation_result
+from photoevaporation_timescale import (
+    compute_photoevaporation_timescale,
+    format_photoevaporation_result,
+)
 
 
 class TestComputePhotoevaporationTimescale:

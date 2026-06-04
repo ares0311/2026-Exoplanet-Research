@@ -1,7 +1,6 @@
 """Tests for Skills/stellar_xuv_flux_estimator.py"""
 from __future__ import annotations
 
-import math
 import sys
 from pathlib import Path
 
