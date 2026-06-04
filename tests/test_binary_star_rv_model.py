@@ -1,7 +1,6 @@
 """Tests for Skills/binary_star_rv_model.py"""
 from __future__ import annotations
 
-import math
 import sys
 from pathlib import Path
 

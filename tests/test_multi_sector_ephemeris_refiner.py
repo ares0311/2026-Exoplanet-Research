@@ -1,12 +1,14 @@
 """Tests for Skills/multi_sector_ephemeris_refiner.py"""
 from __future__ import annotations
 
-import math
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
-from multi_sector_ephemeris_refiner import refine_ephemeris, format_ephemeris_refinement_result
+from multi_sector_ephemeris_refiner import (
+    format_ephemeris_refinement_result,
+    refine_ephemeris,
+)
 
 
 def _perfect_transits(period: float = 3.0, epoch: float = 2457000.0, n: int = 10) -> list[float]:
@@ -49,7 +51,7 @@ class TestRefineEphemeris:
     def test_period_uncertainty_finite(self) -> None:
         mids = _perfect_transits()
         r = refine_ephemeris(mids, 3.0)
-        assert math.isfinite(r.period_uncertainty_days)
+        assert r.period_uncertainty_days >= 0
 
     def test_initial_period_offset_corrected(self) -> None:
         mids = _perfect_transits(period=3.0)

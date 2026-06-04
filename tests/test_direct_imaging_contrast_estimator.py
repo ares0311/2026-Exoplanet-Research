@@ -1,7 +1,6 @@
 """Tests for Skills/direct_imaging_contrast_estimator.py"""
 from __future__ import annotations
 
-import math
 import sys
 from pathlib import Path
 
