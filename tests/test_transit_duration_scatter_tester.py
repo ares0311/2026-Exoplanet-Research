@@ -9,6 +9,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 from transit_duration_scatter_tester import (
     format_duration_scatter_result,
+)
+from transit_duration_scatter_tester import (
     test_duration_scatter as run_scatter_test,
 )
 
