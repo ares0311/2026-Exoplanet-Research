@@ -45,6 +45,7 @@ data/processed/
 data/*.csv
 data/*.pkl
 data/*.pickle
+data/*.json
 
 # IDE / editor
 .vscode/
