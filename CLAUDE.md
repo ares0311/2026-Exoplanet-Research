@@ -26,12 +26,13 @@ Before proposing or executing any task you must:
 
 ### When the user says "Apply All System Directives"
 1. Read `AGENTS.md` and `docs/PRODUCTION_READINESS.md`.
-2. State the highest-priority Tier 1 gap by name.
-3. Propose only the minimal work that closes that specific gap.
-4. Do not propose or execute anything else.
+2. State the current Tier 1 and Tier 2 gaps in priority order.
+3. For planning: propose tasks in priority order where every task closes or unblocks a named gap. Stop when gap-closing tasks run out — do not pad the list with non-gap work.
+4. For each task, identify external dependencies (API keys, network access, GPU, human reviewer) and surface them as explicit questions before the DO phase.
+5. Do not propose or execute work that does not close a named gap.
 
 ### When the highest-priority Tier 1 gap is blocked by an outside action
-State the gap, name the blocker, and stop. Do not fill the gap with unrelated code.
+State the gap, name the blocker, and ask what the user wants to do. Do not fill the gap with unrelated code while waiting.
 
 ---
 
