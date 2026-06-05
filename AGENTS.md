@@ -2,6 +2,41 @@
 
 This file contains binding rules for AI coding agents working in this repository.
 
+---
+
+## PRIMARY DIRECTIVE — READ THIS BEFORE ANYTHING ELSE
+
+**The only authorized work is work that advances this project to live production.**
+
+Every session must begin by reading:
+1. `AGENTS.md` (this file)
+2. `docs/PRODUCTION_READINESS.md`
+
+Before proposing or executing any task you must:
+1. Name the highest-priority unresolved Tier 1 gap from `docs/PRODUCTION_READINESS.md`.
+2. State explicitly how the proposed work closes or directly unblocks that gap.
+3. If the proposed work does not close or unblock a named gap in `docs/PRODUCTION_READINESS.md`, **do not do it**.
+
+### Prohibited work
+
+- Adding Skills, modules, schemas, or scaffolding that do not directly close a named Tier 1 or Tier 2 gap.
+- Repeating work already listed under "What Is Complete" in `docs/PRODUCTION_READINESS.md`.
+- Writing "the next N utility scripts" when those scripts do not unblock a named gap.
+- Treating "Apply All System Directives" as permission to add more code — it means read the gap list and work the highest-priority gap only.
+
+### When the user says "Apply All System Directives"
+
+1. Read `AGENTS.md` and `docs/PRODUCTION_READINESS.md`.
+2. State the highest-priority Tier 1 gap by name.
+3. Propose only the minimal work that closes that specific gap.
+4. Do not propose or execute anything else.
+
+### Outside blockers are not code problems
+
+If the highest-priority Tier 1 gap is blocked by a human action (data collection, expert review, network access), say so clearly and stop. Do not fill the gap with unrelated code while waiting.
+
+---
+
 ## Read First
 
 Before writing code, recover project context from committed files. Read:
