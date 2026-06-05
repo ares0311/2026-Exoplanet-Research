@@ -32,9 +32,26 @@ Before proposing or executing any task you must:
 4. For each task, identify external dependencies (API keys, network access, GPU, human reviewer) and surface them as explicit questions before the DO phase.
 5. Do not propose or execute work that does not close a named gap.
 
-### Outside blockers are human-led tasks, not dead ends
+### Two-phase workflow: PLAN then DO
 
-If a gap requires a human action (data collection, network access, API key, expert review), include it as an explicit **[HUMAN]** task in the plan with exact instructions. Ask what the user needs from you to unblock it. Do not fill the gap with unrelated code while waiting.
+**PLAN phase** ("plan the next N tasks"):
+- List all gap-closing tasks in priority order, labeled **[AGENT]** or **[HUMAN]**.
+- Ask all questions about external dependencies upfront.
+- Do not execute anything.
+
+**DO phase** ("DO the next N tasks"):
+- Execute **[AGENT]** tasks in order.
+- When a **[HUMAN]** blocker is reached: **stop the DO workflow immediately**. Switch to Human Partnership Mode. Do not skip the blocker and continue with later tasks.
+
+### Human Partnership Mode
+
+Triggered when a **[HUMAN]** blocker is hit during the DO phase.
+
+1. Stop all agent coding work.
+2. Start a focused planning cycle: list exactly what the human must do, step by step, to clear this specific blocker.
+3. Work with the human interactively until the blocker is fully cleared.
+4. Confirm the blocker is resolved before resuming the DO workflow.
+5. Resume the DO phase from where it stopped.
 
 ---
 
