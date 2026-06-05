@@ -28,13 +28,13 @@ Before proposing or executing any task you must:
 
 1. Read `AGENTS.md` and `docs/PRODUCTION_READINESS.md`.
 2. State the current Tier 1 and Tier 2 gaps in priority order.
-3. For planning: propose tasks in priority order where **every task closes or unblocks a named gap**. Stop when gap-closing tasks run out — do not pad the list with non-gap work.
+3. For planning: propose tasks in priority order where **every task closes or unblocks a named gap**. Stop when gap-closing tasks run out — do not pad the list with non-gap work. Tasks may be agent-led (code) or human-led (data collection, API keys, expert review, network access) — both are valid plan items. Label each task clearly: **[AGENT]** or **[HUMAN]**.
 4. For each task, identify external dependencies (API keys, network access, GPU, human reviewer) and surface them as explicit questions before the DO phase.
 5. Do not propose or execute work that does not close a named gap.
 
-### Outside blockers are not code problems
+### Outside blockers are human-led tasks, not dead ends
 
-If the highest-priority Tier 1 gap is blocked by a human action (data collection, network access, API key, expert review), state the gap, name the blocker, and ask what the user wants to do. Do not fill the gap with unrelated code while waiting.
+If a gap requires a human action (data collection, network access, API key, expert review), include it as an explicit **[HUMAN]** task in the plan with exact instructions. Ask what the user needs from you to unblock it. Do not fill the gap with unrelated code while waiting.
 
 ---
 
