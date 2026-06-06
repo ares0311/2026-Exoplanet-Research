@@ -44,9 +44,17 @@ def _utc_now() -> str:
 
 def _read_exofop_table(source_url: str, timeout_seconds: int) -> Any:
     """Fetch the ExoFOP TOI table with an explicit timeout."""
+    import ssl
+
     import pandas as pd
 
-    with urlopen(source_url, timeout=timeout_seconds) as response:
+    try:
+        import certifi
+        ssl_ctx: ssl.SSLContext | None = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        ssl_ctx = None
+
+    with urlopen(source_url, timeout=timeout_seconds, context=ssl_ctx) as response:
         return pd.read_csv(BytesIO(response.read()), comment="#")
 
 
