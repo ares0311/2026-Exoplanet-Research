@@ -52,6 +52,14 @@ Before proposing or executing any task you must:
 ### When the highest-priority Tier 1 gap is blocked by an outside action
 State the gap, name the blocker, and **immediately provide a complete step-by-step recipe** assuming the user has zero background knowledge of the specific task. Give exact commands to copy-paste, explain each in one plain-English sentence, and state exactly what output to paste back. Do not ask "do you want the commands?" — give them.
 
+### macOS Long-Running Process Policy — ALWAYS USE caffeinate
+Any recipe for a Python command that runs longer than ~60 seconds **must** use `caffeinate -i`:
+```bash
+caffeinate -i python Skills/<script>.py [args]   # standard
+caffeinate -dims python Skills/<script>.py [args] # lid-close safe
+```
+This applies to: light curve downloads, CNN training, batch scans, injection-recovery, and any repeated-network or long-compute script. **Never give a bare `python ...` recipe for these.**
+
 ### Python Environment Policy — NEVER TOUCH SYSTEM PYTHON
 - All work happens inside the `.venv` virtual environment
 - Never run `/Applications/Python*/Install\ Certificates.command`
