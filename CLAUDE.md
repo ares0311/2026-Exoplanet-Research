@@ -49,6 +49,16 @@ Before proposing or executing any task you must:
 - Execute only [AGENT] tasks.
 - The DO phase should never contain a [HUMAN] blocker — if one appears, the PLAN phase was incomplete.
 
+### When the highest-priority Tier 1 gap is blocked by an outside action
+State the gap, name the blocker, and **immediately provide a complete step-by-step recipe** assuming the user has zero background knowledge of the specific task. Give exact commands to copy-paste, explain each in one plain-English sentence, and state exactly what output to paste back. Do not ask "do you want the commands?" — give them.
+
+### Python Environment Policy — NEVER TOUCH SYSTEM PYTHON
+- All work happens inside the `.venv` virtual environment
+- Never run `/Applications/Python*/Install\ Certificates.command`
+- Never suggest `sudo pip install` or any path under `/Library/Frameworks/Python.framework/`
+- `pip install` with `(.venv)` active is always venv-scoped and safe
+- Fix SSL/package issues inside the venv only
+
 ---
 
 ## Standing Rules

@@ -50,6 +50,18 @@ Before proposing or executing any task you must:
 - Execute only **[AGENT]** tasks.
 - The DO phase should never contain a **[HUMAN]** blocker — if one appears, the PLAN phase was incomplete.
 
+### Outside blockers are not code problems
+
+If the highest-priority Tier 1 gap is blocked by a human action (data collection, network access, API key, expert review), state the gap, name the blocker, and **immediately provide a complete step-by-step recipe** assuming the user has zero background knowledge of the specific task. Do not ask "do you want the commands?" — give them.
+
+### Human-blocker recipe format
+
+When the user must take an action to unblock a gap:
+1. Give exact commands to copy-paste, in order, with no ambiguity
+2. Explain what each command does in one plain-English sentence
+3. State exactly what output to paste back so you can continue
+4. Do not stop at "here's how to get started" — give the complete recipe through to the handoff point
+
 ---
 
 ## Read First
@@ -151,6 +163,17 @@ Before performance-sensitive changes or large jobs, read `docs/SYSTEM_PROFILE.md
 
 Optimize local defaults for the recorded MacBook Pro M4 Max profile while keeping scientific code portable and configurable. Do not hardcode local machine assumptions into candidate detection, scoring, or pathway logic.
 
+## Python Environment Policy
+
+This project runs inside a `.venv` virtual environment. **Never touch or run system Python.**
+
+- All `pip install` commands must be run with the venv active (`(.venv)` in the prompt)
+- Never run `/Applications/Python*/Install\ Certificates.command` — this modifies system Python
+- Never suggest `sudo pip install` or `pip install --system`
+- Never reference `/Library/Frameworks/Python.framework/` paths — those are system Python
+- If an SSL or package issue arises, fix it inside the venv: `pip install <package>` with venv active is always safe and venv-scoped
+- To verify the venv is active before suggesting any pip/python commands, check that the prompt starts with `(.venv)`
+
 ## What Not To Do
 
 - Do not add features, abstractions, or refactors beyond what the task requires.
@@ -158,3 +181,4 @@ Optimize local defaults for the recorded MacBook Pro M4 Max profile while keepin
 - Do not claim a signal is a confirmed planet.
 - Do not enable live network access in default tests.
 - Do not hide durable rules in chat-only context.
+- Do not touch system Python — all Python work happens inside the `.venv`.
