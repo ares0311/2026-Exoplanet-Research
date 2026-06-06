@@ -7,7 +7,6 @@ import sys
 from pathlib import Path
 
 import pandas as pd
-import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
@@ -24,31 +23,36 @@ def _read_csv(path: Path) -> list[dict[str, str]]:
 def _mock_toi_df() -> pd.DataFrame:
     rows = [
         {"TOI": 700.01, "TIC ID": 150428135, "TFOPWG Disposition": "CP",
-         "Period (days)": 37.4, "Duration (hours)": 2.3, "Depth (mmag)": 1.2,
+         "Period (days)": 37.4, "Epoch (BJD)": 2458325.0,
+         "Duration (hours)": 2.3, "Depth (mmag)": 1.2,
          "Planet Radius (R_Earth)": 1.8, "Planet SNR": 22.0,
          "Number of Sectors": 6, "Stellar Radius (R_Sun)": 0.42,
          "Stellar Eff Temp (K)": 3480, "Stellar log(g) (cm/s^2)": 4.8,
          "TESS Mag": 13.1},
         {"TOI": 101.01, "TIC ID": 777, "TFOPWG Disposition": "KP",
-         "Period (days)": 10.0, "Duration (hours)": 2.0, "Depth (mmag)": 2.0,
+         "Period (days)": 10.0, "Epoch (BJD)": 2458320.0,
+         "Duration (hours)": 2.0, "Depth (mmag)": 2.0,
          "Planet Radius (R_Earth)": 1.5, "Planet SNR": 30.0,
          "Number of Sectors": 4, "Stellar Radius (R_Sun)": 0.9,
          "Stellar Eff Temp (K)": 5500, "Stellar log(g) (cm/s^2)": 4.4,
          "TESS Mag": 11.0},
         {"TOI": 100.01, "TIC ID": 999, "TFOPWG Disposition": "FP",
-         "Period (days)": 3.1, "Duration (hours)": 1.0, "Depth (mmag)": 20.0,
+         "Period (days)": 3.1, "Epoch (BJD)": 2458310.0,
+         "Duration (hours)": 1.0, "Depth (mmag)": 20.0,
          "Planet Radius (R_Earth)": 22.0, "Planet SNR": 5.0,
          "Number of Sectors": 2, "Stellar Radius (R_Sun)": 1.0,
          "Stellar Eff Temp (K)": 5800, "Stellar log(g) (cm/s^2)": 4.4,
          "TESS Mag": 10.5},
         {"TOI": 102.01, "TIC ID": 666, "TFOPWG Disposition": "FA",
-         "Period (days)": 1.0, "Duration (hours)": 0.5, "Depth (mmag)": 0.1,
+         "Period (days)": 1.0, "Epoch (BJD)": 2458300.0,
+         "Duration (hours)": 0.5, "Depth (mmag)": 0.1,
          "Planet Radius (R_Earth)": 0.5, "Planet SNR": 2.0,
          "Number of Sectors": 1, "Stellar Radius (R_Sun)": 1.1,
          "Stellar Eff Temp (K)": 6000, "Stellar log(g) (cm/s^2)": 4.3,
          "TESS Mag": 9.0},
         {"TOI": 200.01, "TIC ID": 888, "TFOPWG Disposition": "PC",
-         "Period (days)": 5.0, "Duration (hours)": 1.5, "Depth (mmag)": 3.0,
+         "Period (days)": 5.0, "Epoch (BJD)": 2458290.0,
+         "Duration (hours)": 1.5, "Depth (mmag)": 3.0,
          "Planet Radius (R_Earth)": 2.5, "Planet SNR": 15.0,
          "Number of Sectors": 3, "Stellar Radius (R_Sun)": 0.9,
          "Stellar Eff Temp (K)": 5200, "Stellar log(g) (cm/s^2)": 4.5,
@@ -72,6 +76,9 @@ def _mock_fetch(url: str) -> bytes:
 class TestConstants:
     def test_col_map_has_toi(self) -> None:
         assert "TOI" in _COL_MAP
+
+    def test_col_map_has_epoch(self) -> None:
+        assert "Epoch (BJD)" in _COL_MAP
 
     def test_col_map_has_disposition(self) -> None:
         assert "TFOPWG Disposition" in _COL_MAP
@@ -158,3 +165,11 @@ class TestFetchToiTable:
         rows = _read_csv(out)
         assert rows
         assert "snr" in rows[0]
+
+    def test_epoch_bjd_column_present(self, tmp_path: Path) -> None:
+        from Skills.fetch_tess_toi import fetch_toi_table
+        out = tmp_path / "toi.csv"
+        fetch_toi_table(out, fetch_fn=_mock_fetch)
+        rows = _read_csv(out)
+        assert rows
+        assert "epoch_bjd" in rows[0]
