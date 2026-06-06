@@ -1,6 +1,7 @@
 # PRODUCTION READINESS
 
 Last reviewed: 2026-06-06
+Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
 Test baseline: 1,937 default tests passing, 2 integration_live deselected
 
@@ -51,17 +52,21 @@ The system is safe to deploy now for Bayesian and XGBoost scoring modes. The CNN
 - **Action**: Run training pipeline on TESS TOI CP/FP labels when labels are available
 - **Outside blocker**: Sufficient TESS CP/FP label quality (partially available from ExoFOP now, but a larger confirmed set is better)
 
-### T2-2: Expert Vetting and Methodology Review
+### T2-2: Expert Vetting and Methodology Review — N/A
 
-- **What is missing**: At least one run on known confirmed TESS planets to validate scoring behavior end-to-end
-- **Action**: Run `exo <TIC-ID>` on 3–5 confirmed TOIs and 3–5 confirmed FPs; verify FPP ordering matches ground truth
-- **Outside blocker**: Human review required; cannot be automated
+**Status: Out of scope (DECISION-013).** This is a citizen science project operating independently.
+Conservative scoring guardrails enforced in code serve as the substitute:
+- Never output "confirmed planet"
+- Always expose false-positive evidence
+- Suppress `tfop_ready` when key diagnostics are missing
+- No external submission without explicit human approval
 
-### T2-3: Peer Review Before Publishing
+### T2-3: Peer Review Before Publishing — N/A
 
-- **What is missing**: Independent review of the Bayesian log-score methodology and feature weights
-- **Action**: Submit `docs/SCORING_MODEL.md` for review by an exoplanet transit expert before making public discovery claims
-- **Outside blocker**: Requires an expert reviewer
+**Status: Out of scope (DECISION-013).** This is a citizen science project operating independently.
+The scientific guardrails in `docs/SCORING_MODEL.md §15` and `src/exo_toolkit/pathway.py` are the
+conservative substitute for formal peer review. All outputs are labeled "candidate signal" or
+"follow-up target" — never "confirmed planet".
 
 ---
 
@@ -119,10 +124,8 @@ These are enforced in code and must never be bypassed:
 
 | Blocker | What Is Needed | Who |
 |---|---|---|
-| TESS light curve download | ~120 GB, 2–6 hours — run `labelled_lc_collector.py` locally | You (local Mac with internet) |
+| TESS light curve download | ~120 GB, 2–6 hours — run `download_tess_lightcurves.py` locally with `caffeinate -i` | You (local Mac with internet) |
 | CNN training run | Execute training pipeline after light curves downloaded | Agent (after download complete) |
-| Expert vetting | Run on known confirmed targets; verify FPP ordering | Exoplanet transit astronomer |
-| Peer review | Review `docs/SCORING_MODEL.md` methodology | Independent expert reviewer |
 | CNN production training | Execute CNN training pipeline after label gate opens | Agent + human approval |
 | Stacking weight calibration | Tune blend weights on held-out calibration set | Agent after T1-1 resolved |
 
