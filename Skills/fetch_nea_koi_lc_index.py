@@ -42,7 +42,13 @@ _FALSE_POSITIVE = "FALSE POSITIVE"
 
 
 def _default_tap_fn(url: str) -> str:
-    with urllib.request.urlopen(url, timeout=60) as resp:  # noqa: S310
+    import ssl
+    try:
+        import certifi
+        ctx: ssl.SSLContext | None = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        ctx = None
+    with urllib.request.urlopen(url, timeout=60, context=ctx) as resp:  # noqa: S310
         return resp.read().decode("utf-8", errors="replace")
 
 

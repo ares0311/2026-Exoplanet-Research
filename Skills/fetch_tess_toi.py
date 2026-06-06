@@ -1,8 +1,8 @@
 """Download the TESS TOI (Targets of Interest) disposition table from ExoFOP-TESS.
 
-Fetches confirmed planets (CP) and false positives (FP/EB) for use as
-training labels.  Planet candidates (PC) are excluded — they are unresolved
-and make noisy labels.
+Fetches quality training labels: CP/KP (positive class) and FP/FA (negative
+class).  Planet candidates (PC/APC) are excluded — unresolved, noisy labels.
+ExoFOP does not use an "EB" disposition; eclipsing binaries appear as FP.
 
 Usage
 -----
@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
@@ -48,7 +49,9 @@ _COL_MAP = {
 }
 
 # Keep only these dispositions as training labels
-_KEEP_DISPOSITIONS = {"CP", "FP", "EB"}
+# CP = Confirmed Planet, KP = Known Planet → positive class
+# FP = False Positive, FA = False Alarm   → negative class
+_KEEP_DISPOSITIONS = {"CP", "KP", "FP", "FA"}
 
 
 # ---------------------------------------------------------------------------
@@ -56,19 +59,43 @@ _KEEP_DISPOSITIONS = {"CP", "FP", "EB"}
 # ---------------------------------------------------------------------------
 
 
-def fetch_toi_table(output_path: str | Path = "data/tess_toi.csv") -> Path:
+def _default_fetch(url: str) -> bytes:
+    """Fetch URL bytes using certifi SSL context when available."""
+    import ssl
+    from urllib.request import urlopen
+
+    try:
+        import certifi
+        ctx: ssl.SSLContext | None = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        ctx = None
+    with urlopen(url, timeout=60, context=ctx) as resp:
+        return resp.read()
+
+
+def fetch_toi_table(
+    output_path: str | Path = "data/tess_toi.csv",
+    *,
+    fetch_fn: Callable[[str], bytes] | None = None,
+) -> Path:
     """Download TESS TOI table from ExoFOP and save to *output_path*.
 
     Args:
         output_path: Destination CSV path.
+        fetch_fn: Injectable fetch function (url -> bytes). Defaults to
+            urlopen with certifi SSL context. Supply a mock in tests.
 
     Returns:
         Path to the written CSV file.
     """
+    from io import BytesIO
+
     import pandas as pd
 
+    _fetch = fetch_fn or _default_fetch
+
     print("Downloading TESS TOI table from ExoFOP …")
-    df = pd.read_csv(_EXOFOP_URL, comment="#")
+    df = pd.read_csv(BytesIO(_fetch(_EXOFOP_URL)), comment="#")
 
     # Rename to normalised column names
     df = df.rename(columns={k: v for k, v in _COL_MAP.items() if k in df.columns})

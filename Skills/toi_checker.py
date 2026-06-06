@@ -34,7 +34,13 @@ _ACTIVE_DISPOSITIONS: frozenset[str] = frozenset(
 
 def _fetch_toi_csv(url: str = _EXOFOP_URL) -> str:
     """Download the ExoFOP TOI CSV and return it as a string."""
-    with urllib.request.urlopen(url, timeout=30) as resp:  # noqa: S310
+    import ssl
+    try:
+        import certifi
+        ctx: ssl.SSLContext | None = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        ctx = None
+    with urllib.request.urlopen(url, timeout=30, context=ctx) as resp:  # noqa: S310
         return resp.read().decode("utf-8")
 
 

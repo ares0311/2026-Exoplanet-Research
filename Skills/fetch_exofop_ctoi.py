@@ -100,7 +100,13 @@ def _label_confidence(n_ratings: int) -> float:
 
 
 def _default_fetch(url: str) -> str:
-    with urllib.request.urlopen(url, timeout=30) as resp:  # noqa: S310
+    import ssl
+    try:
+        import certifi
+        ctx: ssl.SSLContext | None = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        ctx = None
+    with urllib.request.urlopen(url, timeout=30, context=ctx) as resp:  # noqa: S310
         return resp.read().decode("utf-8", errors="replace")
 
 

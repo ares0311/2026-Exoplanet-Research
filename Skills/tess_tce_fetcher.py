@@ -55,8 +55,14 @@ class TceFetchResult:
 
 def _default_fetch(url: str) -> list[dict]:
     """Fetch JSON from URL."""
+    import ssl
     import urllib.request
-    with urllib.request.urlopen(url, timeout=30) as resp:
+    try:
+        import certifi
+        ctx: ssl.SSLContext | None = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        ctx = None
+    with urllib.request.urlopen(url, timeout=30, context=ctx) as resp:
         return json.loads(resp.read().decode())
 
 
