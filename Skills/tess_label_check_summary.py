@@ -32,8 +32,9 @@ class TessLabelCheckSummary:
     latest_status: str | None
     latest_exit_code: int | None
     latest_cp: int | None
+    latest_kp: int | None
     latest_fp: int | None
-    latest_eb: int | None
+    latest_fa: int | None
     latest_total: int | None
     latest_gate_open: bool | None
     latest_error_message: str | None
@@ -68,8 +69,9 @@ def build_summary(db_path: Path = _DEFAULT_LOG_DB) -> TessLabelCheckSummary:
             latest_status=None,
             latest_exit_code=None,
             latest_cp=None,
+            latest_kp=None,
             latest_fp=None,
-            latest_eb=None,
+            latest_fa=None,
             latest_total=None,
             latest_gate_open=None,
             latest_error_message=None,
@@ -118,8 +120,9 @@ def build_summary(db_path: Path = _DEFAULT_LOG_DB) -> TessLabelCheckSummary:
         latest_status=latest["status"] if latest else None,
         latest_exit_code=latest["exit_code"] if latest else None,
         latest_cp=latest["cp"] if latest else None,
+        latest_kp=latest["kp"] if latest else None,
         latest_fp=latest["fp"] if latest else None,
-        latest_eb=latest["eb"] if latest else None,
+        latest_fa=latest["fa"] if latest else None,
         latest_total=latest["total"] if latest else None,
         latest_gate_open=_bool_or_none(latest["gate_open"] if latest else None),
         latest_error_message=latest["error_message"] if latest else None,
@@ -160,8 +163,8 @@ def format_summary(summary: TessLabelCheckSummary) -> str:
             f"- Started: {summary.latest_started_at or 'unknown'}",
             f"- Status: {summary.latest_status or 'unknown'}",
             f"- Exit code: {summary.latest_exit_code}",
-            f"- CP/FP/EB/total: {summary.latest_cp}/{summary.latest_fp}/"
-            f"{summary.latest_eb}/{summary.latest_total}",
+            f"- CP/KP/FP/FA/total: {summary.latest_cp}/{summary.latest_kp}/"
+            f"{summary.latest_fp}/{summary.latest_fa}/{summary.latest_total}",
             f"- Gate open: {summary.latest_gate_open}",
         ]
     )

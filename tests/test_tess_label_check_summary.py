@@ -17,21 +17,26 @@ from tess_label_check_summary import (
 
 
 def _write_success(db_path: Path, *, cp: int = 3, total: int = 7) -> None:
+    gate_open = total >= 5 and cp >= 5
     write_log_entry(
         db_path,
         started_at="2026-06-03T00:00:00+00:00",
         finished_at="2026-06-03T00:00:01+00:00",
         elapsed_ms=1000,
         source_url="https://example.test/toi.csv",
-        threshold=5,
-        exit_code=0 if cp >= 5 else 1,
+        min_total=5,
+        min_positive=5,
+        exit_code=0 if gate_open else 1,
         status="success",
         result={
             "cp": cp,
+            "kp": 0,
             "fp": total - cp,
-            "eb": 0,
+            "fa": 0,
+            "positive": cp,
+            "negative": total - cp,
             "total": total,
-            "gate_open": cp >= 5,
+            "gate_open": gate_open,
         },
     )
 
@@ -53,7 +58,8 @@ def test_summary_counts_success_and_error_rows(tmp_path: Path) -> None:
         finished_at="2026-06-03T00:02:02+00:00",
         elapsed_ms=2000,
         source_url="https://example.test/toi.csv",
-        threshold=5,
+        min_total=5,
+        min_positive=5,
         exit_code=2,
         status="error",
         error_message="TimeoutError: simulated",
