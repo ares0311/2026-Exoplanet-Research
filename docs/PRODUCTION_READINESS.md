@@ -1,8 +1,8 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-06-05
-Branch: `claude/review-markdown-docs-SwVnR` (Milestones 1–47 complete)
-Test baseline: 6,385 default tests passing, 2 integration_live deselected (2026-06-03)
+Last reviewed: 2026-06-06
+Branch: `main` (production-critical Skills only; non-production fluff removed 2026-06-06)
+Test baseline: ~1,937 default tests passing, 2 integration_live deselected
 
 ---
 

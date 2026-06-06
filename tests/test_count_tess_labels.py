@@ -33,7 +33,7 @@ def test_count_labels_uses_injected_table_reader() -> None:
         assert timeout_seconds == 7
         return _toi_table(cp=3, fp=2, eb=1)
 
-    result = count_labels(threshold=3, timeout_seconds=7, read_table_fn=reader)
+    result = count_labels(min_total=6, min_cp=3, timeout_seconds=7, read_table_fn=reader)
 
     assert result == {
         "cp": 3,
@@ -48,7 +48,7 @@ def test_cli_writes_success_log_for_open_gate(tmp_path: Path) -> None:
     db_path = tmp_path / "logs" / "tess_label_check.sqlite3"
 
     code = _cli(
-        ["--threshold", "3", "--log-db", str(db_path)],
+        ["--min-total", "5", "--min-cp", "3", "--log-db", str(db_path)],
         read_table_fn=lambda _url, _timeout: _toi_table(cp=3, fp=1, eb=1),
     )
 
@@ -68,7 +68,7 @@ def test_cli_writes_success_log_for_closed_gate(tmp_path: Path) -> None:
     db_path = tmp_path / "logs" / "tess_label_check.sqlite3"
 
     code = _cli(
-        ["--threshold", "5", "--log-db", str(db_path)],
+        ["--min-total", "8", "--min-cp", "3", "--log-db", str(db_path)],
         read_table_fn=lambda _url, _timeout: _toi_table(cp=2, fp=4, eb=1),
     )
 
@@ -87,7 +87,7 @@ def test_cli_writes_error_log_for_fetch_failure(tmp_path: Path) -> None:
         raise TimeoutError("simulated timeout")
 
     code = _cli(
-        ["--threshold", "5", "--log-db", str(db_path)],
+        ["--min-total", "5", "--min-cp", "2", "--log-db", str(db_path)],
         read_table_fn=failing_reader,
     )
 
