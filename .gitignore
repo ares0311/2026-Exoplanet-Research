@@ -42,10 +42,13 @@ dmypy.json
 # Data files (raw downloads — committed intentionally via DVC or similar)
 data/raw/
 data/processed/
+data/lightcurves/
 data/*.csv
 data/*.pkl
 data/*.pickle
 data/*.json
+data/*.fits
+data/*.fits.gz
 
 # IDE / editor
 .vscode/
