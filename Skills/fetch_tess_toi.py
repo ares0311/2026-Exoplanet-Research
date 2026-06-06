@@ -11,7 +11,7 @@ Usage
 Output
 ------
     CSV with columns: toi, tic_id, tfopwg_disposition, period_days,
-    duration_hours, depth_mmag, planet_radius_earth, snr,
+    epoch_bjd, duration_hours, depth_mmag, planet_radius_earth, snr,
     n_sectors, stellar_radius_sun, stellar_teff, stellar_logg, tmag
 """
 from __future__ import annotations
@@ -37,6 +37,7 @@ _COL_MAP = {
     "TIC ID": "tic_id",
     "TFOPWG Disposition": "tfopwg_disposition",
     "Period (days)": "period_days",
+    "Epoch (BJD)": "epoch_bjd",
     "Duration (hours)": "duration_hours",
     "Depth (mmag)": "depth_mmag",
     "Planet Radius (R_Earth)": "planet_radius_earth",
