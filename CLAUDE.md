@@ -52,6 +52,27 @@ Before proposing or executing any task you must:
 ### When the highest-priority Tier 1 gap is blocked by an outside action
 State the gap, name the blocker, and **immediately provide a complete step-by-step recipe** assuming the user has zero background knowledge of the specific task. Give exact commands to copy-paste, explain each in one plain-English sentence, and state exactly what output to paste back. Do not ask "do you want the commands?" — give them.
 
+### Local–Remote Sync Policy — MANDATORY
+
+The user's local Mac and GitHub `main` are the joint source of truth. Keep them in sync at all times.
+
+**Agent rules (non-negotiable):**
+1. Every code change must complete the full cycle: feature branch → commit → push → PR → CI green → merge to main → PR closed. Never leave a PR open at end of session.
+2. Never tell the user to run a script that has not yet been merged to `main`.
+3. Every recipe given to the user must begin with `git pull origin main`.
+4. After every merge to `main`, remind the user: `git pull origin main`.
+
+**Standard recipe header — prepend to EVERY user command:**
+```bash
+git pull origin main
+```
+
+**For long-running commands:**
+```bash
+git pull origin main
+caffeinate -i python Skills/<script>.py [args]
+```
+
 ### macOS Long-Running Process Policy — ALWAYS USE caffeinate
 Any recipe for a Python command that runs longer than ~60 seconds **must** use `caffeinate -i`:
 ```bash
