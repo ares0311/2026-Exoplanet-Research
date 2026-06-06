@@ -177,6 +177,39 @@ caffeinate -dims python Skills/<script>.py [args]
 
 This applies to: light curve downloads, CNN training, batch scans, injection-recovery runs, and any other script that makes repeated network calls or runs for more than a minute. Never give a bare `python ...` recipe for these — always prepend `caffeinate -i`.
 
+## Local–Remote Sync Policy
+
+The user's local Mac and GitHub `main` are the joint source of truth. The agent's server environment is a temporary workspace only. Keeping them in sync is a hard requirement — never leave them diverged.
+
+### Rules for the agent
+
+1. **All code changes must reach `main` before the user runs anything.** The full cycle is mandatory: feature branch → commit → push → PR → CI green → merge to main → PR closed. Never leave a PR open at the end of a session.
+2. **Never tell the user to run a script that has not yet been merged to main.** If a script is still on a feature branch, merge it first.
+3. **Every recipe given to the user must begin with `git pull origin main`** so their local is guaranteed current before any command executes.
+4. **PRs must be merged, not just approved.** After CI passes, promote from draft, squash-merge, and confirm the PR is closed before the session ends.
+5. **After every merge**, remind the user to run `git pull origin main` on their Mac if they have a terminal open.
+
+### Standard recipe header (copy-paste this before every user command)
+
+```bash
+# Always sync first
+git pull origin main
+```
+
+For long-running commands, the full header is:
+
+```bash
+git pull origin main
+caffeinate -i python Skills/<script>.py [args]
+```
+
+### What Not To Do
+
+- Do not tell the user to run `python Skills/foo.py` before `foo.py` is on `main`.
+- Do not leave PRs in draft or open state at end of a session.
+- Do not commit directly to `main` — always use a feature branch and PR.
+- Do not assume the user's local is current — always prepend `git pull origin main`.
+
 ## Python Environment Policy
 
 This project runs inside a `.venv` virtual environment. **Never touch or run system Python.**
