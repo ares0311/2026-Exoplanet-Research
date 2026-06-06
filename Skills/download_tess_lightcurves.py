@@ -10,13 +10,18 @@ Run `python -c "import lightkurve; lightkurve.conf.cache_dir"` to see it.
 
 Usage
 -----
-    python Skills/download_tess_lightcurves.py \\
+    # Always use caffeinate -i on macOS to prevent sleep from killing the run:
+    caffeinate -i python Skills/download_tess_lightcurves.py \\
         --toi-csv  data/tess_toi.csv \\
         --output   data/tess_snippets.jsonl \\
         [--resume]             # skip TIC IDs already in output
         [--max-targets N]      # stop after N targets (default: all)
         [--n-bins 201]         # phase bins per snippet (default: 201)
         [--sleep 0.5]          # seconds between MAST requests (default: 0.5)
+
+    # To run with lid closed add -dims:
+    caffeinate -dims python Skills/download_tess_lightcurves.py --resume \\
+        --toi-csv data/tess_toi.csv --output data/tess_snippets.jsonl
 
 Output JSONL format (one JSON object per line)
 ----------------------------------------------

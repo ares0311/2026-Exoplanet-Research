@@ -163,6 +163,20 @@ Before performance-sensitive changes or large jobs, read `docs/SYSTEM_PROFILE.md
 
 Optimize local defaults for the recorded MacBook Pro M4 Max profile while keeping scientific code portable and configurable. Do not hardcode local machine assumptions into candidate detection, scoring, or pathway logic.
 
+## macOS Long-Running Process Policy
+
+Any Python command expected to run longer than ~60 seconds **must** be prefixed with `caffeinate -i` in recipes given to the user. This prevents macOS from sleeping and killing the process mid-run.
+
+```bash
+# Standard form for any long download or training run:
+caffeinate -i python Skills/<script>.py [args]
+
+# To keep running with lid closed, use -dims instead:
+caffeinate -dims python Skills/<script>.py [args]
+```
+
+This applies to: light curve downloads, CNN training, batch scans, injection-recovery runs, and any other script that makes repeated network calls or runs for more than a minute. Never give a bare `python ...` recipe for these — always prepend `caffeinate -i`.
+
 ## Python Environment Policy
 
 This project runs inside a `.venv` virtual environment. **Never touch or run system Python.**
