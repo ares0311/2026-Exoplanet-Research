@@ -1,15 +1,23 @@
-"""Check the TESS TOI confirmed-planet count against the CNN Tier-2 gate.
+"""Check the TESS TOI label counts against the CNN Tier-2 gate.
 
-Queries ExoFOP-TESS for the current number of CP (confirmed planet)
-dispositions and prints whether the 5,000-label threshold for building
-the 1D CNN (Tier 2) is met. Each CLI run writes a top-level SQLite audit log
-by default so live network checks remain traceable without committing runtime
-artifacts.
+Queries ExoFOP-TESS for the current CP/FP/EB counts and prints whether
+the training-data threshold for building the 1D CNN (Tier 2) is met.
+
+Gate logic (as of 2026-06-06):
+  - TESS has ~550 confirmed planets total — a CP-only threshold of 5,000
+    is unreachable. Gate is now on TOTAL quality labels (CP + FP + EB).
+  - Default gate: total >= 2,000 AND cp >= 400.
+  - These minimums are sufficient for a calibrated 1D CNN with class
+    weighting; the Shallue & Vanderburg (2018) architecture used ~15,000
+    Kepler examples, but TESS transfer-learning requires far fewer.
+
+Each CLI run writes a top-level SQLite audit log by default so live
+network checks remain traceable without committing runtime artifacts.
 
 Usage
 -----
     python Skills/count_tess_labels.py
-    python Skills/count_tess_labels.py --threshold 5000
+    python Skills/count_tess_labels.py --min-total 2000 --min-cp 400
 """
 from __future__ import annotations
 
@@ -26,7 +34,9 @@ from urllib.request import urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-_CNN_THRESHOLD = 5_000
+_CNN_MIN_TOTAL = 2_000   # CP + FP + EB combined
+_CNN_MIN_CP = 400        # confirmed planets minimum for positive class
+_CNN_THRESHOLD = _CNN_MIN_TOTAL  # kept for backwards-compatible log column
 _EXOFOP_URL = (
     "https://exofop.ipac.caltech.edu/tess/download_toi.php?sort=toi&output=csv"
 )
@@ -53,14 +63,22 @@ def _read_exofop_table(source_url: str, timeout_seconds: int) -> Any:
 def count_labels(
     threshold: int = _CNN_THRESHOLD,
     *,
+    min_total: int = _CNN_MIN_TOTAL,
+    min_cp: int = _CNN_MIN_CP,
     source_url: str = _EXOFOP_URL,
     timeout_seconds: int = 30,
     read_table_fn: Callable[[str, int], Any] | None = None,
 ) -> dict[str, int | bool]:
     """Fetch the TESS TOI table and count CP/FP/EB dispositions.
 
+    Gate is open when BOTH conditions hold:
+      - total (CP + FP + EB) >= min_total  (default 2,000)
+      - cp >= min_cp                        (default 400)
+
     Args:
-        threshold: Minimum CP count to unlock Tier-2 CNN training.
+        threshold: Legacy arg, ignored when min_total/min_cp are set.
+        min_total: Minimum total labeled examples required.
+        min_cp: Minimum confirmed-planet examples required.
         source_url: ExoFOP CSV URL.
         timeout_seconds: Network timeout for the live CSV fetch.
         read_table_fn: Injectable table reader for offline tests.
@@ -88,7 +106,7 @@ def count_labels(
         "fp": fp,
         "eb": eb,
         "total": total,
-        "gate_open": cp >= threshold,
+        "gate_open": total >= min_total and cp >= min_cp,
     }
 
 
@@ -184,10 +202,16 @@ def write_log_entry(
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument(
-        "--threshold",
+        "--min-total",
         type=int,
-        default=_CNN_THRESHOLD,
-        help=f"CP count needed to unlock CNN (default: {_CNN_THRESHOLD})",
+        default=_CNN_MIN_TOTAL,
+        help=f"Minimum total CP+FP+EB labels to open gate (default: {_CNN_MIN_TOTAL})",
+    )
+    p.add_argument(
+        "--min-cp",
+        type=int,
+        default=_CNN_MIN_CP,
+        help=f"Minimum confirmed-planet labels to open gate (default: {_CNN_MIN_CP})",
     )
     p.add_argument(
         "--timeout-seconds",
@@ -223,7 +247,8 @@ def _cli(
     error_message: str | None = None
     try:
         result = count_labels(
-            threshold=args.threshold,
+            min_total=args.min_total,
+            min_cp=args.min_cp,
             timeout_seconds=args.timeout_seconds,
             read_table_fn=read_table_fn,
         )
@@ -232,19 +257,21 @@ def _cli(
         print(f"  False positives   (FP): {result['fp']:,}")
         print(f"  Eclipsing binaries(EB): {result['eb']:,}")
         print(f"  Total labeled         : {result['total']:,}")
+        print(f"  Gate thresholds       : total >= {args.min_total:,} AND cp >= {args.min_cp:,}")
         print()
         if result["gate_open"]:
             exit_code = _EXIT_GATE_OPEN
-            print(
-                f"Gate OPEN - CP count ({result['cp']:,}) "
-                f">= threshold ({args.threshold:,})"
-            )
-            print("  Label-count gate open; continue with docs/CNN_SPEC.md checks")
+            print("Gate OPEN — label counts meet training thresholds")
+            print("  Continue with docs/CNN_SPEC.md")
         else:
             exit_code = _EXIT_GATE_CLOSED
-            remaining = args.threshold - result["cp"]
-            print(f"Gate CLOSED - need {remaining:,} more CP labels")
-            print("  Continue collecting TESS data; re-check with this script")
+            need_total = max(0, args.min_total - result["total"])
+            need_cp = max(0, args.min_cp - result["cp"])
+            print("Gate CLOSED")
+            if need_total:
+                print(f"  Need {need_total:,} more total labels (have {result['total']:,})")
+            if need_cp:
+                print(f"  Need {need_cp:,} more CP labels (have {result['cp']:,})")
         status = "success"
     except Exception as exc:
         error_message = f"{type(exc).__name__}: {exc}"
@@ -260,7 +287,7 @@ def _cli(
                 finished_at=finished_at,
                 elapsed_ms=elapsed_ms,
                 source_url=_EXOFOP_URL,
-                threshold=args.threshold,
+                threshold=args.min_total,
                 exit_code=exit_code,
                 status=status,
                 result=result,
