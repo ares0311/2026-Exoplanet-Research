@@ -1,15 +1,29 @@
-"""Check the TESS TOI confirmed-planet count against the CNN Tier-2 gate.
+"""Check the TESS TOI label counts against the CNN Tier-2 gate.
 
-Queries ExoFOP-TESS for the current number of CP (confirmed planet)
-dispositions and prints whether the 5,000-label threshold for building
-the 1D CNN (Tier 2) is met. Each CLI run writes a top-level SQLite audit log
-by default so live network checks remain traceable without committing runtime
-artifacts.
+Queries ExoFOP-TESS for the current CP/KP/FP/FA counts and prints whether
+the training-data threshold for building the 1D CNN (Tier 2) is met.
+
+ExoFOP TFOPWG disposition codes and their CNN training class:
+  CP  Confirmed Planet         → positive class
+  KP  Known Planet (TESS obs)  → positive class (confirmed, same quality as CP)
+  FP  False Positive           → negative class
+  FA  False Alarm (artifact)   → negative class
+  PC  Planet Candidate         → NOT used (unvetted)
+  APC Ambiguous PC             → NOT used (unvetted)
+
+Gate logic (as of 2026-06-06):
+  - positive (CP + KP) >= 400   — enough confirmed-planet examples
+  - total (positive + negative) >= 2,000  — minimum corpus for class weighting
+  ExoFOP does not use an "EB" disposition code; eclipsing binaries are
+  classified as FP. The old "EB" label was incorrect and has been removed.
+
+Each CLI run writes a top-level SQLite audit log by default so live
+network checks remain traceable without committing runtime artifacts.
 
 Usage
 -----
     python Skills/count_tess_labels.py
-    python Skills/count_tess_labels.py --threshold 5000
+    python Skills/count_tess_labels.py --min-total 2000 --min-positive 400
 """
 from __future__ import annotations
 
@@ -26,13 +40,14 @@ from urllib.request import urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-_CNN_THRESHOLD = 5_000
+_CNN_MIN_TOTAL = 2_000
+_CNN_MIN_POSITIVE = 400
 _EXOFOP_URL = (
     "https://exofop.ipac.caltech.edu/tess/download_toi.php?sort=toi&output=csv"
 )
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_LOG_DB = _PROJECT_ROOT / "logs" / "tess_label_check.sqlite3"
-_LOG_SCHEMA_VERSION = 1
+_LOG_SCHEMA_VERSION = 2
 _EXIT_GATE_OPEN = 0
 _EXIT_GATE_CLOSED = 1
 _EXIT_ERROR = 2
@@ -59,22 +74,32 @@ def _read_exofop_table(source_url: str, timeout_seconds: int) -> Any:
 
 
 def count_labels(
-    threshold: int = _CNN_THRESHOLD,
     *,
+    min_total: int = _CNN_MIN_TOTAL,
+    min_positive: int = _CNN_MIN_POSITIVE,
     source_url: str = _EXOFOP_URL,
     timeout_seconds: int = 30,
     read_table_fn: Callable[[str, int], Any] | None = None,
 ) -> dict[str, int | bool]:
-    """Fetch the TESS TOI table and count CP/FP/EB dispositions.
+    """Fetch the TESS TOI table and count quality training labels.
+
+    Positive class: CP (Confirmed Planet) + KP (Known Planet).
+    Negative class: FP (False Positive) + FA (False Alarm).
+
+    Gate is open when BOTH conditions hold:
+      - positive (CP + KP) >= min_positive  (default 400)
+      - total (positive + negative) >= min_total  (default 2,000)
 
     Args:
-        threshold: Minimum CP count to unlock Tier-2 CNN training.
+        min_total: Minimum total quality labels required.
+        min_positive: Minimum positive-class (confirmed planet) labels required.
         source_url: ExoFOP CSV URL.
         timeout_seconds: Network timeout for the live CSV fetch.
         read_table_fn: Injectable table reader for offline tests.
 
     Returns:
-        Dict with keys: ``cp``, ``fp``, ``eb``, ``total``, ``gate_open``.
+        Dict with keys: ``cp``, ``kp``, ``fp``, ``fa``,
+        ``positive``, ``negative``, ``total``, ``gate_open``.
     """
     table_reader = read_table_fn or _read_exofop_table
     df = table_reader(source_url, timeout_seconds)
@@ -87,16 +112,22 @@ def count_labels(
 
     counts = df[col].value_counts().to_dict()
     cp = int(counts.get("CP", 0))
+    kp = int(counts.get("KP", 0))
     fp = int(counts.get("FP", 0))
-    eb = int(counts.get("EB", 0))
-    total = cp + fp + eb
+    fa = int(counts.get("FA", 0))
+    positive = cp + kp
+    negative = fp + fa
+    total = positive + negative
 
     return {
         "cp": cp,
+        "kp": kp,
         "fp": fp,
-        "eb": eb,
+        "fa": fa,
+        "positive": positive,
+        "negative": negative,
         "total": total,
-        "gate_open": cp >= threshold,
+        "gate_open": total >= min_total and positive >= min_positive,
     }
 
 
@@ -113,10 +144,14 @@ def initialize_log_db(db_path: Path) -> Path:
                 finished_at TEXT NOT NULL,
                 elapsed_ms INTEGER NOT NULL,
                 source_url TEXT NOT NULL,
-                threshold INTEGER NOT NULL,
+                min_total INTEGER NOT NULL,
+                min_positive INTEGER NOT NULL,
                 cp INTEGER,
+                kp INTEGER,
                 fp INTEGER,
-                eb INTEGER,
+                fa INTEGER,
+                positive INTEGER,
+                negative INTEGER,
                 total INTEGER,
                 gate_open INTEGER,
                 exit_code INTEGER NOT NULL,
@@ -139,7 +174,8 @@ def write_log_entry(
     finished_at: str,
     elapsed_ms: int,
     source_url: str,
-    threshold: int,
+    min_total: int,
+    min_positive: int,
     exit_code: int,
     status: str,
     result: dict[str, int | bool] | None = None,
@@ -152,22 +188,12 @@ def write_log_entry(
         conn.execute(
             """
             INSERT INTO tess_label_checks (
-                schema_version,
-                started_at,
-                finished_at,
-                elapsed_ms,
-                source_url,
-                threshold,
-                cp,
-                fp,
-                eb,
-                total,
-                gate_open,
-                exit_code,
-                status,
-                error_message
+                schema_version, started_at, finished_at, elapsed_ms,
+                source_url, min_total, min_positive,
+                cp, kp, fp, fa, positive, negative, total, gate_open,
+                exit_code, status, error_message
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 _LOG_SCHEMA_VERSION,
@@ -175,11 +201,15 @@ def write_log_entry(
                 finished_at,
                 elapsed_ms,
                 source_url,
-                threshold,
-                int(result["cp"]) if "cp" in result else None,
-                int(result["fp"]) if "fp" in result else None,
-                int(result["eb"]) if "eb" in result else None,
-                int(result["total"]) if "total" in result else None,
+                min_total,
+                min_positive,
+                result.get("cp"),
+                result.get("kp"),
+                result.get("fp"),
+                result.get("fa"),
+                result.get("positive"),
+                result.get("negative"),
+                result.get("total"),
                 int(bool(result["gate_open"])) if "gate_open" in result else None,
                 exit_code,
                 status,
@@ -192,10 +222,16 @@ def write_log_entry(
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument(
-        "--threshold",
+        "--min-total",
         type=int,
-        default=_CNN_THRESHOLD,
-        help=f"CP count needed to unlock CNN (default: {_CNN_THRESHOLD})",
+        default=_CNN_MIN_TOTAL,
+        help=f"Minimum total quality labels to open gate (default: {_CNN_MIN_TOTAL})",
+    )
+    p.add_argument(
+        "--min-positive",
+        type=int,
+        default=_CNN_MIN_POSITIVE,
+        help=f"Minimum positive-class labels to open gate (default: {_CNN_MIN_POSITIVE})",
     )
     p.add_argument(
         "--timeout-seconds",
@@ -231,29 +267,40 @@ def _cli(
     error_message: str | None = None
     try:
         result = count_labels(
-            threshold=args.threshold,
+            min_total=args.min_total,
+            min_positive=args.min_positive,
             timeout_seconds=args.timeout_seconds,
             read_table_fn=read_table_fn,
         )
         print("TESS TOI label counts:")
-        print(f"  Confirmed planets (CP): {result['cp']:,}")
-        print(f"  False positives   (FP): {result['fp']:,}")
-        print(f"  Eclipsing binaries(EB): {result['eb']:,}")
-        print(f"  Total labeled         : {result['total']:,}")
+        print(f"  Confirmed planets  (CP): {result['cp']:,}")
+        print(f"  Known planets      (KP): {result['kp']:,}  ← positive class")
+        print(f"  False positives    (FP): {result['fp']:,}")
+        print(f"  False alarms       (FA): {result['fa']:,}  ← negative class")
+        print(f"  {'─' * 36}")
+        print(f"  Positive class (CP+KP) : {result['positive']:,}")
+        print(f"  Negative class (FP+FA) : {result['negative']:,}")
+        print(f"  Total quality labels   : {result['total']:,}")
+        print(
+            f"  Gate thresholds        : total >= {args.min_total:,}"
+            f" AND positive >= {args.min_positive:,}"
+        )
         print()
         if result["gate_open"]:
             exit_code = _EXIT_GATE_OPEN
-            print(
-                f"Gate OPEN - CP count ({result['cp']:,}) "
-                f">= threshold ({args.threshold:,})"
-            )
-            print("  Label-count gate open; continue with docs/CNN_SPEC.md checks")
+            status = "success"
+            print("Gate OPEN — label counts meet training thresholds")
+            print("  Continue with docs/CNN_SPEC.md")
         else:
             exit_code = _EXIT_GATE_CLOSED
-            remaining = args.threshold - result["cp"]
-            print(f"Gate CLOSED - need {remaining:,} more CP labels")
-            print("  Continue collecting TESS data; re-check with this script")
-        status = "success"
+            status = "success"
+            need_total = max(0, args.min_total - int(result["total"]))
+            need_pos = max(0, args.min_positive - int(result["positive"]))
+            print("Gate CLOSED")
+            if need_total:
+                print(f"  Need {need_total:,} more total labels (have {result['total']:,})")
+            if need_pos:
+                print(f"  Need {need_pos:,} more positive labels (have {result['positive']:,})")
     except Exception as exc:
         error_message = f"{type(exc).__name__}: {exc}"
         print("TESS TOI label count failed:", file=sys.stderr)
@@ -268,7 +315,8 @@ def _cli(
                 finished_at=finished_at,
                 elapsed_ms=elapsed_ms,
                 source_url=_EXOFOP_URL,
-                threshold=args.threshold,
+                min_total=args.min_total,
+                min_positive=args.min_positive,
                 exit_code=exit_code,
                 status=status,
                 result=result,

@@ -12,8 +12,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 from count_tess_labels import _cli, count_labels
 
 
-def _toi_table(*, cp: int = 0, fp: int = 0, eb: int = 0) -> pd.DataFrame:
-    dispositions = ["CP"] * cp + ["FP"] * fp + ["EB"] * eb
+def _toi_table(
+    *, cp: int = 0, kp: int = 0, fp: int = 0, fa: int = 0
+) -> pd.DataFrame:
+    dispositions = ["CP"] * cp + ["KP"] * kp + ["FP"] * fp + ["FA"] * fa
     return pd.DataFrame({"TFOPWG Disposition": dispositions})
 
 
@@ -27,38 +29,94 @@ def _read_logged_row(db_path: Path) -> dict[str, object]:
     return dict(row)
 
 
+def test_count_labels_positive_class_includes_kp() -> None:
+    """CP + KP both count as positive class."""
+    def reader(source_url: str, timeout_seconds: int) -> pd.DataFrame:
+        return _toi_table(cp=300, kp=200, fp=100, fa=50)
+
+    result = count_labels(read_table_fn=reader)
+
+    assert result["cp"] == 300
+    assert result["kp"] == 200
+    assert result["fp"] == 100
+    assert result["fa"] == 50
+    assert result["positive"] == 500   # CP + KP
+    assert result["negative"] == 150   # FP + FA
+    assert result["total"] == 650
+
+
+def test_count_labels_gate_open_when_thresholds_met() -> None:
+    def reader(source_url: str, timeout_seconds: int) -> pd.DataFrame:
+        return _toi_table(cp=300, kp=200, fp=1000, fa=600)
+
+    result = count_labels(
+        min_total=2000, min_positive=400, read_table_fn=reader
+    )
+
+    assert result["positive"] == 500
+    assert result["total"] == 2100
+    assert result["gate_open"] is True
+
+
+def test_count_labels_gate_closed_when_total_insufficient() -> None:
+    def reader(source_url: str, timeout_seconds: int) -> pd.DataFrame:
+        return _toi_table(cp=400, kp=100, fp=900, fa=50)
+
+    result = count_labels(
+        min_total=2000, min_positive=400, read_table_fn=reader
+    )
+
+    assert result["positive"] == 500
+    assert result["total"] == 1450
+    assert result["gate_open"] is False
+
+
+def test_count_labels_gate_closed_when_positive_insufficient() -> None:
+    def reader(source_url: str, timeout_seconds: int) -> pd.DataFrame:
+        return _toi_table(cp=100, kp=100, fp=1500, fa=500)
+
+    result = count_labels(
+        min_total=2000, min_positive=400, read_table_fn=reader
+    )
+
+    assert result["positive"] == 200
+    assert result["total"] == 2200
+    assert result["gate_open"] is False
+
+
 def test_count_labels_uses_injected_table_reader() -> None:
     def reader(source_url: str, timeout_seconds: int) -> pd.DataFrame:
         assert source_url.startswith("https://")
         assert timeout_seconds == 7
-        return _toi_table(cp=3, fp=2, eb=1)
+        return _toi_table(cp=300, kp=150, fp=200, fa=50)
 
-    result = count_labels(threshold=3, timeout_seconds=7, read_table_fn=reader)
+    result = count_labels(
+        min_total=600, min_positive=400, timeout_seconds=7, read_table_fn=reader
+    )
 
-    assert result == {
-        "cp": 3,
-        "fp": 2,
-        "eb": 1,
-        "total": 6,
-        "gate_open": True,
-    }
+    assert result["positive"] == 450
+    assert result["total"] == 700
+    assert result["gate_open"] is True
 
 
 def test_cli_writes_success_log_for_open_gate(tmp_path: Path) -> None:
     db_path = tmp_path / "logs" / "tess_label_check.sqlite3"
 
     code = _cli(
-        ["--threshold", "3", "--log-db", str(db_path)],
-        read_table_fn=lambda _url, _timeout: _toi_table(cp=3, fp=1, eb=1),
+        ["--min-total", "600", "--min-positive", "400", "--log-db", str(db_path)],
+        read_table_fn=lambda _url, _timeout: _toi_table(cp=300, kp=150, fp=200, fa=50),
     )
 
     row = _read_logged_row(db_path)
     assert code == 0
     assert row["status"] == "success"
-    assert row["cp"] == 3
-    assert row["fp"] == 1
-    assert row["eb"] == 1
-    assert row["total"] == 5
+    assert row["cp"] == 300
+    assert row["kp"] == 150
+    assert row["fp"] == 200
+    assert row["fa"] == 50
+    assert row["positive"] == 450
+    assert row["negative"] == 250
+    assert row["total"] == 700
     assert row["gate_open"] == 1
     assert row["exit_code"] == 0
     assert row["error_message"] is None
@@ -68,14 +126,15 @@ def test_cli_writes_success_log_for_closed_gate(tmp_path: Path) -> None:
     db_path = tmp_path / "logs" / "tess_label_check.sqlite3"
 
     code = _cli(
-        ["--threshold", "5", "--log-db", str(db_path)],
-        read_table_fn=lambda _url, _timeout: _toi_table(cp=2, fp=4, eb=1),
+        ["--min-total", "2000", "--min-positive", "400", "--log-db", str(db_path)],
+        read_table_fn=lambda _url, _timeout: _toi_table(cp=100, kp=100, fp=500, fa=50),
     )
 
     row = _read_logged_row(db_path)
     assert code == 1
     assert row["status"] == "success"
-    assert row["cp"] == 2
+    assert row["positive"] == 200
+    assert row["total"] == 750
     assert row["gate_open"] == 0
     assert row["exit_code"] == 1
 
@@ -87,14 +146,14 @@ def test_cli_writes_error_log_for_fetch_failure(tmp_path: Path) -> None:
         raise TimeoutError("simulated timeout")
 
     code = _cli(
-        ["--threshold", "5", "--log-db", str(db_path)],
+        ["--min-total", "2000", "--min-positive", "400", "--log-db", str(db_path)],
         read_table_fn=failing_reader,
     )
 
     row = _read_logged_row(db_path)
     assert code == 2
     assert row["status"] == "error"
-    assert row["cp"] is None
+    assert row["positive"] is None
     assert row["gate_open"] is None
     assert row["exit_code"] == 2
     assert "simulated timeout" in str(row["error_message"])
