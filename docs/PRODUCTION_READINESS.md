@@ -13,10 +13,10 @@ Test baseline: 1,937 default tests passing, 2 integration_live deselected
 | `--scorer bayesian` | **PRODUCTION READY** | None — default mode, zero external dependencies |
 | `--scorer xgboost` | **PRODUCTION READY** | None — trained on 7,586 Kepler KOIs, AUC=0.992 |
 | `--scorer ensemble` | **PRODUCTION READY** | None — conservative XGBoost+Bayesian blend when CNN absent |
-| `--scorer cnn` | **NOT READY** | T1-1: 2,000+ total TESS labels AND 400+ CPs required |
+| `--scorer cnn` | **NOT READY** | T1-1: CNN training pipeline must be run (gate is open, data ready) |
 | `--scorer full-ensemble` | **NOT READY** | T1-1: CNN checkpoint required first |
 
-The system is safe to deploy now for Bayesian and XGBoost scoring modes. The CNN tier requires data collection first — this is an outside blocker, not a code gap.
+The system is safe to deploy now for Bayesian and XGBoost scoring modes. The CNN label gate is open (2,668 quality labels as of 2026-06-06) — training pipeline can now be executed.
 
 ---
 
@@ -25,13 +25,13 @@ The system is safe to deploy now for Bayesian and XGBoost scoring modes. The CNN
 ### T1-1: Production Tier 2 CNN Checkpoint
 
 - **What is missing**: A trained, calibrated 1D CNN checkpoint on TESS phase-folded flux
-- **Root cause**: Data collection — 2,000+ total quality labels (CP+FP+EB) AND 400+ confirmed planets have not yet been assembled
-- **Why this threshold**: Shallue & Vanderburg (2018) used ~15,000 Kepler examples; TESS transfer-learning requires far fewer. Gate is total >= 2,000 AND cp >= 400 — calibrated for class-weighted 1D CNN
+- **Gate status**: **OPEN as of 2026-06-06** — 1,324 positive (CP+KP) + 1,344 negative (FP+FA) = 2,668 total
+- **What is missing**: A trained, calibrated 1D CNN checkpoint — the training pipeline must now be run
 - **Code status**: Complete — `ml/cnn_scorer.py`, `Skills/train_cnn.py`, `labelled_lc_collector.py`, `snippet_normalizer.py`, `cnn_split_validator.py`, `cnn_calibrator.py`, and all supporting data pipeline utilities exist and are tested
-- **Gate check (requires live network approval)**: `python Skills/count_tess_labels.py`
-- **Offline readiness**: `python Skills/tier2_progress_reporter.py`
+- **Next step**: Run `python Skills/fetch_tess_toi.py` then `python Skills/labelled_lc_collector.py` to download light curves, then agent-run training pipeline
+- **Gate check**: `python Skills/count_tess_labels.py`
 - **Architecture spec**: `docs/CNN_SPEC.md`
-- **Outside blocker**: Human label collection from ExoFOP-TESS — cannot be automated without intentional live network approval
+- **Outside blocker**: Light curve download (~120 GB, 2–6 hours) must run on user's local Mac with internet access
 
 ### T1-2: Stacking Tier 3 Production Weight Calibration
 
@@ -119,7 +119,8 @@ These are enforced in code and must never be bypassed:
 
 | Blocker | What Is Needed | Who |
 |---|---|---|
-| TESS label collection | 2,000+ total (CP+FP+EB) AND 400+ CP TESS labels from ExoFOP | Citizen scientist or TFOP WG collaboration |
+| TESS light curve download | ~120 GB, 2–6 hours — run `labelled_lc_collector.py` locally | You (local Mac with internet) |
+| CNN training run | Execute training pipeline after light curves downloaded | Agent (after download complete) |
 | Expert vetting | Run on known confirmed targets; verify FPP ordering | Exoplanet transit astronomer |
 | Peer review | Review `docs/SCORING_MODEL.md` methodology | Independent expert reviewer |
 | CNN production training | Execute CNN training pipeline after label gate opens | Agent + human approval |
