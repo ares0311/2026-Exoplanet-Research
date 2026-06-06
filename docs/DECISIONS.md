@@ -324,3 +324,39 @@ The older bare `mypy src` form is superseded for current local and CI validation
 - Keeps type checking tied to the same interpreter and installed packages used by the rest of validation.
 - Reduces cross-agent ambiguity when multiple shells, virtual environments, or package managers are present.
 - Aligns contributor docs, CI, and handoff validation evidence.
+
+---
+
+## DECISION-013: Expert Vetting and Peer Review Are Out of Scope (Citizen Science)
+
+**Date:** 2026-06-06
+**Status:** Accepted
+
+### Context
+
+`docs/PRODUCTION_READINESS.md` originally listed T2-2 (Expert Vetting) and T2-3 (Peer Review Before
+Publishing) as Tier 2 improvement gaps. Both required access to an independent exoplanet transit
+astronomer or academic peer reviewer. The project owner confirmed that this is a citizen science
+project operating independently — no expert reviewer is available.
+
+### Decision
+
+T2-2 and T2-3 are permanently out of scope. They are marked N/A in `docs/PRODUCTION_READINESS.md`
+and will never appear in gap lists or task plans.
+
+The code-enforced scientific guardrails already in place are the citizen-science substitute:
+
+1. Never output "confirmed planet" — only "candidate signal" or "follow-up target"
+2. Always expose false-positive evidence alongside positive evidence
+3. Suppress `tfop_ready` pathway when key diagnostics are missing
+4. No external submission or discovery contact without explicit human approval
+5. Background automation draft reports require human approval before any external action
+6. Conservative priors by default; mission-specific profiles are opt-in
+7. `provenance_score` gates `tfop_ready` — 2-min SPOC with ≥2 sectors required
+
+### Rationale
+
+- The project is citizen science; external expert access is not feasible.
+- Conservative guardrails enforced in code provide equivalent protection against false claims.
+- Removing unfeasible gaps from the gap list keeps planning focused on actionable work.
+- This decision must not be reversed by a future agent without explicit instruction from the user.
