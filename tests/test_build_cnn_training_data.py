@@ -183,3 +183,45 @@ def test_format_split_summary_contains_counts(tmp_path: Path) -> None:
     summary = format_split_summary(manifest)
     assert "Total examples: 6" in summary
     assert "Live services: False" in summary
+
+
+def test_load_training_examples_from_jsonl(tmp_path: Path) -> None:
+    """JSONL format produced by download_tess_lightcurves.py is accepted."""
+    lines = [
+        json.dumps({**_snippet(tic_id=10, label=1), "status": "ok"}),
+        json.dumps({**_snippet(tic_id=11, label=0), "status": "ok"}),
+        # error record — no phase/flux — must be silently skipped
+        json.dumps({"tic_id": 999, "status": "error", "reason": "No LC found"}),
+    ]
+    path = tmp_path / "tess_snippets.jsonl"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    examples = load_training_examples([path])
+
+    assert len(examples) == 2
+    assert {e.tic_id for e in examples} == {10, 11}
+    assert {e.label for e in examples} == {0, 1}
+
+
+def test_load_training_examples_jsonl_201_bins(tmp_path: Path) -> None:
+    """201-bin JSONL snippets (canonical download_tess_lightcurves output) load correctly."""
+    n_bins = 201
+    snippet = {
+        "tic_id": 150428135,
+        "label": 1,
+        "disposition": "CP",
+        "period_days": 37.4,
+        "epoch_bjd": 2458325.0,
+        "phase": [round(-0.5 + (i + 0.5) / n_bins, 6) for i in range(n_bins)],
+        "flux": [1.0 if i != 100 else 0.998 for i in range(n_bins)],
+        "n_points": 8732,
+        "status": "ok",
+    }
+    path = tmp_path / "snippets.jsonl"
+    path.write_text(json.dumps(snippet) + "\n", encoding="utf-8")
+
+    examples = load_training_examples([path])
+
+    assert len(examples) == 1
+    assert examples[0].tic_id == 150428135
+    assert len(examples[0].flux) == n_bins

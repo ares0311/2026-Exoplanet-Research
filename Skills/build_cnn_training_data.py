@@ -53,16 +53,41 @@ class SplitConfig:
 
 
 def load_training_examples(paths: list[Path | str]) -> list[TrainingExample]:
-    """Load and validate training examples from local JSON files."""
+    """Load and validate training examples from local JSON or JSONL files.
+
+    Accepts:
+    - JSON files: list of dicts, or ``{"snippets": [...]}`` / ``{"examples": [...]}``
+      wrapper (produced by ``labelled_lc_collector.py`` and ``cnn_feature_augmenter.py``)
+    - JSONL files: one JSON object per line (produced by ``download_tess_lightcurves.py``)
+    """
     examples: list[TrainingExample] = []
     for path_like in paths:
         path = Path(path_like)
-        rows = _candidate_rows(json.loads(path.read_text(encoding="utf-8")))
+        rows = _parse_file_rows(path)
         for index, row in enumerate(rows):
             example = _training_example(row, source_file=str(path), row_index=index)
             if example is not None:
                 examples.append(example)
     return examples
+
+
+def _parse_file_rows(path: Path) -> list[dict[str, Any]]:
+    """Parse training rows from a JSON or JSONL file."""
+    text = path.read_text(encoding="utf-8")
+    # Try full JSON first (existing format: list or wrapper dict)
+    with suppress(json.JSONDecodeError):
+        return _candidate_rows(json.loads(text))
+    # Fall back to JSONL: one JSON object per line
+    rows: list[dict[str, Any]] = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        with suppress(json.JSONDecodeError):
+            obj = json.loads(line)
+            if isinstance(obj, dict):
+                rows.append(obj)
+    return rows
 
 
 def split_examples(
