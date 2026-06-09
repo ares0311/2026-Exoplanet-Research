@@ -101,7 +101,11 @@ Source contract status before any default-training integration:
 - Light curves: cache to `~/.lightkurve-cache/` (Lightkurve default)
 - KOI CSV: save to `data/kepler_koi.csv`; re-download quarterly
 - TOI CSV: save to `data/tess_toi.csv`; re-download monthly (table grows)
-- Trained models: save to `models/`; version by date or commit hash
+- Generated training corpora, including `data/tess_snippets.jsonl`, remain
+  local runtime artifacts and are not committed.
+- Validated production models, calibration metadata, registry entries, and
+  reproducibility manifests: save to `models/`, version by date or commit
+  hash, and commit after production-readiness validation.
 
 ---
 

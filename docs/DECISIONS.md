@@ -360,3 +360,49 @@ The code-enforced scientific guardrails already in place are the citizen-science
 - Conservative guardrails enforced in code provide equivalent protection against false claims.
 - Removing unfeasible gaps from the gap list keeps planning focused on actionable work.
 - This decision must not be reversed by a future agent without explicit instruction from the user.
+
+---
+
+## DECISION-014: Keep Training Corpora Local and Version Production Model Artifacts
+
+**Date:** 2026-06-09
+**Status:** Accepted
+
+### Context
+
+T1-1 requires training a production Tier 2 CNN from the generated
+`data/tess_snippets.jsonl` corpus. The repository already directs agents to
+cache large mission data locally and avoid committing generated data or cache
+directories. The completed local corpus contains all 2,636 eligible rows:
+2,623 usable snippets and 13 recorded fetch or extraction errors.
+
+Production scoring must also remain reproducible across machines and agents.
+That requires the exact validated model and its calibration and provenance
+metadata to be available from the repository rather than only from one local
+workspace.
+
+### Decision
+
+1. Treat `data/tess_snippets.jsonl` as the authorized local training corpus for
+   T1-1 after integrity, class-balance, and leakage checks pass.
+2. Keep generated training corpora and downloaded mission data local and
+   uncommitted. Ignore `data/*.jsonl` alongside the other generated `data/`
+   formats.
+3. After production-readiness validation, commit the selected production CNN
+   checkpoint, calibration metadata, model registry entry, and reproducibility
+   manifest under `models/`.
+4. The reproducibility manifest must identify the source-catalog version or
+   hash, corpus hash, split manifest hash, training configuration, code commit,
+   metrics, and calibration artifact.
+5. If a validated checkpoint is too large for ordinary Git hosting, use Git
+   LFS or another explicitly approved versioned artifact store without
+   committing the training corpus itself.
+
+### Rationale
+
+- Keeps large, regenerable mission-derived data out of Git.
+- Allows T1-1 training to proceed from the completed local corpus.
+- Makes the deployed scorer reproducible and available to every agent and
+  production environment.
+- Separates private or bulky training inputs from the small set of artifacts
+  required to reproduce production inference.
