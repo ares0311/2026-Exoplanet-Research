@@ -14,6 +14,7 @@ from Skills.cnn_training_config import default_config
 from Skills.train_cnn import (
     CnnTrainingResult,
     EpochRecord,
+    _augment_training_batch,
     _compute_auc,
     _load_split,
     format_training_result,
@@ -61,6 +62,21 @@ class TestComputeAuc:
     def test_all_positive_returns_half(self) -> None:
         auc = _compute_auc([1, 1, 1], [0.9, 0.8, 0.7])
         assert auc == 0.5
+
+
+def test_train_augmentation_changes_only_enabled_batches() -> None:
+    import dataclasses
+
+    import torch
+
+    batch = torch.ones((4, 1, 201))
+    disabled = dataclasses.replace(default_config(), augment=False)
+    assert torch.equal(_augment_training_batch(batch, disabled), batch)
+
+    torch.manual_seed(42)
+    augmented = _augment_training_batch(batch, default_config())
+    assert augmented.shape == batch.shape
+    assert not torch.equal(augmented, batch)
 
 
 # ---------------------------------------------------------------------------

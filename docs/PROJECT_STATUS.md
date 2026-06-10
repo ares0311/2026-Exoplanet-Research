@@ -85,12 +85,14 @@ reports/background/*.html
 
 **Production ML Tier 2 — checkpoint generalization**
 
-- The label gate is open with 2,623 usable balanced TESS snippets.
+- The label gate is open, but the existing 2,623-row local corpus is invalid.
 - The first seed-42 checkpoint completed training but was rejected on 2026-06-10.
 - Held-out test AUC was 0.7404 and calibrated F1 was 0.6297, below the documented 0.85 and 0.80 targets.
 - Validation-fitted Platt calibration worsened test Brier score and ECE, so no calibration or checkpoint artifact was promoted into `models/`.
+- A 2026-06-10 audit found that every nominally usable snippet had `epoch_bjd=0.0`, so catalog transit events were not centered in phase.
+- The old corpus, original seed-42 split, and temporary replacement split are retired. Fetch/download now reject missing or non-BJD epochs and expose an offline corpus audit.
 - Architecture and evaluation details: `docs/CNN_SPEC.md`.
-- Next implementation blocker: improve the training recipe without tuning against the opened test partition, then retrain and evaluate a new candidate.
+- Next outside blocker: rebuild the local epoch-corrected TESS corpus from scratch and pass its audit before model selection resumes.
 
 ---
 
@@ -98,7 +100,7 @@ reports/background/*.html
 
 1. Run `python Skills/tier2_progress_reporter.py --labels data/exofop_ctoi_labels.json --output reports/tier2_status.md --json-output reports/tier2_status.json` to produce offline CNN readiness artifacts.
 2. Run `python Skills/count_tess_labels.py` only when live ExoFOP access is intentionally approved, then run `python Skills/tess_label_check_summary.py` to inspect the local SQLite audit history.
-3. Improve and rerun the CNN training pipeline; do not promote the rejected seed-42 checkpoint documented in `docs/CNN_SPEC.md`.
+3. Rebuild and audit the epoch-corrected CNN corpus, create a fresh sealed promotion split, then resume grouped development experiments; do not reuse any artifact derived from the zero-epoch corpus.
 4. Use `toi_checker.py` before investing pipeline time on new live targets.
 5. Use `batch_scan.py` + `alert_filter.py` + `rank_candidates.py` + `watchlist.py` for systematic follow-up.
 6. Use `multi_sector_phase_compare.py` to inspect sector-to-sector depth and phase consistency before advancing multi-sector follow-up targets.

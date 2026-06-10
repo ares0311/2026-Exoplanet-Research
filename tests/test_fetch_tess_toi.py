@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
@@ -173,3 +174,30 @@ class TestFetchToiTable:
         rows = _read_csv(out)
         assert rows
         assert "epoch_bjd" in rows[0]
+
+    def test_missing_epoch_column_fails_closed(self, tmp_path: Path) -> None:
+        from Skills.fetch_tess_toi import fetch_toi_table
+
+        frame = _mock_toi_df().drop(columns=["Epoch (BJD)"])
+        buffer = io.StringIO()
+        frame.to_csv(buffer, index=False)
+
+        with pytest.raises(ValueError, match="epoch_bjd"):
+            fetch_toi_table(
+                tmp_path / "toi.csv",
+                fetch_fn=lambda _url: buffer.getvalue().encode(),
+            )
+
+    def test_invalid_epoch_rows_are_excluded(self, tmp_path: Path) -> None:
+        from Skills.fetch_tess_toi import fetch_toi_table
+
+        frame = _mock_toi_df()
+        frame.loc[0, "Epoch (BJD)"] = 0.0
+        buffer = io.StringIO()
+        frame.to_csv(buffer, index=False)
+        output = tmp_path / "toi.csv"
+
+        fetch_toi_table(output, fetch_fn=lambda _url: buffer.getvalue().encode())
+
+        rows = _read_csv(output)
+        assert all(float(row["epoch_bjd"]) >= 2_000_000.0 for row in rows)

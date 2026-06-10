@@ -41,9 +41,9 @@ class CnnInferenceResult:
 
 
 def _pad_or_truncate(flux: list[float], n_bins: int) -> list[float]:
-    """Pad with 1.0 or truncate *flux* to exactly *n_bins* elements."""
+    """Pad normalized flux with 0.0 or truncate it to exactly *n_bins* elements."""
     if len(flux) < n_bins:
-        return flux + [1.0] * (n_bins - len(flux))
+        return flux + [0.0] * (n_bins - len(flux))
     return flux[:n_bins]
 
 
@@ -134,8 +134,8 @@ def run_cnn_inference(
             :func:`~cnn_calibrator.save_cnn_calibration`.
         batch_size: Batch size for PyTorch inference (ignored when
             ``model_fn`` is provided).
-        n_bins: Expected flux array length; shorter arrays are padded with
-            1.0, longer arrays are truncated.
+        n_bins: Expected flux array length; shorter normalized arrays are padded
+            with 0.0, longer arrays are truncated.
 
     Returns:
         :class:`CnnInferenceResult` with all predicted probabilities.

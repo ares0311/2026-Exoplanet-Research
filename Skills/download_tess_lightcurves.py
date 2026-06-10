@@ -49,6 +49,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import sys
 import time
 from collections.abc import Callable
@@ -105,6 +106,17 @@ def _load_toi_rows(csv_path: Path) -> list[dict]:
     rows: list[dict] = []
     with csv_path.open(newline="") as fh:
         reader = csv.DictReader(fh)
+        required = {
+            "tic_id",
+            "tfopwg_disposition",
+            "period_days",
+            "epoch_bjd",
+        }
+        missing = sorted(required - set(reader.fieldnames or ()))
+        if missing:
+            raise ValueError(
+                "TOI CSV is missing required CNN columns: " + ", ".join(missing)
+            )
         for row in reader:
             disp = row.get("tfopwg_disposition", "").strip()
             if disp not in _DISPOSITION_LABEL:
@@ -112,11 +124,15 @@ def _load_toi_rows(csv_path: Path) -> list[dict]:
             try:
                 tic_id = int(float(row["tic_id"]))
                 period = float(row["period_days"])
-                epoch_raw = row.get("epoch_bjd", "") or ""
-                epoch = float(epoch_raw) if epoch_raw.strip() else 0.0
+                epoch = float(row["epoch_bjd"])
             except (ValueError, KeyError):
                 continue
-            if period <= 0:
+            if (
+                period <= 0
+                or not math.isfinite(period)
+                or epoch < 2_000_000.0
+                or not math.isfinite(epoch)
+            ):
                 continue
             rows.append({
                 "tic_id": tic_id,
@@ -126,6 +142,50 @@ def _load_toi_rows(csv_path: Path) -> list[dict]:
                 "epoch_bjd": epoch,
             })
     return rows
+
+
+def audit_snippet_corpus(path: Path) -> dict[str, int | bool]:
+    """Check that a downloaded corpus has usable, BJD-centered snippets."""
+    n_rows = n_ok = n_error = invalid_epoch = invalid_bins = 0
+    with Path(path).open(encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            n_rows += 1
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                n_error += 1
+                continue
+            if row.get("status") != "ok":
+                n_error += 1
+                continue
+            n_ok += 1
+            epoch = row.get("epoch_bjd")
+            if (
+                not isinstance(epoch, (int, float))
+                or isinstance(epoch, bool)
+                or not math.isfinite(float(epoch))
+                or float(epoch) < 2_000_000.0
+            ):
+                invalid_epoch += 1
+            phase = row.get("phase")
+            flux = row.get("flux")
+            if (
+                not isinstance(phase, list)
+                or not isinstance(flux, list)
+                or len(phase) != 201
+                or len(flux) != 201
+            ):
+                invalid_bins += 1
+    return {
+        "n_rows": n_rows,
+        "n_ok": n_ok,
+        "n_error": n_error,
+        "invalid_epoch": invalid_epoch,
+        "invalid_bins": invalid_bins,
+        "valid": n_ok > 0 and invalid_epoch == 0 and invalid_bins == 0,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -235,6 +295,8 @@ def download_and_extract(
     fetch = lc_fetch_fn if lc_fetch_fn is not None else _fetch_lc_lightkurve
 
     rows = _load_toi_rows(toi_csv)
+    if not rows:
+        raise ValueError("TOI CSV has no labelled rows with valid BJD ephemerides")
     done_ids = _load_done_tic_ids(output_path) if resume else set()
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -341,7 +403,21 @@ def _cli(argv: list[str] | None = None) -> int:
         metavar="SEC",
         help="Seconds to sleep between MAST requests (default: 0.5)",
     )
+    parser.add_argument(
+        "--audit-only",
+        action="store_true",
+        help="Audit the existing --output corpus without downloading",
+    )
     args = parser.parse_args(argv)
+
+    output_path = Path(args.output)
+    if args.audit_only:
+        if not output_path.is_file():
+            print(f"ERROR: {output_path} not found.")
+            return 1
+        audit = audit_snippet_corpus(output_path)
+        print(json.dumps(audit, indent=2, sort_keys=True))
+        return 0 if audit["valid"] else 1
 
     toi_csv = Path(args.toi_csv)
     if not toi_csv.exists():
@@ -351,14 +427,18 @@ def _cli(argv: list[str] | None = None) -> int:
         )
         return 1
 
-    result = download_and_extract(
-        toi_csv,
-        Path(args.output),
-        resume=args.resume,
-        max_targets=args.max_targets,
-        n_bins=args.n_bins,
-        sleep_between=args.sleep,
-    )
+    try:
+        result = download_and_extract(
+            toi_csv,
+            output_path,
+            resume=args.resume,
+            max_targets=args.max_targets,
+            n_bins=args.n_bins,
+            sleep_between=args.sleep,
+        )
+    except ValueError as error:
+        print(f"ERROR: {error}")
+        return 1
     print(
         f"\nDone: {result['n_ok']} ok, {result['n_error']} errors, "
         f"{result['n_skipped']} skipped of {result['n_total']} targets."

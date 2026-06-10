@@ -53,6 +53,12 @@ _COL_MAP = {
 # CP = Confirmed Planet, KP = Known Planet → positive class
 # FP = False Positive, FA = False Alarm   → negative class
 _KEEP_DISPOSITIONS = {"CP", "KP", "FP", "FA"}
+_REQUIRED_TRAINING_COLUMNS = {
+    "tic_id",
+    "tfopwg_disposition",
+    "period_days",
+    "epoch_bjd",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -100,6 +106,12 @@ def fetch_toi_table(
 
     # Rename to normalised column names
     df = df.rename(columns={k: v for k, v in _COL_MAP.items() if k in df.columns})
+    missing = sorted(_REQUIRED_TRAINING_COLUMNS - set(df.columns))
+    if missing:
+        raise ValueError(
+            "ExoFOP TOI table is missing required CNN training columns: "
+            + ", ".join(missing)
+        )
 
     # Keep only columns we renamed (ignore extra ExoFOP columns)
     keep = [v for v in _COL_MAP.values() if v in df.columns]
@@ -108,6 +120,17 @@ def fetch_toi_table(
     # Filter to labelled dispositions only
     if "tfopwg_disposition" in df.columns:
         df = df[df["tfopwg_disposition"].isin(_KEEP_DISPOSITIONS)]
+    for column in ("tic_id", "period_days", "epoch_bjd"):
+        df[column] = pd.to_numeric(df[column], errors="coerce")
+    before_ephemeris_filter = len(df)
+    df = df[
+        df["tic_id"].notna()
+        & (df["period_days"] > 0.0)
+        & (df["epoch_bjd"] >= 2_000_000.0)
+    ]
+    rejected_ephemerides = before_ephemeris_filter - len(df)
+    if df.empty:
+        raise ValueError("ExoFOP TOI table has no rows with valid BJD ephemerides")
 
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -117,6 +140,8 @@ def fetch_toi_table(
         df["tfopwg_disposition"].value_counts() if "tfopwg_disposition" in df.columns else {}
     )
     print(f"Saved {len(df):,} TOIs → {output}")
+    if rejected_ephemerides:
+        print(f"  rejected invalid/missing ephemerides: {rejected_ephemerides:,}")
     for disp, n in sorted(disp_counts.items()):
         print(f"  {disp:4s}: {n:,}")
 

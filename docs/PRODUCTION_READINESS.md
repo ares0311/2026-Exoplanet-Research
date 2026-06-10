@@ -3,7 +3,7 @@
 Last reviewed: 2026-06-10
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 1,990 default tests passing, 2 integration_live deselected
+Test baseline: 2,003 default tests passing, 2 integration_live deselected
 
 ---
 
@@ -31,13 +31,15 @@ production scoring.
 - **What is missing**: A CNN checkpoint that passes held-out performance and calibration gates
 - **Gate status**: **OPEN as of 2026-06-06** — 1,324 positive (CP+KP) + 1,344 negative (FP+FA) = 2,668 total
 - **Code status**: Training and state-dict inference paths are operational; the package scorer reconstructs the trained architecture and fails closed when loading fails
-- **Local corpus status**: Complete as of 2026-06-06 — `data/tess_snippets.jsonl` contains all 2,636 eligible rows, with 2,623 usable snippets and 13 recorded fetch/extraction errors
-- **Data policy**: The generated corpus is the authorized local T1-1 training input and remains uncommitted; it is covered by the local-only large mission-data policy in `docs/SYSTEM_PROFILE.md` and DECISION-014
-- **Verified split**: Seed 42 produces 1,837 train / 392 validation / 394 test examples with balanced labels and zero validation findings
+- **Local corpus status**: **INVALID as of 2026-06-10** — all 2,623 nominally usable rows in `data/tess_snippets.jsonl` were phase-folded with `epoch_bjd=0.0` because the local `data/tess_toi.csv` predates epoch-column ingestion; the corpus and every split derived from it are retired
+- **Data policy**: A future audit-passing replacement corpus will be the authorized local T1-1 training input and remain uncommitted under `docs/SYSTEM_PROFILE.md` and DECISION-014
+- **Retired splits**: The seed-42 1,837 / 392 / 394 split and temporary 1,492 / 369 / 368 replacement split were both derived from the invalid zero-epoch corpus and must not be reused
 - **Rejected candidate**: SHA-256 `e02af3903ab65f4af4f3f05f95dd6da8815a6746fea1bf2eac67bbba3555d6c6`, trained on Python 3.14.3 with PyTorch 2.12.0; best epoch 5, validation AUC 0.7476
 - **Held-out test result**: raw AUC 0.7404, F1 0.5804, Brier 0.2131, ECE 0.0716; validation-fitted Platt calibration and threshold 0.503 produced test F1 0.6297, Brier 0.2295, and ECE 0.1273
 - **Promotion decision**: **REJECTED** — AUC and F1 are below the documented 0.85 and 0.80 targets, and calibration worsened both Brier score and ECE
-- **Next step**: Diagnose the generalization gap, improve the training recipe without using the test partition for tuning, retrain from the same deterministic split, and evaluate the new candidate once
+- **Root cause found**: Missing transit epochs left genuine transit events uncentered in phase; this is not an architecture-only generalization problem
+- **Code remediation**: TOI fetch/download now fail closed on missing or non-BJD epochs, corpus audit reports invalid epochs, normalized padding is consistent at zero, and grouped development experiments cannot read the sealed promotion holdout
+- **Next step**: Re-fetch the current ExoFOP TOI table, rebuild the local light-curve corpus from scratch with valid BJD epochs, audit it, and create a completely fresh grouped development/promotion split
 - **Gate check**: `python Skills/count_tess_labels.py`
 - **Architecture spec**: `docs/CNN_SPEC.md`
 - **Artifact policy**: Commit the validated production checkpoint, calibration metadata, model registry entry, and reproducibility manifest under `models/` after all production-readiness checks pass
@@ -93,7 +95,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
 | 82 production-critical Skills/ | ✅ |
-| 1,990 default tests, ruff clean, mypy clean | ✅ |
+| 2,003 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -132,7 +134,8 @@ These are enforced in code and must never be bypassed:
 
 | Blocker | What Is Needed | Who |
 |---|---|---|
-| CNN retraining run | Run the next approved training recipe in `.venv` after the agent improves the training path | Human |
+| CNN corpus rebuild | Re-fetch the epoch-bearing TOI table and rebuild all local phase-folded snippets from scratch | Human |
+| CNN retraining run | Run the next approved training recipe in `.venv` after the rebuilt corpus passes audit | Human |
 | CNN production promotion | Validate, calibrate, register, and commit only a checkpoint that passes held-out gates | Agent + human approval |
 | Stacking weight calibration | Tune blend weights on held-out calibration set | Agent after T1-1 resolved |
 
