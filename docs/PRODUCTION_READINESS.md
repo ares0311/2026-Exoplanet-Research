@@ -1,9 +1,9 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-06-06
+Last reviewed: 2026-06-09
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 1,937 default tests passing, 2 integration_live deselected
+Test baseline: 1,979 default tests passing, 2 integration_live deselected
 
 ---
 
@@ -29,10 +29,12 @@ The system is safe to deploy now for Bayesian and XGBoost scoring modes. The CNN
 - **Gate status**: **OPEN as of 2026-06-06** — 1,324 positive (CP+KP) + 1,344 negative (FP+FA) = 2,668 total
 - **What is missing**: A trained, calibrated 1D CNN checkpoint — the training pipeline must now be run
 - **Code status**: Complete — `ml/cnn_scorer.py`, `Skills/train_cnn.py`, `labelled_lc_collector.py`, `snippet_normalizer.py`, `cnn_split_validator.py`, `cnn_calibrator.py`, and all supporting data pipeline utilities exist and are tested
-- **Next step**: Run `python Skills/fetch_tess_toi.py` then `python Skills/labelled_lc_collector.py` to download light curves, then agent-run training pipeline
+- **Local corpus status**: Complete as of 2026-06-06 — `data/tess_snippets.jsonl` contains all 2,636 eligible rows, with 2,623 usable snippets and 13 recorded fetch/extraction errors
+- **Data policy**: The generated corpus is the authorized local T1-1 training input and remains uncommitted; it is covered by the local-only large mission-data policy in `docs/SYSTEM_PROFILE.md` and DECISION-014
+- **Next step**: Build and validate leakage-safe train/validation/test splits from the local corpus, then run training and calibration
 - **Gate check**: `python Skills/count_tess_labels.py`
 - **Architecture spec**: `docs/CNN_SPEC.md`
-- **Outside blocker**: Light curve download (~120 GB, 2–6 hours) must run on user's local Mac with internet access
+- **Artifact policy**: Commit the validated production checkpoint, calibration metadata, model registry entry, and reproducibility manifest under `models/` after all production-readiness checks pass
 
 ### T1-2: Stacking Tier 3 Production Weight Calibration
 
@@ -85,7 +87,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
 | 82 production-critical Skills/ | ✅ |
-| 1,937 default tests, ruff clean, mypy clean | ✅ |
+| 1,979 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -124,9 +126,8 @@ These are enforced in code and must never be bypassed:
 
 | Blocker | What Is Needed | Who |
 |---|---|---|
-| TESS light curve download | ~120 GB, 2–6 hours — run `download_tess_lightcurves.py` locally with `caffeinate -i` | You (local Mac with internet) |
-| CNN training run | Execute training pipeline after light curves downloaded | Agent (after download complete) |
-| CNN production training | Execute CNN training pipeline after label gate opens | Agent + human approval |
+| CNN training run | Build validated splits and train from the completed local `data/tess_snippets.jsonl` corpus | Agent |
+| CNN production promotion | Validate, calibrate, register, and commit the production checkpoint and metadata | Agent + human approval |
 | Stacking weight calibration | Tune blend weights on held-out calibration set | Agent after T1-1 resolved |
 
 ---
