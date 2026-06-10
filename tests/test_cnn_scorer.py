@@ -125,6 +125,30 @@ class TestCnnScorerFromCheckpoint:
         result = s.predict_proba(_snippet())
         assert 0.0 <= result <= 1.0
 
+    def test_loads_checkpoint_through_state_dict_loader(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        from types import SimpleNamespace
+
+        import exo_toolkit.ml.cnn_scorer as cnn_scorer_module
+
+        checkpoint = tmp_path / "best.pt"
+        checkpoint.write_bytes(b"state-dict")
+        loaded_model = object()
+        batcher = SimpleNamespace(
+            _load_torch_model=lambda path: (loaded_model, SimpleNamespace(n_bins=201))
+        )
+        monkeypatch.setattr(
+            cnn_scorer_module,
+            "import_module",
+            lambda name: batcher if name == "Skills.cnn_inference_batcher" else None,
+        )
+
+        scorer = CnnScorer.from_checkpoint(checkpoint)
+
+        assert scorer.is_available
+        assert scorer._model is loaded_model
+
 
 # ---------------------------------------------------------------------------
 # CNN weight validation via StackingScorer

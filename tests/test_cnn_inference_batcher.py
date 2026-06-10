@@ -126,6 +126,28 @@ class TestRunCnnInference:
         result = run_cnn_inference(arrays, model_fn=_constant_model(0.5))
         assert result.model_path is None
 
+    def test_model_path_uses_checkpoint_loader(self, tmp_path: Path, monkeypatch) -> None:
+        from types import SimpleNamespace
+
+        import Skills.cnn_inference_batcher as batcher
+
+        checkpoint = tmp_path / "best.pt"
+        checkpoint.write_bytes(b"state-dict")
+        calls: list[Path] = []
+
+        def fake_load(path: Path):
+            calls.append(path)
+            return object(), SimpleNamespace(n_bins=201)
+
+        monkeypatch.setattr(batcher, "_load_torch_model", fake_load)
+        monkeypatch.setattr(batcher, "_run_torch_batch", lambda *_args: [0.73])
+
+        result = run_cnn_inference([_make_flux()], model_path=checkpoint)
+
+        assert result.flag == "OK"
+        assert result.probabilities == (0.73,)
+        assert calls == [checkpoint]
+
 
 # ---------------------------------------------------------------------------
 # format_cnn_inference

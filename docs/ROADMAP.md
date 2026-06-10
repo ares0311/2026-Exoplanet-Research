@@ -68,10 +68,11 @@
 - [x] Offline CNN snippet split assembly (`Skills/build_cnn_training_data.py`, 13 tests)
 - [x] Offline CNN split validation (`Skills/cnn_split_validator.py`, 15 tests)
 - [x] Tier 2 scaffolding — CNN scorer wrapper, training loop, checkpoint/calibration helpers, phase-folded snippet wiring, and `cnn/full-ensemble` CLI modes
-- [ ] Production Tier 2 checkpoint — trained/calibrated 1D CNN on phase-folded flux (**BLOCKED: requires 5,000+ TESS labels**)
+- [x] First Tier 2 candidate — trained and evaluated on the deterministic seed-42 split; rejected because held-out AUC was 0.7404 and calibration worsened Brier/ECE
+- [ ] Production Tier 2 checkpoint — improve generalization, retrain without tuning against the opened test partition, and pass all promotion gates
   - Architecture spec: `docs/CNN_SPEC.md`
-  - Offline status: `Skills/tier2_progress_reporter.py`
-  - Live gate check: `Skills/count_tess_labels.py` when network access is intentionally approved
+  - Authoritative blocker and rejected checkpoint hash: `docs/PRODUCTION_READINESS.md`
+  - The rejected checkpoint remains local under ignored `checkpoints/`; no artifact from that run is registered
 
 ---
 

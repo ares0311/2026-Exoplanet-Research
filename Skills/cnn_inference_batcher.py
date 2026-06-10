@@ -63,12 +63,18 @@ def _load_torch_model(model_path: Path):  # noqa: ANN201
     import torch  # noqa: F401  # raises ImportError if torch absent
 
     config_path = Path(model_path).parent / "config.json"
-    from Skills.cnn_training_config import load_config
+    try:
+        from Skills.cnn_training_config import load_config
+    except ModuleNotFoundError:  # Direct script execution adds Skills/ to sys.path.
+        from cnn_training_config import load_config
 
     config = load_config(config_path)
 
     # Rebuild the model architecture using train_cnn._build_torch_model
-    from train_cnn import _build_torch_model  # type: ignore[import]
+    try:
+        from Skills.train_cnn import _build_torch_model
+    except ModuleNotFoundError:  # Direct script execution adds Skills/ to sys.path.
+        from train_cnn import _build_torch_model  # type: ignore[import]
 
     model = _build_torch_model(config)
     state = torch.load(str(model_path), map_location="cpu", weights_only=True)
@@ -225,10 +231,16 @@ def run_cnn_inference(
     calibration_applied = False
     if calibration_path is not None:
         try:
-            from Skills.cnn_calibrator import (
-                apply_cnn_calibration,
-                load_cnn_calibration,
-            )
+            try:
+                from Skills.cnn_calibrator import (
+                    apply_cnn_calibration,
+                    load_cnn_calibration,
+                )
+            except ModuleNotFoundError:  # Direct script execution adds Skills/ to sys.path.
+                from cnn_calibrator import (  # type: ignore[no-redef]
+                    apply_cnn_calibration,
+                    load_cnn_calibration,
+                )
             cal = load_cnn_calibration(Path(calibration_path))
             if cal.flag == "OK":
                 probabilities = [
