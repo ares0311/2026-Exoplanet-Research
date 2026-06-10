@@ -11,7 +11,6 @@ import tempfile
 from pathlib import Path
 
 import pytest
-
 from Skills.cnn_training_config import default_config
 from Skills.train_cnn import (
     CnnTrainingResult,
