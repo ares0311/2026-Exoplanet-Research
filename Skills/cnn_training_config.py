@@ -7,8 +7,8 @@ round-tripped through JSON for reproducible experiment tracking.
 Public API
 ----------
 ConvLayerSpec(out_channels, kernel_size, pool_size)
-CnnTrainingConfig(n_bins, conv_layers, dense_units, dropout_rate, optimizer,
-                  learning_rate, batch_size, max_epochs,
+CnnTrainingConfig(n_bins, conv_layers, dense_units, dropout_rate,
+                  dense_dropout_rates, optimizer, learning_rate, batch_size, max_epochs,
                   early_stopping_patience, augment, seed, checkpoint_dir)
 CnnConfigValidation(ok, errors)
 default_config() -> CnnTrainingConfig
@@ -47,6 +47,7 @@ class CnnTrainingConfig:
     conv_layers: tuple[ConvLayerSpec, ...]
     dense_units: tuple[int, ...]
     dropout_rate: float
+    dense_dropout_rates: tuple[float, ...]
     optimizer: str
     learning_rate: float
     batch_size: int
@@ -73,22 +74,24 @@ class CnnConfigValidation:
 def default_config() -> CnnTrainingConfig:
     """Return the default CNN config per CNN_SPEC.md.
 
-    Architecture: 2 conv layers (16-ch k=5 pool=2, 32-ch k=5 pool=2),
-    1 dense layer (64 units), dropout=0.5, adam lr=1e-3, batch=32,
-    max_epochs=100, patience=10.
+    Architecture: 3 conv layers (16/32/64 channels), dense layers 256/64,
+    dropout rates 0.5/0.3, adam lr=1e-3, batch=64, max_epochs=50,
+    patience=10.
     """
     return CnnTrainingConfig(
         n_bins=201,
         conv_layers=(
             ConvLayerSpec(out_channels=16, kernel_size=5, pool_size=2),
             ConvLayerSpec(out_channels=32, kernel_size=5, pool_size=2),
+            ConvLayerSpec(out_channels=64, kernel_size=3, pool_size=2),
         ),
-        dense_units=(64,),
+        dense_units=(256, 64),
         dropout_rate=0.5,
+        dense_dropout_rates=(0.5, 0.3),
         optimizer="adam",
         learning_rate=1e-3,
-        batch_size=32,
-        max_epochs=100,
+        batch_size=64,
+        max_epochs=50,
         early_stopping_patience=10,
         augment=True,
         seed=42,
@@ -115,6 +118,7 @@ def _config_to_dict(config: CnnTrainingConfig) -> dict:
         ],
         "dense_units": list(config.dense_units),
         "dropout_rate": config.dropout_rate,
+        "dense_dropout_rates": list(config.dense_dropout_rates),
         "optimizer": config.optimizer,
         "learning_rate": config.learning_rate,
         "batch_size": config.batch_size,
@@ -137,11 +141,20 @@ def _config_from_dict(d: dict) -> CnnTrainingConfig:
         for cl in d.get("conv_layers", [])
     )
     dense_units = tuple(int(u) for u in d.get("dense_units", []))
+    dropout_rate = float(d["dropout_rate"])
+    dense_dropout_rates = tuple(
+        float(rate)
+        for rate in d.get(
+            "dense_dropout_rates",
+            [dropout_rate for _ in dense_units],
+        )
+    )
     return CnnTrainingConfig(
         n_bins=int(d["n_bins"]),
         conv_layers=conv_layers,
         dense_units=dense_units,
-        dropout_rate=float(d["dropout_rate"]),
+        dropout_rate=dropout_rate,
+        dense_dropout_rates=dense_dropout_rates,
         optimizer=str(d["optimizer"]),
         learning_rate=float(d["learning_rate"]),
         batch_size=int(d["batch_size"]),
@@ -208,6 +221,7 @@ def validate_config(config: CnnTrainingConfig) -> CnnConfigValidation:
     Checks:
     - ``n_bins > 0``
     - ``dropout_rate`` in [0, 1]
+    - one valid dense dropout rate per dense layer
     - ``learning_rate > 0``
     - ``batch_size >= 1``
     - ``optimizer`` in {"adam", "sgd"}
@@ -230,6 +244,16 @@ def validate_config(config: CnnTrainingConfig) -> CnnConfigValidation:
         errors.append(
             f"dropout_rate must be in [0, 1], got {config.dropout_rate}"
         )
+    if len(config.dense_dropout_rates) != len(config.dense_units):
+        errors.append(
+            "dense_dropout_rates must contain one value per dense layer, "
+            f"got {len(config.dense_dropout_rates)} for {len(config.dense_units)} layers"
+        )
+    for index, rate in enumerate(config.dense_dropout_rates):
+        if not 0.0 <= rate < 1.0:
+            errors.append(
+                f"dense_dropout_rates[{index}] must be in [0, 1), got {rate}"
+            )
     if config.learning_rate <= 0.0:
         errors.append(
             f"learning_rate must be > 0, got {config.learning_rate}"
@@ -292,7 +316,7 @@ def format_config(config: CnnTrainingConfig) -> str:
         f"- n_bins: {config.n_bins}",
         f"- conv_layers: [{conv_strs}]",
         f"- dense_units: [{dense_strs}]",
-        f"- dropout_rate: {config.dropout_rate}",
+        f"- dense_dropout_rates: {list(config.dense_dropout_rates)}",
         f"- optimizer: {config.optimizer}  lr={config.learning_rate}",
         f"- batch_size: {config.batch_size}",
         f"- max_epochs: {config.max_epochs}  patience={config.early_stopping_patience}",

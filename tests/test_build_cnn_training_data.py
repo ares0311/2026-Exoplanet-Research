@@ -38,6 +38,14 @@ def _write_json(path: Path, payload: object) -> Path:
     return path
 
 
+def _write_jsonl(path: Path, rows: list[dict]) -> Path:
+    path.write_text(
+        "".join(f"{json.dumps(row)}\n" for row in rows),
+        encoding="utf-8",
+    )
+    return path
+
+
 def _examples(n_per_label: int = 4) -> list[TrainingExample]:
     rows = [
         _snippet(tic_id=100 + idx, label=label)
@@ -57,22 +65,53 @@ def test_load_training_examples_from_collector_shape(tmp_path: Path) -> None:
 
 
 def test_load_training_examples_from_augmenter_shape(tmp_path: Path) -> None:
+    augmented = _snippet(tic_id=12, label=0)
+    augmented.pop("tic_id")
+    augmented.pop("source")
+    augmented["original_tic_id"] = 12
+    augmented["augmentation"] = "noise"
     path = _write_json(
         tmp_path / "augmented.json",
-        [
-            {
-                "original_tic_id": 12,
-                "label": 0,
-                "phase": [-0.1, 0.0, 0.1],
-                "flux": [1.0, 0.99, 1.0],
-                "augmentation": "noise",
-            }
-        ],
+        [augmented],
     )
     examples = load_training_examples([path])
     assert examples[0].tic_id == 12
     assert examples[0].augmentation == "noise"
     assert examples[0].source == "unknown"
+
+
+def test_load_training_examples_from_jsonl_and_skip_error_rows(tmp_path: Path) -> None:
+    path = _write_jsonl(
+        tmp_path / "snippets.jsonl",
+        [
+            {**_snippet(tic_id=42), "status": "ok", "disposition": "CP"},
+            {"tic_id": 43, "status": "error", "reason": "not found"},
+        ],
+    )
+
+    examples = load_training_examples([path])
+
+    assert len(examples) == 1
+    assert examples[0].tic_id == 42
+    assert examples[0].source == "tess"
+    assert examples[0].normalization == "local_median_mad"
+
+
+def test_load_training_examples_rejects_invalid_jsonl(tmp_path: Path) -> None:
+    path = tmp_path / "bad.jsonl"
+    path.write_text('{"tic_id": 1}\nnot-json\n', encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"bad\.jsonl:2"):
+        load_training_examples([path])
+
+
+def test_load_training_examples_normalizes_flux(tmp_path: Path) -> None:
+    path = _write_json(tmp_path / "dataset.json", {"snippets": [_snippet()]})
+
+    example = load_training_examples([path])[0]
+
+    assert example.flux != tuple(_snippet()["flux"])
+    assert example.flux[2] < 0.0
 
 
 def test_load_training_examples_skips_malformed_rows(tmp_path: Path) -> None:
@@ -117,6 +156,31 @@ def test_split_examples_stratifies_when_possible(tmp_path: Path) -> None:
     splits = split_examples(load_training_examples([path]), SplitConfig(seed=1))
     for split_rows in splits.values():
         assert {example.label for example in split_rows} == {0, 1}
+
+
+def test_split_examples_keeps_same_tic_in_one_split(tmp_path: Path) -> None:
+    rows = [
+        _snippet(tic_id=500, label=0),
+        _snippet(tic_id=500, label=1),
+        *[
+            _snippet(tic_id=100 * label + idx + 1, label=label)
+            for label in (0, 1)
+            for idx in range(5)
+        ],
+    ]
+    path = _write_json(tmp_path / "dataset.json", {"snippets": rows})
+
+    splits = split_examples(load_training_examples([path]), SplitConfig(seed=8))
+
+    containing_splits = {
+        split_name
+        for split_name, split_rows in splits.items()
+        if any(example.tic_id == 500 for example in split_rows)
+    }
+    assert len(containing_splits) == 1
+    assert sum(
+        example.tic_id == 500 for split_rows in splits.values() for example in split_rows
+    ) == 2
 
 
 def test_split_examples_non_stratified_preserves_total(tmp_path: Path) -> None:

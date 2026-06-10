@@ -168,6 +168,16 @@ def test_duplicate_example_id_across_splits_reports_error(tmp_path: Path) -> Non
     assert "duplicate_example_id" in _codes(split_dir)
 
 
+def test_duplicate_tic_id_across_splits_reports_leakage(tmp_path: Path) -> None:
+    split_dir = _valid_split_dir(tmp_path)
+    train_payload = _split_payload(split_dir, "train")
+    val_payload = _split_payload(split_dir, "val")
+    val_payload["examples"][0]["tic_id"] = train_payload["examples"][0]["tic_id"]
+    _write_split_payload(split_dir, "val", val_payload)
+
+    assert "tic_id_leakage" in _codes(split_dir)
+
+
 def test_live_services_true_reports_error(tmp_path: Path) -> None:
     split_dir = _valid_split_dir(tmp_path)
     manifest = _read_manifest(split_dir)

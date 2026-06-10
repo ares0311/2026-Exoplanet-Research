@@ -26,9 +26,9 @@ class TestDefaultConfig:
         cfg = default_config()
         assert cfg.n_bins == 201
 
-    def test_two_conv_layers(self) -> None:
+    def test_three_conv_layers(self) -> None:
         cfg = default_config()
-        assert len(cfg.conv_layers) == 2
+        assert len(cfg.conv_layers) == 3
 
     def test_conv_layer_types(self) -> None:
         cfg = default_config()
@@ -42,6 +42,13 @@ class TestDefaultConfig:
     def test_default_dropout(self) -> None:
         cfg = default_config()
         assert cfg.dropout_rate == 0.5
+        assert cfg.dense_dropout_rates == (0.5, 0.3)
+
+    def test_default_matches_cnn_spec(self) -> None:
+        cfg = default_config()
+        assert cfg.dense_units == (256, 64)
+        assert cfg.batch_size == 64
+        assert cfg.max_epochs == 50
 
 
 class TestValidateConfig:
@@ -64,6 +71,13 @@ class TestValidateConfig:
         result = validate_config(cfg)
         assert result.ok is False
         assert any("dropout_rate" in e for e in result.errors)
+
+    def test_dense_dropout_count_must_match_dense_layers(self) -> None:
+        import dataclasses
+        cfg = dataclasses.replace(default_config(), dense_dropout_rates=(0.5,))
+        result = validate_config(cfg)
+        assert result.ok is False
+        assert any("one value per dense layer" in error for error in result.errors)
 
     def test_invalid_optimizer(self) -> None:
         import dataclasses
@@ -125,10 +139,30 @@ class TestSerialisation:
     def test_json_has_expected_keys(self) -> None:
         cfg = default_config()
         d = _config_to_dict(cfg)
-        for key in ("n_bins", "conv_layers", "dense_units", "dropout_rate",
-                    "optimizer", "learning_rate", "batch_size", "max_epochs",
-                    "early_stopping_patience", "augment", "seed", "checkpoint_dir"):
+        for key in (
+            "n_bins",
+            "conv_layers",
+            "dense_units",
+            "dropout_rate",
+            "dense_dropout_rates",
+            "optimizer",
+            "learning_rate",
+            "batch_size",
+            "max_epochs",
+            "early_stopping_patience",
+            "augment",
+            "seed",
+            "checkpoint_dir",
+        ):
             assert key in d
+
+    def test_old_config_uses_legacy_dropout_for_each_dense_layer(self) -> None:
+        payload = _config_to_dict(default_config())
+        payload.pop("dense_dropout_rates")
+
+        config = _config_from_dict(payload)
+
+        assert config.dense_dropout_rates == (0.5, 0.5)
 
     def test_conv_layers_serialised_as_list_of_dicts(self) -> None:
         cfg = default_config()

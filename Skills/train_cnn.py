@@ -181,10 +181,14 @@ def _build_torch_model(config: CnnTrainingConfig):  # noqa: ANN201
             flat_size = in_ch * max(current_len, 1)
             dense_layers: list[nn.Module] = []
             prev = flat_size
-            for units in config.dense_units:
+            for units, dropout_rate in zip(
+                config.dense_units,
+                config.dense_dropout_rates,
+                strict=True,
+            ):
                 dense_layers.append(nn.Linear(prev, units))
                 dense_layers.append(nn.ReLU())
-                dense_layers.append(nn.Dropout(config.dropout_rate))
+                dense_layers.append(nn.Dropout(dropout_rate))
                 prev = units
             dense_layers.append(nn.Linear(prev, 1))
             dense_layers.append(nn.Sigmoid())
