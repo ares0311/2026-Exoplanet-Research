@@ -8,9 +8,9 @@ import json
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
 
 import pytest
-from pathlib import Path
 
 from Skills.cnn_training_config import default_config
 from Skills.train_cnn import (
