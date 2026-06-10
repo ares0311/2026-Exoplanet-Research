@@ -26,6 +26,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+try:
+    from Skills.snippet_normalizer import normalize_snippet
+except ModuleNotFoundError:  # Direct script execution adds Skills/ to sys.path.
+    from snippet_normalizer import normalize_snippet
+
 
 @dataclass(frozen=True)
 class TrainingExample:
@@ -39,6 +44,7 @@ class TrainingExample:
     source: str
     source_file: str
     augmentation: str | None = None
+    normalization: str = "local_median_mad"
 
 
 @dataclass(frozen=True)
@@ -53,11 +59,11 @@ class SplitConfig:
 
 
 def load_training_examples(paths: list[Path | str]) -> list[TrainingExample]:
-    """Load and validate training examples from local JSON files."""
+    """Load, normalize, and validate examples from local JSON or JSONL files."""
     examples: list[TrainingExample] = []
     for path_like in paths:
         path = Path(path_like)
-        rows = _candidate_rows(json.loads(path.read_text(encoding="utf-8")))
+        rows = _load_candidate_rows(path)
         for index, row in enumerate(rows):
             example = _training_example(row, source_file=str(path), row_index=index)
             if example is not None:
@@ -72,23 +78,30 @@ def split_examples(
     """Split examples into deterministic train/validation/test partitions."""
     config = config or SplitConfig()
     _validate_config(config)
-    groups: list[list[TrainingExample]]
+    example_groups = _group_examples(examples)
+    groups: list[list[list[TrainingExample]]]
     if config.stratify:
-        by_label: dict[int, list[TrainingExample]] = {}
-        for example in examples:
-            by_label.setdefault(example.label, []).append(example)
-        groups = [by_label[label] for label in sorted(by_label)]
+        by_label_signature: dict[tuple[int, ...], list[list[TrainingExample]]] = {}
+        for example_group in example_groups:
+            signature = tuple(sorted({example.label for example in example_group}))
+            by_label_signature.setdefault(signature, []).append(example_group)
+        groups = [by_label_signature[key] for key in sorted(by_label_signature)]
     else:
-        groups = [list(examples)]
+        groups = [example_groups]
 
     splits: dict[str, list[TrainingExample]] = {"train": [], "val": [], "test": []}
-    for group_index, group in enumerate(groups):
-        shuffled = list(group)
+    for group_index, stratum in enumerate(groups):
+        shuffled = list(stratum)
         random.Random(config.seed + group_index).shuffle(shuffled)
         train_n, val_n, test_n = _split_counts(len(shuffled), config)
-        splits["train"].extend(shuffled[:train_n])
-        splits["val"].extend(shuffled[train_n : train_n + val_n])
-        splits["test"].extend(shuffled[train_n + val_n : train_n + val_n + test_n])
+        split_groups = {
+            "train": shuffled[:train_n],
+            "val": shuffled[train_n : train_n + val_n],
+            "test": shuffled[train_n + val_n : train_n + val_n + test_n],
+        }
+        for split_name, assigned_groups in split_groups.items():
+            for assigned_group in assigned_groups:
+                splits[split_name].extend(assigned_group)
 
     for split_name in splits:
         splits[split_name].sort(key=lambda example: example.example_id)
@@ -168,6 +181,24 @@ def _candidate_rows(data: Any) -> list[dict[str, Any]]:
     return [row for row in data if isinstance(row, dict)]
 
 
+def _load_candidate_rows(path: Path) -> list[dict[str, Any]]:
+    text = path.read_text(encoding="utf-8")
+    if path.suffix.lower() != ".jsonl":
+        return _candidate_rows(json.loads(text))
+
+    rows: list[dict[str, Any]] = []
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"{path}:{line_number}: invalid JSONL row") from exc
+        if isinstance(row, dict):
+            rows.append(row)
+    return rows
+
+
 def _training_example(
     row: dict[str, Any],
     *,
@@ -180,7 +211,22 @@ def _training_example(
     if label is None or not phase or not flux or len(phase) != len(flux):
         return None
     tic_id = _tic_id(row)
-    source = str(row.get("source") or row.get("label_source") or "unknown")
+    source = str(
+        row.get("source")
+        or row.get("label_source")
+        or ("tess" if row.get("disposition") else "unknown")
+    )
+    normalized = normalize_snippet(
+        tic_id=str(tic_id),
+        label=label,
+        source=source,
+        phase=list(phase),
+        flux=list(flux),
+        n_bins=len(phase),
+        min_oot_points=min(10, max(1, len(phase) // 2)),
+    )
+    if normalized.flag != "OK":
+        return None
     augmentation = row.get("augmentation")
     example_id = str(
         row.get("example_id")
@@ -191,12 +237,25 @@ def _training_example(
         example_id=example_id,
         tic_id=tic_id,
         label=label,
-        phase=phase,
-        flux=flux,
+        phase=normalized.phase,
+        flux=normalized.flux,
         source=source,
         source_file=source_file,
         augmentation=str(augmentation) if augmentation is not None else None,
+        normalization=normalized.normalization,
     )
+
+
+def _group_examples(examples: list[TrainingExample]) -> list[list[TrainingExample]]:
+    grouped: dict[tuple[str, int | str], list[TrainingExample]] = {}
+    for example in examples:
+        key: tuple[str, int | str] = (
+            ("tic", example.tic_id)
+            if example.tic_id > 0
+            else ("example", example.example_id)
+        )
+        grouped.setdefault(key, []).append(example)
+    return [grouped[key] for key in sorted(grouped, key=lambda item: (item[0], str(item[1])))]
 
 
 def _label(value: Any) -> int | None:

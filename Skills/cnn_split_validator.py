@@ -64,6 +64,7 @@ def validate_split_manifest(path: Path | str) -> SplitValidationResult:
     split_counts: dict[str, int] = {}
     label_counts: dict[str, dict[int, int]] = {}
     seen_ids: dict[str, str] = {}
+    seen_tic_ids: dict[int, str] = {}
 
     manifest = _load_json_object(manifest_path, issues)
     if manifest is None:
@@ -139,6 +140,22 @@ def validate_split_manifest(path: Path | str) -> SplitValidationResult:
                 )
             else:
                 seen_ids[example_id] = split_name
+            tic_id = _tic_id(row)
+            if tic_id is None or tic_id <= 0:
+                continue
+            previous_tic_split = seen_tic_ids.get(tic_id)
+            if previous_tic_split is not None and previous_tic_split != split_name:
+                issues.append(
+                    ValidationIssue(
+                        "error",
+                        "tic_id_leakage",
+                        f"TIC {tic_id} also appears in {previous_tic_split}",
+                        split=split_name,
+                        example_id=example_id,
+                    )
+                )
+            else:
+                seen_tic_ids[tic_id] = split_name
 
     _validate_counts(
         manifest,
@@ -425,6 +442,18 @@ def _example_id(row: Any, split: str, index: int) -> str | None:
     if not isinstance(value, str) or not value.strip():
         return None
     return value
+
+
+def _tic_id(row: Any) -> int | None:
+    if not isinstance(row, dict):
+        return None
+    value = row.get("tic_id")
+    if isinstance(value, bool):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _numeric_sequence(value: Any) -> tuple[float, ...] | None:

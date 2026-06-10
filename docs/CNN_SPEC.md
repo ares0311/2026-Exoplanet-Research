@@ -1,6 +1,12 @@
 # ML Tier-2 — 1D CNN Architecture Specification
 
-**Status: IMPLEMENTATION SCAFFOLD BUILT — production training/use remains gated on 5,000+ labeled TESS light curves**
+**Status: TRAINING READY — production use remains gated on checkpoint validation, calibration, and registration**
+
+The production corpus gate opened on 2026-06-06. The authorized local corpus
+contains 2,623 usable TESS snippets after 13 recorded fetch/extraction errors.
+The split builder reads the JSONL corpus directly, applies the specified
+median/MAD normalization, and keeps every TIC wholly within one
+train/validation/test partition.
 
 Track local Tier-2 readiness with the offline reporter:
 
@@ -87,7 +93,8 @@ to fit the smaller TESS dataset.
 
 ## Data Requirements
 
-- **Minimum**: 5,000 labeled TESS light curves (CP + FP)
+- **Current production gate**: open with 2,623 usable balanced TESS snippets
+  from externally reviewed CP/KP and FP/FA dispositions
 - **Preferred**: 10,000+ with balanced classes
 - Sources: ExoFOP CP/FP, Planet Hunters TESS, TFOP follow-up confirmed FPs
 - Augmentation: time-shift, flux noise injection, phase jitter
@@ -137,4 +144,5 @@ must not drive formal submission pathways.
 - [x] Update CLI `--scorer` to accept `cnn` and `full-ensemble`
 - [x] `Skills/train_cnn.py` — PyTorch training script with early stopping and graceful `NO_TORCH`
 - [x] Wire vetted phase-folded snippets from the pipeline into CNN inference rows with neutral fallback when unavailable
-- [ ] Train, calibrate, and register a production CNN checkpoint after the label gate opens
+- [x] Read the production JSONL corpus with deterministic TIC-grouped splits and median/MAD normalization
+- [ ] Train, calibrate, validate, and register the production CNN checkpoint

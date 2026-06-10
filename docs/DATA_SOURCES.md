@@ -103,6 +103,8 @@ Source contract status before any default-training integration:
 - TOI CSV: save to `data/tess_toi.csv`; re-download monthly (table grows)
 - Generated training corpora, including `data/tess_snippets.jsonl`, remain
   local runtime artifacts and are not committed.
+- Generated split files and per-epoch training checkpoints remain local
+  runtime artifacts under ignored `data/processed/` and `checkpoints/` paths.
 - Validated production models, calibration metadata, registry entries, and
   reproducibility manifests: save to `models/`, version by date or commit
   hash, and commit after production-readiness validation.
