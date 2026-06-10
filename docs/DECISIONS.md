@@ -383,8 +383,8 @@ workspace.
 
 ### Decision
 
-1. Treat `data/tess_snippets.jsonl` as the authorized local training corpus for
-   T1-1 after integrity, class-balance, and leakage checks pass.
+1. Treat a generated TESS snippet corpus as authorized local training input for
+   T1-1 only after ephemeris integrity, class-balance, and leakage checks pass.
 2. Keep generated training corpora and downloaded mission data local and
    uncommitted. Ignore `data/*.jsonl` alongside the other generated `data/`
    formats.
@@ -406,3 +406,37 @@ workspace.
   production environment.
 - Separates private or bulky training inputs from the small set of artifacts
   required to reproduce production inference.
+
+---
+
+## DECISION-015: Fail Closed on Missing Transit Epochs
+
+**Date:** 2026-06-10
+**Status:** Accepted
+
+### Context
+
+The first local TESS corpus was generated from a stale TOI CSV that lacked the
+`epoch_bjd` column. The downloader silently substituted zero, causing all 2,623
+nominally usable snippets to be phase-folded without centering the catalog
+transit. The resulting checkpoint failed held-out discrimination and
+calibration gates.
+
+### Decision
+
+1. TOI training inputs must contain finite `epoch_bjd` values on the BJD scale
+   (`>= 2,000,000`) and positive finite periods.
+2. Fetch and download stages fail closed when required ephemeris columns are
+   absent and exclude rows with invalid ephemerides.
+3. Every generated corpus must pass the offline corpus audit before splitting
+   or training.
+4. The zero-epoch corpus, all splits derived from it, and all resulting
+   checkpoints are permanently retired.
+
+### Rationale
+
+- A phase-folded CNN cannot learn centered transit morphology from an
+  arbitrary phase origin.
+- Silent numeric defaults are unsafe for scientific ephemerides.
+- Corpus validation must precede model tuning so held-out evidence remains
+  meaningful.

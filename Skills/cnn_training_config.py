@@ -50,10 +50,19 @@ class CnnTrainingConfig:
     dense_dropout_rates: tuple[float, ...]
     optimizer: str
     learning_rate: float
+    weight_decay: float
     batch_size: int
     max_epochs: int
     early_stopping_patience: int
+    selection_metric: str
+    lr_scheduler_patience: int
+    lr_scheduler_factor: float
+    min_learning_rate: float
+    gradient_clip_norm: float
     augment: bool
+    augmentation_noise_fraction: float
+    augmentation_scale_min: float
+    augmentation_scale_max: float
     seed: int
     checkpoint_dir: str
 
@@ -88,12 +97,21 @@ def default_config() -> CnnTrainingConfig:
         dense_units=(256, 64),
         dropout_rate=0.5,
         dense_dropout_rates=(0.5, 0.3),
-        optimizer="adam",
+        optimizer="adamw",
         learning_rate=1e-3,
+        weight_decay=1e-4,
         batch_size=64,
         max_epochs=50,
         early_stopping_patience=10,
+        selection_metric="val_auc",
+        lr_scheduler_patience=3,
+        lr_scheduler_factor=0.5,
+        min_learning_rate=1e-5,
+        gradient_clip_norm=5.0,
         augment=True,
+        augmentation_noise_fraction=0.02,
+        augmentation_scale_min=0.95,
+        augmentation_scale_max=1.05,
         seed=42,
         checkpoint_dir="checkpoints/cnn",
     )
@@ -121,10 +139,19 @@ def _config_to_dict(config: CnnTrainingConfig) -> dict:
         "dense_dropout_rates": list(config.dense_dropout_rates),
         "optimizer": config.optimizer,
         "learning_rate": config.learning_rate,
+        "weight_decay": config.weight_decay,
         "batch_size": config.batch_size,
         "max_epochs": config.max_epochs,
         "early_stopping_patience": config.early_stopping_patience,
+        "selection_metric": config.selection_metric,
+        "lr_scheduler_patience": config.lr_scheduler_patience,
+        "lr_scheduler_factor": config.lr_scheduler_factor,
+        "min_learning_rate": config.min_learning_rate,
+        "gradient_clip_norm": config.gradient_clip_norm,
         "augment": config.augment,
+        "augmentation_noise_fraction": config.augmentation_noise_fraction,
+        "augmentation_scale_min": config.augmentation_scale_min,
+        "augmentation_scale_max": config.augmentation_scale_max,
         "seed": config.seed,
         "checkpoint_dir": config.checkpoint_dir,
     }
@@ -157,10 +184,19 @@ def _config_from_dict(d: dict) -> CnnTrainingConfig:
         dense_dropout_rates=dense_dropout_rates,
         optimizer=str(d["optimizer"]),
         learning_rate=float(d["learning_rate"]),
+        weight_decay=float(d.get("weight_decay", 0.0)),
         batch_size=int(d["batch_size"]),
         max_epochs=int(d["max_epochs"]),
         early_stopping_patience=int(d["early_stopping_patience"]),
+        selection_metric=str(d.get("selection_metric", "val_loss")),
+        lr_scheduler_patience=int(d.get("lr_scheduler_patience", 3)),
+        lr_scheduler_factor=float(d.get("lr_scheduler_factor", 0.5)),
+        min_learning_rate=float(d.get("min_learning_rate", 1e-5)),
+        gradient_clip_norm=float(d.get("gradient_clip_norm", 0.0)),
         augment=bool(d["augment"]),
+        augmentation_noise_fraction=float(d.get("augmentation_noise_fraction", 0.0)),
+        augmentation_scale_min=float(d.get("augmentation_scale_min", 1.0)),
+        augmentation_scale_max=float(d.get("augmentation_scale_max", 1.0)),
         seed=int(d["seed"]),
         checkpoint_dir=str(d["checkpoint_dir"]),
     )
@@ -260,9 +296,11 @@ def validate_config(config: CnnTrainingConfig) -> CnnConfigValidation:
         )
     if config.batch_size < 1:
         errors.append(f"batch_size must be >= 1, got {config.batch_size}")
-    if config.optimizer not in {"adam", "sgd"}:
+    if config.weight_decay < 0.0:
+        errors.append(f"weight_decay must be >= 0, got {config.weight_decay}")
+    if config.optimizer not in {"adam", "adamw", "sgd"}:
         errors.append(
-            f"optimizer must be 'adam' or 'sgd', got '{config.optimizer}'"
+            f"optimizer must be 'adam', 'adamw', or 'sgd', got '{config.optimizer}'"
         )
     if config.max_epochs < 1:
         errors.append(f"max_epochs must be >= 1, got {config.max_epochs}")
@@ -271,6 +309,23 @@ def validate_config(config: CnnTrainingConfig) -> CnnConfigValidation:
             f"early_stopping_patience must be >= 1, "
             f"got {config.early_stopping_patience}"
         )
+    if config.selection_metric not in {"val_loss", "val_auc"}:
+        errors.append(
+            "selection_metric must be 'val_loss' or 'val_auc', "
+            f"got '{config.selection_metric}'"
+        )
+    if config.lr_scheduler_patience < 1:
+        errors.append("lr_scheduler_patience must be >= 1")
+    if not 0.0 < config.lr_scheduler_factor < 1.0:
+        errors.append("lr_scheduler_factor must be in (0, 1)")
+    if not 0.0 < config.min_learning_rate <= config.learning_rate:
+        errors.append("min_learning_rate must be in (0, learning_rate]")
+    if config.gradient_clip_norm < 0.0:
+        errors.append("gradient_clip_norm must be >= 0")
+    if config.augmentation_noise_fraction < 0.0:
+        errors.append("augmentation_noise_fraction must be >= 0")
+    if not 0.0 < config.augmentation_scale_min <= config.augmentation_scale_max:
+        errors.append("augmentation scale range must be positive and ordered")
     for i, cl in enumerate(config.conv_layers):
         if cl.kernel_size % 2 == 0:
             errors.append(
@@ -318,9 +373,11 @@ def format_config(config: CnnTrainingConfig) -> str:
         f"- dense_units: [{dense_strs}]",
         f"- dense_dropout_rates: {list(config.dense_dropout_rates)}",
         f"- optimizer: {config.optimizer}  lr={config.learning_rate}",
+        f"- weight_decay: {config.weight_decay}",
         f"- batch_size: {config.batch_size}",
         f"- max_epochs: {config.max_epochs}  patience={config.early_stopping_patience}",
-        f"- augment: {config.augment}",
+        f"- selection_metric: {config.selection_metric}",
+        f"- augment: {config.augment}  noise_fraction={config.augmentation_noise_fraction}",
         f"- seed: {config.seed}",
         f"- checkpoint_dir: {config.checkpoint_dir}",
     ]

@@ -37,7 +37,7 @@ class TestDefaultConfig:
 
     def test_default_optimizer(self) -> None:
         cfg = default_config()
-        assert cfg.optimizer == "adam"
+        assert cfg.optimizer == "adamw"
 
     def test_default_dropout(self) -> None:
         cfg = default_config()
@@ -147,10 +147,19 @@ class TestSerialisation:
             "dense_dropout_rates",
             "optimizer",
             "learning_rate",
+            "weight_decay",
             "batch_size",
             "max_epochs",
             "early_stopping_patience",
+            "selection_metric",
+            "lr_scheduler_patience",
+            "lr_scheduler_factor",
+            "min_learning_rate",
+            "gradient_clip_norm",
             "augment",
+            "augmentation_noise_fraction",
+            "augmentation_scale_min",
+            "augmentation_scale_max",
             "seed",
             "checkpoint_dir",
         ):
@@ -158,11 +167,25 @@ class TestSerialisation:
 
     def test_old_config_uses_legacy_dropout_for_each_dense_layer(self) -> None:
         payload = _config_to_dict(default_config())
-        payload.pop("dense_dropout_rates")
+        for key in (
+            "dense_dropout_rates",
+            "weight_decay",
+            "selection_metric",
+            "lr_scheduler_patience",
+            "lr_scheduler_factor",
+            "min_learning_rate",
+            "gradient_clip_norm",
+            "augmentation_noise_fraction",
+            "augmentation_scale_min",
+            "augmentation_scale_max",
+        ):
+            payload.pop(key)
 
         config = _config_from_dict(payload)
 
         assert config.dense_dropout_rates == (0.5, 0.5)
+        assert config.weight_decay == 0.0
+        assert config.selection_metric == "val_loss"
 
     def test_conv_layers_serialised_as_list_of_dicts(self) -> None:
         cfg = default_config()

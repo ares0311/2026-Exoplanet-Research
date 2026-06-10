@@ -57,6 +57,14 @@ rejected and must remain under the ignored local `checkpoints/` path; no
 checkpoint, calibration file, registry entry, or reproducibility manifest from
 this run may be promoted into `models/`.
 
+An audit later on 2026-06-10 found that every nominally usable training
+snippet had `epoch_bjd=0.0`. The local TOI CSV used for the download predated
+epoch-column ingestion, so events were phase-folded without centering the
+catalog transit. This invalidates the corpus, the original seed-42 split, and
+all later splits or experiments derived from it. Training must remain stopped
+until a newly downloaded, BJD-epoch-bearing corpus passes
+`download_tess_lightcurves.py --audit-only`.
+
 ---
 
 ## Motivation
@@ -174,5 +182,6 @@ must not drive formal submission pathways.
 - [x] Wire vetted phase-folded snippets from the pipeline into CNN inference rows with neutral fallback when unavailable
 - [x] Read the production JSONL corpus with deterministic TIC-grouped splits and median/MAD normalization
 - [x] Train and evaluate the first production candidate checkpoint
-- [ ] Improve generalization, retrain, and pass held-out promotion gates
+- [ ] Rebuild the local corpus with valid BJD transit epochs and pass corpus audit
+- [ ] Improve generalization on a fresh grouped split, retrain, and pass held-out promotion gates
 - [ ] Calibrate and register only a checkpoint that passes those gates

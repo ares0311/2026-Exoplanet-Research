@@ -18,6 +18,7 @@ from Skills.download_tess_lightcurves import (
     _load_done_tic_ids,
     _load_toi_rows,
     _phase_fold_bin,
+    audit_snippet_corpus,
     download_and_extract,
 )
 
@@ -111,14 +112,29 @@ class TestLoadToiRows:
         rows = _load_toi_rows(csv_path)
         assert rows == []
 
-    def test_handles_missing_epoch(self, tmp_path: Path) -> None:
+    def test_rejects_missing_epoch(self, tmp_path: Path) -> None:
         csv_path = _make_toi_csv(tmp_path / "toi.csv", [
             {"toi": "1.01", "tic_id": "333", "tfopwg_disposition": "FP",
              "period_days": "3.1", "epoch_bjd": "", "duration_hours": "1.0", "snr": "5"},
         ])
         rows = _load_toi_rows(csv_path)
-        assert len(rows) == 1
-        assert rows[0]["epoch_bjd"] == pytest.approx(0.0)
+        assert rows == []
+
+    def test_rejects_zero_epoch(self, tmp_path: Path) -> None:
+        csv_path = _make_toi_csv(tmp_path / "toi.csv", [
+            {"toi": "1.01", "tic_id": "333", "tfopwg_disposition": "FP",
+             "period_days": "3.1", "epoch_bjd": "0", "duration_hours": "1.0", "snr": "5"},
+        ])
+        assert _load_toi_rows(csv_path) == []
+
+    def test_missing_epoch_column_fails_closed(self, tmp_path: Path) -> None:
+        csv_path = tmp_path / "toi.csv"
+        csv_path.write_text(
+            "tic_id,tfopwg_disposition,period_days\n333,FP,3.1\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="epoch_bjd"):
+            _load_toi_rows(csv_path)
 
     def test_kp_label_is_positive(self, tmp_path: Path) -> None:
         csv_path = _make_toi_csv(tmp_path / "toi.csv", [
@@ -342,3 +358,47 @@ class TestCli:
             "--output", str(tmp_path / "out.jsonl"),
         ])
         assert rc == 1
+
+    def test_exits_1_when_csv_has_no_epoch_column(self, tmp_path: Path) -> None:
+        from Skills.download_tess_lightcurves import _cli
+
+        csv_path = tmp_path / "stale.csv"
+        csv_path.write_text(
+            "tic_id,tfopwg_disposition,period_days\n333,FP,3.1\n",
+            encoding="utf-8",
+        )
+        rc = _cli([
+            "--toi-csv", str(csv_path),
+            "--output", str(tmp_path / "out.jsonl"),
+        ])
+        assert rc == 1
+
+
+class TestCorpusAudit:
+    def test_accepts_valid_bjd_centered_corpus(self, tmp_path: Path) -> None:
+        path = tmp_path / "valid.jsonl"
+        path.write_text(
+            json.dumps({
+                "status": "ok",
+                "epoch_bjd": 2458325.0,
+                "phase": [0.0] * 201,
+                "flux": [1.0] * 201,
+            }) + "\n"
+        )
+        result = audit_snippet_corpus(path)
+        assert result["valid"] is True
+        assert result["invalid_epoch"] == 0
+
+    def test_rejects_zero_epoch_corpus(self, tmp_path: Path) -> None:
+        path = tmp_path / "invalid.jsonl"
+        path.write_text(
+            json.dumps({
+                "status": "ok",
+                "epoch_bjd": 0.0,
+                "phase": [0.0] * 201,
+                "flux": [1.0] * 201,
+            }) + "\n"
+        )
+        result = audit_snippet_corpus(path)
+        assert result["valid"] is False
+        assert result["invalid_epoch"] == 1

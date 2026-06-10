@@ -46,6 +46,7 @@ class EpochRecord:
     train_loss: float
     val_loss: float
     val_auc: float
+    learning_rate: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -133,6 +134,22 @@ def _bce_loss(pred: float, label: int) -> float:
     if label == 1:
         return -math.log(p)
     return -math.log(1.0 - p)
+
+
+def _augment_training_batch(x, config: CnnTrainingConfig):  # noqa: ANN001, ANN201
+    """Apply deterministic, train-only perturbations in normalized flux space."""
+    import torch
+
+    if not config.augment:
+        return x
+    scale = torch.empty(
+        (x.shape[0], 1, 1),
+        dtype=x.dtype,
+        device=x.device,
+    ).uniform_(config.augmentation_scale_min, config.augmentation_scale_max)
+    sample_std = x.std(dim=2, keepdim=True).clamp_min(1e-6)
+    noise = torch.randn_like(x) * sample_std * config.augmentation_noise_fraction
+    return x * scale + noise
 
 
 # ---------------------------------------------------------------------------
@@ -249,6 +266,25 @@ def train_cnn(
             flag="NO_TORCH",
         )
 
+    try:
+        from Skills.cnn_training_config import validate_config
+    except ModuleNotFoundError:
+        from cnn_training_config import validate_config
+    if not validate_config(config).ok:
+        return CnnTrainingResult(
+            best_epoch=0,
+            best_val_loss=float("inf"),
+            best_val_auc=0.0,
+            train_history=(),
+            checkpoint_path="",
+            config_path="",
+            n_train=0,
+            n_val=0,
+            n_positive=0,
+            n_negative=0,
+            flag="INVALID",
+        )
+
     # Validate split directory
     split_dir = Path(split_dir)
     train_path = split_dir / "train.json"
@@ -315,7 +351,7 @@ def train_cnn(
             flux = list(e["flux"])
             # Pad or truncate to n_bins
             if len(flux) < config.n_bins:
-                flux = flux + [1.0] * (config.n_bins - len(flux))
+                flux = flux + [0.0] * (config.n_bins - len(flux))
             else:
                 flux = flux[: config.n_bins]
             fluxes.append(flux)
@@ -330,12 +366,34 @@ def train_cnn(
     model = _build_torch_model(config)
     criterion = nn.BCELoss()
     if config.optimizer == "adam":
-        optimizer = optim.Adam(model.parameters(), lr=config.learning_rate)
+        optimizer = optim.Adam(
+            model.parameters(),
+            lr=config.learning_rate,
+            weight_decay=config.weight_decay,
+        )
+    elif config.optimizer == "adamw":
+        optimizer = optim.AdamW(
+            model.parameters(),
+            lr=config.learning_rate,
+            weight_decay=config.weight_decay,
+        )
     else:
-        optimizer = optim.SGD(model.parameters(), lr=config.learning_rate)
+        optimizer = optim.SGD(
+            model.parameters(),
+            lr=config.learning_rate,
+            weight_decay=config.weight_decay,
+        )
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        mode="min",
+        factor=config.lr_scheduler_factor,
+        patience=config.lr_scheduler_patience,
+        min_lr=config.min_learning_rate,
+    )
 
     best_val_loss = float("inf")
     best_val_auc = 0.0
+    best_selection_value = float("-inf")
     best_epoch = 0
     patience_counter = 0
     history: list[EpochRecord] = []
@@ -356,10 +414,16 @@ def train_cnn(
         for start in range(0, n_train, batch_size):
             xb = x_shuf[start : start + batch_size]
             yb = y_shuf[start : start + batch_size]
+            xb = _augment_training_batch(xb, config)
             optimizer.zero_grad()
             pred = model(xb)
             loss = criterion(pred, yb)
             loss.backward()
+            if config.gradient_clip_norm > 0.0:
+                torch.nn.utils.clip_grad_norm_(
+                    model.parameters(),
+                    config.gradient_clip_norm,
+                )
             optimizer.step()
             total_train_loss += loss.item()
             n_batches += 1
@@ -378,12 +442,14 @@ def train_cnn(
             [int(v) for v in y_true_list],
             [float(v) for v in y_prob_list],
         )
+        learning_rate = float(optimizer.param_groups[0]["lr"])
 
         rec = EpochRecord(
             epoch=epoch,
             train_loss=round(train_loss, 6),
             val_loss=round(val_loss, 6),
             val_auc=round(val_auc, 6),
+            learning_rate=learning_rate,
         )
         history.append(rec)
 
@@ -398,11 +464,14 @@ def train_cnn(
                 "epoch": epoch,
                 "val_loss": round(val_loss, 6),
                 "val_auc": round(val_auc, 6),
+                "learning_rate": learning_rate,
                 "created_at": datetime.now(UTC).isoformat(),
             }
         )
 
-        if val_loss < best_val_loss:
+        selection_value = val_auc if config.selection_metric == "val_auc" else -val_loss
+        if selection_value > best_selection_value:
+            best_selection_value = selection_value
             best_val_loss = val_loss
             best_val_auc = val_auc
             best_epoch = epoch
@@ -412,6 +481,7 @@ def train_cnn(
             patience_counter += 1
             if patience_counter >= config.early_stopping_patience:
                 break
+        scheduler.step(val_loss)
 
     # Write metrics.json for checkpoint manager
     _atomic_write_json(

@@ -69,7 +69,7 @@
 - [x] Offline CNN split validation (`Skills/cnn_split_validator.py`, 15 tests)
 - [x] Tier 2 scaffolding — CNN scorer wrapper, training loop, checkpoint/calibration helpers, phase-folded snippet wiring, and `cnn/full-ensemble` CLI modes
 - [x] First Tier 2 candidate — trained and evaluated on the deterministic seed-42 split; rejected because held-out AUC was 0.7404 and calibration worsened Brier/ECE
-- [ ] Production Tier 2 checkpoint — improve generalization, retrain without tuning against the opened test partition, and pass all promotion gates
+- [ ] Production Tier 2 checkpoint — rebuild the invalid zero-epoch corpus, create a fresh grouped promotion split, improve generalization without tuning against the sealed holdout, and pass all promotion gates
   - Architecture spec: `docs/CNN_SPEC.md`
   - Authoritative blocker and rejected checkpoint hash: `docs/PRODUCTION_READINESS.md`
   - The rejected checkpoint remains local under ignored `checkpoints/`; no artifact from that run is registered

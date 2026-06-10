@@ -40,7 +40,7 @@ class TestPadOrTruncate:
     def test_short_flux_padded(self) -> None:
         result = _pad_or_truncate([0.9, 1.0], 5)
         assert len(result) == 5
-        assert result[2:] == [1.0, 1.0, 1.0]
+        assert result[2:] == [0.0, 0.0, 0.0]
 
     def test_exact_length_unchanged(self) -> None:
         flux = [0.9] * 201
