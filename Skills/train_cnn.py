@@ -296,7 +296,10 @@ def train_cnn(
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     # Save config
-    from Skills.cnn_training_config import save_config as _save_cfg
+    try:
+        from Skills.cnn_training_config import save_config as _save_cfg
+    except ModuleNotFoundError:  # Direct script execution adds Skills/ to sys.path.
+        from cnn_training_config import save_config as _save_cfg
     config_path = checkpoint_dir / "config.json"
     _save_cfg(config, config_path)
 
@@ -488,7 +491,10 @@ def _cli(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", type=Path, default=None, metavar="JSON")
     args = parser.parse_args(argv)
 
-    from Skills.cnn_training_config import default_config, load_config
+    try:
+        from Skills.cnn_training_config import default_config, load_config
+    except ModuleNotFoundError:  # Direct script execution adds Skills/ to sys.path.
+        from cnn_training_config import default_config, load_config
 
     cfg = load_config(args.config) if args.config else default_config()
     result = train_cnn(args.split_dir, cfg, checkpoint_dir=args.checkpoint_dir)

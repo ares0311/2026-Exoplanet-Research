@@ -214,7 +214,12 @@ def test_write_training_splits_creates_files(tmp_path: Path) -> None:
         config=SplitConfig(seed=99),
         created_at="2026-05-20T00:00:00+00:00",
     )
-    assert Path(manifest["split_files"]["train"]).exists()
+    assert manifest["split_files"] == {
+        "train": "train.json",
+        "val": "val.json",
+        "test": "test.json",
+    }
+    assert Path(tmp_path / "splits" / manifest["split_files"]["train"]).exists()
     assert Path(tmp_path / "splits" / "manifest.json").exists()
 
 
@@ -233,7 +238,8 @@ def test_write_training_splits_manifest_records_provenance(tmp_path: Path) -> No
 def test_written_split_rows_are_json_ready(tmp_path: Path) -> None:
     input_path = _write_json(tmp_path / "dataset.json", {"snippets": [_snippet()]})
     manifest = write_training_splits(load_training_examples([input_path]), tmp_path / "splits")
-    train_payload = json.loads(Path(manifest["split_files"]["train"]).read_text())
+    train_path = tmp_path / "splits" / manifest["split_files"]["train"]
+    train_payload = json.loads(train_path.read_text())
     assert isinstance(train_payload["examples"], list)
     assert "phase" in train_payload["examples"][0]
 
