@@ -82,6 +82,7 @@ caffeinate -dims python Skills/<script>.py [args] # lid-close safe
 This applies to: light curve downloads, CNN training, batch scans, injection-recovery, and any repeated-network or long-compute script. **Never give a bare `python ...` recipe for these.**
 
 ### Python Environment Policy — NEVER TOUCH SYSTEM PYTHON
+- Validated runtime: **Python 3.14.3** inside `.venv` — never use system Python
 - All work happens inside the `.venv` virtual environment
 - Never run `/Applications/Python*/Install\ Certificates.command`
 - Never suggest `sudo pip install` or any path under `/Library/Frameworks/Python.framework/`

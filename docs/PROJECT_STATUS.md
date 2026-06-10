@@ -18,7 +18,7 @@ The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit w
 - 432 top-level test files, 6,385 default tests passing
 - 27 package Python modules under `src/exo_toolkit/`
 
-Local validation note: after restoring the declared `xgboost` dependency and installing the macOS OpenMP runtime (`libomp`), the default test suite passes locally on Python 3.13.12.
+Local validation note: validated on Python 3.14.3 in `.venv` with `xgboost` dependency restored and macOS OpenMP runtime (`libomp`) installed. System Python is never used.
 
 ---
 
