@@ -10,6 +10,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pytest
 from Skills.cnn_training_config import default_config
 from Skills.train_cnn import (
     CnnTrainingResult,
@@ -67,7 +68,7 @@ class TestComputeAuc:
 def test_train_augmentation_changes_only_enabled_batches() -> None:
     import dataclasses
 
-    import torch
+    torch = pytest.importorskip("torch")
 
     batch = torch.ones((4, 1, 201))
     disabled = dataclasses.replace(default_config(), augment=False)

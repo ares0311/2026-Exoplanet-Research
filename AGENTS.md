@@ -105,7 +105,7 @@ If a gate cannot run because of a local environment issue, record the exact bloc
 
 ## Code Standards
 
-- Python 3.11+.
+- Python 3.14.3 (validated runtime; minimum acceptable is 3.11).
 - Use `from __future__ import annotations` in Python modules.
 - Prefer Pydantic v2 frozen models for structured data contracts.
 - Public functions must be fully typed.

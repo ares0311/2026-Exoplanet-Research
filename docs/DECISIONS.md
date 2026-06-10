@@ -440,3 +440,42 @@ calibration gates.
 - Silent numeric defaults are unsafe for scientific ephemerides.
 - Corpus validation must precede model tuning so held-out evidence remains
   meaningful.
+
+---
+
+## DECISION-016: Validated Runtime Is Python 3.14.3 in `.venv`
+
+**Date:** 2026-06-10
+**Status:** Accepted
+
+### Context
+
+The project was previously developed on Python 3.11 and later validated on
+Python 3.13.12. The project owner and a coding agent jointly tested and
+confirmed full compatibility with Python 3.14.3. The Python Environment Policy
+(AGENTS.md) already prohibits touching system Python; this decision records
+the validated runtime version and makes the venv-only constraint durable.
+
+### Decision
+
+1. The validated and required runtime is **Python 3.14.3** running inside the
+   project `.venv` virtual environment.
+2. No code, test, or agent workflow may use system Python for any project
+   operation.
+3. All `pip install` commands must run with `(.venv)` active in the prompt.
+4. Recipes given to the user must assume `.venv` is active and must never
+   reference `/Library/Frameworks/Python.framework/` or suggest
+   `sudo pip install`.
+5. If a future Python version is tested and validated by the project owner,
+   record it here as a superseding decision entry — do not silently rewrite
+   this entry.
+
+### Rationale
+
+- Eliminates ambiguity about which Python interpreter agents and contributors
+  should use.
+- System Python on macOS is managed by the OS and must not be modified.
+- Recording the validated version allows future agents to diagnose
+  compatibility regressions against a known-good baseline.
+- Keeps scientific code, dependencies, and environment fully isolated in the
+  project venv.
