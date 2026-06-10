@@ -53,16 +53,37 @@ class SplitConfig:
 
 
 def load_training_examples(paths: list[Path | str]) -> list[TrainingExample]:
-    """Load and validate training examples from local JSON files."""
+    """Load and validate training examples from local JSON or JSONL files."""
     examples: list[TrainingExample] = []
     for path_like in paths:
         path = Path(path_like)
-        rows = _candidate_rows(json.loads(path.read_text(encoding="utf-8")))
+        rows = _parse_file_rows(path)
         for index, row in enumerate(rows):
             example = _training_example(row, source_file=str(path), row_index=index)
             if example is not None:
                 examples.append(example)
     return examples
+
+
+def _parse_file_rows(path: Path) -> list[dict[str, Any]]:
+    """Parse JSON or JSONL file into a list of raw row dicts."""
+    text = path.read_text(encoding="utf-8")
+    try:
+        return _candidate_rows(json.loads(text))
+    except json.JSONDecodeError:
+        pass
+    rows: list[dict[str, Any]] = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+            if isinstance(obj, dict):
+                rows.append(obj)
+        except json.JSONDecodeError:
+            continue
+    return rows
 
 
 def split_examples(

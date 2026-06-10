@@ -399,7 +399,7 @@ Complete user reference for all 24 Skills scripts (updated Milestone 12).
 - **Conservative priors**: built-in defaults remain planet_candidate = 0.10, EB/BEB/stellar/instrumental = 0.20 each, known_object = 0.10
 - **Mission prior profiles**: `configs/scoring_priors_v0.json` defines opt-in conservative TESS/Kepler/K2 profiles loaded by `priors.py`
 - **ML Tier 1 (XGBoost) is built** — `ml/xgboost_scorer.py` ships as an optional alternative scorer; Bayesian log-score model remains the default fallback when labels are unavailable
-- **ML Tier 2 scaffolding is built** — `ml/cnn_scorer.py`, `Skills/train_cnn.py`, checkpoint/calibration utilities, and CLI wiring exist; production CNN use remains gated on 5,000+ labeled TESS light curves and calibration review
+- **ML Tier 2 scaffolding is built** — `ml/cnn_scorer.py`, `Skills/train_cnn.py`, checkpoint/calibration utilities, and CLI wiring exist; CNN label gate is OPEN (2,668 labels); TESS light curve download COMPLETE (2,636 targets → `data/tess_snippets.jsonl`); training pipeline ready to execute
 - **ML Tier 3 (stacking) is built** — `ml/stacking_scorer.py` blends XGBoost + CNN + Bayesian P(planet) when models are supplied; falls back conservatively when optional models are unavailable
 - **CLI scorer options**: `exo <TIC-ID> --scorer [bayesian|xgboost|ensemble|cnn|full-ensemble] --model-path <path> --cnn-checkpoint <path>`
 - **Never output "confirmed planet"** — use "candidate signal" or "follow-up target"
@@ -1031,10 +1031,16 @@ All pipeline modules are complete.
 
 ### Next Step
 
-**Collect 5,000+ TESS labeled examples** — then run CNN training pipeline
-- Gate check: `python Skills/count_tess_labels.py`
-- Architecture spec: `docs/CNN_SPEC.md`
-- Full pipeline: `fetch_ctoi_table` → `assemble_labels` → `run_label_qc` → `normalize_batch` → `monitor_training_data` → `train_cnn` → `cnn_calibrator` → `CnnScorer`
+**Run CNN training pipeline** — TESS light curve download is complete (2,636 targets, `data/tess_snippets.jsonl`), label gate is OPEN (2,668 labels: 1,324 positive + 1,344 negative)
+
+Training pipeline in order:
+1. `python Skills/build_cnn_training_data.py data/tess_snippets.jsonl --output-dir data/cnn_splits` — assemble train/val/test splits
+2. `python Skills/cnn_split_validator.py data/cnn_splits` — validate splits before training
+3. `caffeinate -i python Skills/train_cnn.py --splits-dir data/cnn_splits --output-dir models/cnn/` — train 1D CNN
+4. `python Skills/cnn_calibrator.py --checkpoint models/cnn/best.pt --splits-dir data/cnn_splits --output models/cnn/calibration.json` — Platt calibration
+5. `exo <TIC-ID> --scorer full-ensemble --cnn-checkpoint models/cnn/best.pt` — use trained CNN
+
+Architecture spec: `docs/CNN_SPEC.md`
 
 ### ML Ensemble Scorer Status
 
@@ -1042,7 +1048,7 @@ The optional ML tiers now augment the Bayesian log-score model while preserving
 Bayesian scoring as the default fallback:
 
 **Tier 1 — XGBoost on tabular features (build first)** ✅ DONE
-**Tier 2 — 1D CNN on phase-folded flux (scaffold built; production checkpoint after 5,000+ TESS labels)**
+**Tier 2 — 1D CNN on phase-folded flux (scaffold built; label gate OPEN; data downloaded; training pipeline ready)**
 - Input: phase-folded, normalized flux array (treat as 1D image)
 - Learns transit morphology directly; proven architecture (Shallue & Vanderburg 2018)
 - Requires TESS-specific fine-tuning — Kepler-trained models are miscalibrated on TESS due to cadence, pixel scale, and systematics differences

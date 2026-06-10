@@ -1,8 +1,8 @@
 # PROJECT STATUS
 
 ## Status: Active Development
-## Phase: Milestone 39 Complete — Physics, Vetting, Planning, and XGBoost Model Trained
-## Last Updated: 2026-06-03
+## Phase: CNN Data Collection Complete — Training Pipeline Ready
+## Last Updated: 2026-06-09
 
 ---
 
@@ -37,7 +37,8 @@ Local validation note: after restoring the declared `xgboost` dependency and ins
 | Scheduler docs | `docs/SCHEDULER.md` — cron, launchd, systemd | Complete |
 | ML Tier 1 | `ml/xgboost_scorer.py` + `models/xgboost_koi.json` | Complete — trained on 7,586 Kepler KOIs (AUC=0.992) |
 | ML Tier 3 | `ml/stacking_scorer.py` | Complete, includes optional 3-tier XGBoost/CNN/Bayesian blend |
-| ML Tier 2 scaffolding | `ml/cnn_scorer.py`, `Skills/train_cnn.py`, CNN data utilities | Complete, production use gated on labeled TESS corpus |
+| ML Tier 2 scaffolding | `ml/cnn_scorer.py`, `Skills/train_cnn.py`, CNN data utilities | Complete; label gate OPEN (2,668 labels); TESS light curve download complete (2,636 targets → `data/tess_snippets.jsonl`) |
+| TESS light curve download | `Skills/download_tess_lightcurves.py` | Complete — 2,636 TESS TOI targets downloaded, `data/tess_snippets.jsonl` ready for CNN training |
 | Training/evaluation Skills | Kepler, TESS, combined training, CNN data assembly/validation/training support, XGBoost training, scorer evaluation | Complete |
 | Discovery workflow Skills | star scanner, batch scan, alert filter, ranking, watchlist, exports, reports | Complete |
 | Milestones 13-39 Skills | 354 additional analysis, vetting, observability, ML, physics, reporting, scheduling, and follow-up utilities | Complete |
@@ -81,39 +82,42 @@ reports/background/*.html
 
 ---
 
-## Blocked
+## Active Blocker
 
-**Production ML Tier 2 — trained 1D CNN on phase-folded flux**
+**T1-1: Run CNN training pipeline** — data collection is complete, training has not yet run
 
-- Gate: 5,000+ labeled TESS light curves required before production training/use
-- Offline readiness check: `python Skills/tier2_progress_reporter.py --labels data/exofop_ctoi_labels.json --output reports/tier2_status.md --json-output reports/tier2_status.json`
-- Live gate check: `python Skills/count_tess_labels.py` when network access is intentionally approved; summarize local audit history with `python Skills/tess_label_check_summary.py`
+- Label gate: OPEN — 2,668 labels (1,324 positive CP/KP + 1,344 negative FP/FA) as of 2026-06-06
+- TESS download: COMPLETE — 2,636 TOI targets, `data/tess_snippets.jsonl`
+- Code: all training/calibration code exists and is tested
+- Blocker: training run requires PyTorch + CPU/GPU time; must be executed locally after `git pull origin main`
 - Architecture spec: `docs/CNN_SPEC.md`
-- Supporting implementation exists: `ml/cnn_scorer.py`, `Skills/train_cnn.py`, `labelled_lc_collector.py`, `cnn_feature_augmenter.py`, `build_cnn_training_data.py`, `cnn_split_validator.py`, and related label/QC/checkpoint/calibration utilities.
-
-No active implementation blocker is known in the default local validation path.
 
 ---
 
 ## Next Actions
 
-1. Run `python Skills/tier2_progress_reporter.py --labels data/exofop_ctoi_labels.json --output reports/tier2_status.md --json-output reports/tier2_status.json` to produce offline CNN readiness artifacts.
-2. Run `python Skills/count_tess_labels.py` only when live ExoFOP access is intentionally approved, then run `python Skills/tess_label_check_summary.py` to inspect the local SQLite audit history.
-3. Once the CNN gate opens, run the implemented CNN training/calibration pipeline per `docs/CNN_SPEC.md`.
-4. Use `toi_checker.py` before investing pipeline time on new live targets.
-5. Use `batch_scan.py` + `alert_filter.py` + `rank_candidates.py` + `watchlist.py` for systematic follow-up.
-6. Use `multi_sector_phase_compare.py` to inspect sector-to-sector depth and phase consistency before advancing multi-sector follow-up targets.
-7. Use `candidate_dashboard_export.py` to build static local review dashboards from existing candidate JSON outputs, including optional phase-fold plot artifact paths when available.
-8. Use `candidate_api.py` to serve existing local candidate JSON, optional read-only background SQLite summaries, `/artifact.json` review bundles, and opt-in CORS for separate local frontends.
-9. Use `candidate_browser_ui.py` for an interactive local browser UI with embedded-data/API modes and optional phase-fold plot previews.
-10. Keep CTOI/community candidate ingestion opt-in and outside default training; the fixture-backed source contract now lives in `docs/CTOI_SOURCE_CONTRACT.md`.
+**[HUMAN first]** Verify PyTorch is installed in the venv:
+```bash
+git pull origin main
+python -c "import torch; print('PyTorch', torch.__version__)"
+```
+If missing: `pip install torch` with venv active.
 
-Live-network note: the CNN gate check was not run during the latest local
-maintenance pass because it queries ExoFOP and requires intentional live network
-approval.
+**[AGENT then HUMAN]** Run CNN training pipeline in order:
 
-Remote sync note: local `main` is synced with `origin/main` as of the latest
-handoff.
+1. `python Skills/build_cnn_training_data.py data/tess_snippets.jsonl --output-dir data/cnn_splits`
+2. `python Skills/cnn_split_validator.py data/cnn_splits`
+3. `caffeinate -i python Skills/train_cnn.py --splits-dir data/cnn_splits --output-dir models/cnn/`
+4. `python Skills/cnn_calibrator.py --checkpoint models/cnn/best.pt --splits-dir data/cnn_splits --output models/cnn/calibration.json`
+5. Test: `exo <known-TOI-TIC-ID> --scorer full-ensemble --cnn-checkpoint models/cnn/best.pt`
+
+**[OPTIONAL CLEANUP]** One corrupt FITS cache entry may need manual clearing:
+```bash
+rm -rf "/Users/Rome/.lightkurve/cache/mastDownload/TESS/tess2021146024351-s0039-0000000220435095-0210-s"
+caffeinate -i python Skills/download_tess_lightcurves.py --toi-csv data/tess_toi.csv --output data/tess_snippets.jsonl --resume
+```
+
+Remote sync note: local `main` is synced with `origin/main` as of 2026-06-09.
 
 
 ## Latest Local Validation

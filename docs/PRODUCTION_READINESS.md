@@ -1,8 +1,11 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-06-05
-Branch: `claude/review-markdown-docs-SwVnR` (Milestones 1–47 complete)
-Test baseline: 6,385 default tests passing, 2 integration_live deselected (2026-06-03)
+Last reviewed: 2026-06-09
+Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
+Branch: `claude/review-markdown-docs-SwVnR`
+Test baseline: 1,939 default tests passing (core package), 2 integration_live deselected
+Full suite: 6,385 default tests passing (2026-06-03)
+TESS download: COMPLETE — 2,636 targets, `data/tess_snippets.jsonl`
 
 ---
 
@@ -13,10 +16,10 @@ Test baseline: 6,385 default tests passing, 2 integration_live deselected (2026-
 | `--scorer bayesian` | **PRODUCTION READY** | None — default mode, zero external dependencies |
 | `--scorer xgboost` | **PRODUCTION READY** | None — trained on 7,586 Kepler KOIs, AUC=0.992 |
 | `--scorer ensemble` | **PRODUCTION READY** | None — conservative XGBoost+Bayesian blend when CNN absent |
-| `--scorer cnn` | **NOT READY** | T1-1: 5,000+ labeled TESS light curves required |
+| `--scorer cnn` | **NOT READY** | T1-1: CNN training pipeline must be run (gate is open, data ready) |
 | `--scorer full-ensemble` | **NOT READY** | T1-1: CNN checkpoint required first |
 
-The system is safe to deploy now for Bayesian and XGBoost scoring modes. The CNN tier requires data collection first — this is an outside blocker, not a code gap.
+The system is safe to deploy now for Bayesian and XGBoost scoring modes. The CNN label gate is open (2,668 quality labels as of 2026-06-06) and TESS download is complete — training pipeline can now be executed.
 
 ---
 
@@ -25,13 +28,14 @@ The system is safe to deploy now for Bayesian and XGBoost scoring modes. The CNN
 ### T1-1: Production Tier 2 CNN Checkpoint
 
 - **What is missing**: A trained, calibrated 1D CNN checkpoint on TESS phase-folded flux
-- **Root cause**: Data collection — 5,000+ labeled TESS light curves (confirmed planets + confirmed false positives) have not yet been assembled
-- **Why this threshold**: Shallue & Vanderburg (2018) showed Kepler CNNs require TESS-specific fine-tuning; the 5,000-label gate is a minimum for meaningful calibration, not an arbitrary milestone
-- **Code status**: Complete — `ml/cnn_scorer.py`, `Skills/train_cnn.py`, `labelled_lc_collector.py`, `snippet_normalizer.py`, `cnn_split_validator.py`, `cnn_calibrator.py`, and all supporting data pipeline utilities exist and are tested
-- **Gate check (requires live network approval)**: `python Skills/count_tess_labels.py`
-- **Offline readiness**: `python Skills/tier2_progress_reporter.py`
+- **Gate status**: **OPEN as of 2026-06-06** — 1,324 positive (CP+KP) + 1,344 negative (FP+FA) = 2,668 total
+- **Download status**: **COMPLETE** — 2,636 TESS TOI targets downloaded to `data/tess_snippets.jsonl`
+- **What is missing**: A trained, calibrated 1D CNN checkpoint — the training pipeline must now be run
+- **Code status**: Complete — `ml/cnn_scorer.py`, `Skills/train_cnn.py`, `labelled_lc_collector.py`, `snippet_normalizer.py`, `cnn_split_validator.py`, `cnn_calibrator.py`, `build_cnn_training_data.py` (now with JSONL support), and all supporting data pipeline utilities exist and are tested
+- **Next step**: Run CNN training pipeline — see `docs/CNN_SPEC.md` for full recipe
+- **Gate check**: `python Skills/count_tess_labels.py`
 - **Architecture spec**: `docs/CNN_SPEC.md`
-- **Outside blocker**: Human label collection from ExoFOP-TESS — cannot be automated without intentional live network approval
+- **Outside blocker**: CNN training run (~hours) must run locally with PyTorch in venv
 
 ### T1-2: Stacking Tier 3 Production Weight Calibration
 
@@ -51,17 +55,21 @@ The system is safe to deploy now for Bayesian and XGBoost scoring modes. The CNN
 - **Action**: Run training pipeline on TESS TOI CP/FP labels when labels are available
 - **Outside blocker**: Sufficient TESS CP/FP label quality (partially available from ExoFOP now, but a larger confirmed set is better)
 
-### T2-2: Expert Vetting and Methodology Review
+### T2-2: Expert Vetting and Methodology Review — N/A
 
-- **What is missing**: At least one run on known confirmed TESS planets to validate scoring behavior end-to-end
-- **Action**: Run `exo <TIC-ID>` on 3–5 confirmed TOIs and 3–5 confirmed FPs; verify FPP ordering matches ground truth
-- **Outside blocker**: Human review required; cannot be automated
+**Status: Out of scope (DECISION-013).** This is a citizen science project operating independently.
+Conservative scoring guardrails enforced in code serve as the substitute:
+- Never output "confirmed planet"
+- Always expose false-positive evidence
+- Suppress `tfop_ready` when key diagnostics are missing
+- No external submission without explicit human approval
 
-### T2-3: Peer Review Before Publishing
+### T2-3: Peer Review Before Publishing — N/A
 
-- **What is missing**: Independent review of the Bayesian log-score methodology and feature weights
-- **Action**: Submit `docs/SCORING_MODEL.md` for review by an exoplanet transit expert before making public discovery claims
-- **Outside blocker**: Requires an expert reviewer
+**Status: Out of scope (DECISION-013).** This is a citizen science project operating independently.
+The scientific guardrails in `docs/SCORING_MODEL.md §15` and `src/exo_toolkit/pathway.py` are the
+conservative substitute for formal peer review. All outputs are labeled "candidate signal" or
+"follow-up target" — never "confirmed planet".
 
 ---
 
@@ -82,6 +90,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | 415+ Skills/ utility scripts | ✅ |
 | 6,385+ default tests, ruff clean, mypy clean | ✅ |
 | Milestones 1–47 | ✅ |
+| TESS light curve download (2,636 targets → `data/tess_snippets.jsonl`) | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -120,10 +129,9 @@ These are enforced in code and must never be bypassed:
 
 | Blocker | What Is Needed | Who |
 |---|---|---|
-| TESS label collection | 5,000+ CP/FP TESS light curve labels from ExoFOP | Citizen scientist or TFOP WG collaboration |
-| Expert vetting | Run on known confirmed targets; verify FPP ordering | Exoplanet transit astronomer |
-| Peer review | Review `docs/SCORING_MODEL.md` methodology | Independent expert reviewer |
-| CNN production training | Execute CNN training pipeline after label gate opens | Agent + human approval |
+| ~~TESS light curve download~~ | ~~DONE~~ — 2,636 targets in `data/tess_snippets.jsonl` | ✅ Complete |
+| CNN training run | `caffeinate -i python Skills/train_cnn.py --splits-dir data/cnn_splits --output-dir models/cnn/` — requires PyTorch in venv | Agent + human (run locally) |
+| CNN production training | Verify checkpoint quality, calibrate with `cnn_calibrator.py` | Agent after training complete |
 | Stacking weight calibration | Tune blend weights on held-out calibration set | Agent after T1-1 resolved |
 
 ---

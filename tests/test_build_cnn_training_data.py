@@ -183,3 +183,33 @@ def test_format_split_summary_contains_counts(tmp_path: Path) -> None:
     summary = format_split_summary(manifest)
     assert "Total examples: 6" in summary
     assert "Live services: False" in summary
+
+
+def test_load_training_examples_from_jsonl(tmp_path: Path) -> None:
+    path = tmp_path / "tess_snippets.jsonl"
+    lines = [
+        json.dumps(_snippet(tic_id=1, label=1)),
+        json.dumps({"tic_id": 2, "status": "error", "reason": "no data"}),
+        json.dumps(_snippet(tic_id=3, label=0)),
+        "",
+    ]
+    path.write_text("\n".join(lines), encoding="utf-8")
+    examples = load_training_examples([path])
+    assert len(examples) == 2
+    assert {e.tic_id for e in examples} == {1, 3}
+
+
+def test_load_training_examples_jsonl_201_bins(tmp_path: Path) -> None:
+    n = 201
+    row = {
+        "tic_id": 99,
+        "label": 1,
+        "phase": [round(-0.5 + i / n, 6) for i in range(n)],
+        "flux": [1.0] * n,
+        "source": "tess",
+    }
+    path = tmp_path / "canonical.jsonl"
+    path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    examples = load_training_examples([path])
+    assert len(examples) == 1
+    assert len(examples[0].phase) == 201
