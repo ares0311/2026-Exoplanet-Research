@@ -1,10 +1,12 @@
-"""Tests for Skills.train_cnn (13 tests).
+"""Tests for Skills.train_cnn (16 tests).
 
-All tests use the NO_TORCH path or controlled stubs; PyTorch is not required.
+Tests remain valid whether or not optional PyTorch is installed.
 """
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -90,6 +92,27 @@ class TestLoadSplit:
 
 
 class TestTrainCnn:
+    def test_direct_script_execution_loads_training_config(self, tmp_path: Path) -> None:
+        script = Path(__file__).parents[1] / "Skills" / "train_cnn.py"
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(script),
+                "--split-dir",
+                str(tmp_path / "missing"),
+                "--checkpoint-dir",
+                str(tmp_path / "checkpoints"),
+            ],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert completed.returncode == 1
+        assert "ModuleNotFoundError" not in completed.stderr
+        assert "Flag:" in completed.stdout
+
     def test_missing_split_dir_returns_invalid(self) -> None:
         cfg = default_config()
         with tempfile.TemporaryDirectory() as tmpdir:

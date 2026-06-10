@@ -131,7 +131,7 @@ def write_training_splits(
             "examples": [_example_payload(example) for example in split_rows],
         }
         _atomic_write_json(path, split_payload)
-        split_files[split_name] = str(path)
+        split_files[split_name] = path.name
 
     manifest = {
         "created_at": created_at,

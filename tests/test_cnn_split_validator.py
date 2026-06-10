@@ -59,14 +59,19 @@ def _write_manifest(split_dir: Path, manifest: dict) -> None:
     _write_json(split_dir / "manifest.json", manifest)
 
 
+def _split_path(split_dir: Path, manifest: dict, split: str) -> Path:
+    path = Path(manifest["split_files"][split])
+    return path if path.is_absolute() else split_dir / path
+
+
 def _split_payload(split_dir: Path, split: str) -> dict:
     manifest = _read_manifest(split_dir)
-    return json.loads(Path(manifest["split_files"][split]).read_text(encoding="utf-8"))
+    return json.loads(_split_path(split_dir, manifest, split).read_text(encoding="utf-8"))
 
 
 def _write_split_payload(split_dir: Path, split: str, payload: dict) -> None:
     manifest = _read_manifest(split_dir)
-    _write_json(Path(manifest["split_files"][split]), payload)
+    _write_json(_split_path(split_dir, manifest, split), payload)
 
 
 def _codes(split_dir: Path) -> set[str]:
@@ -99,7 +104,7 @@ def test_missing_manifest_reports_error(tmp_path: Path) -> None:
 def test_missing_split_file_reports_error(tmp_path: Path) -> None:
     split_dir = _valid_split_dir(tmp_path)
     manifest = _read_manifest(split_dir)
-    Path(manifest["split_files"]["val"]).unlink()
+    _split_path(split_dir, manifest, "val").unlink()
     assert "missing_json_file" in _codes(split_dir)
 
 
