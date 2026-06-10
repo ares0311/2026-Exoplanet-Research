@@ -1,9 +1,9 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-06-09
+Last reviewed: 2026-06-10
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 1,987 default tests passing, 2 integration_live deselected
+Test baseline: 1,990 default tests passing, 2 integration_live deselected
 
 ---
 
@@ -14,10 +14,13 @@ Test baseline: 1,987 default tests passing, 2 integration_live deselected
 | `--scorer bayesian` | **PRODUCTION READY** | None — default mode, zero external dependencies |
 | `--scorer xgboost` | **PRODUCTION READY** | None — trained on 7,586 Kepler KOIs, AUC=0.992 |
 | `--scorer ensemble` | **PRODUCTION READY** | None — conservative XGBoost+Bayesian blend when CNN absent |
-| `--scorer cnn` | **NOT READY** | T1-1: CNN training pipeline must be run (gate is open, data ready) |
-| `--scorer full-ensemble` | **NOT READY** | T1-1: CNN checkpoint required first |
+| `--scorer cnn` | **NOT READY** | T1-1: first trained checkpoint failed held-out performance and calibration gates |
+| `--scorer full-ensemble` | **NOT READY** | T1-1: no production-approved CNN checkpoint |
 
-The system is safe to deploy now for Bayesian and XGBoost scoring modes. The CNN label gate is open (2,668 quality labels as of 2026-06-06) — training pipeline can now be executed.
+The system is safe to deploy now for Bayesian and XGBoost scoring modes. The
+CNN label gate is open, but the first trained checkpoint was evaluated and
+rejected; it must not be copied into `models/`, registered, or used for
+production scoring.
 
 ---
 
@@ -25,14 +28,16 @@ The system is safe to deploy now for Bayesian and XGBoost scoring modes. The CNN
 
 ### T1-1: Production Tier 2 CNN Checkpoint
 
-- **What is missing**: A trained, calibrated 1D CNN checkpoint on TESS phase-folded flux
+- **What is missing**: A CNN checkpoint that passes held-out performance and calibration gates
 - **Gate status**: **OPEN as of 2026-06-06** — 1,324 positive (CP+KP) + 1,344 negative (FP+FA) = 2,668 total
-- **What is missing**: A trained, calibrated 1D CNN checkpoint — the training pipeline must now be run
-- **Code status**: Complete — the split builder reads the production JSONL corpus, applies median/MAD normalization, groups all rows for a TIC into one partition, and the validator rejects cross-split TIC leakage
+- **Code status**: Training and state-dict inference paths are operational; the package scorer reconstructs the trained architecture and fails closed when loading fails
 - **Local corpus status**: Complete as of 2026-06-06 — `data/tess_snippets.jsonl` contains all 2,636 eligible rows, with 2,623 usable snippets and 13 recorded fetch/extraction errors
 - **Data policy**: The generated corpus is the authorized local T1-1 training input and remains uncommitted; it is covered by the local-only large mission-data policy in `docs/SYSTEM_PROFILE.md` and DECISION-014
 - **Verified split**: Seed 42 produces 1,837 train / 392 validation / 394 test examples with balanced labels and zero validation findings
-- **Next step**: Install optional PyTorch in the project `.venv`, build and validate the deterministic splits, then run terminal training
+- **Rejected candidate**: SHA-256 `e02af3903ab65f4af4f3f05f95dd6da8815a6746fea1bf2eac67bbba3555d6c6`, trained on Python 3.14.3 with PyTorch 2.12.0; best epoch 5, validation AUC 0.7476
+- **Held-out test result**: raw AUC 0.7404, F1 0.5804, Brier 0.2131, ECE 0.0716; validation-fitted Platt calibration and threshold 0.503 produced test F1 0.6297, Brier 0.2295, and ECE 0.1273
+- **Promotion decision**: **REJECTED** — AUC and F1 are below the documented 0.85 and 0.80 targets, and calibration worsened both Brier score and ECE
+- **Next step**: Diagnose the generalization gap, improve the training recipe without using the test partition for tuning, retrain from the same deterministic split, and evaluate the new candidate once
 - **Gate check**: `python Skills/count_tess_labels.py`
 - **Architecture spec**: `docs/CNN_SPEC.md`
 - **Artifact policy**: Commit the validated production checkpoint, calibration metadata, model registry entry, and reproducibility manifest under `models/` after all production-readiness checks pass
@@ -88,7 +93,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
 | 82 production-critical Skills/ | ✅ |
-| 1,987 default tests, ruff clean, mypy clean | ✅ |
+| 1,990 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -127,8 +132,8 @@ These are enforced in code and must never be bypassed:
 
 | Blocker | What Is Needed | Who |
 |---|---|---|
-| CNN training run | Install optional PyTorch in `.venv` and run the documented terminal training recipe from the completed local corpus | Human |
-| CNN production promotion | Validate, calibrate, register, and commit the production checkpoint and metadata | Agent + human approval |
+| CNN retraining run | Run the next approved training recipe in `.venv` after the agent improves the training path | Human |
+| CNN production promotion | Validate, calibrate, register, and commit only a checkpoint that passes held-out gates | Agent + human approval |
 | Stacking weight calibration | Tune blend weights on held-out calibration set | Agent after T1-1 resolved |
 
 ---

@@ -2,7 +2,7 @@
 
 ## Status: Active Development
 ## Phase: Milestone 39 Complete — Physics, Vetting, Planning, and XGBoost Model Trained
-## Last Updated: 2026-06-03
+## Last Updated: 2026-06-10
 
 ---
 
@@ -83,15 +83,14 @@ reports/background/*.html
 
 ## Blocked
 
-**Production ML Tier 2 — trained 1D CNN on phase-folded flux**
+**Production ML Tier 2 — checkpoint generalization**
 
-- Gate: 5,000+ labeled TESS light curves required before production training/use
-- Offline readiness check: `python Skills/tier2_progress_reporter.py --labels data/exofop_ctoi_labels.json --output reports/tier2_status.md --json-output reports/tier2_status.json`
-- Live gate check: `python Skills/count_tess_labels.py` when network access is intentionally approved; summarize local audit history with `python Skills/tess_label_check_summary.py`
-- Architecture spec: `docs/CNN_SPEC.md`
-- Supporting implementation exists: `ml/cnn_scorer.py`, `Skills/train_cnn.py`, `labelled_lc_collector.py`, `cnn_feature_augmenter.py`, `build_cnn_training_data.py`, `cnn_split_validator.py`, and related label/QC/checkpoint/calibration utilities.
-
-No active implementation blocker is known in the default local validation path.
+- The label gate is open with 2,623 usable balanced TESS snippets.
+- The first seed-42 checkpoint completed training but was rejected on 2026-06-10.
+- Held-out test AUC was 0.7404 and calibrated F1 was 0.6297, below the documented 0.85 and 0.80 targets.
+- Validation-fitted Platt calibration worsened test Brier score and ECE, so no calibration or checkpoint artifact was promoted into `models/`.
+- Architecture and evaluation details: `docs/CNN_SPEC.md`.
+- Next implementation blocker: improve the training recipe without tuning against the opened test partition, then retrain and evaluate a new candidate.
 
 ---
 
@@ -99,7 +98,7 @@ No active implementation blocker is known in the default local validation path.
 
 1. Run `python Skills/tier2_progress_reporter.py --labels data/exofop_ctoi_labels.json --output reports/tier2_status.md --json-output reports/tier2_status.json` to produce offline CNN readiness artifacts.
 2. Run `python Skills/count_tess_labels.py` only when live ExoFOP access is intentionally approved, then run `python Skills/tess_label_check_summary.py` to inspect the local SQLite audit history.
-3. Once the CNN gate opens, run the implemented CNN training/calibration pipeline per `docs/CNN_SPEC.md`.
+3. Improve and rerun the CNN training pipeline; do not promote the rejected seed-42 checkpoint documented in `docs/CNN_SPEC.md`.
 4. Use `toi_checker.py` before investing pipeline time on new live targets.
 5. Use `batch_scan.py` + `alert_filter.py` + `rank_candidates.py` + `watchlist.py` for systematic follow-up.
 6. Use `multi_sector_phase_compare.py` to inspect sector-to-sector depth and phase consistency before advancing multi-sector follow-up targets.

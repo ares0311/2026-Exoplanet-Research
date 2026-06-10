@@ -1,6 +1,6 @@
 # ML Tier-2 — 1D CNN Architecture Specification
 
-**Status: TRAINING READY — production use remains gated on checkpoint validation, calibration, and registration**
+**Status: FIRST CHECKPOINT REJECTED — retraining required before production promotion**
 
 The production corpus gate opened on 2026-06-06. The authorized local corpus
 contains 2,623 usable TESS snippets after 13 recorded fetch/extraction errors.
@@ -28,6 +28,34 @@ Those pieces are tested with offline fixtures and injectable models. They do
 not imply that a production CNN checkpoint is available or that the CNN should
 be used for scientific claims before the TESS label gate and calibration checks
 are satisfied.
+
+## First Production Candidate Evaluation
+
+The seed-42 training run completed on 2026-06-10 using Python 3.14.3 and
+PyTorch 2.12.0. The selected epoch-5 checkpoint has SHA-256:
+
+```text
+e02af3903ab65f4af4f3f05f95dd6da8815a6746fea1bf2eac67bbba3555d6c6
+```
+
+Calibration and threshold selection used only the 392-example validation
+partition. The 394-example test partition was then opened once for the final
+promotion decision.
+
+| Metric | Raw test | Calibrated test | Production target |
+|---|---:|---:|---:|
+| ROC-AUC | 0.7404 | 0.7404 | >= 0.85 |
+| F1 | 0.5804 | 0.6297 | >= 0.80 |
+| Precision | 0.7541 | 0.7297 | >= 0.80 |
+| Recall | 0.4718 | 0.5538 | >= 0.75 |
+| Brier | 0.2131 | 0.2295 | must not worsen |
+| ECE | 0.0716 | 0.1273 | must not worsen |
+
+The validation-selected calibrated threshold was 0.503. The checkpoint failed
+the AUC, F1, precision, recall, and calibration non-degradation gates. It is
+rejected and must remain under the ignored local `checkpoints/` path; no
+checkpoint, calibration file, registry entry, or reproducibility manifest from
+this run may be promoted into `models/`.
 
 ---
 
@@ -145,4 +173,6 @@ must not drive formal submission pathways.
 - [x] `Skills/train_cnn.py` — PyTorch training script with early stopping and graceful `NO_TORCH`
 - [x] Wire vetted phase-folded snippets from the pipeline into CNN inference rows with neutral fallback when unavailable
 - [x] Read the production JSONL corpus with deterministic TIC-grouped splits and median/MAD normalization
-- [ ] Train, calibrate, validate, and register the production CNN checkpoint
+- [x] Train and evaluate the first production candidate checkpoint
+- [ ] Improve generalization, retrain, and pass held-out promotion gates
+- [ ] Calibrate and register only a checkpoint that passes those gates

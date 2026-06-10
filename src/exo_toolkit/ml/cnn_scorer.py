@@ -20,6 +20,7 @@ Public API
 from __future__ import annotations
 
 from collections.abc import Callable
+from importlib import import_module
 from pathlib import Path
 from typing import Any
 
@@ -57,50 +58,37 @@ class CnnScorer:
     def _load(self) -> None:
         if self._model_fn is not None:
             self._available = True
-            return
-        if self._checkpoint_path is None:
-            return
-        try:
-            import torch  # noqa: F401
-            self._available = True
-        except ImportError:
-            self._available = False
+        elif self._checkpoint_path is not None and self._checkpoint_path.exists():
+            self._ensure_model()
+            self._available = self._model is not None
 
         if self._calibration_path is not None and self._calibration_path.exists():
             try:
-                import sys
-
-                sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "Skills"))
-                from cnn_calibrator import load_cnn_calibration  # type: ignore[import-not-found]
-
-                self._calibration = load_cnn_calibration(self._calibration_path)
+                calibrator = import_module("Skills.cnn_calibrator")
+                calibration = calibrator.load_cnn_calibration(self._calibration_path)
+                if calibration.flag == "OK":
+                    self._calibration = calibration
             except Exception:  # noqa: BLE001
                 pass
 
     def _ensure_model(self) -> None:
         if self._model_fn is not None or self._model is not None:
             return
-        if self._checkpoint_path is None or not self._available:
+        if self._checkpoint_path is None:
             return
         try:
-            import torch  # noqa: PLC0415
-
-            self._model = torch.load(
-                self._checkpoint_path, map_location="cpu", weights_only=True
-            )
+            batcher = import_module("Skills.cnn_inference_batcher")
+            self._model, _config = batcher._load_torch_model(self._checkpoint_path)
         except Exception:  # noqa: BLE001
+            self._model = None
             self._available = False
 
     def _apply_calibration(self, p: float) -> float:
         if self._calibration is None:
             return p
         try:
-            import sys
-
-            sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "Skills"))
-            from cnn_calibrator import apply_cnn_calibration  # noqa: PLC0415
-
-            return float(apply_cnn_calibration(p, self._calibration))
+            calibrator = import_module("Skills.cnn_calibrator")
+            return float(calibrator.apply_cnn_calibration(p, self._calibration))
         except Exception:  # noqa: BLE001
             return p
 
@@ -140,14 +128,7 @@ class CnnScorer:
         if self._model is None:
             return 0.5
         try:
-            import torch  # noqa: PLC0415
-
-            tensor = torch.tensor([snippet], dtype=torch.float32).unsqueeze(1)
-            with torch.no_grad():
-                out = self._model(tensor)
-                p = float(torch.sigmoid(out).squeeze())
-            p = max(0.0, min(1.0, p))
-            return self._apply_calibration(p)
+            return self.predict_proba_batch([snippet])[0]
         except Exception:  # noqa: BLE001
             return 0.5
 
@@ -179,7 +160,7 @@ class CnnScorer:
             tensor = torch.tensor(snippets, dtype=torch.float32).unsqueeze(1)
             with torch.no_grad():
                 out = self._model(tensor)
-                probs: list[float] = torch.sigmoid(out).flatten().tolist()
+                probs: list[float] = out.flatten().tolist()
             return [self._apply_calibration(max(0.0, min(1.0, float(p)))) for p in probs]
         except Exception:  # noqa: BLE001
             return [0.5] * len(snippets)
