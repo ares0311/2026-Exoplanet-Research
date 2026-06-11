@@ -132,7 +132,7 @@ def load_toi_csv(csv_path: Path) -> list[dict]:
                 "tic_id": tic_id,
                 "period_days": period,
                 "epoch_bjd": epoch,
-                "label": 1 if disp == "CP" else 0,
+                "label": 1 if disp in ("CP", "KP") else 0,
                 "source": "tess",
             })
 
