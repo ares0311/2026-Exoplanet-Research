@@ -307,37 +307,68 @@ def download_tess_lightcurves(
     )
 
     open_mode = "a" if resume else "w"
-    with open(output_path, open_mode) as out_fh, ThreadPoolExecutor(max_workers=workers) as pool:
+
+    # Use explicit pool management so KeyboardInterrupt can cancel pending
+    # futures immediately instead of blocking in ThreadPoolExecutor.__exit__
+    # (which calls shutdown(wait=True) and holds until all threads finish).
+    pool = ThreadPoolExecutor(max_workers=workers)
+    interrupted = False
+    try:
+        with open(output_path, open_mode) as out_fh:
             futures = {pool.submit(fn, row): row for row in pending}
-            for i, future in enumerate(as_completed(futures), 1):
-                row = futures[future]
-                tic_key = str(row["tic_id"])
-                n_attempted += 1
+            try:
+                for i, future in enumerate(as_completed(futures), 1):
+                    row = futures[future]
+                    tic_key = str(row["tic_id"])
+                    n_attempted += 1
 
-                try:
-                    result = future.result()
-                except Exception as exc:
-                    logger.warning("TIC %s raised: %s", row["tic_id"], exc)
-                    result = None
+                    try:
+                        result = future.result()
+                    except Exception as exc:
+                        logger.warning("TIC %s raised: %s", row["tic_id"], exc)
+                        result = None
 
-                if result is not None:
-                    out_fh.write(json.dumps(result) + "\n")
-                    out_fh.flush()
-                    completed.add(tic_key)
-                    failed.discard(tic_key)
-                    n_succeeded += 1
-                else:
-                    failed.add(tic_key)
-                    n_failed += 1
+                    if result is not None:
+                        out_fh.write(json.dumps(result) + "\n")
+                        out_fh.flush()
+                        completed.add(tic_key)
+                        failed.discard(tic_key)
+                        n_succeeded += 1
+                    else:
+                        failed.add(tic_key)
+                        n_failed += 1
 
-                # Save checkpoint after every record (main thread only — no lock needed)
+                    # Save checkpoint after every record (main thread only)
+                    _save_checkpoint(checkpoint_path, completed, failed)
+
+                    if i % 10 == 0 or i == len(pending):
+                        print(
+                            f"  [{i}/{len(pending)}] "
+                            f"+{n_succeeded} ok  -{n_failed} failed"
+                        )
+
+            except KeyboardInterrupt:
+                interrupted = True
+                pool.shutdown(wait=False, cancel_futures=True)
                 _save_checkpoint(checkpoint_path, completed, failed)
+                print(
+                    f"\nInterrupted at {n_attempted}/{len(pending)} targets. "
+                    f"Checkpoint saved ({n_succeeded} done). "
+                    f"Resume with the same command."
+                )
+    finally:
+        pool.shutdown(wait=False)
 
-                if i % 10 == 0 or i == len(pending):
-                    print(
-                        f"  [{i}/{len(pending)}] "
-                        f"+{n_succeeded} ok  -{n_failed} failed"
-                    )
+    if interrupted:
+        return {
+            "flag": "INTERRUPTED",
+            "n_attempted": n_attempted,
+            "n_succeeded": n_succeeded,
+            "n_failed": n_failed,
+            "n_skipped": n_skipped,
+            "output_path": str(output_path),
+            "checkpoint_path": str(checkpoint_path),
+        }
 
     print(
         f"\nDone: {n_succeeded} succeeded, {n_failed} failed, "
