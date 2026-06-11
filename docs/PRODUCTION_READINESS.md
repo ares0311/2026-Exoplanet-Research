@@ -1,6 +1,6 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-06-10
+Last reviewed: 2026-06-11
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
 Test baseline: 2,003 default tests passing, 2 integration_live deselected
@@ -55,12 +55,13 @@ production scoring.
 
 ## Tier 2 Gaps (Improvements, Not Blocking Deployment)
 
-### T2-1: TESS-Specific XGBoost Model
+### T2-1: TESS-Specific XGBoost Model — COMPLETE
 
-- **What is missing**: XGBoost model trained on TESS TOI labels (current model trained on Kepler KOIs)
-- **Code status**: Complete — `Skills/build_tess_training_data.py`, `Skills/fetch_tess_toi.py`, `Skills/train_xgboost.py` all exist and are tested
-- **Action**: Run training pipeline on TESS TOI CP/FP labels when labels are available
-- **Outside blocker**: Sufficient TESS CP/FP label quality (partially available from ExoFOP now, but a larger confirmed set is better)
+- **Status: COMPLETE as of 2026-06-11**
+- **Model**: `models/xgboost_toi.json` + `models/xgboost_toi.xgb.json` (committed `882b838`)
+- **Training set**: 1,960 examples from ExoFOP TOI (CP/KP → positive, FP/FA → negative)
+- **Performance**: AUC=0.884, F1=0.729 on held-out fold; Platt calibration A=5.3061, B=−2.7153
+- **Usage**: `exo <TIC-ID> --scorer xgboost --model-path models/xgboost_toi.json`
 
 ### T2-2: Expert Vetting and Methodology Review — N/A
 
