@@ -16,6 +16,7 @@ Public API
     .from_model_path(path, xgb_weight) (classmethod) — XGBoost only
     .from_model_paths(xgb_path, cnn_path, *, xgb_weight, cnn_weight) (classmethod)
     .bayesian_only() (classmethod)
+    .from_weights_file(weights_path, *, xgb_scorer, cnn_scorer) (classmethod)
     .xgb_weight → float
     .cnn_weight → float
     .has_xgb → bool
@@ -237,3 +238,40 @@ class StackingScorer:
         Useful as a no-op drop-in when no trained models are available.
         """
         return cls(xgb_scorer=None, cnn_scorer=None, xgb_weight=0.5, cnn_weight=0.0)
+
+    @classmethod
+    def from_weights_file(
+        cls,
+        weights_path: str | Path,
+        *,
+        xgb_scorer: XGBoostScorer | None = None,
+        cnn_scorer: CnnScorer | None = None,
+    ) -> StackingScorer:
+        """Load blend weights from a stacking_weights.json file.
+
+        The JSON file must contain ``w_xgb`` and ``w_cnn`` keys, as written by
+        ``Skills/calibrate_stacking_weights.py``.
+
+        Args:
+            weights_path: Path to the weights JSON file.
+            xgb_scorer: Optional pre-loaded ``XGBoostScorer``.
+            cnn_scorer: Optional pre-loaded ``CnnScorer``.
+
+        Returns:
+            A ``StackingScorer`` with calibrated blend weights.
+
+        Raises:
+            ValueError: If ``w_xgb`` or ``w_cnn`` keys are missing.
+        """
+        import json
+
+        weights = json.loads(Path(weights_path).read_text(encoding="utf-8"))
+        for key in ("w_xgb", "w_cnn"):
+            if key not in weights:
+                raise ValueError(f"Missing key '{key}' in {weights_path}")
+        return cls(
+            xgb_scorer=xgb_scorer,
+            cnn_scorer=cnn_scorer,
+            xgb_weight=float(weights["w_xgb"]),
+            cnn_weight=float(weights["w_cnn"]),
+        )

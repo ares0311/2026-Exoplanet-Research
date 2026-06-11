@@ -473,12 +473,29 @@ def scan(
         raise typer.Exit(code=1)
 
     if scorer in ("xgboost", "ensemble", "full-ensemble") and model_path is None:
-        typer.echo(f"--model-path is required when --scorer={scorer}", err=True)
-        raise typer.Exit(code=1)
+        for _candidate in (Path("models/xgboost_toi.json"), Path("models/xgboost_koi.json")):
+            if _candidate.exists():
+                model_path = _candidate
+                break
+        if model_path is None:
+            typer.echo(
+                f"--model-path is required when --scorer={scorer} "
+                "(tried models/xgboost_toi.json, models/xgboost_koi.json)",
+                err=True,
+            )
+            raise typer.Exit(code=1)
 
     if scorer in ("cnn", "full-ensemble") and cnn_checkpoint_path is None:
-        typer.echo(f"--cnn-checkpoint is required when --scorer={scorer}", err=True)
-        raise typer.Exit(code=1)
+        _cnn_candidate = Path("models/cnn/best.pt")
+        if _cnn_candidate.exists():
+            cnn_checkpoint_path = _cnn_candidate
+        else:
+            typer.echo(
+                f"--cnn-checkpoint is required when --scorer={scorer} "
+                "(tried models/cnn/best.pt)",
+                err=True,
+            )
+            raise typer.Exit(code=1)
 
     typer.echo(f"Scanning {target_id} ({mission}) [scorer={scorer}] ...")
 
