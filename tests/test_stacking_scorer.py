@@ -206,3 +206,44 @@ class TestStackingScorerFactory:
     def test_from_model_path_missing_raises(self, tmp_path: Path) -> None:
         with pytest.raises(FileNotFoundError):
             StackingScorer.from_model_path(tmp_path / "nonexistent.json")
+
+    def test_from_weights_file_loads_weights(self, tmp_path: Path) -> None:
+        import json
+
+        f = tmp_path / "stacking_weights.json"
+        f.write_text(json.dumps({"w_xgb": 0.40, "w_cnn": 0.35, "w_bayes": 0.25}))
+        s = StackingScorer.from_weights_file(f)
+        assert s.xgb_weight == pytest.approx(0.40)
+        assert s.cnn_weight == pytest.approx(0.35)
+
+    def test_from_weights_file_no_scorers_by_default(self, tmp_path: Path) -> None:
+        import json
+
+        f = tmp_path / "w.json"
+        f.write_text(json.dumps({"w_xgb": 0.35, "w_cnn": 0.35}))
+        s = StackingScorer.from_weights_file(f)
+        assert s.has_xgb is False
+        assert s.has_cnn is False
+
+    def test_from_weights_file_with_mock_xgb(self, tmp_path: Path) -> None:
+        import json
+
+        f = tmp_path / "w.json"
+        f.write_text(json.dumps({"w_xgb": 0.50, "w_cnn": 0.00}))
+        xgb = _mock_xgb(return_value=0.9)
+        s = StackingScorer.from_weights_file(f, xgb_scorer=xgb)
+        assert s.has_xgb is True
+        p = s.predict_proba(_all_zero_features(), bayesian_planet_prob=0.2)
+        assert p == pytest.approx(0.50 * 0.9 + 0.50 * 0.2)
+
+    def test_from_weights_file_missing_key_raises(self, tmp_path: Path) -> None:
+        import json
+
+        f = tmp_path / "bad.json"
+        f.write_text(json.dumps({"w_xgb": 0.35}))  # missing w_cnn
+        with pytest.raises(ValueError, match="w_cnn"):
+            StackingScorer.from_weights_file(f)
+
+    def test_from_weights_file_missing_file_raises(self, tmp_path: Path) -> None:
+        with pytest.raises(FileNotFoundError):
+            StackingScorer.from_weights_file(tmp_path / "nonexistent.json")

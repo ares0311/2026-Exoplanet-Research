@@ -422,12 +422,79 @@ class TestScorerOption:
         assert captured.get("scorer") == "xgboost"
         assert captured.get("model_path") == Path("/tmp/m.json")
 
-    def test_xgboost_without_model_path_exits_nonzero(self) -> None:
+    def test_xgboost_without_model_path_exits_nonzero(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)  # no model files in tmp_path
         result = runner.invoke(app, ["TIC 0", "--scorer", "xgboost"])
         assert result.exit_code != 0
 
-    def test_ensemble_without_model_path_exits_nonzero(self) -> None:
+    def test_ensemble_without_model_path_exits_nonzero(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)  # no model files in tmp_path
         result = runner.invoke(app, ["TIC 0", "--scorer", "ensemble"])
+        assert result.exit_code != 0
+
+    def test_xgboost_autodetects_toi_model(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        (tmp_path / "models").mkdir()
+        (tmp_path / "models" / "xgboost_toi.json").write_text("{}")
+        monkeypatch.chdir(tmp_path)
+        captured: dict[str, Any] = {}
+
+        def _spy(target_id: str, mission: str, **kwargs: Any) -> list[Any]:
+            captured["model_path"] = kwargs.get("model_path")
+            return []
+
+        with patch("exo_toolkit.cli.run_pipeline", side_effect=_spy):
+            result = runner.invoke(app, ["TIC 0", "--scorer", "xgboost"])
+
+        assert result.exit_code == 0
+        assert captured.get("model_path") == Path("models/xgboost_toi.json")
+
+    def test_xgboost_autodetects_koi_model_when_toi_missing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        (tmp_path / "models").mkdir()
+        (tmp_path / "models" / "xgboost_koi.json").write_text("{}")
+        monkeypatch.chdir(tmp_path)
+        captured: dict[str, Any] = {}
+
+        def _spy(target_id: str, mission: str, **kwargs: Any) -> list[Any]:
+            captured["model_path"] = kwargs.get("model_path")
+            return []
+
+        with patch("exo_toolkit.cli.run_pipeline", side_effect=_spy):
+            result = runner.invoke(app, ["TIC 0", "--scorer", "xgboost"])
+
+        assert result.exit_code == 0
+        assert captured.get("model_path") == Path("models/xgboost_koi.json")
+
+    def test_cnn_autodetects_best_pt(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        (tmp_path / "models" / "cnn").mkdir(parents=True)
+        (tmp_path / "models" / "cnn" / "best.pt").write_bytes(b"fake")
+        monkeypatch.chdir(tmp_path)
+        captured: dict[str, Any] = {}
+
+        def _spy(target_id: str, mission: str, **kwargs: Any) -> list[Any]:
+            captured["cnn_checkpoint_path"] = kwargs.get("cnn_checkpoint_path")
+            return []
+
+        with patch("exo_toolkit.cli.run_pipeline", side_effect=_spy):
+            result = runner.invoke(app, ["TIC 0", "--scorer", "cnn"])
+
+        assert result.exit_code == 0
+        assert captured.get("cnn_checkpoint_path") == Path("models/cnn/best.pt")
+
+    def test_cnn_without_checkpoint_exits_nonzero(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)  # no models/cnn/best.pt
+        result = runner.invoke(app, ["TIC 0", "--scorer", "cnn"])
         assert result.exit_code != 0
 
     def test_invalid_scorer_exits_nonzero(self) -> None:
