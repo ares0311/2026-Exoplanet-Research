@@ -10,7 +10,7 @@ SnippetEntry(tic_id, label, source, phase, flux, period_days, snr)
 BatchBuildResult(n_attempted, n_succeeded, n_failed, n_snippets,
                  label_counts, output_path, checkpoint_path, flag)
 build_snippet_batch(manifest, *, snippet_fn, output_path,
-                    checkpoint_path, n_bins, resume) -> BatchBuildResult
+                    checkpoint_path, n_bins, resume, workers) -> BatchBuildResult
 load_batch_output(path) -> list[SnippetEntry]
 save_batch_output(entries, path) -> None
 format_batch_result(result) -> str
@@ -22,6 +22,7 @@ import json
 import os
 import tempfile
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -157,6 +158,7 @@ def build_snippet_batch(
     checkpoint_path: Path,
     n_bins: int = 201,
     resume: bool = True,
+    workers: int = 1,
 ) -> BatchBuildResult:
     """Extract CNN snippets for all records in *manifest*.
 
@@ -168,6 +170,9 @@ def build_snippet_batch(
         checkpoint_path:  Path for the checkpoint JSON (completed/failed TIC IDs).
         n_bins:           Expected number of phase bins (for validation).
         resume:           If True, skip TIC IDs already in checkpoint.
+        workers:          Concurrent threads for snippet_fn calls (default 1).
+                          Values > 1 use ThreadPoolExecutor; state mutations
+                          remain in the main thread via as_completed().
 
     Returns:
         :class:`BatchBuildResult`
@@ -195,50 +200,75 @@ def build_snippet_batch(
     n_succeeded = 0
     n_failed = 0
 
-    for record in manifest.records:
-        tic_id = record.tic_id
-        if resume and tic_id in completed:
-            continue
+    pending = [r for r in manifest.records if not (resume and r.tic_id in completed)]
 
-        n_attempted += 1
+    def _process_record(record: object) -> tuple[object, object]:
         try:
             result = snippet_fn(
-                tic_id,
+                record.tic_id,
                 record.period_days,
                 record.epoch,
                 record.duration_hours,
             )
         except Exception:  # noqa: BLE001
             result = None
+        return record, result
 
-        if result is None:
-            failed.add(tic_id)
-            n_failed += 1
-        else:
-            phase_list, flux_list = result
-            # Validate length
-            if len(phase_list) != n_bins or len(flux_list) != n_bins:
+    if workers > 1:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(_process_record, r): r for r in pending}
+            for future in as_completed(futures):
+                record, result = future.result()
+                tic_id = record.tic_id
+                n_attempted += 1
+
+                if result is None:
+                    failed.add(tic_id)
+                    n_failed += 1
+                else:
+                    phase_list, flux_list = result
+                    if len(phase_list) != n_bins or len(flux_list) != n_bins:
+                        failed.add(tic_id)
+                        n_failed += 1
+                    else:
+                        entries.append(SnippetEntry(
+                            tic_id=tic_id, label=record.label, source=record.source,
+                            phase=tuple(float(x) for x in phase_list),
+                            flux=tuple(float(x) for x in flux_list),
+                            period_days=record.period_days, snr=None,
+                        ))
+                        completed.add(tic_id)
+                        n_succeeded += 1
+
+                _save_checkpoint(checkpoint_path, completed, failed)
+    else:
+        for record in pending:
+            tic_id = record.tic_id
+            n_attempted += 1
+            _, result = _process_record(record)
+
+            if result is None:
                 failed.add(tic_id)
                 n_failed += 1
-                _save_checkpoint(checkpoint_path, completed, failed)
-                continue
+            else:
+                phase_list, flux_list = result
+                if len(phase_list) != n_bins or len(flux_list) != n_bins:
+                    failed.add(tic_id)
+                    n_failed += 1
+                    _save_checkpoint(checkpoint_path, completed, failed)
+                    continue
 
-            entries.append(
-                SnippetEntry(
-                    tic_id=tic_id,
-                    label=record.label,
-                    source=record.source,
+                entries.append(SnippetEntry(
+                    tic_id=tic_id, label=record.label, source=record.source,
                     phase=tuple(float(x) for x in phase_list),
                     flux=tuple(float(x) for x in flux_list),
-                    period_days=record.period_days,
-                    snr=None,
-                )
-            )
-            completed.add(tic_id)
-            n_succeeded += 1
+                    period_days=record.period_days, snr=None,
+                ))
+                completed.add(tic_id)
+                n_succeeded += 1
 
-        # Save checkpoint after each record
-        _save_checkpoint(checkpoint_path, completed, failed)
+            # Save checkpoint after each record
+            _save_checkpoint(checkpoint_path, completed, failed)
 
     # Save final output
     save_batch_output(entries, output_path)
@@ -304,6 +334,7 @@ def _cli(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", required=True, help="Output snippet JSON path.")
     parser.add_argument("--checkpoint", required=True, help="Checkpoint JSON path.")
     parser.add_argument("--n-bins", type=int, default=201)
+    parser.add_argument("--workers", type=int, default=1, help="Concurrent threads (default 1)")
     parser.add_argument("--no-resume", action="store_true")
     args = parser.parse_args(argv)
 
@@ -340,6 +371,7 @@ def _cli(argv: list[str] | None = None) -> int:
         checkpoint_path=Path(args.checkpoint),
         n_bins=args.n_bins,
         resume=not args.no_resume,
+        workers=args.workers,
     )
     print(format_batch_result(result))
     return 0 if result.flag in ("OK", "PARTIAL") else 1

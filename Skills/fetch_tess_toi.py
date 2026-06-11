@@ -13,6 +13,11 @@ Output
     CSV with columns: toi, tic_id, tfopwg_disposition, period_days,
     epoch_bjd, duration_hours, depth_mmag, planet_radius_earth, snr,
     n_sectors, stellar_radius_sun, stellar_teff, stellar_logg, tmag
+
+DECISION-015 note
+-----------------
+    epoch_bjd is required by Skills/download_tess_lightcurves.py.
+    Rows with epoch_bjd=0 or missing are rejected by the download script.
 """
 from __future__ import annotations
 

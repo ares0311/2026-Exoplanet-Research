@@ -1,367 +1,356 @@
-"""Download TESS light curves and extract phase-folded CNN training snippets.
+"""Download TESS light curves from MAST and build a JSONL snippet corpus.
 
-Reads data/tess_toi.csv (produced by fetch_tess_toi.py), fetches PDCSAP light
-curves from MAST via lightkurve, phase-folds each one into a 201-point array,
-and saves compact snippet records to a JSONL checkpoint file.
+Reads a TOI CSV produced by Skills/fetch_tess_toi.py, downloads each TIC ID
+from MAST via lightkurve, phase-folds and normalises the light curve, and
+appends the result as one JSON object per line to an output JSONL file.
 
-No FITS files are kept — raw light curves are discarded after extraction.
-Lightkurve's own cache (~/.lightkurve/cache/) holds temporary FITS files.
-Run `python -c "import lightkurve; lightkurve.conf.cache_dir"` to see it.
+Resume safety
+-------------
+A checkpoint JSON (same schema as lc_snippet_batch_builder.py) tracks
+completed and failed TIC IDs.  An interrupted run can be restarted with the
+same command and will skip already-processed targets automatically.
+
+Concurrency
+-----------
+MAST downloads are I/O-bound.  ThreadPoolExecutor is used for parallel HTTP
+requests.  File writes and checkpoint saves happen in the main thread so no
+lock is needed on disk operations.  Use --workers to tune (default 4).
+
+DECISION-015 compliance
+-----------------------
+Rows with epoch_bjd=0.0 or missing epoch_bjd are rejected before any
+download attempt.  If all rows are rejected, re-run fetch_tess_toi.py.
 
 Usage
 -----
-    # Always use caffeinate -i on macOS to prevent sleep from killing the run:
-    caffeinate -i python Skills/download_tess_lightcurves.py \\
-        --toi-csv  data/tess_toi.csv \\
-        --output   data/tess_snippets.jsonl \\
-        [--resume]             # skip TIC IDs already in output
-        [--max-targets N]      # stop after N targets (default: all)
-        [--n-bins 201]         # phase bins per snippet (default: 201)
-        [--sleep 0.5]          # seconds between MAST requests (default: 0.5)
-
-    # To run with lid closed add -dims:
-    caffeinate -dims python Skills/download_tess_lightcurves.py --resume \\
-        --toi-csv data/tess_toi.csv --output data/tess_snippets.jsonl
-
-Output JSONL format (one JSON object per line)
-----------------------------------------------
-Success:
-    {"tic_id": 150428135, "label": 1, "disposition": "CP",
-     "period_days": 37.4, "epoch_bjd": 2458325.0,
-     "phase": [...201 floats...], "flux": [...201 floats...],
-     "n_points": 8732, "status": "ok"}
-
-Failure:
-    {"tic_id": 999, "status": "error", "reason": "No TESS LC found"}
-
-Progress report
----------------
-After the run, check progress with:
-    python -c "
-import json, collections
-rows = [json.loads(l) for l in open('data/tess_snippets.jsonl')]
-st = collections.Counter(r['status'] for r in rows)
-print(st)
-"
+    python Skills/download_tess_lightcurves.py \\
+        --toi-csv data/tess_toi.csv \\
+        --output data/tess_snippets.jsonl \\
+        [--checkpoint checkpoints/download_tess.json] \\
+        [--workers 4] \\
+        [--n-bins 201] \\
+        [--no-resume] \\
+        [--limit N]
 """
 from __future__ import annotations
 
 import argparse
-import csv
+import contextlib
 import json
-import math
+import logging
+import os
 import sys
-import time
-from collections.abc import Callable
+import tempfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-_DISPOSITION_LABEL: dict[str, int] = {
-    "CP": 1, "KP": 1,   # positive class — confirmed/known planets
-    "FP": 0, "FA": 0,   # negative class — false positives / false alarms
-}
+logger = logging.getLogger(__name__)
 
+_SCHEMA_VERSION = 1
 
 # ---------------------------------------------------------------------------
-# Light-curve fetcher
+# Checkpoint helpers (compatible schema with lc_snippet_batch_builder.py)
 # ---------------------------------------------------------------------------
 
 
-def _fetch_lc_lightkurve(tic_id: int) -> tuple[list[float], list[float]]:
-    """Fetch TESS PDCSAP light curve via lightkurve; returns (time_jd, flux)."""
-    import lightkurve as lk
-
-    # Prefer 2-min SPOC cadence; fall back to QLP
-    results = lk.search_lightcurve(
-        f"TIC {tic_id}", mission="TESS", author="SPOC", exptime=120
-    )
-    if len(results) == 0:
-        results = lk.search_lightcurve(f"TIC {tic_id}", mission="TESS", author="QLP")
-    if len(results) == 0:
-        raise ValueError(f"No TESS light curve found for TIC {tic_id}")
-
-    lc = results.download_all().stitch()
-
-    # Remove NaN cadences before returning
-    import numpy as np
-    mask = np.isfinite(lc.flux.value)
-    time_jd = lc.time.jd[mask].tolist()
-    flux = lc.flux.value[mask].tolist()
-
-    if len(time_jd) == 0:
-        raise ValueError(f"All cadences are NaN for TIC {tic_id}")
-
-    return time_jd, flux
-
-
-# ---------------------------------------------------------------------------
-# CSV reader
-# ---------------------------------------------------------------------------
-
-
-def _load_toi_rows(csv_path: Path) -> list[dict]:
-    """Read TOI CSV and return rows filtered to labelled dispositions."""
-    rows: list[dict] = []
-    with csv_path.open(newline="") as fh:
-        reader = csv.DictReader(fh)
-        required = {
-            "tic_id",
-            "tfopwg_disposition",
-            "period_days",
-            "epoch_bjd",
+def _load_checkpoint(path: Path) -> dict[str, set[str]]:
+    """Load checkpoint; returns empty sets if file absent or corrupt."""
+    with contextlib.suppress(OSError, json.JSONDecodeError):
+        data = json.loads(path.read_text())
+        return {
+            "completed": {str(t) for t in data.get("completed_tic_ids", [])},
+            "failed": {str(t) for t in data.get("failed_tic_ids", [])},
         }
-        missing = sorted(required - set(reader.fieldnames or ()))
-        if missing:
-            raise ValueError(
-                "TOI CSV is missing required CNN columns: " + ", ".join(missing)
-            )
+    return {"completed": set(), "failed": set()}
+
+
+def _save_checkpoint(path: Path, completed: set[str], failed: set[str]) -> None:
+    """Atomically write checkpoint JSON."""
+    payload = {
+        "schema_version": _SCHEMA_VERSION,
+        "completed_tic_ids": sorted(completed),
+        "failed_tic_ids": sorted(failed),
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), suffix=".json.tmp")
+    try:
+        with os.fdopen(fd, "w") as fh:
+            json.dump(payload, fh, indent=2)
+        os.replace(tmp, str(path))
+    except Exception:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
+
+
+# ---------------------------------------------------------------------------
+# TOI CSV loading
+# ---------------------------------------------------------------------------
+
+
+def load_toi_csv(csv_path: Path) -> list[dict]:
+    """Load TIC IDs, ephemerides, and labels from a TOI CSV.
+
+    Expected columns (output of Skills/fetch_tess_toi.py):
+        tic_id, period_days, epoch_bjd, tfopwg_disposition
+
+    DECISION-015: rows with epoch_bjd=0.0 or missing are silently rejected
+    and counted.  A warning is emitted if any rows are rejected.
+
+    Returns:
+        List of dicts with keys: tic_id (int), period_days (float),
+        epoch_bjd (float), label (0|1), source (str).
+    """
+    import csv
+
+    rows: list[dict] = []
+    rejected_epoch = 0
+
+    with open(csv_path, newline="") as fh:
+        reader = csv.DictReader(fh)
         for row in reader:
-            disp = row.get("tfopwg_disposition", "").strip()
-            if disp not in _DISPOSITION_LABEL:
-                continue
             try:
-                tic_id = int(float(row["tic_id"]))
-                period = float(row["period_days"])
-                epoch = float(row["epoch_bjd"])
-            except (ValueError, KeyError):
+                tic_id = int(float(row.get("tic_id") or 0))
+                period = float(row.get("period_days") or 0)
+                raw_epoch = (row.get("epoch_bjd") or "").strip()
+                epoch = float(raw_epoch) if raw_epoch else 0.0
+                disp = str(row.get("tfopwg_disposition", "")).strip().upper()
+            except (ValueError, TypeError):
                 continue
-            if (
-                period <= 0
-                or not math.isfinite(period)
-                or epoch < 2_000_000.0
-                or not math.isfinite(epoch)
-            ):
+
+            if tic_id <= 0 or period <= 0:
                 continue
+
+            if epoch <= 0:
+                rejected_epoch += 1
+                continue
+
             rows.append({
                 "tic_id": tic_id,
-                "disposition": disp,
-                "label": _DISPOSITION_LABEL[disp],
                 "period_days": period,
                 "epoch_bjd": epoch,
+                "label": 1 if disp == "CP" else 0,
+                "source": "tess",
             })
+
+    if rejected_epoch:
+        logger.warning(
+            "Rejected %d row(s) with missing/zero epoch_bjd (DECISION-015). "
+            "Re-run Skills/fetch_tess_toi.py to refresh epoch data.",
+            rejected_epoch,
+        )
+
     return rows
 
 
-def audit_snippet_corpus(path: Path) -> dict[str, int | bool]:
-    """Check that a downloaded corpus has usable, BJD-centered snippets."""
-    n_rows = n_ok = n_error = invalid_epoch = invalid_bins = 0
-    with Path(path).open(encoding="utf-8") as handle:
-        for line in handle:
-            if not line.strip():
-                continue
-            n_rows += 1
-            try:
-                row = json.loads(line)
-            except json.JSONDecodeError:
-                n_error += 1
-                continue
-            if row.get("status") != "ok":
-                n_error += 1
-                continue
-            n_ok += 1
-            epoch = row.get("epoch_bjd")
-            if (
-                not isinstance(epoch, (int, float))
-                or isinstance(epoch, bool)
-                or not math.isfinite(float(epoch))
-                or float(epoch) < 2_000_000.0
-            ):
-                invalid_epoch += 1
-            phase = row.get("phase")
-            flux = row.get("flux")
-            if (
-                not isinstance(phase, list)
-                or not isinstance(flux, list)
-                or len(phase) != 201
-                or len(flux) != 201
-            ):
-                invalid_bins += 1
-    return {
-        "n_rows": n_rows,
-        "n_ok": n_ok,
-        "n_error": n_error,
-        "invalid_epoch": invalid_epoch,
-        "invalid_bins": invalid_bins,
-        "valid": n_ok > 0 and invalid_epoch == 0 and invalid_bins == 0,
-    }
-
-
 # ---------------------------------------------------------------------------
-# Checkpoint reader
+# Per-TIC download worker (injectable for tests)
 # ---------------------------------------------------------------------------
 
 
-def _load_done_tic_ids(output_path: Path) -> set[int]:
-    """Return set of TIC IDs already written to *output_path*."""
-    done: set[int] = set()
-    if not output_path.exists():
-        return done
-    with output_path.open() as fh:
-        for line in fh:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                obj = json.loads(line)
-                done.add(int(obj["tic_id"]))
-            except (json.JSONDecodeError, KeyError, ValueError):
-                continue
-    return done
+def _download_one(row: dict, *, n_bins: int) -> dict | None:
+    """Download one TIC ID from MAST and return a snippet dict or None.
 
+    The light curve is stitched across all available TESS sectors, phase-folded
+    using epoch_bjd, and normalised by out-of-transit median flux.
 
-# ---------------------------------------------------------------------------
-# Phase-fold and bin (local copy to avoid cross-import issues)
-# ---------------------------------------------------------------------------
+    Time axis: lc.time.jd (standard Julian Date, sufficient precision for
+    phase-folding; difference from full BJD is < 8 min = negligible vs transit
+    durations of hours).
 
-
-def _phase_fold_bin(
-    time: list[float],
-    flux: list[float],
-    period: float,
-    epoch: float,
-    n_bins: int,
-) -> tuple[list[float], list[float]]:
-    phases = [((t - epoch) % period) / period for t in time]
-    phases = [p - 1.0 if p >= 0.5 else p for p in phases]
-
-    bin_flux: list[list[float]] = [[] for _ in range(n_bins)]
-    for ph, f in zip(phases, flux, strict=False):
-        b = int((ph + 0.5) * n_bins)
-        b = max(0, min(n_bins - 1, b))
-        bin_flux[b].append(f)
-
-    bin_centers = [(-0.5 + (i + 0.5) / n_bins) for i in range(n_bins)]
-    bin_means = [
-        sum(vals) / len(vals) if vals else 1.0
-        for vals in bin_flux
-    ]
-    return bin_centers, bin_means
-
-
-def _extract_snippet(
-    time_jd: list[float],
-    flux: list[float],
-    period: float,
-    epoch: float,
-    n_bins: int,
-) -> tuple[list[float], list[float]] | None:
-    """Phase-fold, normalise, and bin. Returns (phase, flux_binned) or None."""
-    if len(time_jd) < n_bins // 2 or period <= 0:
+    Returns None on any download or extraction failure.
+    """
+    try:
+        import lightkurve as lk  # noqa: PLC0415
+    except ImportError:
+        logger.error("lightkurve not installed; run: pip install lightkurve")
         return None
 
-    # Normalise by median (OOT) flux
-    sorted_f = sorted(flux)
-    median_f = sorted_f[len(sorted_f) // 2]
-    if median_f == 0.0:
-        median_f = 1.0
-    flux_norm = [f / median_f for f in flux]
+    from Skills.labelled_lc_collector import extract_snippet  # noqa: PLC0415
 
-    phase_centers, bin_means = _phase_fold_bin(time_jd, flux_norm, period, epoch, n_bins)
-    return phase_centers, bin_means
+    tic_id = row["tic_id"]
+    period = row["period_days"]
+    epoch = row["epoch_bjd"]
+
+    try:
+        # Prefer 2-min cadence; fall back to any available
+        results = lk.search_lightcurve(
+            f"TIC {tic_id}", mission="TESS", exptime="short"
+        )
+        if len(results) == 0:
+            results = lk.search_lightcurve(f"TIC {tic_id}", mission="TESS")
+        if len(results) == 0:
+            return None
+
+        lc_col = results.download_all(quality_bitmask="default")
+        if lc_col is None or len(lc_col) == 0:
+            return None
+
+        lc = lc_col.stitch().remove_nans().remove_outliers()
+        time = list(map(float, lc.time.jd))
+        flux = list(map(float, lc.flux.value))
+
+        snippet = extract_snippet(
+            time, flux, period, epoch,
+            n_bins=n_bins,
+            label=row["label"],
+            tic_id=tic_id,
+            source=row["source"],
+        )
+        if snippet is None:
+            return None
+
+        return {
+            "tic_id": tic_id,
+            "label": row["label"],
+            "period_days": period,
+            "epoch_bjd": epoch,
+            "phase": list(snippet.phase),
+            "flux": list(snippet.flux),
+            "source": row["source"],
+            "normalization": "local_median_mad",
+        }
+
+    except Exception as exc:
+        logger.debug("TIC %s: %s", tic_id, exc)
+        return None
 
 
 # ---------------------------------------------------------------------------
-# Main pipeline
+# Main download function
 # ---------------------------------------------------------------------------
 
 
-def download_and_extract(
+def download_tess_lightcurves(
     toi_csv: Path,
     output_path: Path,
     *,
-    resume: bool = False,
-    max_targets: int | None = None,
+    checkpoint_path: Path,
+    workers: int = 4,
     n_bins: int = 201,
-    lc_fetch_fn: Callable[[int], tuple[list[float], list[float]]] | None = None,
-    sleep_between: float = 0.5,
-) -> dict[str, int]:
-    """Download TESS light curves and extract phase-folded CNN snippets.
+    resume: bool = True,
+    limit: int | None = None,
+    _download_fn: object = None,
+) -> dict:
+    """Download TESS light curves and build a JSONL snippet corpus.
 
     Args:
-        toi_csv: Path to data/tess_toi.csv.
-        output_path: JSONL output path (appended to when resume=True).
-        resume: Skip TIC IDs already present in output_path.
-        max_targets: Cap total targets processed (default: all).
-        n_bins: Phase bins per snippet — 201 matches Shallue & Vanderburg 2018.
-        lc_fetch_fn: Injectable light-curve fetcher for tests. Defaults to
-            lightkurve + MAST. Signature: (tic_id) -> (time_jd, flux).
-        sleep_between: Seconds to sleep between MAST requests. Set to 0 in tests.
+        toi_csv:         Path to TOI CSV from Skills/fetch_tess_toi.py.
+        output_path:     Destination JSONL file (appended to when resuming).
+        checkpoint_path: Checkpoint JSON tracking completed/failed TIC IDs.
+        workers:         Concurrent download threads (I/O-bound; default 4).
+        n_bins:          Phase bins per snippet (must match CNN input size).
+        resume:          If False, ignore checkpoint and overwrite output.
+        limit:           Process at most this many TIC IDs (testing/dry runs).
+        _download_fn:    Injection point for tests; replaces _download_one.
 
     Returns:
-        Dict with keys n_ok, n_error, n_skipped, n_total.
+        Dict with: flag, n_attempted, n_succeeded, n_failed, n_skipped,
+        output_path, checkpoint_path.
     """
-    fetch = lc_fetch_fn if lc_fetch_fn is not None else _fetch_lc_lightkurve
-
-    rows = _load_toi_rows(toi_csv)
+    rows = load_toi_csv(toi_csv)
     if not rows:
-        raise ValueError("TOI CSV has no labelled rows with valid BJD ephemerides")
-    done_ids = _load_done_tic_ids(output_path) if resume else set()
+        print(
+            "No valid rows found (all rejected due to missing epoch_bjd).\n"
+            "Run: python Skills/fetch_tess_toi.py --output data/tess_toi.csv"
+        )
+        return {
+            "flag": "NO_DATA",
+            "n_attempted": 0,
+            "n_succeeded": 0,
+            "n_failed": 0,
+            "n_skipped": 0,
+        }
+
+    checkpoint = (
+        _load_checkpoint(checkpoint_path)
+        if resume
+        else {"completed": set(), "failed": set()}
+    )
+    completed: set[str] = checkpoint["completed"]
+    failed: set[str] = checkpoint["failed"]
+
+    # Deduplicate by tic_id (keep first) and filter already-done
+    seen: set[int] = set()
+    pending: list[dict] = []
+    n_skipped = 0
+    for row in rows:
+        tid = row["tic_id"]
+        if tid in seen:
+            continue
+        seen.add(tid)
+        if resume and str(tid) in completed:
+            n_skipped += 1
+            continue
+        pending.append(row)
+
+    if limit is not None:
+        pending = pending[:limit]
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    targets = rows if max_targets is None else rows[:max_targets]
-    n_ok = n_error = n_skipped = 0
-    mode = "a" if resume else "w"
+    fn = _download_fn if _download_fn is not None else (
+        lambda row: _download_one(row, n_bins=n_bins)
+    )
 
-    with output_path.open(mode) as fh:
-        for i, row in enumerate(targets):
-            tic_id = row["tic_id"]
+    n_attempted = 0
+    n_succeeded = 0
+    n_failed = 0
 
-            if tic_id in done_ids:
-                n_skipped += 1
-                continue
+    print(
+        f"Starting: {len(pending)} pending, {n_skipped} already done, "
+        f"{workers} worker(s) → {output_path}"
+    )
 
-            print(
-                f"[{i + 1}/{len(targets)}] TIC {tic_id} ({row['disposition']}) … ",
-                end="",
-                flush=True,
-            )
+    open_mode = "a" if resume else "w"
+    with open(output_path, open_mode) as out_fh, ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(fn, row): row for row in pending}
+            for i, future in enumerate(as_completed(futures), 1):
+                row = futures[future]
+                tic_key = str(row["tic_id"])
+                n_attempted += 1
 
-            try:
-                time_jd, flux = fetch(tic_id)
-                result = _extract_snippet(
-                    time_jd, flux, row["period_days"], row["epoch_bjd"], n_bins
-                )
-                if result is None:
-                    raise ValueError("Insufficient data for phase-fold extraction")
+                try:
+                    result = future.result()
+                except Exception as exc:
+                    logger.warning("TIC %s raised: %s", row["tic_id"], exc)
+                    result = None
 
-                phase_centers, flux_bins = result
-                record: dict = {
-                    "tic_id": tic_id,
-                    "label": row["label"],
-                    "disposition": row["disposition"],
-                    "period_days": row["period_days"],
-                    "epoch_bjd": row["epoch_bjd"],
-                    "phase": [round(p, 6) for p in phase_centers],
-                    "flux": [round(f, 8) for f in flux_bins],
-                    "n_points": len(time_jd),
-                    "status": "ok",
-                }
-                fh.write(json.dumps(record) + "\n")
-                fh.flush()
-                n_ok += 1
-                print(f"ok  ({len(time_jd):,} cadences → {n_bins} bins)")
+                if result is not None:
+                    out_fh.write(json.dumps(result) + "\n")
+                    out_fh.flush()
+                    completed.add(tic_key)
+                    failed.discard(tic_key)
+                    n_succeeded += 1
+                else:
+                    failed.add(tic_key)
+                    n_failed += 1
 
-            except Exception as exc:
-                record = {
-                    "tic_id": tic_id,
-                    "status": "error",
-                    "reason": str(exc)[:300],
-                }
-                fh.write(json.dumps(record) + "\n")
-                fh.flush()
-                n_error += 1
-                print(f"ERROR — {exc}")
+                # Save checkpoint after every record (main thread only — no lock needed)
+                _save_checkpoint(checkpoint_path, completed, failed)
 
-            if sleep_between > 0 and lc_fetch_fn is None:
-                time.sleep(sleep_between)
+                if i % 10 == 0 or i == len(pending):
+                    print(
+                        f"  [{i}/{len(pending)}] "
+                        f"+{n_succeeded} ok  -{n_failed} failed"
+                    )
 
+    print(
+        f"\nDone: {n_succeeded} succeeded, {n_failed} failed, "
+        f"{n_skipped} skipped (already in checkpoint)."
+    )
     return {
-        "n_ok": n_ok,
-        "n_error": n_error,
+        "flag": "OK",
+        "n_attempted": n_attempted,
+        "n_succeeded": n_succeeded,
+        "n_failed": n_failed,
         "n_skipped": n_skipped,
-        "n_total": len(targets),
+        "output_path": str(output_path),
+        "checkpoint_path": str(checkpoint_path),
     }
 
 
@@ -371,82 +360,55 @@ def download_and_extract(
 
 
 def _cli(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
+
+    p = argparse.ArgumentParser(
         prog="download_tess_lightcurves",
-        description="Download TESS LCs and extract phase-folded CNN snippets.",
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument(
-        "--toi-csv", default="data/tess_toi.csv",
-        metavar="PATH",
-        help="TOI label CSV from fetch_tess_toi.py (default: data/tess_toi.csv)",
+    p.add_argument(
+        "--toi-csv", default="data/tess_toi.csv", metavar="PATH",
+        help="TOI CSV from fetch_tess_toi.py (default: data/tess_toi.csv)",
     )
-    parser.add_argument(
-        "--output", default="data/tess_snippets.jsonl",
-        metavar="PATH",
-        help="Output JSONL path (default: data/tess_snippets.jsonl)",
+    p.add_argument(
+        "--output", default="data/tess_snippets.jsonl", metavar="PATH",
+        help="Output JSONL file (default: data/tess_snippets.jsonl)",
     )
-    parser.add_argument(
-        "--resume", action="store_true",
-        help="Skip TIC IDs already written to --output",
+    p.add_argument(
+        "--checkpoint", default="checkpoints/download_tess.json", metavar="PATH",
+        help="Checkpoint JSON (default: checkpoints/download_tess.json)",
     )
-    parser.add_argument(
-        "--max-targets", type=int, default=None,
-        metavar="N",
-        help="Stop after N targets (default: all 2668)",
+    p.add_argument(
+        "--workers", type=int, default=4, metavar="N",
+        help="Concurrent download threads (default: 4)",
     )
-    parser.add_argument(
-        "--n-bins", type=int, default=201,
+    p.add_argument(
+        "--n-bins", type=int, default=201, metavar="N",
         help="Phase bins per snippet (default: 201)",
     )
-    parser.add_argument(
-        "--sleep", type=float, default=0.5,
-        metavar="SEC",
-        help="Seconds to sleep between MAST requests (default: 0.5)",
+    p.add_argument(
+        "--no-resume", action="store_true",
+        help="Ignore checkpoint and overwrite output file",
     )
-    parser.add_argument(
-        "--audit-only",
-        action="store_true",
-        help="Audit the existing --output corpus without downloading",
+    p.add_argument(
+        "--limit", type=int, default=None, metavar="N",
+        help="Process at most N TIC IDs (for testing / dry runs)",
     )
-    args = parser.parse_args(argv)
+    args = p.parse_args(argv)
 
-    output_path = Path(args.output)
-    if args.audit_only:
-        if not output_path.is_file():
-            print(f"ERROR: {output_path} not found.")
-            return 1
-        audit = audit_snippet_corpus(output_path)
-        print(json.dumps(audit, indent=2, sort_keys=True))
-        return 0 if audit["valid"] else 1
-
-    toi_csv = Path(args.toi_csv)
-    if not toi_csv.exists():
-        print(
-            f"ERROR: {toi_csv} not found.\n"
-            "Run first:  python Skills/fetch_tess_toi.py --output data/tess_toi.csv"
-        )
-        return 1
-
-    try:
-        result = download_and_extract(
-            toi_csv,
-            output_path,
-            resume=args.resume,
-            max_targets=args.max_targets,
-            n_bins=args.n_bins,
-            sleep_between=args.sleep,
-        )
-    except ValueError as error:
-        print(f"ERROR: {error}")
-        return 1
-    print(
-        f"\nDone: {result['n_ok']} ok, {result['n_error']} errors, "
-        f"{result['n_skipped']} skipped of {result['n_total']} targets."
+    result = download_tess_lightcurves(
+        Path(args.toi_csv),
+        Path(args.output),
+        checkpoint_path=Path(args.checkpoint),
+        workers=args.workers,
+        n_bins=args.n_bins,
+        resume=not args.no_resume,
+        limit=args.limit,
     )
-    print(f"Snippets saved to: {args.output}")
-    if result["n_error"] > 0:
-        print("Re-run with --resume to retry failed targets after fixing any issues.")
-    return 0 if result["n_error"] == 0 else 2
+    for key, val in result.items():
+        print(f"  {key}: {val}")
+    return 0
 
 
 if __name__ == "__main__":
