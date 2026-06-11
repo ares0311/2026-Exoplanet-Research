@@ -1,0 +1,342 @@
+"""Tests for Skills/evaluate_cnn_checkpoint.py (offline only — no PyTorch)."""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+from Skills.evaluate_cnn_checkpoint import (
+    CnnEvalMetrics,
+    CnnEvalResult,
+    _apply_platt,
+    _auc_roc,
+    _best_f1_threshold,
+    _brier,
+    _compute_metrics,
+    _ece,
+    _fit_platt,
+    evaluate_cnn_checkpoint,
+    format_eval_result,
+)
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _write_split(path: Path, examples: list[dict], split: str = "test") -> None:
+    path.write_text(json.dumps({"split": split, "examples": examples}))
+
+
+def _good_example(label: int, signal_strength: float = 1.0) -> dict:
+    """Phase-folded snippet: transit-like dip at center for label=1."""
+    flux = [1.0] * 201
+    if label == 1:
+        mid = 100
+        for i in range(mid - 5, mid + 6):
+            flux[i] = 1.0 - 0.01 * signal_strength
+    return {"flux": flux, "label": label}
+
+
+def _make_splits(tmp_path: Path, n: int = 30) -> Path:
+    split_dir = tmp_path / "splits"
+    split_dir.mkdir()
+    examples = [_good_example(i % 2) for i in range(n)]
+    _write_split(split_dir / "val.json", examples, "val")
+    _write_split(split_dir / "test.json", examples, "test")
+    return split_dir
+
+
+def _dummy_model_fn_pass(fluxes: list[list[float]]) -> list[float]:
+    """Returns high prob for transit-like snippets (label=1 examples have dip)."""
+    probs = []
+    for flux in fluxes:
+        mid = flux[100]
+        # Dipped flux (label=1) → high probability
+        probs.append(max(0.01, min(0.99, 1.0 - mid * 0.9)))
+    return probs
+
+
+def _dummy_model_fn_random(fluxes: list[list[float]]) -> list[float]:
+    """Returns 0.5 for all inputs (poor model)."""
+    return [0.5] * len(fluxes)
+
+
+# ---------------------------------------------------------------------------
+# Metric helpers
+# ---------------------------------------------------------------------------
+
+
+class TestAucRoc:
+    def test_perfect_auc(self) -> None:
+        y_true = [1, 1, 0, 0]
+        y_score = [0.9, 0.8, 0.2, 0.1]
+        assert _auc_roc(y_true, y_score) == pytest.approx(1.0, abs=0.01)
+
+    def test_worst_auc_near_zero(self) -> None:
+        # Inverted classifier: positives get low scores
+        y_true = [1, 1, 0, 0]
+        y_score = [0.1, 0.2, 0.8, 0.9]
+        assert _auc_roc(y_true, y_score) == pytest.approx(0.0, abs=0.01)
+
+    def test_all_same_class_returns_half(self) -> None:
+        y_true = [1, 1, 1]
+        y_score = [0.9, 0.8, 0.7]
+        assert _auc_roc(y_true, y_score) == 0.5
+
+    def test_empty_returns_half(self) -> None:
+        assert _auc_roc([], []) == 0.5
+
+
+class TestBestF1Threshold:
+    def test_finds_good_threshold(self) -> None:
+        y_true = [1, 1, 0, 0]
+        y_score = [0.9, 0.8, 0.2, 0.1]
+        t, f1 = _best_f1_threshold(y_true, y_score)
+        assert f1 == pytest.approx(1.0, abs=0.01)
+        assert 0.0 <= t <= 1.0
+
+    def test_returns_tuple(self) -> None:
+        y_true = [1, 0]
+        y_score = [0.6, 0.4]
+        result = _best_f1_threshold(y_true, y_score)
+        assert len(result) == 2
+
+
+class TestBrier:
+    def test_perfect_brier_zero(self) -> None:
+        y_true = [1, 0]
+        y_score = [1.0, 0.0]
+        assert _brier(y_true, y_score) == pytest.approx(0.0, abs=1e-7)
+
+    def test_worst_brier_one(self) -> None:
+        y_true = [1, 0]
+        y_score = [0.0, 1.0]
+        assert _brier(y_true, y_score) == pytest.approx(1.0, abs=1e-7)
+
+
+class TestEce:
+    def test_ece_miscalibrated_nonzero(self) -> None:
+        # All positives, predictions all 0.1 → large calibration error
+        y_true = [1, 1, 1, 1]
+        y_score = [0.1, 0.1, 0.1, 0.1]
+        ece = _ece(y_true, y_score)
+        assert ece > 0.5
+
+    def test_empty_returns_zero(self) -> None:
+        assert _ece([], []) == 0.0
+
+
+class TestFitPlatt:
+    def test_platt_converges(self) -> None:
+        y_true = [1, 1, 0, 0]
+        y_prob = [0.9, 0.8, 0.2, 0.1]
+        a, b = _fit_platt(y_true, y_prob)
+        assert isinstance(a, float)
+        assert isinstance(b, float)
+
+    def test_apply_platt_in_range(self) -> None:
+        result = _apply_platt(0.5, 1.0, 0.0)
+        assert 0.0 < result < 1.0
+
+
+class TestComputeMetrics:
+    def test_returns_cnn_eval_metrics(self) -> None:
+        y_true = [1, 1, 0, 0]
+        y_score = [0.9, 0.8, 0.2, 0.1]
+        m = _compute_metrics(y_true, y_score)
+        assert isinstance(m, CnnEvalMetrics)
+        assert m.n == 4
+        assert 0.0 <= m.auc <= 1.0
+        assert 0.0 <= m.f1 <= 1.0
+        assert 0.0 <= m.brier <= 1.0
+        assert 0.0 <= m.ece <= 1.0
+
+
+# ---------------------------------------------------------------------------
+# evaluate_cnn_checkpoint
+# ---------------------------------------------------------------------------
+
+
+class TestEvaluateCnnCheckpoint:
+    def test_missing_val_split_returns_missing_flag(self, tmp_path: Path) -> None:
+        split_dir = tmp_path / "splits"
+        split_dir.mkdir()
+        _write_split(split_dir / "test.json", [_good_example(0)])
+        # no val.json
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            model_fn=_dummy_model_fn_pass,
+        )
+        assert result.flag == "MISSING_SPLIT"
+        assert not result.passed
+
+    def test_missing_test_split_returns_missing_flag(self, tmp_path: Path) -> None:
+        split_dir = tmp_path / "splits"
+        split_dir.mkdir()
+        _write_split(split_dir / "val.json", [_good_example(0)])
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            model_fn=_dummy_model_fn_pass,
+        )
+        assert result.flag == "MISSING_SPLIT"
+
+    def test_model_fn_error_returns_load_error(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path)
+
+        def _bad_fn(fluxes: list[list[float]]) -> list[float]:
+            raise RuntimeError("simulated error")
+
+        result = evaluate_cnn_checkpoint(
+            split_dir, tmp_path / "fake.pt", model_fn=_bad_fn
+        )
+        assert result.flag == "LOAD_ERROR"
+
+    def test_pass_with_good_model(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path, n=40)
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            gate_auc=0.50,
+            gate_f1=0.50,
+            model_fn=_dummy_model_fn_pass,
+        )
+        assert result.flag == "PASS"
+        assert result.passed
+
+    def test_fail_with_random_model(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path, n=40)
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            gate_auc=0.90,
+            gate_f1=0.90,
+            model_fn=_dummy_model_fn_random,
+        )
+        assert result.flag == "FAIL"
+        assert not result.passed
+
+    def test_result_has_all_metrics(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path)
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            gate_auc=0.5,
+            gate_f1=0.5,
+            model_fn=_dummy_model_fn_pass,
+        )
+        assert result.val_metrics_raw is not None
+        assert result.test_metrics_raw is not None
+        assert result.test_metrics_cal is not None
+
+    def test_platt_params_set(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path)
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            gate_auc=0.5,
+            gate_f1=0.5,
+            model_fn=_dummy_model_fn_pass,
+        )
+        assert isinstance(result.platt_a, float)
+        assert isinstance(result.platt_b, float)
+
+    def test_calibration_json_written_on_pass(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path, n=40)
+        cal_path = tmp_path / "calibration.json"
+        evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            gate_auc=0.5,
+            gate_f1=0.5,
+            output_calibration=cal_path,
+            model_fn=_dummy_model_fn_pass,
+        )
+        assert cal_path.exists()
+        cal = json.loads(cal_path.read_text())
+        assert "platt_a" in cal
+        assert "platt_b" in cal
+        assert cal.get("flag") == "OK"
+
+    def test_calibration_json_not_written_on_fail(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path, n=40)
+        cal_path = tmp_path / "calibration.json"
+        evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            gate_auc=0.99,
+            gate_f1=0.99,
+            output_calibration=cal_path,
+            model_fn=_dummy_model_fn_random,
+        )
+        assert not cal_path.exists()
+
+    def test_gates_reflected_in_result(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path)
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            gate_auc=0.77,
+            gate_f1=0.66,
+            model_fn=_dummy_model_fn_pass,
+        )
+        assert result.gate_auc == pytest.approx(0.77)
+        assert result.gate_f1 == pytest.approx(0.66)
+
+    def test_evaluated_at_iso_format(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path)
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            model_fn=_dummy_model_fn_pass,
+        )
+        assert "T" in result.evaluated_at  # ISO 8601
+
+
+# ---------------------------------------------------------------------------
+# format_eval_result
+# ---------------------------------------------------------------------------
+
+
+class TestFormatEvalResult:
+    def test_format_contains_flag(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path)
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            gate_auc=0.5,
+            gate_f1=0.5,
+            model_fn=_dummy_model_fn_pass,
+        )
+        text = format_eval_result(result)
+        assert "PASS" in text or "FAIL" in text
+
+    def test_format_contains_auc(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path)
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            gate_auc=0.5,
+            gate_f1=0.5,
+            model_fn=_dummy_model_fn_pass,
+        )
+        text = format_eval_result(result)
+        assert "AUC" in text
+
+    def test_format_missing_split(self) -> None:
+        result = CnnEvalResult(
+            val_metrics_raw=None,
+            test_metrics_raw=None,
+            test_metrics_cal=None,
+            platt_a=1.0,
+            platt_b=0.0,
+            gate_auc=0.85,
+            gate_f1=0.80,
+            passed=False,
+            flag="MISSING_SPLIT",
+            evaluated_at="2026-01-01T00:00:00+00:00",
+        )
+        text = format_eval_result(result)
+        assert "MISSING_SPLIT" in text
