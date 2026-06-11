@@ -46,6 +46,10 @@ data/*.csv
 data/*.pkl
 data/*.pickle
 data/*.json
+data/*.jsonl
+
+# Download checkpoints (local resume state — never committed)
+checkpoints/
 
 # IDE / editor
 .vscode/

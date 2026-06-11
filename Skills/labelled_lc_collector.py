@@ -15,6 +15,7 @@ format_dataset_summary(dataset) -> str
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import tempfile
@@ -123,12 +124,37 @@ def extract_snippet(
     )
 
 
+def _load_build_checkpoint(path: Path) -> set[int]:
+    """Load set of completed tic_ids from checkpoint; empty set if absent."""
+    with contextlib.suppress(OSError, json.JSONDecodeError):
+        data = json.loads(path.read_text())
+        return {int(t) for t in data.get("completed_tic_ids", [])}
+    return set()
+
+
+def _save_build_checkpoint(path: Path, completed: set[int]) -> None:
+    """Atomically save checkpoint for build_dataset."""
+    payload = {"completed_tic_ids": sorted(completed)}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), suffix=".json.tmp")
+    try:
+        with os.fdopen(fd, "w") as fh:
+            json.dump(payload, fh, indent=2)
+        os.replace(tmp, str(path))
+    except Exception:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
+
+
 def build_dataset(
     rows: list[dict],
     *,
     lc_fetcher: callable | None = None,
     n_bins: int = 201,
     output_path: Path | None = None,
+    checkpoint_path: Path | None = None,
+    resume: bool = True,
 ) -> LabelledDataset:
     """Build a labelled dataset from a list of candidate rows.
 
@@ -138,10 +164,16 @@ def build_dataset(
         lc_fetcher: Optional callable(tic_id) -> (time, flux) for fetching LCs.
         n_bins: Number of phase bins per snippet.
         output_path: If given, save dataset as JSON.
+        checkpoint_path: If given, track completed tic_ids for resume support.
+        resume: If True and checkpoint_path is set, skip already-processed rows.
 
     Returns:
         :class:`LabelledDataset`.
     """
+    completed: set[int] = set()
+    if checkpoint_path is not None and resume:
+        completed = _load_build_checkpoint(Path(checkpoint_path))
+
     snippets: list[LabelledSnippet] = []
 
     for row in rows:
@@ -150,6 +182,9 @@ def build_dataset(
         period = float(row.get("period_days", 0.0))
         epoch = float(row.get("epoch_bjd", 0.0))
         source = str(row.get("source", "unknown"))
+
+        if checkpoint_path is not None and resume and tic_id in completed:
+            continue
 
         time_data = row.get("time")
         flux_data = row.get("flux")
@@ -173,6 +208,9 @@ def build_dataset(
         )
         if snippet is not None:
             snippets.append(snippet)
+            if checkpoint_path is not None:
+                completed.add(tic_id)
+                _save_build_checkpoint(Path(checkpoint_path), completed)
 
     label_counts: dict[int, int] = {}
     for s in snippets:

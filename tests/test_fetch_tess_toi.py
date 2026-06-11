@@ -31,6 +31,10 @@ class TestConstants:
     def test_col_map_has_disposition(self) -> None:
         assert "TFOPWG Disposition" in _COL_MAP
 
+    def test_col_map_has_epoch(self) -> None:
+        assert "Epoch (BJD)" in _COL_MAP
+        assert _COL_MAP["Epoch (BJD)"] == "epoch_bjd"
+
     def test_keep_dispositions(self) -> None:
         assert "CP" in _KEEP_DISPOSITIONS
         assert "FP" in _KEEP_DISPOSITIONS
@@ -51,19 +55,22 @@ class TestConstants:
 def _mock_toi_df() -> pd.DataFrame:
     rows = [
         {"TOI": 700.01, "TIC ID": 150428135, "TFOPWG Disposition": "CP",
-         "Period (days)": 37.4, "Duration (hours)": 2.3, "Depth (mmag)": 1.2,
+         "Period (days)": 37.4, "Epoch (BJD)": 2458325.6,
+         "Duration (hours)": 2.3, "Depth (mmag)": 1.2,
          "Planet Radius (R_Earth)": 1.8, "Planet SNR": 22.0,
          "Number of Sectors": 6, "Stellar Radius (R_Sun)": 0.42,
          "Stellar Eff Temp (K)": 3480, "Stellar log(g) (cm/s^2)": 4.8,
          "TESS Mag": 13.1},
         {"TOI": 100.01, "TIC ID": 999, "TFOPWG Disposition": "FP",
-         "Period (days)": 3.1, "Duration (hours)": 1.0, "Depth (mmag)": 20.0,
+         "Period (days)": 3.1, "Epoch (BJD)": 2458100.0,
+         "Duration (hours)": 1.0, "Depth (mmag)": 20.0,
          "Planet Radius (R_Earth)": 22.0, "Planet SNR": 5.0,
          "Number of Sectors": 2, "Stellar Radius (R_Sun)": 1.0,
          "Stellar Eff Temp (K)": 5800, "Stellar log(g) (cm/s^2)": 4.4,
          "TESS Mag": 10.5},
         {"TOI": 200.01, "TIC ID": 888, "TFOPWG Disposition": "PC",
-         "Period (days)": 5.0, "Duration (hours)": 1.5, "Depth (mmag)": 3.0,
+         "Period (days)": 5.0, "Epoch (BJD)": 2458200.0,
+         "Duration (hours)": 1.5, "Depth (mmag)": 3.0,
          "Planet Radius (R_Earth)": 2.5, "Planet SNR": 15.0,
          "Number of Sectors": 3, "Stellar Radius (R_Sun)": 0.9,
          "Stellar Eff Temp (K)": 5200, "Stellar log(g) (cm/s^2)": 4.5,
@@ -127,3 +134,25 @@ class TestFetchToiTable:
         rows = _read_csv(out)
         assert rows
         assert "snr" in rows[0]
+
+    def test_epoch_bjd_column_present(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import Skills.fetch_tess_toi as mod
+        monkeypatch.setattr("pandas.read_csv", lambda *a, **kw: _mock_toi_df())
+        out = tmp_path / "toi.csv"
+        mod.fetch_toi_table(out)
+        rows = _read_csv(out)
+        assert rows
+        assert "epoch_bjd" in rows[0]
+
+    def test_epoch_bjd_values_nonzero(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import Skills.fetch_tess_toi as mod
+        monkeypatch.setattr("pandas.read_csv", lambda *a, **kw: _mock_toi_df())
+        out = tmp_path / "toi.csv"
+        mod.fetch_toi_table(out)
+        rows = _read_csv(out)
+        for row in rows:
+            assert float(row["epoch_bjd"]) > 0, f"epoch_bjd=0 for row {row}"
