@@ -259,3 +259,33 @@ class TestDownloadTessLightcurves:
         )
         state = _load_checkpoint(cp)
         assert "42" in state["completed"]
+
+    def test_keyboard_interrupt_returns_interrupted_flag(
+        self, tmp_path: Path
+    ) -> None:
+        """KeyboardInterrupt mid-run must return flag='INTERRUPTED' with checkpoint saved."""
+        csv_path = tmp_path / "toi.csv"
+        _write_toi_csv(csv_path, [_good_row(i) for i in range(1, 6)])
+        out = tmp_path / "out.jsonl"
+        cp = tmp_path / "cp.json"
+
+        call_count = 0
+
+        def _interrupt_on_second(row: dict) -> dict | None:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 2:
+                raise KeyboardInterrupt
+            return _fake_ok(row)
+
+        result = download_tess_lightcurves(
+            csv_path, out,
+            checkpoint_path=cp,
+            workers=1,
+            _download_fn=_interrupt_on_second,
+        )
+        assert result["flag"] == "INTERRUPTED"
+        assert {"flag", "n_attempted", "n_succeeded", "n_failed", "n_skipped"} <= result.keys()
+        # Checkpoint must be saved so the run is resumable
+        state = _load_checkpoint(cp)
+        assert len(state["completed"]) >= 1
