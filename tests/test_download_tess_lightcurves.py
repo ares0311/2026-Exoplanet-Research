@@ -118,9 +118,19 @@ class TestLoadToiCsv:
         _write_toi_csv(path, [_good_row(disp="CP")])
         assert load_toi_csv(path)[0]["label"] == 1
 
+    def test_kp_maps_to_label_1(self, tmp_path: Path) -> None:
+        path = tmp_path / "toi.csv"
+        _write_toi_csv(path, [_good_row(disp="KP")])
+        assert load_toi_csv(path)[0]["label"] == 1
+
     def test_fp_maps_to_label_0(self, tmp_path: Path) -> None:
         path = tmp_path / "toi.csv"
         _write_toi_csv(path, [_good_row(disp="FP")])
+        assert load_toi_csv(path)[0]["label"] == 0
+
+    def test_fa_maps_to_label_0(self, tmp_path: Path) -> None:
+        path = tmp_path / "toi.csv"
+        _write_toi_csv(path, [_good_row(disp="FA")])
         assert load_toi_csv(path)[0]["label"] == 0
 
     def test_skips_bad_tic_id(self, tmp_path: Path) -> None:
