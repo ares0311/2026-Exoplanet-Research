@@ -150,7 +150,13 @@ def _augment_training_batch(x, config: CnnTrainingConfig):  # noqa: ANN001, ANN2
     ).uniform_(config.augmentation_scale_min, config.augmentation_scale_max)
     sample_std = x.std(dim=2, keepdim=True).clamp_min(1e-6)
     noise = torch.randn_like(x) * sample_std * config.augmentation_noise_fraction
-    return x * scale + noise
+    x = x * scale + noise
+    if config.augmentation_flip:
+        # randomly reverse phase axis per sample — valid symmetry for transit shape
+        flip_mask = torch.rand(x.shape[0], device=x.device) > 0.5
+        x = x.clone()
+        x[flip_mask] = x[flip_mask].flip(dims=[2])
+    return x
 
 
 # ---------------------------------------------------------------------------

@@ -63,6 +63,7 @@ class CnnTrainingConfig:
     augmentation_noise_fraction: float
     augmentation_scale_min: float
     augmentation_scale_max: float
+    augmentation_flip: bool
     seed: int
     checkpoint_dir: str
 
@@ -112,6 +113,7 @@ def default_config() -> CnnTrainingConfig:
         augmentation_noise_fraction=0.02,
         augmentation_scale_min=0.95,
         augmentation_scale_max=1.05,
+        augmentation_flip=False,
         seed=42,
         checkpoint_dir="checkpoints/cnn",
     )
@@ -152,6 +154,7 @@ def _config_to_dict(config: CnnTrainingConfig) -> dict:
         "augmentation_noise_fraction": config.augmentation_noise_fraction,
         "augmentation_scale_min": config.augmentation_scale_min,
         "augmentation_scale_max": config.augmentation_scale_max,
+        "augmentation_flip": config.augmentation_flip,
         "seed": config.seed,
         "checkpoint_dir": config.checkpoint_dir,
     }
@@ -197,6 +200,7 @@ def _config_from_dict(d: dict) -> CnnTrainingConfig:
         augmentation_noise_fraction=float(d.get("augmentation_noise_fraction", 0.0)),
         augmentation_scale_min=float(d.get("augmentation_scale_min", 1.0)),
         augmentation_scale_max=float(d.get("augmentation_scale_max", 1.0)),
+        augmentation_flip=bool(d.get("augmentation_flip", False)),
         seed=int(d["seed"]),
         checkpoint_dir=str(d["checkpoint_dir"]),
     )
