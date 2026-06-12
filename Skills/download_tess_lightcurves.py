@@ -12,9 +12,15 @@ same command and will skip already-processed targets automatically.
 
 Concurrency
 -----------
-MAST downloads are I/O-bound.  ThreadPoolExecutor is used for parallel HTTP
-requests.  File writes and checkpoint saves happen in the main thread so no
-lock is needed on disk operations.  Use --workers to tune (default 4).
+Default mode is sequential (--workers 1) with a configurable inter-request
+delay (--delay 2.0 seconds).  Sequential mode is reliable with MAST because
+it avoids concurrent request throttling that causes the service to stop
+responding.
+
+ThreadPoolExecutor is still available via --workers N (N > 1) for faster
+downloads on networks where MAST is not rate-limited, but this mode often
+hangs after ~20 requests under normal MAST load.  If you observe the script
+stopping after a small number of records, reduce to --workers 1.
 
 DECISION-015 compliance
 -----------------------
@@ -23,11 +29,18 @@ download attempt.  If all rows are rejected, re-run fetch_tess_toi.py.
 
 Usage
 -----
+    # Recommended: sequential with default 2-second inter-request delay
+    python Skills/download_tess_lightcurves.py \\
+        --toi-csv data/tess_toi.csv \\
+        --output data/tess_snippets.jsonl
+
+    # Full options
     python Skills/download_tess_lightcurves.py \\
         --toi-csv data/tess_toi.csv \\
         --output data/tess_snippets.jsonl \\
         [--checkpoint checkpoints/download_tess.json] \\
-        [--workers 4] \\
+        [--workers 1] \\
+        [--delay 2.0] \\
         [--n-bins 201] \\
         [--no-resume] \\
         [--limit N]
@@ -41,6 +54,7 @@ import logging
 import os
 import sys
 import tempfile
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -190,11 +204,11 @@ def _download_one(row: dict, *, n_bins: int) -> dict | None:
             return None
 
         lc = lc_col.stitch().remove_nans().remove_outliers()
-        time = list(map(float, lc.time.jd))
+        time_arr = list(map(float, lc.time.jd))
         flux = list(map(float, lc.flux.value))
 
         snippet = extract_snippet(
-            time, flux, period, epoch,
+            time_arr, flux, period, epoch,
             n_bins=n_bins,
             label=row["label"],
             tic_id=tic_id,
@@ -215,7 +229,7 @@ def _download_one(row: dict, *, n_bins: int) -> dict | None:
         }
 
     except Exception as exc:
-        logger.debug("TIC %s: %s", tic_id, exc)
+        logger.info("TIC %s failed: %s", tic_id, exc)
         return None
 
 
@@ -229,10 +243,11 @@ def download_tess_lightcurves(
     output_path: Path,
     *,
     checkpoint_path: Path,
-    workers: int = 4,
+    workers: int = 1,
     n_bins: int = 201,
     resume: bool = True,
     limit: int | None = None,
+    delay: float = 0.0,
     _download_fn: object = None,
 ) -> dict:
     """Download TESS light curves and build a JSONL snippet corpus.
@@ -241,10 +256,13 @@ def download_tess_lightcurves(
         toi_csv:         Path to TOI CSV from Skills/fetch_tess_toi.py.
         output_path:     Destination JSONL file (appended to when resuming).
         checkpoint_path: Checkpoint JSON tracking completed/failed TIC IDs.
-        workers:         Concurrent download threads (I/O-bound; default 4).
+        workers:         Download threads.  1 = sequential (default, reliable
+                         with MAST).  >1 = concurrent (faster but may throttle).
         n_bins:          Phase bins per snippet (must match CNN input size).
         resume:          If False, ignore checkpoint and overwrite output.
         limit:           Process at most this many TIC IDs (testing/dry runs).
+        delay:           Seconds to sleep between requests in sequential mode
+                         (workers<=1).  Default 0.0; CLI default is 2.0.
         _download_fn:    Injection point for tests; replaces _download_one.
 
     Returns:
@@ -300,6 +318,7 @@ def download_tess_lightcurves(
     n_attempted = 0
     n_succeeded = 0
     n_failed = 0
+    interrupted = False
 
     print(
         f"Starting: {len(pending)} pending, {n_skipped} already done, "
@@ -308,22 +327,17 @@ def download_tess_lightcurves(
 
     open_mode = "a" if resume else "w"
 
-    # Use explicit pool management so KeyboardInterrupt can cancel pending
-    # futures immediately instead of blocking in ThreadPoolExecutor.__exit__
-    # (which calls shutdown(wait=True) and holds until all threads finish).
-    pool = ThreadPoolExecutor(max_workers=workers)
-    interrupted = False
-    try:
-        with open(output_path, open_mode) as out_fh:
-            futures = {pool.submit(fn, row): row for row in pending}
-            try:
-                for i, future in enumerate(as_completed(futures), 1):
-                    row = futures[future]
+    if workers <= 1:
+        # Sequential path — reliable with MAST rate limits.
+        # Delay between requests prevents throttling on sustained runs.
+        try:
+            with open(output_path, open_mode) as out_fh:
+                for i, row in enumerate(pending, 1):
                     tic_key = str(row["tic_id"])
                     n_attempted += 1
 
                     try:
-                        result = future.result()
+                        result = fn(row)
                     except Exception as exc:
                         logger.warning("TIC %s raised: %s", row["tic_id"], exc)
                         result = None
@@ -338,7 +352,6 @@ def download_tess_lightcurves(
                         failed.add(tic_key)
                         n_failed += 1
 
-                    # Save checkpoint after every record (main thread only)
                     _save_checkpoint(checkpoint_path, completed, failed)
 
                     if i % 10 == 0 or i == len(pending):
@@ -347,17 +360,66 @@ def download_tess_lightcurves(
                             f"+{n_succeeded} ok  -{n_failed} failed"
                         )
 
-            except KeyboardInterrupt:
-                interrupted = True
-                pool.shutdown(wait=False, cancel_futures=True)
-                _save_checkpoint(checkpoint_path, completed, failed)
-                print(
-                    f"\nInterrupted at {n_attempted}/{len(pending)} targets. "
-                    f"Checkpoint saved ({n_succeeded} done). "
-                    f"Resume with the same command."
-                )
-    finally:
-        pool.shutdown(wait=False)
+                    if delay > 0 and i < len(pending):
+                        time.sleep(delay)
+
+        except KeyboardInterrupt:
+            interrupted = True
+            _save_checkpoint(checkpoint_path, completed, failed)
+            print(
+                f"\nInterrupted at {n_attempted}/{len(pending)} targets. "
+                f"Checkpoint saved ({n_succeeded} done). "
+                f"Resume with the same command."
+            )
+
+    else:
+        # Concurrent path — faster but may throttle with MAST.
+        # Use --workers 1 if you observe the run stopping after ~20 records.
+        pool = ThreadPoolExecutor(max_workers=workers)
+        try:
+            with open(output_path, open_mode) as out_fh:
+                futures = {pool.submit(fn, row): row for row in pending}
+                try:
+                    for i, future in enumerate(as_completed(futures), 1):
+                        row = futures[future]
+                        tic_key = str(row["tic_id"])
+                        n_attempted += 1
+
+                        try:
+                            result = future.result()
+                        except Exception as exc:
+                            logger.warning("TIC %s raised: %s", row["tic_id"], exc)
+                            result = None
+
+                        if result is not None:
+                            out_fh.write(json.dumps(result) + "\n")
+                            out_fh.flush()
+                            completed.add(tic_key)
+                            failed.discard(tic_key)
+                            n_succeeded += 1
+                        else:
+                            failed.add(tic_key)
+                            n_failed += 1
+
+                        _save_checkpoint(checkpoint_path, completed, failed)
+
+                        if i % 10 == 0 or i == len(pending):
+                            print(
+                                f"  [{i}/{len(pending)}] "
+                                f"+{n_succeeded} ok  -{n_failed} failed"
+                            )
+
+                except KeyboardInterrupt:
+                    interrupted = True
+                    pool.shutdown(wait=False, cancel_futures=True)
+                    _save_checkpoint(checkpoint_path, completed, failed)
+                    print(
+                        f"\nInterrupted at {n_attempted}/{len(pending)} targets. "
+                        f"Checkpoint saved ({n_succeeded} done). "
+                        f"Resume with the same command."
+                    )
+        finally:
+            pool.shutdown(wait=False)
 
     if interrupted:
         return {
@@ -411,8 +473,14 @@ def _cli(argv: list[str] | None = None) -> int:
         help="Checkpoint JSON (default: checkpoints/download_tess.json)",
     )
     p.add_argument(
-        "--workers", type=int, default=4, metavar="N",
-        help="Concurrent download threads (default: 4)",
+        "--workers", type=int, default=1, metavar="N",
+        help="Download threads (default: 1).  Sequential mode (1) is reliable "
+             "with MAST.  Higher values may throttle after ~20 requests.",
+    )
+    p.add_argument(
+        "--delay", type=float, default=2.0, metavar="SEC",
+        help="Seconds between requests in sequential mode (default: 2.0). "
+             "Ignored when --workers > 1.",
     )
     p.add_argument(
         "--n-bins", type=int, default=201, metavar="N",
@@ -436,6 +504,7 @@ def _cli(argv: list[str] | None = None) -> int:
         n_bins=args.n_bins,
         resume=not args.no_resume,
         limit=args.limit,
+        delay=args.delay,
     )
     for key, val in result.items():
         print(f"  {key}: {val}")
