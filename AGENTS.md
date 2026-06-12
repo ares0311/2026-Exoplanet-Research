@@ -177,6 +177,45 @@ caffeinate -dims python Skills/<script>.py [args]
 
 This applies to: light curve downloads, CNN training, batch scans, injection-recovery runs, and any other script that makes repeated network calls or runs for more than a minute. Never give a bare `python ...` recipe for these — always prepend `caffeinate -i`.
 
+## Console Output and ETA — MANDATORY
+
+**Every script that iterates over N items or trains for N epochs must print real-time progress.**
+The operator cannot see internal state; silent scripts look identical to hung ones.
+
+### Required pattern for item loops
+
+```python
+import time
+
+start = time.monotonic()
+for i, item in enumerate(items, 1):
+    # ... do work ...
+    elapsed = time.monotonic() - start
+    rate = i / elapsed
+    remaining = (n_total - i) / rate if rate > 0 else float("inf")
+    eta = f"{remaining/60:.0f}m{remaining%60:.0f}s" if remaining > 90 else f"{remaining:.0f}s"
+    print(f"  [{i}/{n_total}]  elapsed={elapsed:.0f}s  ETA={eta}", flush=True)
+```
+
+### Required pattern for training loops
+
+Print one line per epoch with at minimum: epoch number, train loss, val loss, primary metric, learning rate, and whether this is a new best or how far patience has advanced:
+
+```
+Epoch  N/50  train=0.4123  val=0.5210  auc=0.8011  lr=3.00e-04  ← best
+Epoch  N/50  train=0.3990  val=0.5350  auc=0.7944  lr=3.00e-04  (patience 1/10)
+```
+
+Print a startup banner before the loop showing total size, batch size, max epochs, and patience.
+Print an explicit early-stopping or completion line at the end.
+
+### Non-negotiable rules
+
+- Always `flush=True` on every progress print — buffered output defeats the purpose.
+- Print at every step, or at minimum every 10 items for very fast loops.
+- **Never commit a long-running script that has no console output** — if a script is silent, add progress prints before committing.
+- When reviewing or modifying any existing long-running script, verify it meets this standard and add output if missing.
+
 ## Local–Remote Sync Policy
 
 The user's local Mac and GitHub `main` are the joint source of truth. The agent's server environment is a temporary workspace only. Keeping them in sync is a hard requirement — never leave them diverged.
