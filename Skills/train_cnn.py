@@ -403,6 +403,13 @@ def train_cnn(
     n_train = len(x_train)
     batch_size = config.batch_size
 
+    print(
+        f"Training: {n_train} train / {len(x_val)} val"
+        f" | batch={batch_size} max_epochs={config.max_epochs}"
+        f" | early_stop patience={config.early_stopping_patience}",
+        flush=True,
+    )
+
     for epoch in range(1, config.max_epochs + 1):
         # --- training ---
         model.train()
@@ -470,7 +477,8 @@ def train_cnn(
         )
 
         selection_value = val_auc if config.selection_metric == "val_auc" else -val_loss
-        if selection_value > best_selection_value:
+        is_new_best = selection_value > best_selection_value
+        if is_new_best:
             best_selection_value = selection_value
             best_val_loss = val_loss
             best_val_auc = val_auc
@@ -479,8 +487,23 @@ def train_cnn(
             torch.save(model.state_dict(), best_checkpoint)
         else:
             patience_counter += 1
-            if patience_counter >= config.early_stopping_patience:
-                break
+
+        _pat = f"patience {patience_counter}/{config.early_stopping_patience}"
+        print(
+            f"Epoch {epoch:3d}/{config.max_epochs}"
+            f"  train={train_loss:.4f}  val={val_loss:.4f}"
+            f"  auc={val_auc:.4f}  lr={learning_rate:.2e}"
+            + ("  ← best" if is_new_best else f"  ({_pat})"),
+            flush=True,
+        )
+
+        if patience_counter >= config.early_stopping_patience:
+            print(
+                f"Early stopping at epoch {epoch}"
+                f" — best epoch {best_epoch} val_auc={best_val_auc:.4f}",
+                flush=True,
+            )
+            break
         scheduler.step(val_loss)
 
     # Write metrics.json for checkpoint manager
