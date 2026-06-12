@@ -61,9 +61,42 @@ An audit later on 2026-06-10 found that every nominally usable training
 snippet had `epoch_bjd=0.0`. The local TOI CSV used for the download predated
 epoch-column ingestion, so events were phase-folded without centering the
 catalog transit. This invalidates the corpus, the original seed-42 split, and
-all later splits or experiments derived from it. Training must remain stopped
-until a newly downloaded, BJD-epoch-bearing corpus passes
-`download_tess_lightcurves.py --audit-only`.
+all later splits or experiments derived from it.
+
+## Second Production Candidate Evaluation
+
+The corpus was rebuilt from scratch on 2026-06-12 with valid BJD epochs
+(2,037 snippets: 1,012 positive CP+KP + 1,025 negative FP+FA, ratio 0.99).
+Splits: 1,425 train / 306 val / 306 test (TIC-grouped, seed-42 stratified).
+
+Training used the default config (`cnn_training_config.py::default_config`):
+LR=1e-3, AdamW, weight_decay=1e-4, dropout 0.5/0.3, aug_noise=0.02.
+Best epoch 4, val AUC=0.8177. Early stopping at epoch 14.
+
+Calibration and threshold selection used the 306-example validation partition.
+The 306-example test partition was then opened once for the final decision.
+
+| Metric | Raw val | Raw test | Calibrated test | Production target |
+|---|---:|---:|---:|---:|
+| ROC-AUC | 0.8177 | 0.7180 | 0.7180 | >= 0.85 |
+| F1 | 0.7711 | 0.6998 | 0.6998 | >= 0.80 |
+| Brier | 0.1794 | 0.2153 | 0.2237 | must not worsen |
+| ECE | 0.0690 | 0.0646 | 0.0730 | must not worsen |
+
+Platt calibration: A=1.5546, B=−0.7152; threshold=0.43.
+
+The checkpoint failed both the AUC and F1 gates. The 10-point val→test AUC
+gap (0.8177→0.7180) indicates the model overfit to the training/validation
+distribution under the default config. Calibration worsened both Brier and ECE
+and must not be used. This checkpoint must not be promoted to `models/`.
+
+**Root cause**: Default LR (1e-3) drives fast convergence; best epoch 4 shows
+the model has already begun overfitting by epoch 4 on 1,425 training examples.
+Dropout (0.5/0.3) and weight decay (1e-4) are insufficient for this corpus size.
+
+**Next run**: `configs/cnn_retrain_v1.json` — LR=3e-4, weight_decay=1e-3,
+dropout 0.5/0.5, aug_noise=0.05, scale 0.90–1.10. Same splits. Target: reduce
+val→test gap and push test AUC above 0.85.
 
 ---
 
