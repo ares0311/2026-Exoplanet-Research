@@ -81,6 +81,38 @@ caffeinate -dims python Skills/<script>.py [args] # lid-close safe
 ```
 This applies to: light curve downloads, CNN training, batch scans, injection-recovery, and any repeated-network or long-compute script. **Never give a bare `python ...` recipe for these.**
 
+### Console Output and ETA — MANDATORY
+
+**Every script that iterates over N items or trains for N epochs must print real-time progress with ETA.**
+A silent script is indistinguishable from a hung one.
+
+**Item loop pattern** (download, batch scan, injection-recovery, etc.):
+```python
+import time
+start = time.monotonic()
+for i, item in enumerate(items, 1):
+    # ... work ...
+    elapsed = time.monotonic() - start
+    rate = i / elapsed
+    remaining = (n_total - i) / rate if rate > 0 else float("inf")
+    eta = f"{remaining/60:.0f}m{remaining%60:.0f}s" if remaining > 90 else f"{remaining:.0f}s"
+    print(f"  [{i}/{n_total}]  elapsed={elapsed:.0f}s  ETA={eta}", flush=True)
+```
+
+**Training loop pattern** — one line per epoch, minimum fields: epoch, train loss, val loss, primary metric, LR, best/patience:
+```
+Epoch  4/50  train=0.4123  val=0.5335  auc=0.8177  lr=3.00e-04  ← best
+Epoch  5/50  train=0.3990  val=0.5610  auc=0.8041  lr=3.00e-04  (patience 1/10)
+```
+
+Print a startup banner before any loop. Print a completion or early-stop line at the end.
+
+**Rules:**
+- Always `flush=True` — buffered output defeats the purpose.
+- Print at every step, or every 10 items for fast loops.
+- **Never commit a long-running script without console output.** If a script is silent, add progress prints before committing.
+- When modifying any existing long-running script, check it meets this standard and fix if not.
+
 ### Python Environment Policy — NEVER TOUCH SYSTEM PYTHON
 - Validated runtime: **Python 3.14.3** inside `.venv` — never use system Python
 - All work happens inside the `.venv` virtual environment
