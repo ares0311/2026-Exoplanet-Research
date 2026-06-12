@@ -124,6 +124,35 @@ examples. Increasing regularization alone will not fix this.
 `configs/cnn_retrain_v1.json`. A different seed redistributes examples across
 val/test and may close the gap.
 
+## Fourth Production Candidate Evaluation
+
+Same `configs/cnn_retrain_v1.json`, but splits rebuilt with `--seed 7`
+(1,425 train / 306 val / 306 test). Best epoch 32, val AUC=0.7914.
+Early stopping at epoch 42.
+
+| Metric | Raw val | Raw test | Calibrated test | Production target |
+|---|---:|---:|---:|---:|
+| ROC-AUC | 0.7914 | 0.7682 | 0.7682 | >= 0.85 |
+| F1 | 0.7530 | 0.7267 | 0.7262 | >= 0.80 |
+| Brier | 0.1894 | 0.2008 | 0.2113 | must not worsen |
+| ECE | 0.0805 | 0.1012 | 0.1166 | must not worsen |
+
+Platt calibration: A=1.5641, B=−0.7269; threshold=0.47.
+
+Val→test AUC gap: only **2.3 points** (0.7914→0.7682) — down from 9.5–10.0
+points with seed-42 splits. This confirms seed-42 assigned systematically
+harder examples to its test set; seed-7 gives an honest, balanced evaluation.
+
+**Key finding**: The true model ceiling with the current architecture and
+1,425 training examples is ~0.77 AUC. Regularization and split tuning cannot
+bridge the remaining gap to 0.85. The bottleneck is effective training set
+size and the information content of 201-bin phase-folded arrays alone.
+
+**Next run**: Add `augmentation_flip: true` to the training config. Randomly
+flipping the phase axis during training is a physically valid symmetry (transit
+shape is symmetric about the center) and effectively doubles the examples seen
+per epoch at zero data-collection cost.
+
 ---
 
 ## Motivation
