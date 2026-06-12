@@ -29,9 +29,9 @@ production scoring.
 ### T1-1: Production Tier 2 CNN Checkpoint
 
 - **What is missing**: A CNN checkpoint that passes held-out performance and calibration gates
-- **Gate status**: **OPEN as of 2026-06-06** — 1,324 positive (CP+KP) + 1,344 negative (FP+FA) = 2,668 total
+- **Gate status**: **OPEN** — 2,037 snippets (1,012 positive CP+KP + 1,025 negative FP+FA); corpus valid as of 2026-06-12
 - **Code status**: Training and state-dict inference paths are operational; the package scorer reconstructs the trained architecture and fails closed when loading fails
-- **Local corpus status**: **REBUILD IN PROGRESS as of 2026-06-12** — zero-epoch corpus retired; TOI table re-fetched with valid BJD epochs (2,636 rows); label bug fixed (KP→1); MAST throttling fix merged (`bbb0877`); full sequential re-download running overnight (`--workers 1 --delay 2.0`); corpus not usable until download completes and audit passes
+- **Local corpus status**: **VALID as of 2026-06-12** — 2,037 snippets (1,012 positive CP+KP, 1,025 negative FP+FA, ratio 0.99); zero-epoch corpus retired and rebuilt from scratch with valid BJD epochs; label bug fixed (KP→1); MAST throttling fix applied (`bbb0877`)
 - **Data policy**: A future audit-passing replacement corpus will be the authorized local T1-1 training input and remain uncommitted under `docs/SYSTEM_PROFILE.md` and DECISION-014
 - **Retired splits**: The seed-42 1,837 / 392 / 394 split and temporary 1,492 / 369 / 368 replacement split were both derived from the invalid zero-epoch corpus and must not be reused
 - **Rejected candidate**: SHA-256 `e02af3903ab65f4af4f3f05f95dd6da8815a6746fea1bf2eac67bbba3555d6c6`, trained on Python 3.14.3 with PyTorch 2.12.0; best epoch 5, validation AUC 0.7476
@@ -39,7 +39,7 @@ production scoring.
 - **Promotion decision**: **REJECTED** — AUC and F1 are below the documented 0.85 and 0.80 targets, and calibration worsened both Brier score and ECE
 - **Root cause found**: Missing transit epochs left genuine transit events uncentered in phase; this is not an architecture-only generalization problem
 - **Code remediation**: TOI fetch/download now fail closed on missing or non-BJD epochs, corpus audit reports invalid epochs, normalized padding is consistent at zero, and grouped development experiments cannot read the sealed promotion holdout
-- **Next step**: After overnight download completes, audit corpus (`pos/neg/total`), build CNN splits, validate, retrain, evaluate against gates (AUC ≥ 0.85, F1 ≥ 0.80)
+- **Next step**: Build CNN splits (`build_cnn_training_data.py`), validate (`cnn_split_validator.py`), train (`train_cnn.py`), evaluate against gates (AUC ≥ 0.85, F1 ≥ 0.80), promote if passing
 - **Gate check**: `python Skills/count_tess_labels.py`
 - **Architecture spec**: `docs/CNN_SPEC.md`
 - **Artifact policy**: Commit the validated production checkpoint, calibration metadata, model registry entry, and reproducibility manifest under `models/` after all production-readiness checks pass
@@ -135,7 +135,7 @@ These are enforced in code and must never be bypassed:
 
 | Blocker | What Is Needed | Who |
 |---|---|---|
-| CNN corpus rebuild | Sequential re-download running overnight (2,636 targets, workers=1, delay=2s) — **IN PROGRESS** | Human |
+| CNN retraining run | Run training recipe after splits are built and validated | Human |
 | CNN retraining run | Run the next approved training recipe in `.venv` after the rebuilt corpus passes audit | Human |
 | CNN production promotion | Validate, calibrate, register, and commit only a checkpoint that passes held-out gates | Agent + human approval |
 | Stacking weight calibration | Tune blend weights on held-out calibration set | Agent after T1-1 resolved |
