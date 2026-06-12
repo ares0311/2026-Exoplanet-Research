@@ -23,6 +23,7 @@ import json
 import math
 import os
 import tempfile
+import time
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -410,7 +411,11 @@ def train_cnn(
         flush=True,
     )
 
+    train_start = time.monotonic()
+    epoch_times: list[float] = []
+
     for epoch in range(1, config.max_epochs + 1):
+        epoch_t0 = time.monotonic()
         # --- training ---
         model.train()
         perm = torch.randperm(n_train)
@@ -488,11 +493,18 @@ def train_cnn(
         else:
             patience_counter += 1
 
+        epoch_times.append(time.monotonic() - epoch_t0)
+        elapsed = time.monotonic() - train_start
+        avg_epoch = elapsed / epoch
+        remaining = avg_epoch * (config.max_epochs - epoch)
+        eta = f"{remaining/60:.0f}m{remaining%60:.0f}s" if remaining > 90 else f"{remaining:.0f}s"
+
         _pat = f"patience {patience_counter}/{config.early_stopping_patience}"
         print(
             f"Epoch {epoch:3d}/{config.max_epochs}"
             f"  train={train_loss:.4f}  val={val_loss:.4f}"
             f"  auc={val_auc:.4f}  lr={learning_rate:.2e}"
+            f"  elapsed={elapsed:.0f}s  ETA={eta}"
             + ("  ← best" if is_new_best else f"  ({_pat})"),
             flush=True,
         )
