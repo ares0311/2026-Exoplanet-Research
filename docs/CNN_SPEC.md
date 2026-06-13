@@ -178,9 +178,41 @@ Augmentation (flip+shift) further destabilizes per-batch statistics.
 **Fix**: Disable batch norm. Phase-flip and phase-shift augmentation are retained
 as the primary improvement mechanism.
 
-**Next run**: `configs/cnn_retrain_v2b.json` — `use_batch_norm=false`,
-`augmentation_flip=true`, `augmentation_shift_bins=20`, same seed-7 splits,
-checkpoint dir `models/cnn_v2b/`.
+**Fix**: Disable batch norm. Phase-flip and phase-shift augmentation retained
+as the primary improvement mechanism.
+
+## Seventh Production Candidate Evaluation
+
+`configs/cnn_retrain_v2b.json` — `use_batch_norm=false`, `augmentation_flip=true`,
+`augmentation_shift_bins=20`. Same seed-7 splits (1,425/306/306). Best epoch 23,
+val AUC=0.7887. Early stopping at epoch 33 (patience 10). LR decayed from 3e-4
+to 1.87e-5. Training was stable (no collapse).
+
+| Metric | Val (raw) | Test (raw) | Test (cal) | Target |
+|---|---:|---:|---:|---:|
+| ROC-AUC | 0.7887 | 0.7527 | 0.7527 | ≥ 0.85 |
+| F1 | 0.7397 | 0.7214 | 0.7202 | ≥ 0.80 |
+| Brier | 0.1907 | 0.2070 | 0.2200 | — |
+| ECE | 0.0547 | 0.0990 | 0.1168 | — |
+
+Platt calibration: A=1.4732, B=−0.6896. Val→test gap: 3.6 pts.
+Calibration worsened Brier and ECE (same pattern as all prior candidates).
+**REJECTED** — test AUC 0.7527 < 0.85 gate, calibrated F1 0.7202 < 0.80 gate.
+
+**Root cause**: The model has ~435K parameters (410K in Dense(256) alone) against
+only 1,425 training examples — over 300 examples per parameter. The dense layers
+are massively overparameterized for this dataset size. Augmentation reduced the
+val→test gap slightly (from 3.3 to 3.6 pts) but also depressed val AUC from 0.8083
+to 0.7887, producing lower test AUC than candidate 5.
+
+**Fix**: Drastically reduce model capacity to match the dataset size.
+Proposed v3 architecture: Conv(8/16/32) + Dense(64) only, totaling ~54K parameters.
+With dropout 0.3 and the same flip+shift augmentation, this smaller model should
+generalize better and achieve higher val AUC.
+
+**Next run**: `configs/cnn_retrain_v3.json` — halved conv channels (8/16/32),
+single dense layer (64 units), lower dropout (0.3), same flip+shift, seed-7 splits,
+checkpoint dir `models/cnn_v3/`.
 
 ---
 
