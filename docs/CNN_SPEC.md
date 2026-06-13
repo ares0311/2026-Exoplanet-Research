@@ -282,6 +282,47 @@ python Skills/evaluate_cnn_checkpoint.py --split-dir data/cnn_splits \
     --checkpoint models/cnn_ens_s99/best.pt
 ```
 
+## Tenth Production Candidate Evaluation (Ensemble)
+
+3-seed ensemble of `configs/cnn_retrain_v1.json` (best single-model config) with
+seeds 7, 13, 99. Member val AUCs: 0.7914, 0.7848, 0.8022. Predictions averaged
+at sigmoid-output level before Platt calibration.
+
+| Metric | Val (raw) | Test (raw) | Test (cal) | Target |
+|---|---:|---:|---:|---:|
+| ROC-AUC | 0.8022 | 0.7670 | 0.7670 | ≥ 0.85 |
+| F1 | 0.7438 | 0.7317 | 0.7317 | ≥ 0.80 |
+| Brier | 0.1838 | 0.2057 | 0.2106 | — |
+| ECE | 0.0583 | 0.1260 | 0.1180 | — |
+
+Platt calibration: A=1.5945, B=−0.7796.
+**REJECTED** — test AUC 0.7670 < 0.85 gate, F1 0.7317 < 0.80 gate.
+
+**Root cause**: The 3-seed ensemble is *worse* than the best single model (C5 test
+AUC=0.7758). Members trained on the same 1,425 examples with the same architecture
+are too correlated to provide meaningful diversity; ensemble averaging provides no
+gain over the best seed and can degrade performance when seeds disagree in the
+wrong direction.
+
+**Systematic ceiling confirmed**: All 10 candidates (single-model and ensemble)
+produced test AUC 0.71–0.78. The ceiling is a data-size constraint: 1,425 training
+examples cannot drive this architecture to 0.85 AUC regardless of tuning strategy.
+
+**Authorized path forward (both paths run in parallel):**
+
+- **Path A — More labeled TESS data**: Download additional phase-folded snippets
+  from MAST for ExoFOP confirmed planets and confirmed false positives beyond
+  the current 2,037-snippet corpus. Target: ≥ 5,000 training examples.
+  Gate: test AUC ≥ 0.85 after retraining on expanded corpus.
+
+- **Path B — Kepler→TESS transfer learning**: Pre-train the CNN architecture on
+  tens of thousands of Kepler TCE phase-folded light curves (Shallue & Vanderburg
+  2018 style), then fine-tune the final dense layers on the 1,425 TESS examples.
+  Kepler has ~5,000 confirmed KOIs and ~100,000 TCEs. Pre-training on this corpus
+  supplies a strong feature extractor; TESS fine-tuning adapts to cadence/pixel-scale
+  differences. This is the most robust path to exceeding 0.85 test AUC on the
+  current TESS snippet count.
+
 ---
 
 ## Motivation

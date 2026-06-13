@@ -1,6 +1,6 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-06-13 (ninth training run evaluated; ensemble approach initiated — train_cnn --seed override and multi-checkpoint evaluate implemented)
+Last reviewed: 2026-06-13 (tenth candidate [ensemble] rejected; systematic ceiling confirmed; Path A [more data] + Path B [Kepler transfer learning] authorized)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
 Test baseline: 2,003 default tests passing, 2 integration_live deselected
@@ -45,9 +45,11 @@ production scoring.
 - **Root cause (systematic, candidates 2–7)**: Dense(256) layer alone has 410K parameters; with 1,425 training examples the model cannot generalize past ~0.78 test AUC regardless of regularization; model capacity must be reduced to match the dataset size
 - **Rejected candidate 8**: seed-7 splits, `cnn_retrain_v3.json` (Conv 8/16/32, Dense 64, dropout 0.3, flip+shift); best epoch 11, val AUC=0.7734; test raw AUC=0.7094, F1=0.6805, Brier=0.2238, ECE=0.0992; Platt A=1.3045, B=−0.6584; calibrated test F1=0.6792, Brier=0.2307, ECE=0.1282; val→test gap 6.4 pts; **REJECTED** — test AUC 0.7094 < 0.85 gate; root cause: halved conv channels reduced feature extraction capacity; flip+shift augmentation net harmful across all candidates where it was tested
 - **Rejected candidate 9**: seed-7 splits, `cnn_retrain_v3b.json` (Conv 16/32/64, Dense 128, dropout 0.4, no flip/shift); best epoch 18, val AUC=0.7807; test raw AUC=0.7573, F1=0.7257, Brier=0.2051, ECE=0.0867; Platt A=1.5114, B=−0.7136; calibrated test F1=0.7207, Brier=0.2155, ECE=0.1230; val→test gap 2.3 pts; **REJECTED** — test AUC 0.7573 < 0.85 gate, F1 0.7207 < 0.80 gate; reducing Dense(256→128) slightly hurt val AUC without improving test AUC vs C5
-- **Systematic ceiling (candidates 2–9)**: All 9 candidates produced test AUC 0.71–0.78; ceiling is a data-size constraint (1,425 examples, 201-bin representation); no single-model architectural change has broken through; ensemble approach is the next lever
-- **Ensemble approach**: Train 3 models on v1 config (best single-model, test AUC=0.7758) with seeds 7, 13, 99; average predictions at inference; `train_cnn.py` now supports `--seed N` override; `evaluate_cnn_checkpoint.py` now accepts multiple `--checkpoint` paths for ensemble evaluation
-- **Next step**: Run the 3-seed ensemble training recipe (see `docs/CNN_SPEC.md` Ninth Candidate section), then evaluate the ensemble; if ensemble test AUC < 0.85, the production path requires more training data or Kepler→TESS transfer learning
+- **Rejected candidate 10 (ensemble)**: 3-seed ensemble of `cnn_retrain_v1.json` (seeds 7, 13, 99); individual val AUCs: 0.7914, 0.7848, 0.8022; ensemble val AUC=0.8022; test raw AUC=0.7670, F1=0.7317, Brier=0.2057, ECE=0.1260; Platt A=1.5945, B=−0.7796; calibrated test F1=0.7317; **REJECTED** — test AUC 0.7670 < 0.85 gate, F1 0.7317 < 0.80 gate; ensemble is *worse* than best single model (C5: 0.7758); members too correlated on 1,425 examples to provide diversity gain
+- **Systematic ceiling confirmed (candidates 2–10)**: All 10 candidates (single-model and 3-seed ensemble) produced test AUC 0.71–0.78; ceiling is a data-size constraint; 1,425 training examples cannot drive this architecture to 0.85 AUC regardless of tuning, regularization, augmentation, or ensembling strategy
+- **Authorized path forward — BOTH Path A and Path B run in parallel**:
+  - **Path A — More labeled TESS data**: Download additional phase-folded snippets from MAST for ExoFOP confirmed planets and confirmed false positives; target ≥ 5,000 training examples; retrain with expanded corpus
+  - **Path B — Kepler→TESS transfer learning**: Pre-train CNN on Kepler TCE phase-folded light curves (tens of thousands of examples); fine-tune final dense layers on 1,425 TESS examples; most robust path to exceeding 0.85 test AUC on current TESS snippet count
 - **Gate check**: `python Skills/count_tess_labels.py`
 - **Architecture spec**: `docs/CNN_SPEC.md`
 - **Artifact policy**: Commit the validated production checkpoint, calibration metadata, model registry entry, and reproducibility manifest under `models/` after all production-readiness checks pass
