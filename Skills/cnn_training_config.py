@@ -63,6 +63,9 @@ class CnnTrainingConfig:
     augmentation_noise_fraction: float
     augmentation_scale_min: float
     augmentation_scale_max: float
+    augmentation_flip: bool
+    augmentation_shift_bins: int
+    use_batch_norm: bool
     seed: int
     checkpoint_dir: str
 
@@ -112,6 +115,9 @@ def default_config() -> CnnTrainingConfig:
         augmentation_noise_fraction=0.02,
         augmentation_scale_min=0.95,
         augmentation_scale_max=1.05,
+        augmentation_flip=False,
+        augmentation_shift_bins=0,
+        use_batch_norm=False,
         seed=42,
         checkpoint_dir="checkpoints/cnn",
     )
@@ -152,6 +158,9 @@ def _config_to_dict(config: CnnTrainingConfig) -> dict:
         "augmentation_noise_fraction": config.augmentation_noise_fraction,
         "augmentation_scale_min": config.augmentation_scale_min,
         "augmentation_scale_max": config.augmentation_scale_max,
+        "augmentation_flip": config.augmentation_flip,
+        "augmentation_shift_bins": config.augmentation_shift_bins,
+        "use_batch_norm": config.use_batch_norm,
         "seed": config.seed,
         "checkpoint_dir": config.checkpoint_dir,
     }
@@ -197,6 +206,9 @@ def _config_from_dict(d: dict) -> CnnTrainingConfig:
         augmentation_noise_fraction=float(d.get("augmentation_noise_fraction", 0.0)),
         augmentation_scale_min=float(d.get("augmentation_scale_min", 1.0)),
         augmentation_scale_max=float(d.get("augmentation_scale_max", 1.0)),
+        augmentation_flip=bool(d.get("augmentation_flip", False)),
+        augmentation_shift_bins=int(d.get("augmentation_shift_bins", 0)),
+        use_batch_norm=bool(d.get("use_batch_norm", False)),
         seed=int(d["seed"]),
         checkpoint_dir=str(d["checkpoint_dir"]),
     )
@@ -326,6 +338,8 @@ def validate_config(config: CnnTrainingConfig) -> CnnConfigValidation:
         errors.append("augmentation_noise_fraction must be >= 0")
     if not 0.0 < config.augmentation_scale_min <= config.augmentation_scale_max:
         errors.append("augmentation scale range must be positive and ordered")
+    if config.augmentation_shift_bins < 0:
+        errors.append("augmentation_shift_bins must be >= 0")
     for i, cl in enumerate(config.conv_layers):
         if cl.kernel_size % 2 == 0:
             errors.append(
@@ -378,6 +392,9 @@ def format_config(config: CnnTrainingConfig) -> str:
         f"- max_epochs: {config.max_epochs}  patience={config.early_stopping_patience}",
         f"- selection_metric: {config.selection_metric}",
         f"- augment: {config.augment}  noise_fraction={config.augmentation_noise_fraction}",
+        f"- augmentation_flip: {config.augmentation_flip}"
+        f"  shift_bins={config.augmentation_shift_bins}",
+        f"- use_batch_norm: {config.use_batch_norm}",
         f"- seed: {config.seed}",
         f"- checkpoint_dir: {config.checkpoint_dir}",
     ]

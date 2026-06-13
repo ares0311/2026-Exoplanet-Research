@@ -23,9 +23,9 @@
   "augmentation_noise_fraction": 0.05,
   "augmentation_scale_min": 0.9,
   "augmentation_scale_max": 1.1,
-  "augmentation_flip": false,
-  "augmentation_shift_bins": 0,
-  "use_batch_norm": false,
+  "augmentation_flip": true,
+  "augmentation_shift_bins": 20,
+  "use_batch_norm": true,
   "seed": 7,
-  "checkpoint_dir": "models/cnn_v1"
+  "checkpoint_dir": "models/cnn_v2"
 }

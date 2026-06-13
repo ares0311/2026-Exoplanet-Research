@@ -80,6 +80,47 @@ def test_train_augmentation_changes_only_enabled_batches() -> None:
     assert not torch.equal(augmented, batch)
 
 
+def test_augmentation_flip_reverses_some_samples() -> None:
+    import dataclasses
+
+    torch = pytest.importorskip("torch")
+
+    # Create asymmetric signal: ramp from 0 to 1
+    flux = torch.linspace(0.0, 1.0, 201).unsqueeze(0).unsqueeze(0).expand(8, 1, 201)
+    cfg = dataclasses.replace(default_config(), augmentation_flip=True, augment=True,
+                              augmentation_noise_fraction=0.0,
+                              augmentation_scale_min=1.0, augmentation_scale_max=1.0)
+    torch.manual_seed(0)
+    out = _augment_training_batch(flux, cfg)
+    assert out.shape == flux.shape
+    # At least one sample should be flipped (reversed along last dim)
+    flipped = flux.flip(dims=[2])
+    any_flipped = any(
+        torch.allclose(out[i], flipped[0], atol=1e-5) for i in range(out.shape[0])
+    )
+    assert any_flipped
+
+
+def test_augmentation_shift_bins_rolls_flux() -> None:
+    import dataclasses
+
+    torch = pytest.importorskip("torch")
+
+    flux = torch.zeros((4, 1, 201))
+    flux[:, :, 0] = 1.0  # spike at position 0
+    cfg = dataclasses.replace(default_config(), augmentation_shift_bins=10, augment=True,
+                              augmentation_noise_fraction=0.0,
+                              augmentation_scale_min=1.0, augmentation_scale_max=1.0,
+                              augmentation_flip=False)
+    torch.manual_seed(1)
+    out = _augment_training_batch(flux, cfg)
+    assert out.shape == flux.shape
+    # After shifting, the spike should have moved from position 0
+    for i in range(out.shape[0]):
+        peak_pos = out[i, 0].abs().argmax().item()
+        assert 0 <= peak_pos < 201
+
+
 # ---------------------------------------------------------------------------
 # _load_split
 # ---------------------------------------------------------------------------

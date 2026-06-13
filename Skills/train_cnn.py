@@ -138,7 +138,7 @@ def _bce_loss(pred: float, label: int) -> float:
 
 
 def _augment_training_batch(x, config: CnnTrainingConfig):  # noqa: ANN001, ANN201
-    """Apply deterministic, train-only perturbations in normalized flux space."""
+    """Apply train-only perturbations: scale+noise, optional phase-flip, optional phase-shift."""
     import torch
 
     if not config.augment:
@@ -150,7 +150,20 @@ def _augment_training_batch(x, config: CnnTrainingConfig):  # noqa: ANN001, ANN2
     ).uniform_(config.augmentation_scale_min, config.augmentation_scale_max)
     sample_std = x.std(dim=2, keepdim=True).clamp_min(1e-6)
     noise = torch.randn_like(x) * sample_std * config.augmentation_noise_fraction
-    return x * scale + noise
+    x = x * scale + noise  # new tensor — no in-place needed below
+    if config.augmentation_flip:
+        flip_mask = torch.rand(x.shape[0], device=x.device) > 0.5
+        if flip_mask.any():
+            x = x.clone()
+            x[flip_mask] = x[flip_mask].flip(dims=[2])
+    if config.augmentation_shift_bins > 0:
+        shifts = torch.randint(
+            -config.augmentation_shift_bins,
+            config.augmentation_shift_bins + 1,
+            (x.shape[0],),
+        ).tolist()
+        x = torch.stack([torch.roll(xi, int(s), dims=-1) for xi, s in zip(x, shifts, strict=True)])
+    return x
 
 
 # ---------------------------------------------------------------------------
@@ -192,6 +205,8 @@ def _build_torch_model(config: CnnTrainingConfig):  # noqa: ANN201
                 pad = cl.kernel_size // 2
                 conv_blocks.append(nn.Conv1d(in_ch, cl.out_channels, cl.kernel_size, padding=pad))
                 conv_blocks.append(nn.ReLU())
+                if config.use_batch_norm:
+                    conv_blocks.append(nn.BatchNorm1d(cl.out_channels))
                 conv_blocks.append(nn.MaxPool1d(cl.pool_size))
                 in_ch = cl.out_channels
                 current_len = current_len // cl.pool_size
