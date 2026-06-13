@@ -14,7 +14,6 @@ from Skills.evaluate_cnn_checkpoint import (
     _brier,
     _compute_metrics,
     _ece,
-    _ensemble_infer,
     _fit_platt,
     evaluate_cnn_checkpoint,
     format_eval_result,
@@ -327,7 +326,9 @@ class TestEnsembleSupport:
         )
         assert result.val_metrics_raw is not None
 
-    def test_ensemble_infer_averages_predictions(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_ensemble_infer_averages_predictions(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import Skills.evaluate_cnn_checkpoint as mod
 
         call_count = {"n": 0}
@@ -349,7 +350,9 @@ class TestEnsembleSupport:
         # Average of identical predictions is the same prediction
         assert abs(result[0] - 0.4) < 1e-6
 
-    def test_ensemble_evaluate_with_mocked_infer(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_ensemble_evaluate_with_mocked_infer(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import Skills.evaluate_cnn_checkpoint as mod
 
         def _fake_infer(
