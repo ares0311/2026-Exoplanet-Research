@@ -259,6 +259,16 @@ def _torch_infer(
     return probs
 
 
+def _ensemble_infer(
+    fluxes: list[list[float]], checkpoint_paths: list[Path], config_path: Path
+) -> list[float]:
+    """Average predictions from multiple checkpoints (ensemble inference)."""
+    all_probs = [_torch_infer(fluxes, ckpt, config_path) for ckpt in checkpoint_paths]
+    n = len(fluxes)
+    return [sum(all_probs[m][i] for m in range(len(checkpoint_paths))) / len(checkpoint_paths)
+            for i in range(n)]
+
+
 # ---------------------------------------------------------------------------
 # Main evaluation function
 # ---------------------------------------------------------------------------
@@ -272,20 +282,23 @@ def evaluate_cnn_checkpoint(
     gate_f1: float = 0.80,
     output_calibration: Path | None = None,
     model_fn: Callable[[list[list[float]]], list[float]] | None = None,
+    checkpoint_paths: list[Path] | None = None,
 ) -> CnnEvalResult:
-    """Evaluate a CNN checkpoint and check production promotion gates.
+    """Evaluate a CNN checkpoint (or ensemble) against production gates.
 
     Fits Platt calibration on the validation split, evaluates on the sealed
     test split with and without calibration, and checks AUC and F1 gates.
 
     Args:
         split_dir: Directory containing ``val.json`` and ``test.json``.
-        checkpoint_path: Path to the ``.pt`` PyTorch state-dict file.
+        checkpoint_path: Path to the primary ``.pt`` file (used for config).
         gate_auc: Minimum raw AUC on the test split to pass (default 0.85).
         gate_f1: Minimum calibrated F1 on the test split to pass (default 0.80).
         output_calibration: If provided, write calibration JSON here on pass.
-        model_fn: Injectable inference function for testing; receives a list of
-            flux arrays and returns a list of probabilities.
+        model_fn: Injectable inference function for testing.
+        checkpoint_paths: If provided, run ensemble inference by averaging
+            predictions from all listed checkpoints. ``checkpoint_path``
+            is still used to locate the shared ``config.json``.
 
     Returns:
         :class:`CnnEvalResult` with all metrics and pass/fail flag.
@@ -347,6 +360,36 @@ def evaluate_cnn_checkpoint(
         try:
             val_probs = model_fn(val_fluxes)
             test_probs = model_fn(test_fluxes)
+        except Exception:
+            return CnnEvalResult(
+                val_metrics_raw=None,
+                test_metrics_raw=None,
+                test_metrics_cal=None,
+                platt_a=1.0,
+                platt_b=0.0,
+                gate_auc=gate_auc,
+                gate_f1=gate_f1,
+                passed=False,
+                flag="LOAD_ERROR",
+                evaluated_at=evaluated_at,
+            )
+    elif checkpoint_paths is not None and len(checkpoint_paths) > 1:
+        try:
+            val_probs = _ensemble_infer(val_fluxes, checkpoint_paths, config_path)
+            test_probs = _ensemble_infer(test_fluxes, checkpoint_paths, config_path)
+        except ImportError:
+            return CnnEvalResult(
+                val_metrics_raw=None,
+                test_metrics_raw=None,
+                test_metrics_cal=None,
+                platt_a=1.0,
+                platt_b=0.0,
+                gate_auc=gate_auc,
+                gate_f1=gate_f1,
+                passed=False,
+                flag="NO_TORCH",
+                evaluated_at=evaluated_at,
+            )
         except Exception:
             return CnnEvalResult(
                 val_metrics_raw=None,
@@ -496,7 +539,10 @@ def _main() -> None:
         description="Evaluate a CNN checkpoint against production gates."
     )
     parser.add_argument("--split-dir", type=Path, required=True)
-    parser.add_argument("--checkpoint", type=Path, required=True)
+    parser.add_argument(
+        "--checkpoint", type=Path, required=True, nargs="+",
+        help="Checkpoint path(s). Pass multiple to enable ensemble averaging.",
+    )
     parser.add_argument(
         "--output-calibration", type=Path, default=None,
         help="Write calibration JSON here (only written if gates pass).",
@@ -505,12 +551,14 @@ def _main() -> None:
     parser.add_argument("--gate-f1", type=float, default=0.80)
     args = parser.parse_args()
 
+    checkpoints: list[Path] = args.checkpoint
     result = evaluate_cnn_checkpoint(
         args.split_dir,
-        args.checkpoint,
+        checkpoints[0],
         gate_auc=args.gate_auc,
         gate_f1=args.gate_f1,
         output_calibration=args.output_calibration,
+        checkpoint_paths=checkpoints if len(checkpoints) > 1 else None,
     )
     print(format_eval_result(result))
 

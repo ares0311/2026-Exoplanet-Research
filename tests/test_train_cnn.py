@@ -171,6 +171,28 @@ class TestTrainCnn:
         assert "ModuleNotFoundError" not in completed.stderr
         assert "Flag:" in completed.stdout
 
+    def test_seed_override_accepted_by_cli(self, tmp_path: Path) -> None:
+        script = Path(__file__).parents[1] / "Skills" / "train_cnn.py"
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(script),
+                "--split-dir",
+                str(tmp_path / "missing"),
+                "--checkpoint-dir",
+                str(tmp_path / "checkpoints"),
+                "--seed",
+                "42",
+            ],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert completed.returncode == 1
+        assert "ModuleNotFoundError" not in completed.stderr
+        assert "Flag:" in completed.stdout
+
     def test_missing_split_dir_returns_invalid(self) -> None:
         cfg = default_config()
         with tempfile.TemporaryDirectory() as tmpdir:

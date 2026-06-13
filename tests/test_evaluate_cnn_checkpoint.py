@@ -296,6 +296,87 @@ class TestEvaluateCnnCheckpoint:
 
 
 # ---------------------------------------------------------------------------
+# Ensemble support
+# ---------------------------------------------------------------------------
+
+
+class TestEnsembleSupport:
+    def test_model_fn_takes_priority_over_checkpoint_paths(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path, n=30)
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            gate_auc=0.5,
+            gate_f1=0.5,
+            model_fn=_dummy_model_fn_pass,
+            checkpoint_paths=[tmp_path / "a.pt", tmp_path / "b.pt"],
+        )
+        assert result.flag in {"PASS", "FAIL"}
+        assert result.val_metrics_raw is not None
+
+    def test_single_checkpoint_path_uses_single_mode(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path, n=30)
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            gate_auc=0.5,
+            gate_f1=0.5,
+            model_fn=_dummy_model_fn_pass,
+            checkpoint_paths=[tmp_path / "only.pt"],
+        )
+        assert result.val_metrics_raw is not None
+
+    def test_ensemble_infer_averages_predictions(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import Skills.evaluate_cnn_checkpoint as mod
+
+        call_count = {"n": 0}
+
+        def _fake_infer(
+            fluxes: list[list[float]], ckpt: Path, cfg: Path
+        ) -> list[float]:
+            call_count["n"] += 1
+            return [0.4 if i % 2 == 0 else 0.6 for i in range(len(fluxes))]
+
+        monkeypatch.setattr(mod, "_torch_infer", _fake_infer)
+
+        fluxes = [[1.0] * 201 for _ in range(10)]
+        paths = [tmp_path / "a.pt", tmp_path / "b.pt", tmp_path / "c.pt"]
+        result = mod._ensemble_infer(fluxes, paths, tmp_path / "config.json")
+
+        assert call_count["n"] == 3
+        assert len(result) == 10
+        # Average of identical predictions is the same prediction
+        assert abs(result[0] - 0.4) < 1e-6
+
+    def test_ensemble_evaluate_with_mocked_infer(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import Skills.evaluate_cnn_checkpoint as mod
+
+        def _fake_infer(
+            fluxes: list[list[float]], ckpt: Path, cfg: Path
+        ) -> list[float]:
+            return _dummy_model_fn_pass(fluxes)
+
+        monkeypatch.setattr(mod, "_torch_infer", _fake_infer)
+
+        split_dir = _make_splits(tmp_path, n=30)
+        (tmp_path / "a.pt").touch()
+        (tmp_path / "b.pt").touch()
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "a.pt",
+            gate_auc=0.5,
+            gate_f1=0.5,
+            checkpoint_paths=[tmp_path / "a.pt", tmp_path / "b.pt"],
+        )
+        assert result.val_metrics_raw is not None
+        assert result.flag in {"PASS", "FAIL"}
+
+
+# ---------------------------------------------------------------------------
 # format_eval_result
 # ---------------------------------------------------------------------------
 

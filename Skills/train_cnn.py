@@ -609,6 +609,10 @@ def _cli(argv: list[str] | None = None) -> int:
         "--checkpoint-dir", type=Path, default=Path("checkpoints/cnn"), metavar="DIR"
     )
     parser.add_argument("--config", type=Path, default=None, metavar="JSON")
+    parser.add_argument(
+        "--seed", type=int, default=None, metavar="N",
+        help="Override the seed in the config (controls model init and augmentation RNG).",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -617,6 +621,9 @@ def _cli(argv: list[str] | None = None) -> int:
         from cnn_training_config import default_config, load_config
 
     cfg = load_config(args.config) if args.config else default_config()
+    if args.seed is not None:
+        import dataclasses
+        cfg = dataclasses.replace(cfg, seed=args.seed)
     result = train_cnn(args.split_dir, cfg, checkpoint_dir=args.checkpoint_dir)
     print(format_training_result(result))
     return 0 if result.flag == "OK" else 1
