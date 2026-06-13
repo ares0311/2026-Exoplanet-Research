@@ -68,6 +68,7 @@ class CnnTrainingConfig:
     use_batch_norm: bool
     seed: int
     checkpoint_dir: str
+    freeze_conv_epochs: int
 
 
 @dataclass(frozen=True)
@@ -120,6 +121,7 @@ def default_config() -> CnnTrainingConfig:
         use_batch_norm=False,
         seed=42,
         checkpoint_dir="checkpoints/cnn",
+        freeze_conv_epochs=0,
     )
 
 
@@ -163,6 +165,7 @@ def _config_to_dict(config: CnnTrainingConfig) -> dict:
         "use_batch_norm": config.use_batch_norm,
         "seed": config.seed,
         "checkpoint_dir": config.checkpoint_dir,
+        "freeze_conv_epochs": config.freeze_conv_epochs,
     }
 
 
@@ -211,6 +214,7 @@ def _config_from_dict(d: dict) -> CnnTrainingConfig:
         use_batch_norm=bool(d.get("use_batch_norm", False)),
         seed=int(d["seed"]),
         checkpoint_dir=str(d["checkpoint_dir"]),
+        freeze_conv_epochs=int(d.get("freeze_conv_epochs", 0)),
     )
 
 
@@ -340,6 +344,8 @@ def validate_config(config: CnnTrainingConfig) -> CnnConfigValidation:
         errors.append("augmentation scale range must be positive and ordered")
     if config.augmentation_shift_bins < 0:
         errors.append("augmentation_shift_bins must be >= 0")
+    if config.freeze_conv_epochs < 0:
+        errors.append("freeze_conv_epochs must be >= 0")
     for i, cl in enumerate(config.conv_layers):
         if cl.kernel_size % 2 == 0:
             errors.append(
@@ -397,6 +403,7 @@ def format_config(config: CnnTrainingConfig) -> str:
         f"- use_batch_norm: {config.use_batch_norm}",
         f"- seed: {config.seed}",
         f"- checkpoint_dir: {config.checkpoint_dir}",
+        f"- freeze_conv_epochs: {config.freeze_conv_epochs}",
     ]
     return "\n".join(lines) + "\n"
 
