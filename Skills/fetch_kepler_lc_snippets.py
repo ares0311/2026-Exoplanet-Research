@@ -115,7 +115,7 @@ _KOI_QUERY = (
     "SELECT kepid, kepoi_name, koi_disposition, koi_pdisposition, "
     "koi_period, koi_time0bk "
     "FROM cumulative "
-    "WHERE (koi_pdisposition='CONFIRMED' OR koi_pdisposition='FALSE POSITIVE') "
+    "WHERE (koi_disposition='CONFIRMED' OR koi_disposition='FALSE POSITIVE') "
     "AND koi_period > 0.5 AND koi_period < 500 "
     "AND koi_time0bk > 0 "
     "ORDER BY kepid"
@@ -321,7 +321,7 @@ def build_kepler_snippets(
     with output_path.open(write_mode, encoding="utf-8") as fh:
         for i, row in enumerate(koi_rows, 1):
             kepid = int(row.get("kepid", 0))
-            disposition = str(row.get("koi_pdisposition", ""))
+            disposition = str(row.get("koi_disposition", ""))
             period = float(row.get("koi_period", 0.0))
             time0bk = float(row.get("koi_time0bk", 0.0))
             epoch_bjd = time0bk + _KEPLER_BJD_OFFSET
@@ -433,8 +433,8 @@ def _cli(argv: list[str] | None = None) -> int:
         print(f"ERROR fetching KOI table: {exc}")
         return 1
 
-    confirmed = sum(1 for r in koi_rows if r.get("koi_pdisposition") == "CONFIRMED")
-    fp = sum(1 for r in koi_rows if r.get("koi_pdisposition") == "FALSE POSITIVE")
+    confirmed = sum(1 for r in koi_rows if r.get("koi_disposition") == "CONFIRMED")
+    fp = sum(1 for r in koi_rows if r.get("koi_disposition") == "FALSE POSITIVE")
     print(
         f"KOI table: {len(koi_rows)} rows  CONFIRMED={confirmed}  FALSE POSITIVE={fp}",
         flush=True,

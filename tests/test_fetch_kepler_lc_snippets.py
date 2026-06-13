@@ -131,7 +131,7 @@ class TestBuildKeplerSnippets:
         return [
             {
                 "kepid": str(100 + i),
-                "koi_pdisposition": "CONFIRMED" if i % 2 == 0 else "FALSE POSITIVE",
+                "koi_disposition": "CONFIRMED" if i % 2 == 0 else "FALSE POSITIVE",
                 "koi_period": "3.5",
                 "koi_time0bk": "100.0",
             }
