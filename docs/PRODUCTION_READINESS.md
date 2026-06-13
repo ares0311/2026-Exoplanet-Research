@@ -1,6 +1,6 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-06-13 (eighth training run evaluated; v3b config with restored conv capacity prepared)
+Last reviewed: 2026-06-13 (ninth training run evaluated; ensemble approach initiated — train_cnn --seed override and multi-checkpoint evaluate implemented)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
 Test baseline: 2,003 default tests passing, 2 integration_live deselected
@@ -44,9 +44,10 @@ production scoring.
 - **Rejected candidate 7**: seed-7 splits, `cnn_retrain_v2b.json` (use_batch_norm=false, flip=true, shift=20); best epoch 23, val AUC=0.7887; test raw AUC=0.7527, F1=0.7214, Brier=0.2070, ECE=0.0990; Platt A=1.4732, B=−0.6896, threshold=0.50; calibrated test F1=0.7202, Brier=0.2200, ECE=0.1168; val→test gap 3.6 pts; **REJECTED** — test AUC 0.7527 < 0.85 gate, F1 0.7202 < 0.80 gate; root cause: model has ~435K parameters against 1,425 examples (massively overparameterized); augmentation reduced gap slightly but also depressed val AUC relative to candidate 5
 - **Root cause (systematic, candidates 2–7)**: Dense(256) layer alone has 410K parameters; with 1,425 training examples the model cannot generalize past ~0.78 test AUC regardless of regularization; model capacity must be reduced to match the dataset size
 - **Rejected candidate 8**: seed-7 splits, `cnn_retrain_v3.json` (Conv 8/16/32, Dense 64, dropout 0.3, flip+shift); best epoch 11, val AUC=0.7734; test raw AUC=0.7094, F1=0.6805, Brier=0.2238, ECE=0.0992; Platt A=1.3045, B=−0.6584; calibrated test F1=0.6792, Brier=0.2307, ECE=0.1282; val→test gap 6.4 pts; **REJECTED** — test AUC 0.7094 < 0.85 gate; root cause: halved conv channels reduced feature extraction capacity; flip+shift augmentation net harmful across all candidates where it was tested
-- **Revised diagnosis (candidates 2–8)**: Conv(16/32/64) is necessary for adequate feature extraction; Dense(256) is the overparameterization bottleneck (410K of ~435K total params); flip+shift augmentation consistently reduces test AUC vs. noise+scale-only configs
-- **Next training config**: `configs/cnn_retrain_v3b.json` — Conv(16/32/64) restored, single Dense(128), dropout 0.4, NO flip/shift (noise+scale only), seed-7 splits; checkpoint dir `models/cnn_v3b/`; estimated ~214K parameters
-- **Next step**: Run `caffeinate -dims python Skills/train_cnn.py --split-dir data/cnn_splits --checkpoint-dir models/cnn_v3b/ --config configs/cnn_retrain_v3b.json`, then evaluate against gates (AUC ≥ 0.85, F1 ≥ 0.80)
+- **Rejected candidate 9**: seed-7 splits, `cnn_retrain_v3b.json` (Conv 16/32/64, Dense 128, dropout 0.4, no flip/shift); best epoch 18, val AUC=0.7807; test raw AUC=0.7573, F1=0.7257, Brier=0.2051, ECE=0.0867; Platt A=1.5114, B=−0.7136; calibrated test F1=0.7207, Brier=0.2155, ECE=0.1230; val→test gap 2.3 pts; **REJECTED** — test AUC 0.7573 < 0.85 gate, F1 0.7207 < 0.80 gate; reducing Dense(256→128) slightly hurt val AUC without improving test AUC vs C5
+- **Systematic ceiling (candidates 2–9)**: All 9 candidates produced test AUC 0.71–0.78; ceiling is a data-size constraint (1,425 examples, 201-bin representation); no single-model architectural change has broken through; ensemble approach is the next lever
+- **Ensemble approach**: Train 3 models on v1 config (best single-model, test AUC=0.7758) with seeds 7, 13, 99; average predictions at inference; `train_cnn.py` now supports `--seed N` override; `evaluate_cnn_checkpoint.py` now accepts multiple `--checkpoint` paths for ensemble evaluation
+- **Next step**: Run the 3-seed ensemble training recipe (see `docs/CNN_SPEC.md` Ninth Candidate section), then evaluate the ensemble; if ensemble test AUC < 0.85, the production path requires more training data or Kepler→TESS transfer learning
 - **Gate check**: `python Skills/count_tess_labels.py`
 - **Architecture spec**: `docs/CNN_SPEC.md`
 - **Artifact policy**: Commit the validated production checkpoint, calibration metadata, model registry entry, and reproducibility manifest under `models/` after all production-readiness checks pass

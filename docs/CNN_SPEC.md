@@ -235,9 +235,52 @@ extractor for this data). The bottleneck is the Dense(256) layer (410K params).
 Flip+shift augmentation is net harmful — it obscures the centered transit signal
 without adding useful diversity.
 
-**Next run**: `configs/cnn_retrain_v3b.json` — Conv(16/32/64) restored,
-single Dense(128), dropout 0.4, NO flip/shift (noise+scale only), seed-7 splits,
-checkpoint dir `models/cnn_v3b/`. Estimated ~214K parameters.
+## Ninth Production Candidate Evaluation
+
+`configs/cnn_retrain_v3b.json` — Conv(16/32/64) restored, single Dense(128),
+dropout 0.4, no flip/shift. Same seed-7 splits. Best epoch 18, val AUC=0.7807.
+Early stopping at epoch 28. LR decayed in 5 steps from 3e-4 to 1e-5. Stable
+training (train loss steadily decreasing to 0.52).
+
+| Metric | Val (raw) | Test (raw) | Test (cal) | Target |
+|---|---:|---:|---:|---:|
+| ROC-AUC | 0.7807 | 0.7573 | 0.7573 | ≥ 0.85 |
+| F1 | 0.7374 | 0.7257 | 0.7207 | ≥ 0.80 |
+| Brier | 0.1927 | 0.2051 | 0.2155 | — |
+| ECE | 0.0645 | 0.0867 | 0.1230 | — |
+
+Platt calibration: A=1.5114, B=−0.7136. Val→test gap: 2.3 pts.
+**REJECTED** — test AUC 0.7573 < 0.85 gate, F1 0.7207 < 0.80 gate.
+
+**Root cause (systematic)**: Nine candidates across 5 architecture variants
+have all produced test AUC in the range 0.71–0.78. The ceiling is a
+data-size constraint: 1,425 training examples with a 201-bin representation
+cannot drive a single-model CNN to 0.85 AUC. No architectural change has
+broken through this ceiling.
+
+**Next approach**: Ensemble of 3 models trained with the v1 config (best
+single-model config, test AUC=0.7758) using different random seeds.
+Ensembles reliably gain 2–4 AUC points by diversifying predictions, potentially
+reaching 0.79–0.82. Beyond that, more training data or transfer learning from
+a Kepler-pretrained model is required.
+
+**Ensemble training recipe** (train_cnn.py now supports `--seed` override):
+```bash
+caffeinate -dims python Skills/train_cnn.py --split-dir data/cnn_splits \
+    --checkpoint-dir models/cnn_ens_s7/ --config configs/cnn_retrain_v1.json --seed 7
+caffeinate -dims python Skills/train_cnn.py --split-dir data/cnn_splits \
+    --checkpoint-dir models/cnn_ens_s13/ --config configs/cnn_retrain_v1.json --seed 13
+caffeinate -dims python Skills/train_cnn.py --split-dir data/cnn_splits \
+    --checkpoint-dir models/cnn_ens_s99/ --config configs/cnn_retrain_v1.json --seed 99
+```
+
+**Ensemble evaluation** (evaluate_cnn_checkpoint.py now accepts multiple `--checkpoint`):
+```bash
+python Skills/evaluate_cnn_checkpoint.py --split-dir data/cnn_splits \
+    --checkpoint models/cnn_ens_s7/best.pt \
+    --checkpoint models/cnn_ens_s13/best.pt \
+    --checkpoint models/cnn_ens_s99/best.pt
+```
 
 ---
 
