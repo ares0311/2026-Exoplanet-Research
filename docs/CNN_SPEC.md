@@ -205,14 +205,39 @@ are massively overparameterized for this dataset size. Augmentation reduced the
 val→test gap slightly (from 3.3 to 3.6 pts) but also depressed val AUC from 0.8083
 to 0.7887, producing lower test AUC than candidate 5.
 
-**Fix**: Drastically reduce model capacity to match the dataset size.
-Proposed v3 architecture: Conv(8/16/32) + Dense(64) only, totaling ~54K parameters.
-With dropout 0.3 and the same flip+shift augmentation, this smaller model should
-generalize better and achieve higher val AUC.
+**Fix**: Reduce the dense head, not the conv layers.
+Hypothesis: replace Dense(256, 64) → Dense(128) while keeping Conv(16/32/64).
 
-**Next run**: `configs/cnn_retrain_v3.json` — halved conv channels (8/16/32),
-single dense layer (64 units), lower dropout (0.3), same flip+shift, seed-7 splits,
-checkpoint dir `models/cnn_v3/`.
+## Eighth Production Candidate Evaluation
+
+`configs/cnn_retrain_v3.json` — Conv(8/16/32), single Dense(64), dropout 0.3,
+flip+shift augmentation, seed-7 splits. Best epoch 11, val AUC=0.7734.
+Early stopping at epoch 21. LR decayed to 1.50e-4 at epoch 20.
+
+| Metric | Val (raw) | Test (raw) | Test (cal) | Target |
+|---|---:|---:|---:|---:|
+| ROC-AUC | 0.7734 | 0.7094 | 0.7094 | ≥ 0.85 |
+| F1 | 0.7374 | 0.6805 | 0.6792 | ≥ 0.80 |
+| Brier | 0.2024 | 0.2238 | 0.2307 | — |
+| ECE | 0.0707 | 0.0992 | 0.1282 | — |
+
+Platt calibration: A=1.3045, B=−0.6584. Val→test gap: 6.4 pts.
+**REJECTED** — test AUC 0.7094 < 0.85 gate, F1 0.6792 < 0.80 gate.
+
+**Root cause**: Halving the conv channels (8/16/32) reduced model capacity below
+the learning threshold for 1,425 examples. Fewer conv filters → worse feature
+extraction → lower val AUC (0.7734 vs 0.8083 for C5) AND larger val→test gap
+(6.4 vs 3.3 pts). Flip+shift augmentation also consistently reduces test AUC
+vs. the same config without it (C5: 0.7758 vs C7: 0.7527; C8 worse than C4).
+
+**Revised diagnosis**: Conv capacity should remain at 16/32/64 (best feature
+extractor for this data). The bottleneck is the Dense(256) layer (410K params).
+Flip+shift augmentation is net harmful — it obscures the centered transit signal
+without adding useful diversity.
+
+**Next run**: `configs/cnn_retrain_v3b.json` — Conv(16/32/64) restored,
+single Dense(128), dropout 0.4, NO flip/shift (noise+scale only), seed-7 splits,
+checkpoint dir `models/cnn_v3b/`. Estimated ~214K parameters.
 
 ---
 
