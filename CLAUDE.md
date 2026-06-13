@@ -52,6 +52,25 @@ Before proposing or executing any task you must:
 ### When the highest-priority Tier 1 gap is blocked by an outside action
 State the gap, name the blocker, and **immediately provide a complete step-by-step recipe** assuming the user has zero background knowledge of the specific task. Give exact commands to copy-paste, explain each in one plain-English sentence, and state exactly what output to paste back. Do not ask "do you want the commands?" — give them.
 
+### Branch Naming Rule — MANDATORY
+
+**All feature branches MUST use the `claude/` prefix** (e.g., `claude/fix-ssl-cert`, `claude/add-training-config`).
+
+**Why this is non-negotiable:** `.github/workflows/ci.yml` only triggers CI on push to `main` or `claude/**`:
+```yaml
+on:
+  push:
+    branches: [main, "claude/**"]
+```
+A bare branch name like `fix-something` will NEVER trigger CI on push. A bare-named branch is a broken branch — CI will not run, the full cycle cannot complete, and the change cannot be safely merged.
+
+**Rules (non-negotiable):**
+1. Before running `git checkout -b <name>`, verify the name starts with `claude/`.
+2. If you discover a branch was created without the `claude/` prefix, the correct action is: **stop, document the root cause, create a correctly named replacement branch from the same diff, and close the incorrectly named branch**. Never create a workaround branch as a symptom treatment.
+3. Never push to a bare-named branch for any purpose, including "empty commit" workarounds.
+
+---
+
 ### Local–Remote Sync Policy — MANDATORY
 
 The user's local Mac and GitHub `main` are the joint source of truth. Keep them in sync at all times.
