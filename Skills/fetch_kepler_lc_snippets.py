@@ -132,12 +132,18 @@ def fetch_koi_table(max_rows: int = 10000) -> list[dict]:
         List of dicts with keys: kepid, kepoi_name, koi_disposition,
         koi_pdisposition, koi_period, koi_time0bk.
     """
+    import ssl
+    try:
+        import certifi
+        ctx: ssl.SSLContext | None = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        ctx = None
     params = urlencode({
         "QUERY": _KOI_QUERY + f" TOP {max_rows}",
         "FORMAT": "json",
     })
     url = f"{_NEA_TAP_URL}?{params}"
-    with urlopen(url, timeout=60) as resp:  # noqa: S310
+    with urlopen(url, timeout=60, context=ctx) as resp:  # noqa: S310
         data = json.loads(resp.read().decode("utf-8"))
     if isinstance(data, list):
         return data
