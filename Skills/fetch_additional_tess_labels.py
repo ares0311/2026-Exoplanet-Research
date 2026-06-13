@@ -80,7 +80,13 @@ def load_corpus_tic_ids(jsonl_path: Path) -> set[int]:
 
 def _fetch_csv(url: str, timeout: int = 60) -> list[dict]:
     """Fetch a CSV from a URL and return as list of dicts."""
-    with urlopen(url, timeout=timeout) as resp:  # noqa: S310
+    import ssl
+    try:
+        import certifi
+        ctx: ssl.SSLContext | None = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        ctx = None
+    with urlopen(url, timeout=timeout, context=ctx) as resp:  # noqa: S310
         content = resp.read().decode("utf-8")
     reader = csv.DictReader(io.StringIO(content))
     return list(reader)
