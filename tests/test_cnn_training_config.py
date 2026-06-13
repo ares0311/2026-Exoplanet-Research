@@ -50,6 +50,12 @@ class TestDefaultConfig:
         assert cfg.batch_size == 64
         assert cfg.max_epochs == 50
 
+    def test_new_fields_default_to_off(self) -> None:
+        cfg = default_config()
+        assert cfg.augmentation_flip is False
+        assert cfg.augmentation_shift_bins == 0
+        assert cfg.use_batch_norm is False
+
 
 class TestValidateConfig:
     def test_valid_default_ok(self) -> None:
@@ -112,6 +118,13 @@ class TestValidateConfig:
         result = validate_config(cfg)
         assert result.ok is False
 
+    def test_invalid_shift_bins(self) -> None:
+        import dataclasses
+        cfg = dataclasses.replace(default_config(), augmentation_shift_bins=-1)
+        result = validate_config(cfg)
+        assert result.ok is False
+        assert any("shift_bins" in e for e in result.errors)
+
 
 class TestSerialisation:
     def test_round_trip(self) -> None:
@@ -160,6 +173,9 @@ class TestSerialisation:
             "augmentation_noise_fraction",
             "augmentation_scale_min",
             "augmentation_scale_max",
+            "augmentation_flip",
+            "augmentation_shift_bins",
+            "use_batch_norm",
             "seed",
             "checkpoint_dir",
         ):
@@ -177,6 +193,9 @@ class TestSerialisation:
             "gradient_clip_norm",
             "augmentation_noise_fraction",
             "augmentation_scale_min",
+            "augmentation_flip",
+            "augmentation_shift_bins",
+            "use_batch_norm",
             "augmentation_scale_max",
         ):
             payload.pop(key)
@@ -186,6 +205,9 @@ class TestSerialisation:
         assert config.dense_dropout_rates == (0.5, 0.5)
         assert config.weight_decay == 0.0
         assert config.selection_metric == "val_loss"
+        assert config.augmentation_flip is False
+        assert config.augmentation_shift_bins == 0
+        assert config.use_batch_norm is False
 
     def test_conv_layers_serialised_as_list_of_dicts(self) -> None:
         cfg = default_config()
