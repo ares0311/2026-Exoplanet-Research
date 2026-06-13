@@ -1,6 +1,6 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-06-13 (fifth training run evaluated; v2 config with batch norm + augmentation prepared)
+Last reviewed: 2026-06-13 (seventh training run evaluated; v3 config with smaller architecture prepared)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
 Test baseline: 2,003 default tests passing, 2 integration_live deselected
@@ -41,8 +41,10 @@ production scoring.
 - **Rejected candidate 4**: seed-7 splits (1,425/306/306), `cnn_retrain_v1.json`; best epoch 32, val AUC=0.7914; test AUC=0.7682; val→test gap 2.3 pts; **REJECTED** — test AUC below gate; gap resolved but model generalization insufficient
 - **Rejected candidate 5**: seed-7 splits, `cnn_retrain_v1.json`, ETA-enabled training; best epoch 33, val AUC=0.8083; test AUC=0.7758, F1=0.7268; val→test gap 3.3 pts; **REJECTED** — AUC 0.7758 < 0.85 gate, F1 0.7268 < 0.80 gate; gains plateaued without architectural improvements
 - **Rejected candidate 6**: `cnn_retrain_v2.json` (use_batch_norm=true, flip=true, shift=20); best epoch 1 (val AUC=0.7344); val loss exploded 0.68→1.07; val AUC below 0.5 by epoch 3; early stopping epoch 11; **REJECTED** — BatchNorm1d running stats do not converge in 22 mini-batches/epoch; stale stats misnormalize val set in eval mode; BN incompatible with this dataset size
-- **Next training config**: `configs/cnn_retrain_v2b.json` — `use_batch_norm=false`, `augmentation_flip=true`, `augmentation_shift_bins=20`; same seed-7 splits; checkpoint dir `models/cnn_v2b/`
-- **Next step**: Run `caffeinate -dims python Skills/train_cnn.py --split-dir data/cnn_splits --checkpoint-dir models/cnn_v2b/ --config configs/cnn_retrain_v2b.json`, then evaluate against gates (AUC ≥ 0.85, F1 ≥ 0.80)
+- **Rejected candidate 7**: seed-7 splits, `cnn_retrain_v2b.json` (use_batch_norm=false, flip=true, shift=20); best epoch 23, val AUC=0.7887; test raw AUC=0.7527, F1=0.7214, Brier=0.2070, ECE=0.0990; Platt A=1.4732, B=−0.6896, threshold=0.50; calibrated test F1=0.7202, Brier=0.2200, ECE=0.1168; val→test gap 3.6 pts; **REJECTED** — test AUC 0.7527 < 0.85 gate, F1 0.7202 < 0.80 gate; root cause: model has ~435K parameters against 1,425 examples (massively overparameterized); augmentation reduced gap slightly but also depressed val AUC relative to candidate 5
+- **Root cause (systematic, candidates 2–7)**: Dense(256) layer alone has 410K parameters; with 1,425 training examples the model cannot generalize past ~0.78 test AUC regardless of regularization; model capacity must be reduced to match the dataset size
+- **Next training config**: `configs/cnn_retrain_v3.json` — Conv(8/16/32), single Dense(64), dropout 0.3, flip+shift augmentation; checkpoint dir `models/cnn_v3/`; estimated ~54K parameters (8× reduction)
+- **Next step**: Run `caffeinate -dims python Skills/train_cnn.py --split-dir data/cnn_splits --checkpoint-dir models/cnn_v3/ --config configs/cnn_retrain_v3.json`, then evaluate against gates (AUC ≥ 0.85, F1 ≥ 0.80)
 - **Gate check**: `python Skills/count_tess_labels.py`
 - **Architecture spec**: `docs/CNN_SPEC.md`
 - **Artifact policy**: Commit the validated production checkpoint, calibration metadata, model registry entry, and reproducibility manifest under `models/` after all production-readiness checks pass
