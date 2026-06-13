@@ -241,11 +241,18 @@ def _build_torch_model(config: CnnTrainingConfig):  # noqa: ANN201
 # ---------------------------------------------------------------------------
 
 
+def _set_conv_frozen(model, frozen: bool) -> None:  # noqa: ANN001
+    """Freeze or unfreeze the conv submodule parameters."""
+    for p in model.conv.parameters():
+        p.requires_grad_(not frozen)
+
+
 def train_cnn(
     split_dir: Path,
     config: CnnTrainingConfig,
     *,
     checkpoint_dir: Path,
+    pretrained_checkpoint: Path | None = None,
 ) -> CnnTrainingResult:
     """Train a 1D CNN on phase-folded light curves with early stopping.
 
@@ -380,6 +387,21 @@ def train_cnn(
     x_val, y_val = _examples_to_tensors(val_examples)
 
     model = _build_torch_model(config)
+
+    if pretrained_checkpoint is not None:
+        pretrained_checkpoint = Path(pretrained_checkpoint)
+        if pretrained_checkpoint.exists():
+            state = torch.load(pretrained_checkpoint, map_location="cpu", weights_only=True)
+            model.load_state_dict(state, strict=False)
+            print(f"Loaded pretrained weights from {pretrained_checkpoint}", flush=True)
+        else:
+            print(f"Warning: pretrained checkpoint not found: {pretrained_checkpoint}", flush=True)
+
+    freeze_epochs = config.freeze_conv_epochs
+    if freeze_epochs > 0:
+        _set_conv_frozen(model, frozen=True)
+        print(f"Conv layers FROZEN for first {freeze_epochs} epochs.", flush=True)
+
     criterion = nn.BCELoss()
     if config.optimizer == "adam":
         optimizer = optim.Adam(
@@ -431,6 +453,12 @@ def train_cnn(
 
     for epoch in range(1, config.max_epochs + 1):
         epoch_t0 = time.monotonic()
+        if freeze_epochs > 0 and epoch == freeze_epochs + 1:
+            _set_conv_frozen(model, frozen=False)
+            print(
+                f"Epoch {epoch}: conv layers UNFROZEN — fine-tuning all parameters.",
+                flush=True,
+            )
         # --- training ---
         model.train()
         perm = torch.randperm(n_train)
@@ -613,6 +641,10 @@ def _cli(argv: list[str] | None = None) -> int:
         "--seed", type=int, default=None, metavar="N",
         help="Override the seed in the config (controls model init and augmentation RNG).",
     )
+    parser.add_argument(
+        "--pretrained-checkpoint", type=Path, default=None, metavar="PT",
+        help="Load conv weights from this checkpoint before training (transfer learning).",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -624,7 +656,12 @@ def _cli(argv: list[str] | None = None) -> int:
     if args.seed is not None:
         import dataclasses
         cfg = dataclasses.replace(cfg, seed=args.seed)
-    result = train_cnn(args.split_dir, cfg, checkpoint_dir=args.checkpoint_dir)
+    result = train_cnn(
+        args.split_dir,
+        cfg,
+        checkpoint_dir=args.checkpoint_dir,
+        pretrained_checkpoint=args.pretrained_checkpoint,
+    )
     print(format_training_result(result))
     return 0 if result.flag == "OK" else 1
 
