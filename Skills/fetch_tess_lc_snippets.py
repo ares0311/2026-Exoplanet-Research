@@ -22,10 +22,16 @@ from __future__ import annotations
 
 import contextlib
 import json
+import socket
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+
+# Prevent indefinite hangs when WiFi drops mid-download.
+# Any stalled socket operation raises socket.timeout after this many seconds,
+# which build_tess_snippet's try/except catches and marks as ERROR.
+socket.setdefaulttimeout(120)
 
 _TESS_BJD_OFFSET = 2457000.0  # TESS BTJD = BJD - 2457000
 
