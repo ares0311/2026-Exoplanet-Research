@@ -5,9 +5,12 @@ against ExoFOP TOI and CTOI disposition tables to find labeled TIC IDs not
 yet downloaded.  Writes a target list that can be fed to the TESS light curve
 downloader.
 
-Output is a plain-text file of TIC IDs (one per line) suitable for:
+Output is a plain-text file of TIC IDs (one per line) and a companion JSON
+suitable for:
 
-    python Skills/lc_snippet_batch_builder.py --tic-list <output_file>
+    caffeinate -dims python Skills/fetch_tess_lc_snippets.py \
+        --rows data/new_tess_targets.json \
+        --output data/tess_snippets_expansion.jsonl
 
 Public API
 ----------
@@ -314,8 +317,8 @@ def format_expansion_summary(
         "Download TESS light curves for the new TIC IDs and extract snippets:",
         "```bash",
         "git pull origin main",
-        "caffeinate -dims python Skills/lc_snippet_batch_builder.py \\",
-        "    --tic-list data/new_tess_targets.txt \\",
+        "caffeinate -dims python Skills/fetch_tess_lc_snippets.py \\",
+        "    --rows data/new_tess_targets.json \\",
         "    --output data/tess_snippets_expansion.jsonl",
         "```",
         "",
