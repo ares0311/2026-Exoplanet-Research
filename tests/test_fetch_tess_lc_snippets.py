@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 from Skills.fetch_tess_lc_snippets import (
-    TessSnippetResult,
     _mad,
     _median,
     _normalise,
@@ -14,7 +13,6 @@ from Skills.fetch_tess_lc_snippets import (
     build_tess_snippet,
     build_tess_snippets,
 )
-
 
 # ---------------------------------------------------------------------------
 # Phase-fold helpers
