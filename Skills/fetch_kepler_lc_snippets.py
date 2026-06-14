@@ -24,12 +24,18 @@ from __future__ import annotations
 
 import contextlib
 import json
+import socket
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import urlopen
+
+# Prevent indefinite hangs when WiFi drops mid-download.
+# Any stalled socket operation raises socket.timeout after this many seconds,
+# which build_kepler_snippet's try/except catches and marks as ERROR.
+socket.setdefaulttimeout(120)
 
 _KEPLER_BJD_OFFSET = 2454833.0  # Kepler time is BJD - 2454833
 
