@@ -171,7 +171,7 @@ def _default_lc_fetcher(
         return None
 
     result = lk.search_lightcurve(
-        f"KIC {kepid}", mission="Kepler", exptime=1800
+        f"KIC {kepid}", mission="Kepler", exptime=1800, author="Kepler"
     )
     if len(result) == 0:
         return None
