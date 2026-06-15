@@ -64,6 +64,21 @@ When the user must take an action to unblock a gap:
 
 ---
 
+## Local-Only Data Artifacts — Read Before Any CNN Task
+
+Large training data files are stored on the user's local Mac and are **never committed to the repository**. Before proposing or executing any CNN training task, ask the user to confirm current file state.
+
+| File | Status (as of 2026-06-15) | Description |
+|---|---|---|
+| `data/tess_snippets_v2.jsonl` | **COMPLETE** — 2,619 snippets | TESS phase-folded snippets; merged from two download runs; 56 targets had permanent MAST 404s |
+| `data/kepler_snippets.jsonl` | **IN PROGRESS** — ~922/7,454 as of 2026-06-15 09:00 UTC | Kepler 30-min long-cadence confirmed planets + FPs; auto-restart download running on Mac |
+
+The Kepler download uses `author="Kepler"` (prevents HLSP/IRIS cache corruption) and `socket.setdefaulttimeout(120)` (prevents WiFi-drop hangs). It resumes automatically from where it left off.
+
+**Do not assume these files are complete or present on the agent's server.** They exist only on the user's Mac. The CNN training pipeline cannot proceed until the user confirms `data/kepler_snippets.jsonl` is complete and pastes the line count.
+
+---
+
 ## Read First
 
 Before writing code, recover project context from committed files. Read:
