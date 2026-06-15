@@ -28,6 +28,7 @@ import socket
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import urlopen
@@ -369,7 +370,8 @@ def build_kepler_snippets(
                 n_written += 1
                 consecutive_errors = 0
                 print(
-                    f"  [{i}/{n_total}] KIC {kepid} label={label}"
+                    f"  [{i}/{n_total}] {datetime.now().strftime('%H:%M:%S')}"
+                    f" KIC {kepid} label={label}"
                     f"  written={n_written}  elapsed={elapsed:.0f}s  ETA={eta}",
                     flush=True,
                 )
@@ -377,7 +379,8 @@ def build_kepler_snippets(
                 n_errors += 1
                 consecutive_errors += 1
                 print(
-                    f"  [{i}/{n_total}] KIC {kepid} SKIP flag={result.flag}"
+                    f"  [{i}/{n_total}] {datetime.now().strftime('%H:%M:%S')}"
+                    f" KIC {kepid} SKIP flag={result.flag}"
                     f"  errors={n_errors}  elapsed={elapsed:.0f}s  ETA={eta}",
                     flush=True,
                 )
