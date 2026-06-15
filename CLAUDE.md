@@ -1150,20 +1150,36 @@ caffeinate -dims bash -c 'while true; do python Skills/fetch_kepler_lc_snippets.
 ```
 This command uses `author="Kepler"` to skip HLSP/IRIS corrupted cache files and `socket.setdefaulttimeout(120)` to prevent indefinite hangs on WiFi drops. Resume is automatic — already-downloaded KICs are detected from the JSONL output and skipped.
 
-### Next Step
+### Next Step — HANDOFF 2026-06-15
 
-**CNN training pipeline — waiting for Kepler download to complete**
+**Status: waiting for Kepler download to complete before CNN training can start.**
 
-Current corpus status:
-- **TESS v2**: `data/tess_snippets_v2.jsonl` — 2,619 snippets (COMPLETE)
-- **Kepler**: `data/kepler_snippets.jsonl` — IN PROGRESS (~922/7,454 as of 2026-06-15); ETA ~37 hours from then
+#### Incoming agent: do this first
 
-Training strategy (T1-1 gap, AUC ≥ 0.85 gate):
-- TESS-only training hit a systematic ceiling (~0.78 AUC) at 1,425 training examples — more data alone will not close the gap
-- **Path A (TESS expansion)**: COMPLETE at 2,619 snippets; 56 targets had permanent 404s
-- **Path B (Kepler transfer learning)**: Pre-train CNN on large Kepler corpus, fine-tune on TESS v2; this is the primary path to AUC ≥ 0.85
+Ask the user to paste the output of:
+```bash
+wc -l data/kepler_snippets.jsonl
+ps aux | grep fetch_kepler | grep -v grep
+```
 
-**After Kepler download completes**, run in order:
+- **7,454 lines** → download done; proceed with the CNN training pipeline below.
+- **< 7,454, process alive** → still running; wait and check back when done.
+- **< 7,454, no process found** → died; give the user this single line to restart (no backslash continuations — paste as one line):
+
+```
+caffeinate -dims bash -c 'while true; do python Skills/fetch_kepler_lc_snippets.py --output data/kepler_snippets.jsonl; echo "[$(date +%T)] Ended. Resuming in 30s..."; sleep 30; done'
+```
+
+#### Corpus status
+
+- **TESS v2**: `data/tess_snippets_v2.jsonl` — 2,619 snippets (COMPLETE; 56 targets had permanent MAST 404s)
+- **Kepler**: `data/kepler_snippets.jsonl` — IN PROGRESS (~922/7,454 as of 2026-06-15 09:00 UTC); ETA ~Monday evening
+
+#### CNN training pipeline (after Kepler completes)
+
+Training strategy: TESS-only training hits a hard ~0.78 AUC ceiling at 1,425 examples. Pre-train on Kepler corpus, fine-tune on TESS v2 — this is the only validated path past the ceiling.
+
+Run in order on the user's Mac (always prepend `git pull origin main`; training runs take hours each):
 1. `python Skills/build_cnn_training_data.py data/kepler_snippets.jsonl --output-dir data/kepler_cnn_splits` — build Kepler train/val/test splits
 2. `python Skills/cnn_split_validator.py data/kepler_cnn_splits` — validate before training
 3. `caffeinate -dims python Skills/train_cnn.py --splits-dir data/kepler_cnn_splits --output-dir models/cnn_kepler/` — pre-train on Kepler
