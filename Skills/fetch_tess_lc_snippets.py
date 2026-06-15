@@ -26,6 +26,7 @@ import socket
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 # Prevent indefinite hangs when WiFi drops mid-download.
@@ -310,7 +311,8 @@ def build_tess_snippets(
                 n_written += 1
                 consecutive_errors = 0
                 print(
-                    f"  [{i}/{n_total}] TIC {tic_id} label={label}"
+                    f"  [{i}/{n_total}] {datetime.now().strftime('%H:%M:%S')}"
+                    f" TIC {tic_id} label={label}"
                     f"  written={n_written}  elapsed={elapsed:.0f}s  ETA={eta}",
                     flush=True,
                 )
@@ -318,7 +320,8 @@ def build_tess_snippets(
                 n_errors += 1
                 consecutive_errors += 1
                 print(
-                    f"  [{i}/{n_total}] TIC {tic_id} SKIP flag={result.flag}"
+                    f"  [{i}/{n_total}] {datetime.now().strftime('%H:%M:%S')}"
+                    f" TIC {tic_id} SKIP flag={result.flag}"
                     f"  errors={n_errors}  elapsed={elapsed:.0f}s  ETA={eta}",
                     flush=True,
                 )
