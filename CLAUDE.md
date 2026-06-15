@@ -1135,16 +1135,42 @@ All pipeline modules are complete.
 | `multi_target_scheduler.py` | `schedule_targets`, greedy priority-ordered nightly scheduler | 13 |
 | `candidate_archive.py` | `CandidateArchive.insert/latest/history/search/export_csv` | 13 |
 
+### Local Data Artifacts (NOT committed to repo)
+
+These large data files live only on the user's local Mac. They are never committed to the repository. A new agent must ask the user for their current state before assuming they exist.
+
+| File | Location | Status (as of 2026-06-15) | Notes |
+|---|---|---|---|
+| `data/tess_snippets_v2.jsonl` | Local Mac | **COMPLETE** — 2,619 snippets | Merged from `tess_snippets.jsonl` + `tess_snippets_expansion.jsonl`; 56 targets had permanent MAST 404s and were skipped |
+| `data/kepler_snippets.jsonl` | Local Mac | **IN PROGRESS** — ~922/7,454 snippets as of 2026-06-15 09:00 UTC; ETA ~Monday 2026-06-16 evening | Kepler 30-min long-cadence, confirmed planets + FPs from KOI table; download command below |
+
+**Kepler download auto-restart command** (run in a dedicated terminal tab on the Mac):
+```
+caffeinate -dims bash -c 'while true; do python Skills/fetch_kepler_lc_snippets.py --output data/kepler_snippets.jsonl; echo "[$(date +%T)] Ended. Resuming in 30s..."; sleep 30; done'
+```
+This command uses `author="Kepler"` to skip HLSP/IRIS corrupted cache files and `socket.setdefaulttimeout(120)` to prevent indefinite hangs on WiFi drops. Resume is automatic — already-downloaded KICs are detected from the JSONL output and skipped.
+
 ### Next Step
 
-**Run CNN training pipeline** — TESS light curve download is complete (2,636 targets, `data/tess_snippets.jsonl`), label gate is OPEN (2,668 labels: 1,324 positive + 1,344 negative)
+**CNN training pipeline — waiting for Kepler download to complete**
 
-Training pipeline in order:
-1. `python Skills/build_cnn_training_data.py data/tess_snippets.jsonl --output-dir data/cnn_splits` — assemble train/val/test splits
-2. `python Skills/cnn_split_validator.py data/cnn_splits` — validate splits before training
-3. `caffeinate -i python Skills/train_cnn.py --splits-dir data/cnn_splits --output-dir models/cnn/` — train 1D CNN
-4. `python Skills/cnn_calibrator.py --checkpoint models/cnn/best.pt --splits-dir data/cnn_splits --output models/cnn/calibration.json` — Platt calibration
-5. `exo <TIC-ID> --scorer full-ensemble --cnn-checkpoint models/cnn/best.pt` — use trained CNN
+Current corpus status:
+- **TESS v2**: `data/tess_snippets_v2.jsonl` — 2,619 snippets (COMPLETE)
+- **Kepler**: `data/kepler_snippets.jsonl` — IN PROGRESS (~922/7,454 as of 2026-06-15); ETA ~37 hours from then
+
+Training strategy (T1-1 gap, AUC ≥ 0.85 gate):
+- TESS-only training hit a systematic ceiling (~0.78 AUC) at 1,425 training examples — more data alone will not close the gap
+- **Path A (TESS expansion)**: COMPLETE at 2,619 snippets; 56 targets had permanent 404s
+- **Path B (Kepler transfer learning)**: Pre-train CNN on large Kepler corpus, fine-tune on TESS v2; this is the primary path to AUC ≥ 0.85
+
+**After Kepler download completes**, run in order:
+1. `python Skills/build_cnn_training_data.py data/kepler_snippets.jsonl --output-dir data/kepler_cnn_splits` — build Kepler train/val/test splits
+2. `python Skills/cnn_split_validator.py data/kepler_cnn_splits` — validate before training
+3. `caffeinate -dims python Skills/train_cnn.py --splits-dir data/kepler_cnn_splits --output-dir models/cnn_kepler/` — pre-train on Kepler
+4. `python Skills/build_cnn_training_data.py data/tess_snippets_v2.jsonl --output-dir data/tess_cnn_splits` — build TESS splits
+5. `caffeinate -dims python Skills/train_cnn.py --splits-dir data/tess_cnn_splits --output-dir models/cnn_tess/ --pretrained models/cnn_kepler/best.pt` — fine-tune on TESS
+6. `python Skills/cnn_calibrator.py --checkpoint models/cnn_tess/best.pt --splits-dir data/tess_cnn_splits --output models/cnn_tess/calibration.json` — Platt calibration
+7. Evaluate: AUC ≥ 0.85, F1 ≥ 0.80 → closes T1-1 gap
 
 Architecture spec: `docs/CNN_SPEC.md`
 
@@ -1154,10 +1180,10 @@ The optional ML tiers now augment the Bayesian log-score model while preserving
 Bayesian scoring as the default fallback:
 
 **Tier 1 — XGBoost on tabular features (build first)** ✅ DONE
-**Tier 2 — 1D CNN on phase-folded flux (scaffold built; label gate OPEN; data downloaded; training pipeline ready)**
+**Tier 2 — 1D CNN on phase-folded flux (scaffold built; label gate OPEN; TESS data complete; Kepler download in progress)**
 - Input: phase-folded, normalized flux array (treat as 1D image)
 - Learns transit morphology directly; proven architecture (Shallue & Vanderburg 2018)
-- Requires TESS-specific fine-tuning — Kepler-trained models are miscalibrated on TESS due to cadence, pixel scale, and systematics differences
+- Requires Kepler pre-training + TESS fine-tuning — TESS-only training hits ~0.78 AUC ceiling due to insufficient examples; Kepler corpus provides the volume needed for transfer learning
 
 **Tier 3 — Stacking meta-learner** ✅ DONE
 - Simple weighted blend over outputs of XGBoost + CNN + existing Bayesian log-score model
