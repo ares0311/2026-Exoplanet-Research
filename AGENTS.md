@@ -64,6 +64,57 @@ When the user must take an action to unblock a gap:
 
 ---
 
+## HANDOFF STATE — 2026-06-15 (READ THIS FIRST)
+
+**The only active gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80).**
+
+### Where things stand
+
+| Item | State |
+|---|---|
+| TESS v2 snippets (`data/tess_snippets_v2.jsonl`) | **COMPLETE** — 2,619 snippets on user's Mac |
+| Kepler snippets (`data/kepler_snippets.jsonl`) | **IN PROGRESS** — was ~922/7,454 at 09:00 UTC 2026-06-15; ETA ~Mon 2026-06-16 evening |
+| CNN training pipeline | **BLOCKED** — waiting for Kepler download to finish |
+| XGBoost Tier 1 | Done |
+| Stacking Tier 3 scaffold | Done |
+
+### First action for the incoming agent
+
+Ask the user to run these two commands and paste the output:
+
+```bash
+wc -l data/kepler_snippets.jsonl
+ps aux | grep fetch_kepler | grep -v grep
+```
+
+- Line count = **7,454** → Kepler download complete. Proceed to the CNN training pipeline below.
+- Line count < 7,454 and process **alive** → still running; tell the user to let it finish and check back.
+- Line count < 7,454 and **no process** → download died; give the user this single-line restart command (single line — do NOT use backslash continuations):
+
+```
+caffeinate -dims bash -c 'while true; do python Skills/fetch_kepler_lc_snippets.py --output data/kepler_snippets.jsonl; echo "[$(date +%T)] Ended. Resuming in 30s..."; sleep 30; done'
+```
+
+### CNN training pipeline (run after Kepler download completes)
+
+Prepend `git pull origin main` to every user recipe. All commands run on the user's Mac from the repo root. Each training command takes hours — always use `caffeinate -dims`.
+
+```
+git pull origin main
+python Skills/build_cnn_training_data.py data/kepler_snippets.jsonl --output-dir data/kepler_cnn_splits
+python Skills/cnn_split_validator.py data/kepler_cnn_splits
+caffeinate -dims python Skills/train_cnn.py --splits-dir data/kepler_cnn_splits --output-dir models/cnn_kepler/
+python Skills/build_cnn_training_data.py data/tess_snippets_v2.jsonl --output-dir data/tess_cnn_splits
+caffeinate -dims python Skills/train_cnn.py --splits-dir data/tess_cnn_splits --output-dir models/cnn_tess/ --pretrained models/cnn_kepler/best.pt
+python Skills/cnn_calibrator.py --checkpoint models/cnn_tess/best.pt --splits-dir data/tess_cnn_splits --output models/cnn_tess/calibration.json
+```
+
+Gate: AUC ≥ 0.85, F1 ≥ 0.80. Architecture spec: `docs/CNN_SPEC.md`.
+
+**Why transfer learning?** TESS-only training hits a hard ~0.78 AUC ceiling at 1,425 examples. Pre-training on the large Kepler corpus then fine-tuning on TESS v2 is the only validated path past this ceiling.
+
+---
+
 ## Local-Only Data Artifacts — Read Before Any CNN Task
 
 Large training data files are stored on the user's local Mac and are **never committed to the repository**. Before proposing or executing any CNN training task, ask the user to confirm current file state.
