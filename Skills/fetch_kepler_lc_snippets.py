@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import re
 import socket
 import sys
 import time
@@ -214,7 +215,8 @@ def _default_lc_fetcher(
     except ImportError:
         return None
 
-    for attempt in range(2):
+    max_cache_repairs = 4
+    for attempt in range(max_cache_repairs + 1):
         try:
             result = lk.search_lightcurve(
                 f"KIC {kepid}", mission="Kepler", exptime=1800, author="Kepler"
@@ -235,7 +237,7 @@ def _default_lc_fetcher(
             return time_bjd, flux
         except Exception as exc:
             repaired = _remove_corrupt_lightkurve_cache_file(exc)
-            if attempt == 0 and repaired is not None:
+            if repaired is not None and attempt < max_cache_repairs:
                 _safe_print(
                     "Removed corrupt Lightkurve cache file and retrying "
                     f"KIC {kepid}: {repaired}"
@@ -250,8 +252,8 @@ def _remove_corrupt_lightkurve_cache_file(exc: Exception) -> Path | None:
     text = str(exc)
     if "This file may be corrupt due to an interrupted download" not in text:
         return None
-    for line in text.splitlines():
-        candidate = Path(line.strip())
+    for raw_path in _extract_fits_paths(text):
+        candidate = Path(raw_path)
         if (
             candidate.suffix == ".fits"
             and ".lightkurve" in candidate.parts
@@ -261,6 +263,11 @@ def _remove_corrupt_lightkurve_cache_file(exc: Exception) -> Path | None:
             candidate.unlink()
             return candidate
     return None
+
+
+def _extract_fits_paths(text: str) -> list[str]:
+    paths = re.findall(r"(/[^\n]+?\.fits)", text)
+    return [path.strip() for path in paths]
 
 
 # ---------------------------------------------------------------------------

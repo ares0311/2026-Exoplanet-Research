@@ -343,6 +343,32 @@ class TestOperationalHardening:
         assert removed == corrupt
         assert not corrupt.exists()
 
+    def test_remove_corrupt_lightkurve_cache_file_from_embedded_error_path(
+        self, tmp_path: Path
+    ) -> None:
+        corrupt = (
+            tmp_path
+            / ".lightkurve"
+            / "cache"
+            / "mastDownload"
+            / "Kepler"
+            / "kplr012456601_lc_Q011111111111111111"
+            / "kplr012456601-2013131215648_llc.fits"
+        )
+        corrupt.parent.mkdir(parents=True)
+        corrupt.write_text("truncated", encoding="utf-8")
+        exc = RuntimeError(
+            "Error in reading Data product "
+            f"{corrupt} "
+            "of type KeplerLightCurve . This file may be corrupt due to an "
+            "interrupted download. Please remove it from your disk and try again."
+        )
+
+        removed = _remove_corrupt_lightkurve_cache_file(exc)
+
+        assert removed == corrupt
+        assert not corrupt.exists()
+
     def test_remove_corrupt_lightkurve_cache_file_ignores_non_cache_path(
         self, tmp_path: Path
     ) -> None:
