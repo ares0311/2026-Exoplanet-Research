@@ -4,6 +4,11 @@
 
 This file records the local development machine profile so pipeline code, tests, and notebooks can be sized sensibly for this project.
 
+This file is a committed source of truth for local optimization defaults. Do
+not replace it with chat context, private notes, or untracked local state when
+choosing worker counts, batch sizes, cache behavior, or long-running job
+recipes.
+
 Use this as an optimization guide, not as a portability requirement. The codebase should still run on smaller systems unless a task explicitly documents a higher local resource target.
 
 Sensitive machine identifiers such as serial number, hardware UUID, provisioning UDID, and user account name are intentionally not recorded.

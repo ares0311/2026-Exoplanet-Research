@@ -230,9 +230,18 @@ Schedulers should call one bounded run at a time, capture stdout/stderr, and avo
 
 ## Local System Profile
 
-Before performance-sensitive changes or large jobs, read `docs/SYSTEM_PROFILE.md`.
+`docs/SYSTEM_PROFILE.md` is a committed production directive and the
+authoritative local hardware profile for this project. It must remain in the
+repository and must not be treated as a disposable local note or untracked
+artifact.
 
-Optimize local defaults for the recorded MacBook Pro M4 Max profile while keeping scientific code portable and configurable. Do not hardcode local machine assumptions into candidate detection, scoring, or pathway logic.
+Before performance-sensitive changes, large jobs, worker-count defaults,
+batch-size defaults, cache layout changes, or long-running user recipes, read
+`docs/SYSTEM_PROFILE.md` and optimize project defaults for the recorded MacBook
+Pro M4 Max profile. Keep the scientific code portable and configurable: do not
+hardcode local machine assumptions into candidate detection, scoring,
+classification, or pathway logic. If code needs machine-specific behavior,
+expose it through configuration, CLI flags, or documented runtime defaults.
 
 ## macOS Long-Running Process Policy
 
