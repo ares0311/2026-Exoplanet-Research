@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import math
 import re
 import socket
 import sys
@@ -110,11 +111,12 @@ def _phase_fold_bin(
     n_bins: int,
 ) -> list[float]:
     """Phase-fold and median-bin a light curve into n_bins uniform bins."""
-    phases = [((t - epoch) % period) / period for t in time_bjd]
-    phases = [p - 1.0 if p >= 0.5 else p for p in phases]
-
     bin_flux: list[list[float]] = [[] for _ in range(n_bins)]
-    for ph, f in zip(phases, flux, strict=False):
+    for t, f in zip(time_bjd, flux, strict=False):
+        if not math.isfinite(t) or not math.isfinite(f):
+            continue
+        ph = ((t - epoch) % period) / period
+        ph = ph - 1.0 if ph >= 0.5 else ph
         b = int((ph + 0.5) * n_bins)
         b = max(0, min(n_bins - 1, b))
         bin_flux[b].append(f)
@@ -140,6 +142,8 @@ def _mad(values: list[float], med: float) -> float:
 
 def _normalise(flux_bins: list[float]) -> list[float]:
     """Median/MAD normalisation (same as TESS snippet normaliser)."""
+    if any(not math.isfinite(value) for value in flux_bins):
+        return []
     med = _median(flux_bins)
     mad = _mad(flux_bins, med)
     scale = mad * 1.4826
@@ -321,14 +325,26 @@ def build_kepler_snippet(
         )
 
     time_bjd, flux = result
-    if len(time_bjd) < n_bins:
+    finite_pairs = [
+        (t, f)
+        for t, f in zip(time_bjd, flux, strict=False)
+        if math.isfinite(t) and math.isfinite(f)
+    ]
+    if len(finite_pairs) < n_bins:
         return KoiSnippetResult(
             kepid=kepid, label=label, flux=(), period_days=period_days,
             epoch_bjd=epoch_bjd, n_bins=n_bins, flag="SHORT",
         )
+    time_bjd = [pair[0] for pair in finite_pairs]
+    flux = [pair[1] for pair in finite_pairs]
 
     bins = _phase_fold_bin(time_bjd, flux, period_days, epoch_bjd, n_bins)
     normalised = _normalise(bins)
+    if len(normalised) != n_bins or any(not math.isfinite(value) for value in normalised):
+        return KoiSnippetResult(
+            kepid=kepid, label=label, flux=(), period_days=period_days,
+            epoch_bjd=epoch_bjd, n_bins=n_bins, flag="NONFINITE",
+        )
 
     return KoiSnippetResult(
         kepid=kepid,
@@ -425,12 +441,19 @@ def _result_from_curve(
     time_bjd: list[float],
     flux: list[float],
 ) -> KoiSnippetResult:
-    if len(time_bjd) < task.n_bins:
+    finite_pairs = [
+        (t, f)
+        for t, f in zip(time_bjd, flux, strict=False)
+        if math.isfinite(t) and math.isfinite(f)
+    ]
+    if len(finite_pairs) < task.n_bins:
         return KoiSnippetResult(
             kepid=task.kepid, label=task.label, flux=(),
             period_days=task.period_days, epoch_bjd=task.epoch_bjd,
             n_bins=task.n_bins, flag="SHORT",
         )
+    time_bjd = [pair[0] for pair in finite_pairs]
+    flux = [pair[1] for pair in finite_pairs]
     bins = _phase_fold_bin(
         time_bjd,
         flux,
@@ -438,10 +461,17 @@ def _result_from_curve(
         task.epoch_bjd,
         task.n_bins,
     )
+    normalised = _normalise(bins)
+    if len(normalised) != task.n_bins or any(not math.isfinite(value) for value in normalised):
+        return KoiSnippetResult(
+            kepid=task.kepid, label=task.label, flux=(),
+            period_days=task.period_days, epoch_bjd=task.epoch_bjd,
+            n_bins=task.n_bins, flag="NONFINITE",
+        )
     return KoiSnippetResult(
         kepid=task.kepid,
         label=task.label,
-        flux=tuple(_normalise(bins)),
+        flux=tuple(normalised),
         period_days=task.period_days,
         epoch_bjd=task.epoch_bjd,
         n_bins=task.n_bins,

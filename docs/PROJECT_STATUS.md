@@ -91,22 +91,24 @@ reports/background/*.html
 - Validation-fitted Platt calibration worsened test Brier score and ECE, so no calibration or checkpoint artifact was promoted into `models/`.
 - A 2026-06-10 audit found that every nominally usable snippet had `epoch_bjd=0.0`, so catalog transit events were not centered in phase.
 - The old corpus, original seed-42 split, and temporary replacement split are retired.
-- The local TESS v2 corpus is complete, and the local Kepler corpus is complete at 7,454 rows as of 2026-06-17.
+- The local TESS v2 corpus is complete.
+- The pre-fix local Kepler corpus was rejected on 2026-06-17: it had 7,454 rows, but 7,132 rows contained non-finite flux and only 322 finite examples survived builder filtering.
 - Tiny corrupt Kepler Lightkurve cache files were quarantined locally before training resumed.
 - Architecture details: `docs/CNN_SPEC.md`.
 - Human local runbook: `docs/CNN_PRODUCTION_RUNBOOK.md`.
-- Next outside blocker: build and validate Kepler CNN splits on the user's Mac, then run Kepler pretraining, TESS fine-tuning, and production gate evaluation from the runbook.
+- Next outside blocker: rebuild the Kepler JSONL with the fixed finite-flux fetcher, then build and validate Kepler CNN splits on the user's Mac.
 
 ---
 
 ## Next Actions
 
-1. TODO when back on the local Mac: follow `docs/CNN_PRODUCTION_RUNBOOK.md` Step 0 and Step 1 exactly, then paste back the split summary and validator result before training.
-2. If the Kepler split validator reports `PASS`, continue with `docs/CNN_PRODUCTION_RUNBOOK.md` Step 2 for Kepler pretraining and paste back the final training result plus SHA-256.
-3. After agent review of the Kepler pretraining result, run Step 3 and Step 4 for TESS split validation and fine-tuning, then paste back the final training result plus SHA-256.
-4. Run Step 5 production gate evaluation. Promote nothing unless the evaluator reports `Flag: PASS`, raw test AUC is at least 0.85, calibrated test F1 is at least 0.80, and calibrated Brier/ECE are no worse than raw.
-5. If the gate passes, request explicit human approval to promote the checkpoint; the agent then updates `models/`, registry metadata, readiness docs, and GitHub.
-6. If the gate fails, document the rejection in `docs/PRODUCTION_READINESS.md` and start the next T1-1 planning cycle from the observed failure mode.
+1. TODO when back on the local Mac: follow `docs/CNN_PRODUCTION_RUNBOOK.md` Step 0 and Step 1 exactly to preserve the rejected Kepler JSONL and rebuild it with finite-value filtering.
+2. If the rebuilt Kepler JSONL has a plausible line count, continue with `docs/CNN_PRODUCTION_RUNBOOK.md` Step 2 and paste back the split summary and validator result before training.
+3. If the Kepler split validator reports `PASS`, continue with `docs/CNN_PRODUCTION_RUNBOOK.md` Step 3 for Kepler pretraining and paste back the final training result plus SHA-256.
+4. After agent review of the Kepler pretraining result, run the TESS split validation and fine-tuning steps, then paste back the final training result plus SHA-256.
+5. Run production gate evaluation. Promote nothing unless the evaluator reports `Flag: PASS`, raw test AUC is at least 0.85, calibrated test F1 is at least 0.80, and calibrated Brier/ECE are no worse than raw.
+6. If the gate passes, request explicit human approval to promote the checkpoint; the agent then updates `models/`, registry metadata, readiness docs, and GitHub.
+7. If the gate fails, document the rejection in `docs/PRODUCTION_READINESS.md` and start the next T1-1 planning cycle from the observed failure mode.
 
 Live-network note: the CNN gate check was not run during the latest local
 maintenance pass because it queries ExoFOP and requires intentional live network

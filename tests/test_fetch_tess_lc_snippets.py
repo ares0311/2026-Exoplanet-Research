@@ -40,6 +40,17 @@ class TestPhaseFoldBin:
         assert len(bins) == 5
         assert 1.0 in bins
 
+    def test_nonfinite_points_are_ignored(self) -> None:
+        bins = _phase_fold_bin(
+            [2457000.0, 2457001.0, float("nan")],
+            [0.5, 1.0, float("nan")],
+            period=10.0,
+            epoch=2457000.0,
+            n_bins=5,
+        )
+        assert len(bins) == 5
+        assert all(v == v for v in bins)
+
 
 class TestNormalise:
     def test_zero_mad_returns_zeros(self) -> None:
@@ -92,6 +103,16 @@ class TestBuildTessSnippet:
         result = build_tess_snippet(
             1, 0, 3.0, 2458000.0, n_bins=201, lc_fetcher=fetcher
         )
+        assert result.flag == "SHORT"
+
+    def test_short_flag_when_too_few_finite_points(self) -> None:
+        def fetcher(tic_id, period, epoch):
+            return [2457000.0 + float(i) for i in range(300)], [float("nan")] * 300
+
+        result = build_tess_snippet(
+            1, 0, 3.0, 2458000.0, n_bins=201, lc_fetcher=fetcher
+        )
+
         assert result.flag == "SHORT"
 
     def test_error_flag_on_exception(self) -> None:

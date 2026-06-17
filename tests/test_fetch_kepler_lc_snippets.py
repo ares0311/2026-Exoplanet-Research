@@ -44,6 +44,17 @@ class TestPhaseFoldBin:
         assert len(bins) == 5
         assert 1.0 in bins  # empty bins default to 1.0
 
+    def test_nonfinite_points_are_ignored(self) -> None:
+        bins = _phase_fold_bin(
+            [0.0, 1.0, float("nan")],
+            [0.5, 1.0, float("nan")],
+            period=10.0,
+            epoch=0.0,
+            n_bins=5,
+        )
+        assert len(bins) == 5
+        assert all(v == v for v in bins)
+
 
 class TestNormalise:
     def test_zero_mad_returns_zeros(self) -> None:
@@ -105,6 +116,16 @@ class TestBuildKeplerSnippet:
         result = build_kepler_snippet(
             1, 0, 3.0, 2454900.0, n_bins=201, lc_fetcher=fetcher
         )
+        assert result.flag == "SHORT"
+
+    def test_short_flag_when_too_few_finite_points(self) -> None:
+        def fetcher(kepid, period, epoch):
+            return [float(i) for i in range(300)], [float("nan")] * 300
+
+        result = build_kepler_snippet(
+            1, 0, 3.0, 2454900.0, n_bins=201, lc_fetcher=fetcher
+        )
+
         assert result.flag == "SHORT"
 
     def test_error_flag_on_exception(self) -> None:
@@ -271,6 +292,23 @@ class TestBuildKeplerSnippets:
 
         assert n == 4
         assert len(out.read_text().strip().splitlines()) == 4
+
+    def test_batch_skips_nonfinite_light_curve(self, tmp_path: Path) -> None:
+        def fetcher(kepid, period, epoch):
+            return [float(i) for i in range(50)], [float("nan")] * 50
+
+        out = tmp_path / "kepler_snippets.jsonl"
+        n = build_kepler_snippets(
+            self._make_koi_rows(1),
+            n_bins=11,
+            output_path=out,
+            lc_fetcher=fetcher,
+            resume=False,
+            max_errors=10,
+        )
+
+        assert n == 0
+        assert not out.read_text().strip()
 
     def test_no_resume_overwrites(self, tmp_path: Path) -> None:
         out = tmp_path / "out.jsonl"

@@ -65,6 +65,7 @@ def validate_split_manifest(path: Path | str) -> SplitValidationResult:
     label_counts: dict[str, dict[int, int]] = {}
     seen_ids: dict[str, str] = {}
     seen_tic_ids: dict[int, str] = {}
+    seen_group_ids: dict[str, str] = {}
 
     manifest = _load_json_object(manifest_path, issues)
     if manifest is None:
@@ -142,6 +143,22 @@ def validate_split_manifest(path: Path | str) -> SplitValidationResult:
                 seen_ids[example_id] = split_name
             tic_id = _tic_id(row)
             if tic_id is None or tic_id <= 0:
+                group_id = _group_id(row)
+                if group_id is None:
+                    continue
+                previous_group_split = seen_group_ids.get(group_id)
+                if previous_group_split is not None and previous_group_split != split_name:
+                    issues.append(
+                        ValidationIssue(
+                            "error",
+                            "group_id_leakage",
+                            f"group_id {group_id!r} also appears in {previous_group_split}",
+                            split=split_name,
+                            example_id=example_id,
+                        )
+                    )
+                else:
+                    seen_group_ids[group_id] = split_name
                 continue
             previous_tic_split = seen_tic_ids.get(tic_id)
             if previous_tic_split is not None and previous_tic_split != split_name:
@@ -454,6 +471,15 @@ def _tic_id(row: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _group_id(row: Any) -> str | None:
+    if not isinstance(row, dict):
+        return None
+    value = row.get("group_id")
+    if not isinstance(value, str) or not value.strip():
+        return None
+    return value
 
 
 def _numeric_sequence(value: Any) -> tuple[float, ...] | None:

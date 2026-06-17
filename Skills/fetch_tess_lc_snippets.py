@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import math
 import socket
 import time
 from collections.abc import Callable
@@ -67,11 +68,12 @@ def _phase_fold_bin(
     epoch: float,
     n_bins: int,
 ) -> list[float]:
-    phases = [((t - epoch) % period) / period for t in time_bjd]
-    phases = [p - 1.0 if p >= 0.5 else p for p in phases]
-
     bin_flux: list[list[float]] = [[] for _ in range(n_bins)]
-    for ph, f in zip(phases, flux, strict=False):
+    for t, f in zip(time_bjd, flux, strict=False):
+        if not math.isfinite(t) or not math.isfinite(f):
+            continue
+        ph = ((t - epoch) % period) / period
+        ph = ph - 1.0 if ph >= 0.5 else ph
         b = int((ph + 0.5) * n_bins)
         b = max(0, min(n_bins - 1, b))
         bin_flux[b].append(f)
@@ -95,6 +97,8 @@ def _mad(values: list[float], med: float) -> float:
 
 
 def _normalise(flux_bins: list[float]) -> list[float]:
+    if any(not math.isfinite(value) for value in flux_bins):
+        return []
     med = _median(flux_bins)
     scale = _mad(flux_bins, med) * 1.4826
     if scale < 1e-10:
@@ -192,14 +196,26 @@ def build_tess_snippet(
         )
 
     time_bjd, flux = result
-    if len(time_bjd) < n_bins:
+    finite_pairs = [
+        (t, f)
+        for t, f in zip(time_bjd, flux, strict=False)
+        if math.isfinite(t) and math.isfinite(f)
+    ]
+    if len(finite_pairs) < n_bins:
         return TessSnippetResult(
             tic_id=tic_id, label=label, flux=(), period_days=period_days,
             epoch_bjd=epoch_bjd, n_bins=n_bins, flag="SHORT",
         )
+    time_bjd = [pair[0] for pair in finite_pairs]
+    flux = [pair[1] for pair in finite_pairs]
 
     bins = _phase_fold_bin(time_bjd, flux, period_days, epoch_bjd, n_bins)
     normalised = _normalise(bins)
+    if len(normalised) != n_bins or any(not math.isfinite(value) for value in normalised):
+        return TessSnippetResult(
+            tic_id=tic_id, label=label, flux=(), period_days=period_days,
+            epoch_bjd=epoch_bjd, n_bins=n_bins, flag="NONFINITE",
+        )
 
     return TessSnippetResult(
         tic_id=tic_id,

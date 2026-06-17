@@ -18,6 +18,7 @@ format_normalization_report(report) -> str
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 # ---------------------------------------------------------------------------
@@ -145,6 +146,9 @@ def normalize_snippet(
     )
 
     if len(phase) == 0 or len(flux) == 0 or len(phase) != len(flux):
+        return _rejected
+
+    if not all(math.isfinite(value) for value in (*phase, *flux)):
         return _rejected
 
     bin_centers, binned_flux = _bin_phase_flux(phase, flux, n_bins)
