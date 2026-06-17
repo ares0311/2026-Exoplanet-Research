@@ -6,10 +6,13 @@ from pathlib import Path
 
 import pytest
 from Skills.fetch_kepler_lc_snippets import (
+    _format_flags,
     _mad,
     _median,
     _normalise,
     _phase_fold_bin,
+    _remove_corrupt_lightkurve_cache_file,
+    _safe_print,
     build_kepler_snippet,
     build_kepler_snippets,
 )
@@ -298,3 +301,60 @@ class TestBuildKeplerSnippets:
             assert key in record
         assert record["source"] == "kepler"
         assert record["n_bins"] == 11
+
+
+class TestOperationalHardening:
+    def test_safe_print_ignores_closed_stream(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        def closed_print(*args, **kwargs) -> None:
+            raise ValueError("I/O operation on closed file")
+
+        monkeypatch.setattr("builtins.print", closed_print)
+        _safe_print("still keep the data job alive")
+
+    def test_format_flags_keeps_progress_line_bounded(self) -> None:
+        long_flag = "ERROR:first line\n" + ("x" * 500)
+
+        formatted = _format_flags((long_flag,))
+
+        assert "\n" not in formatted
+        assert len(formatted) == 300
+        assert formatted.endswith("...")
+
+    def test_remove_corrupt_lightkurve_cache_file(self, tmp_path: Path) -> None:
+        corrupt = (
+            tmp_path
+            / ".lightkurve"
+            / "cache"
+            / "mastDownload"
+            / "Kepler"
+            / "kplr_bad"
+            / "bad.fits"
+        )
+        corrupt.parent.mkdir(parents=True)
+        corrupt.write_text("not a fits file", encoding="utf-8")
+        exc = RuntimeError(
+            "Not recognized as a supported data product:\n"
+            f"{corrupt}\n"
+            "This file may be corrupt due to an interrupted download."
+        )
+
+        removed = _remove_corrupt_lightkurve_cache_file(exc)
+
+        assert removed == corrupt
+        assert not corrupt.exists()
+
+    def test_remove_corrupt_lightkurve_cache_file_ignores_non_cache_path(
+        self, tmp_path: Path
+    ) -> None:
+        ordinary = tmp_path / "bad.fits"
+        ordinary.write_text("not a fits file", encoding="utf-8")
+        exc = RuntimeError(
+            "Not recognized as a supported data product:\n"
+            f"{ordinary}\n"
+            "This file may be corrupt due to an interrupted download."
+        )
+
+        removed = _remove_corrupt_lightkurve_cache_file(exc)
+
+        assert removed is None
+        assert ordinary.exists()

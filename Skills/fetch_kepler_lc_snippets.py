@@ -25,6 +25,7 @@ from __future__ import annotations
 import contextlib
 import json
 import socket
+import sys
 import time
 from collections.abc import Callable
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
@@ -40,6 +41,18 @@ from urllib.request import urlopen
 socket.setdefaulttimeout(120)
 
 _KEPLER_BJD_OFFSET = 2454833.0  # Kepler time is BJD - 2454833
+
+
+def _safe_print(message: str) -> None:
+    """Print progress without allowing a closed stream to abort a long run."""
+    try:
+        print(message, flush=True)
+    except (BrokenPipeError, ValueError):
+        # If a parent shell, pipe, or terminal closes stdout, keep the data job
+        # alive. The JSONL output is the durable artifact; console output is
+        # operational visibility only.
+        with contextlib.suppress(Exception):
+            print(message, file=sys.stderr, flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -201,23 +214,53 @@ def _default_lc_fetcher(
     except ImportError:
         return None
 
-    result = lk.search_lightcurve(
-        f"KIC {kepid}", mission="Kepler", exptime=1800, author="Kepler"
-    )
-    if len(result) == 0:
+    for attempt in range(2):
+        try:
+            result = lk.search_lightcurve(
+                f"KIC {kepid}", mission="Kepler", exptime=1800, author="Kepler"
+            )
+            if len(result) == 0:
+                return None
+
+            lc_coll = result.download_all()
+            if lc_coll is None or len(lc_coll) == 0:
+                return None
+
+            lc = lc_coll.stitch()
+            with contextlib.suppress(Exception):
+                lc = lc.normalize()
+
+            time_bjd = [float(t) + _KEPLER_BJD_OFFSET for t in lc.time.value]
+            flux = [float(f) for f in lc.flux.value]
+            return time_bjd, flux
+        except Exception as exc:
+            repaired = _remove_corrupt_lightkurve_cache_file(exc)
+            if attempt == 0 and repaired is not None:
+                _safe_print(
+                    "Removed corrupt Lightkurve cache file and retrying "
+                    f"KIC {kepid}: {repaired}"
+                )
+                continue
+            raise
+
+    return None
+
+
+def _remove_corrupt_lightkurve_cache_file(exc: Exception) -> Path | None:
+    text = str(exc)
+    if "This file may be corrupt due to an interrupted download" not in text:
         return None
-
-    lc_coll = result.download_all()
-    if lc_coll is None or len(lc_coll) == 0:
-        return None
-
-    lc = lc_coll.stitch()
-    with contextlib.suppress(Exception):
-        lc = lc.normalize()
-
-    time_bjd = [float(t) + _KEPLER_BJD_OFFSET for t in lc.time.value]
-    flux = [float(f) for f in lc.flux.value]
-    return time_bjd, flux
+    for line in text.splitlines():
+        candidate = Path(line.strip())
+        if (
+            candidate.suffix == ".fits"
+            and ".lightkurve" in candidate.parts
+            and "mastDownload" in candidate.parts
+            and candidate.is_file()
+        ):
+            candidate.unlink()
+            return candidate
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -499,11 +542,10 @@ def build_kepler_snippets(
     start = time.monotonic()
     workers = max(1, int(workers))
 
-    print(
+    _safe_print(
         f"Building Kepler snippets: {n_total} valid KOIs  resume={resume}  "
         f"already_done={len(completed)}  pending={len(pending_tasks)}  "
-        f"kic_groups={len(task_groups)}  workers={workers}  output={output_path}",
-        flush=True,
+        f"kic_groups={len(task_groups)}  workers={workers}  output={output_path}"
     )
 
     write_mode = "a" if resume else "w"
@@ -524,9 +566,8 @@ def build_kepler_snippets(
                     start,
                 )
                 if consecutive_errors >= max_errors:
-                    print(
-                        f"Aborting: {consecutive_errors} consecutive KIC-group errors.",
-                        flush=True,
+                    _safe_print(
+                        f"Aborting: {consecutive_errors} consecutive KIC-group errors."
                     )
                     break
         else:
@@ -567,9 +608,8 @@ def build_kepler_snippets(
                             start,
                         )
                         if consecutive_errors >= max_errors:
-                            print(
-                                f"Aborting: {consecutive_errors} consecutive KIC-group errors.",
-                                flush=True,
+                            _safe_print(
+                                f"Aborting: {consecutive_errors} consecutive KIC-group errors."
                             )
                             should_abort = True
                             break
@@ -589,10 +629,7 @@ def build_kepler_snippets(
                         if request_delay > 0:
                             time.sleep(request_delay)
 
-    print(
-        f"Done. {n_written} snippets written, {n_errors} skipped/errors.",
-        flush=True,
-    )
+    _safe_print(f"Done. {n_written} snippets written, {n_errors} skipped/errors.")
     return n_written
 
 
@@ -624,15 +661,23 @@ def _print_group_progress(
     )
     ok_count = len(group_result.records)
     fail_count = sum(1 for flag in group_result.flags if flag != "OK")
-    flags = ",".join(sorted(set(group_result.flags))) if group_result.flags else "EMPTY"
-    print(
+    flags = _format_flags(group_result.flags)
+    _safe_print(
         f"  [KIC {group_index}/{n_groups}] {datetime.now().strftime('%H:%M:%S')}"
         f" KIC {group_result.kepid} rows={len(group_result.row_indices)}"
         f" ok={ok_count} fail={fail_count} flags={flags}"
         f"  written={n_written} errors={n_errors}"
-        f"  elapsed={elapsed:.0f}s  ETA={eta}",
-        flush=True,
+        f"  elapsed={elapsed:.0f}s  ETA={eta}"
     )
+
+
+def _format_flags(flags: tuple[str, ...]) -> str:
+    if not flags:
+        return "EMPTY"
+    formatted = ",".join(sorted({flag.replace("\n", " ") for flag in flags}))
+    if len(formatted) > 300:
+        return formatted[:297] + "..."
+    return formatted
 
 
 # ---------------------------------------------------------------------------
@@ -686,18 +731,17 @@ def _cli(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    print("Fetching KOI table from NASA Exoplanet Archive ...", flush=True)
+    _safe_print("Fetching KOI table from NASA Exoplanet Archive ...")
     try:
         koi_rows = fetch_koi_table(max_rows=args.max_rows)
     except Exception as exc:
-        print(f"ERROR fetching KOI table: {exc}")
+        _safe_print(f"ERROR fetching KOI table: {exc}")
         return 1
 
     confirmed = sum(1 for r in koi_rows if r.get("koi_disposition") == "CONFIRMED")
     fp = sum(1 for r in koi_rows if r.get("koi_disposition") == "FALSE POSITIVE")
-    print(
-        f"KOI table: {len(koi_rows)} rows  CONFIRMED={confirmed}  FALSE POSITIVE={fp}",
-        flush=True,
+    _safe_print(
+        f"KOI table: {len(koi_rows)} rows  CONFIRMED={confirmed}  FALSE POSITIVE={fp}"
     )
 
     n = build_kepler_snippets(
@@ -709,7 +753,7 @@ def _cli(argv: list[str] | None = None) -> int:
         workers=args.workers,
         request_delay=args.request_delay,
     )
-    print(f"Flag: OK  snippets_written={n}")
+    _safe_print(f"Flag: OK  snippets_written={n}")
     return 0
 
 
