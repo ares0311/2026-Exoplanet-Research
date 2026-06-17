@@ -1142,13 +1142,13 @@ These large data files live only on the user's local Mac. They are never committ
 | File | Location | Status (as of 2026-06-15) | Notes |
 |---|---|---|---|
 | `data/tess_snippets_v2.jsonl` | Local Mac | **COMPLETE** — 2,619 snippets | Merged from `tess_snippets.jsonl` + `tess_snippets_expansion.jsonl`; 56 targets had permanent MAST 404s and were skipped |
-| `data/kepler_snippets.jsonl` | Local Mac | **IN PROGRESS** — ~922/7,454 snippets as of 2026-06-15 09:00 UTC; ETA ~Monday 2026-06-16 evening | Kepler 30-min long-cadence, confirmed planets + FPs from KOI table; download command below |
+| `data/kepler_snippets.jsonl` | Local Mac | **IN PROGRESS** — ~6,066/7,454 snippets as of 2026-06-16 18:30 ET; still running | Kepler 30-min long-cadence, confirmed planets + FPs from KOI table; optimized restart command below |
 
 **Kepler download auto-restart command** (run in a dedicated terminal tab on the Mac):
 ```
-caffeinate -dims bash -c 'while true; do python Skills/fetch_kepler_lc_snippets.py --output data/kepler_snippets.jsonl; echo "[$(date +%T)] Ended. Resuming in 30s..."; sleep 30; done'
+caffeinate -dims bash -c 'while true; do .venv/bin/python Skills/fetch_kepler_lc_snippets.py --output data/kepler_snippets.jsonl --workers 3 --request-delay 0.5; echo "[$(date +%T)] Ended. Resuming in 30s..."; sleep 30; done'
 ```
-This command uses `author="Kepler"` to skip HLSP/IRIS corrupted cache files and `socket.setdefaulttimeout(120)` to prevent indefinite hangs on WiFi drops. Resume is automatic — already-downloaded KICs are detected from the JSONL output and skipped.
+This command uses `author="Kepler"` to skip HLSP/IRIS corrupted cache files and `socket.setdefaulttimeout(120)` to prevent indefinite hangs on WiFi drops. Resume is automatic. The optimized fetcher groups pending KOIs by `kepid`, fetches each KIC light curve once, folds all KOIs for that star locally, writes JSONL from the main process only, and uses `(kepid, period, epoch, label)` as the resume key so multi-KOI systems are not skipped accidentally.
 
 ### Next Step — HANDOFF 2026-06-15
 
@@ -1167,13 +1167,13 @@ ps aux | grep fetch_kepler | grep -v grep
 - **< 7,454, no process found** → died; give the user this single line to restart (no backslash continuations — paste as one line):
 
 ```
-caffeinate -dims bash -c 'while true; do python Skills/fetch_kepler_lc_snippets.py --output data/kepler_snippets.jsonl; echo "[$(date +%T)] Ended. Resuming in 30s..."; sleep 30; done'
+caffeinate -dims bash -c 'while true; do .venv/bin/python Skills/fetch_kepler_lc_snippets.py --output data/kepler_snippets.jsonl --workers 3 --request-delay 0.5; echo "[$(date +%T)] Ended. Resuming in 30s..."; sleep 30; done'
 ```
 
 #### Corpus status
 
 - **TESS v2**: `data/tess_snippets_v2.jsonl` — 2,619 snippets (COMPLETE; 56 targets had permanent MAST 404s)
-- **Kepler**: `data/kepler_snippets.jsonl` — IN PROGRESS (~922/7,454 as of 2026-06-15 09:00 UTC); ETA ~Monday evening
+- **Kepler**: `data/kepler_snippets.jsonl` — IN PROGRESS (~6,066/7,454 as of 2026-06-16 18:30 ET); optimized bounded-concurrency restart available after merge
 
 #### CNN training pipeline (after Kepler completes)
 
