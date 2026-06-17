@@ -1,0 +1,44 @@
+{
+  "config": {
+    "seed": 7,
+    "stratify": true,
+    "test_fraction": 0.15,
+    "train_fraction": 0.7,
+    "val_fraction": 0.15
+  },
+  "created_at": "2026-06-12T20:20:43.173877+00:00",
+  "label_counts": {
+    "0": 1025,
+    "1": 1012
+  },
+  "language_guardrail": "offline CNN preparation only; no candidate confirmation or discovery claim",
+  "live_services": false,
+  "n_examples": 2037,
+  "source_files": [
+    "data/tess_snippets.jsonl"
+  ],
+  "split_counts": {
+    "test": 306,
+    "train": 1425,
+    "val": 306
+  },
+  "split_files": {
+    "test": "test.json",
+    "train": "train.json",
+    "val": "val.json"
+  },
+  "split_label_counts": {
+    "test": {
+      "0": 154,
+      "1": 152
+    },
+    "train": {
+      "0": 717,
+      "1": 708
+    },
+    "val": {
+      "0": 154,
+      "1": 152
+    }
+  }
+}

@@ -1,0 +1,116 @@
+{
+  "checkpoints": [
+    {
+      "path": "models/cnn/epoch_0001.pt",
+      "epoch": 1,
+      "val_loss": 0.600186,
+      "val_auc": 0.740431,
+      "learning_rate": 0.001,
+      "created_at": "2026-06-12T15:15:32.664576+00:00"
+    },
+    {
+      "path": "models/cnn/epoch_0002.pt",
+      "epoch": 2,
+      "val_loss": 0.575827,
+      "val_auc": 0.780118,
+      "learning_rate": 0.001,
+      "created_at": "2026-06-12T15:15:33.217318+00:00"
+    },
+    {
+      "path": "models/cnn/epoch_0003.pt",
+      "epoch": 3,
+      "val_loss": 0.555364,
+      "val_auc": 0.798872,
+      "learning_rate": 0.001,
+      "created_at": "2026-06-12T15:15:33.766035+00:00"
+    },
+    {
+      "path": "models/cnn/epoch_0004.pt",
+      "epoch": 4,
+      "val_loss": 0.533546,
+      "val_auc": 0.817712,
+      "learning_rate": 0.001,
+      "created_at": "2026-06-12T15:15:34.312658+00:00"
+    },
+    {
+      "path": "models/cnn/epoch_0005.pt",
+      "epoch": 5,
+      "val_loss": 0.546707,
+      "val_auc": 0.807587,
+      "learning_rate": 0.001,
+      "created_at": "2026-06-12T15:15:34.882086+00:00"
+    },
+    {
+      "path": "models/cnn/epoch_0006.pt",
+      "epoch": 6,
+      "val_loss": 0.531716,
+      "val_auc": 0.808143,
+      "learning_rate": 0.001,
+      "created_at": "2026-06-12T15:15:35.444541+00:00"
+    },
+    {
+      "path": "models/cnn/epoch_0007.pt",
+      "epoch": 7,
+      "val_loss": 0.549763,
+      "val_auc": 0.804383,
+      "learning_rate": 0.001,
+      "created_at": "2026-06-12T15:15:35.991661+00:00"
+    },
+    {
+      "path": "models/cnn/epoch_0008.pt",
+      "epoch": 8,
+      "val_loss": 0.53624,
+      "val_auc": 0.803956,
+      "learning_rate": 0.001,
+      "created_at": "2026-06-12T15:15:36.536894+00:00"
+    },
+    {
+      "path": "models/cnn/epoch_0009.pt",
+      "epoch": 9,
+      "val_loss": 0.5639,
+      "val_auc": 0.783578,
+      "learning_rate": 0.001,
+      "created_at": "2026-06-12T15:15:37.096995+00:00"
+    },
+    {
+      "path": "models/cnn/epoch_0010.pt",
+      "epoch": 10,
+      "val_loss": 0.543011,
+      "val_auc": 0.808442,
+      "learning_rate": 0.001,
+      "created_at": "2026-06-12T15:15:37.658952+00:00"
+    },
+    {
+      "path": "models/cnn/epoch_0011.pt",
+      "epoch": 11,
+      "val_loss": 0.570438,
+      "val_auc": 0.802674,
+      "learning_rate": 0.0005,
+      "created_at": "2026-06-12T15:15:38.208092+00:00"
+    },
+    {
+      "path": "models/cnn/epoch_0012.pt",
+      "epoch": 12,
+      "val_loss": 0.604816,
+      "val_auc": 0.801179,
+      "learning_rate": 0.0005,
+      "created_at": "2026-06-12T15:15:38.760782+00:00"
+    },
+    {
+      "path": "models/cnn/epoch_0013.pt",
+      "epoch": 13,
+      "val_loss": 0.62378,
+      "val_auc": 0.798659,
+      "learning_rate": 0.0005,
+      "created_at": "2026-06-12T15:15:39.345024+00:00"
+    },
+    {
+      "path": "models/cnn/epoch_0014.pt",
+      "epoch": 14,
+      "val_loss": 0.619983,
+      "val_auc": 0.778794,
+      "learning_rate": 0.0005,
+      "created_at": "2026-06-12T15:15:39.940770+00:00"
+    }
+  ]
+}
