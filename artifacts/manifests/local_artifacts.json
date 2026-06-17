@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "last_updated": "2026-06-17",
+  "production_gap": "T1-1: Production Tier 2 CNN Checkpoint",
+  "policy": {
+    "standard_operator_cadence": "git add .",
+    "git_add_dot_must_be_safe": true,
+    "bulky_runtime_artifacts_are_ignored": true,
+    "github_visible_ledger_required": true,
+    "human_approval_required_for_cnn_promotion": true
+  },
+  "artifacts": [
+    {
+      "path": "data/tess_snippets_v2.jsonl",
+      "kind": "source_corpus",
+      "status": "present_local_source",
+      "git_policy": "ignored",
+      "last_known": {
+        "rows": 2619,
+        "positive_labels": 1215,
+        "negative_labels": 1404,
+        "finite_flux_rows": 2110,
+        "nonfinite_flux_rows": 509,
+        "verified_on": "2026-06-17"
+      },
+      "validation_gate": "Build data/tess_cnn_splits and require Skills/cnn_split_validator.py PASS before fine-tuning.",
+      "next_action": "Use after Kepler pretraining is reviewed."
+    },
+    {
+      "path": "data/kepler_snippets.jsonl",
+      "kind": "source_corpus",
+      "status": "rebuild_required_current_snapshot_absent",
+      "git_policy": "ignored",
+      "last_known": {
+        "pre_fix_rejected_rows": 7454,
+        "pre_fix_rejected_nonfinite_flux_rows": 7132,
+        "finite_rows_after_filtering": 322,
+        "current_checkout_file_present": false,
+        "verified_on": "2026-06-17"
+      },
+      "validation_gate": "Fetch must report Flag: OK; then build data/kepler_cnn_splits and require Skills/cnn_split_validator.py PASS.",
+      "next_action": "Run docs/CNN_PRODUCTION_RUNBOOK.md Step 1 on the local Mac."
+    },
+    {
+      "path": "data/kepler_snippets_nan_corrupt_20260617.jsonl",
+      "kind": "forensic_corpus",
+      "status": "rejected",
+      "git_policy": "ignored",
+      "validation_gate": "Never train from this artifact.",
+      "next_action": "Keep local only unless explicit forensic review is requested."
+    },
+    {
+      "path": "data/kepler_cnn_splits/",
+      "kind": "cnn_split",
+      "status": "pending_regeneration",
+      "git_policy": "ignored",
+      "validation_gate": "Skills/cnn_split_validator.py data/kepler_cnn_splits must report PASS.",
+      "next_action": "Generate after rebuilt Kepler JSONL fetch completes."
+    },
+    {
+      "path": "data/tess_cnn_splits/",
+      "kind": "cnn_split",
+      "status": "pending_regeneration",
+      "git_policy": "ignored",
+      "validation_gate": "Skills/cnn_split_validator.py data/tess_cnn_splits must report PASS.",
+      "next_action": "Generate after Kepler pretraining review."
+    },
+    {
+      "path": "checkpoints/cnn_kepler_pretrain/",
+      "kind": "checkpoint_dir",
+      "status": "pending_training",
+      "git_policy": "ignored",
+      "validation_gate": "Agent must review final training result and SHA-256 before TESS fine-tuning.",
+      "next_action": "Train only from validated Kepler splits."
+    },
+    {
+      "path": "checkpoints/cnn_tess_finetuned/",
+      "kind": "checkpoint_dir",
+      "status": "pending_training",
+      "git_policy": "ignored",
+      "validation_gate": "Skills/evaluate_cnn_checkpoint.py must report Flag: PASS.",
+      "next_action": "Fine-tune only after Kepler pretraining review."
+    },
+    {
+      "path": "models/cnn*/",
+      "kind": "promotion_target",
+      "status": "no_production_approved_cnn",
+      "git_policy": "ignored_until_explicit_promotion",
+      "validation_gate": "Raw held-out AUC >= 0.85, calibrated F1 >= 0.80, and calibration must not worsen Brier/ECE.",
+      "next_action": "Force-add only after evaluator PASS and explicit human approval."
+    },
+    {
+      "path": "logs/*.sqlite*",
+      "kind": "runtime_log",
+      "status": "runtime_only",
+      "git_policy": "ignored",
+      "validation_gate": "Summaries may be committed in docs; SQLite DBs stay local.",
+      "next_action": "Do not commit runtime databases."
+    },
+    {
+      "path": "reports/",
+      "kind": "runtime_report_export",
+      "status": "runtime_only",
+      "git_policy": "ignored_except_documentation_sentinels",
+      "validation_gate": "Generated reports require review before any curated documentation promotion.",
+      "next_action": "Do not commit generated exports by default."
+    }
+  ]
+}

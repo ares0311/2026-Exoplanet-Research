@@ -479,3 +479,45 @@ the validated runtime version and makes the venv-only constraint durable.
   compatibility regressions against a known-good baseline.
 - Keeps scientific code, dependencies, and environment fully isolated in the
   project venv.
+
+---
+
+## DECISION-017: Make `git add .` Safe and Commit Local Artifact State
+
+**Date:** 2026-06-17
+**Status:** Accepted
+
+### Context
+
+The standard operator cadence for this project is `git add .`. A previous
+commit accidentally staged generated CNN split files, rejected checkpoint
+directories, and other local artifacts. Those artifacts should not live in Git,
+but other coding agents may only see GitHub and still need enough state to
+continue production work without chat context.
+
+T1-1 depends on local-only corpora, split directories, checkpoints, logs, and
+gate results. Ignoring those files without committing their status makes future
+agents blind; committing the files themselves makes Git noisy and unsafe.
+
+### Decision
+
+1. Keep `git add .` safe through repository-owned `.gitignore` rules.
+2. Ignore bulky or volatile local artifacts by default: raw/generated data,
+   generated CNN splits, checkpoints, runtime SQLite logs, generated reports,
+   virtual environments, caches, and rejected experiments.
+3. Commit production-relevant local artifact state in
+   `docs/LOCAL_ARTIFACT_LEDGER.md` and
+   `artifacts/manifests/local_artifacts.json`.
+4. Update the ledger in the same PR as any code, runbook, readiness, or
+   artifact-policy change that affects local artifact status.
+5. Promote CNN artifacts into `models/` only after the production evaluator
+   passes and the human explicitly approves promotion. Because CNN model paths
+   are ignored defensively, that promotion may use documented `git add -f`.
+
+### Rationale
+
+- Supports the user's normal workflow without relying on perfect manual
+  staging.
+- Keeps GitHub useful for agents that cannot see local artifacts.
+- Avoids committing large, rejected, or regenerable runtime products.
+- Preserves a reproducible path for production-approved CNN inference artifacts.

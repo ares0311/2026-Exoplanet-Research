@@ -75,9 +75,17 @@ Runtime artifacts remain ignored by default:
 
 ```text
 logs/background_search.sqlite3
-reports/background/*.md
-reports/background/*.html
+reports/
+checkpoints/
+data/*.jsonl
+data/*_splits/
+models/cnn*/
 ```
+
+Production-relevant ignored artifact state is committed in
+`docs/LOCAL_ARTIFACT_LEDGER.md` and
+`artifacts/manifests/local_artifacts.json` so GitHub-only agents can continue
+without relying on chat context or local terminal output.
 
 ---
 
@@ -103,12 +111,13 @@ reports/background/*.html
 ## Next Actions
 
 1. TODO when back on the local Mac: follow `docs/CNN_PRODUCTION_RUNBOOK.md` Step 0 and Step 1 exactly to preserve the rejected Kepler JSONL and rebuild it with finite-value filtering.
-2. If the rebuilt Kepler JSONL has a plausible line count, continue with `docs/CNN_PRODUCTION_RUNBOOK.md` Step 2 and paste back the split summary and validator result before training.
-3. If the Kepler split validator reports `PASS`, continue with `docs/CNN_PRODUCTION_RUNBOOK.md` Step 3 for Kepler pretraining and paste back the final training result plus SHA-256.
-4. After agent review of the Kepler pretraining result, run the TESS split validation and fine-tuning steps, then paste back the final training result plus SHA-256.
-5. Run production gate evaluation. Promote nothing unless the evaluator reports `Flag: PASS`, raw test AUC is at least 0.85, calibrated test F1 is at least 0.80, and calibrated Brier/ECE are no worse than raw.
-6. If the gate passes, request explicit human approval to promote the checkpoint; the agent then updates `models/`, registry metadata, readiness docs, and GitHub.
-7. If the gate fails, document the rejection in `docs/PRODUCTION_READINESS.md` and start the next T1-1 planning cycle from the observed failure mode.
+2. Update `docs/LOCAL_ARTIFACT_LEDGER.md` and `artifacts/manifests/local_artifacts.json` after each local artifact state change so GitHub records the current corpus/split/checkpoint status.
+3. If the rebuilt Kepler JSONL has a plausible line count, continue with `docs/CNN_PRODUCTION_RUNBOOK.md` Step 2 and paste back the split summary and validator result before training.
+4. If the Kepler split validator reports `PASS`, continue with `docs/CNN_PRODUCTION_RUNBOOK.md` Step 3 for Kepler pretraining and paste back the final training result plus SHA-256.
+5. After agent review of the Kepler pretraining result, run the TESS split validation and fine-tuning steps, then paste back the final training result plus SHA-256.
+6. Run production gate evaluation. Promote nothing unless the evaluator reports `Flag: PASS`, raw test AUC is at least 0.85, calibrated test F1 is at least 0.80, and calibrated Brier/ECE are no worse than raw.
+7. If the gate passes, request explicit human approval to promote the checkpoint; the agent then updates `models/`, registry metadata, readiness docs, artifact ledger, and GitHub.
+8. If the gate fails, document the rejection in `docs/PRODUCTION_READINESS.md` and the artifact ledger, then start the next T1-1 planning cycle from the observed failure mode.
 
 Live-network note: the CNN gate check was not run during the latest local
 maintenance pass because it queries ExoFOP and requires intentional live network

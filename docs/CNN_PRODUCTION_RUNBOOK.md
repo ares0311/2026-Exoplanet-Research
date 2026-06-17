@@ -4,6 +4,8 @@ Purpose: close T1-1, the Production Tier 2 CNN Checkpoint gap.
 
 This runbook is for the user's local Mac. The required training data files are
 local-only artifacts and are not committed to the repository.
+Their GitHub-visible status is tracked in `docs/LOCAL_ARTIFACT_LEDGER.md` and
+`artifacts/manifests/local_artifacts.json`.
 
 Production gates:
 
@@ -23,6 +25,9 @@ Production gates:
 - Fetch and split code now rejects non-finite flux, reconstructs the phase grid
   for Kepler snippets, and groups Kepler KOIs by `kepid` to avoid split leakage.
 - Next human-at-Mac action: rebuild the Kepler JSONL with the fixed fetcher.
+- After every local artifact state change, update the artifact ledger so agents
+  that can only see GitHub know whether the corpus, splits, checkpoint, or
+  promotion gate is missing, pending, valid, rejected, or approved.
 
 ## Step 0: Sync And Verify
 
@@ -50,7 +55,8 @@ wc -l data/kepler_snippets.jsonl
 
 Stop and paste back the final fetch summary and line count. Do not build splits
 unless the fetch reports `Flag: OK` and the line count is close to the expected
-KOI table size.
+KOI table size. After agent review, update the artifact ledger with row counts,
+finite-filter counts when available, and fetch status.
 
 ## Step 2: Build Kepler Splits
 
@@ -61,7 +67,8 @@ caffeinate -i .venv/bin/python Skills/build_cnn_training_data.py data/kepler_sni
 ```
 
 Stop and paste back the split summary and validator result. Do not train if the
-validator does not report `PASS`.
+validator does not report `PASS`. After agent review, update the artifact
+ledger with split counts and validator status.
 
 ## Step 3: Kepler Pretraining
 
@@ -72,7 +79,8 @@ shasum -a 256 checkpoints/cnn_kepler_pretrain/best.pt
 ```
 
 Paste back the final training result and SHA-256. The agent reviews this before
-TESS fine-tuning.
+TESS fine-tuning. After agent review, update the artifact ledger with checkpoint
+path, SHA-256, and pretraining status.
 
 ## Step 4: Build TESS Splits
 
@@ -83,7 +91,8 @@ caffeinate -i .venv/bin/python Skills/build_cnn_training_data.py data/tess_snipp
 ```
 
 Stop and paste back the split summary and validator result. Do not fine-tune if
-the validator does not report `PASS`.
+the validator does not report `PASS`. After agent review, update the artifact
+ledger with split counts and validator status.
 
 ## Step 5: TESS Fine-Tuning
 
@@ -94,6 +103,8 @@ shasum -a 256 checkpoints/cnn_tess_finetuned/best.pt
 ```
 
 Paste back the final training result and SHA-256.
+After agent review, update the artifact ledger with checkpoint path, SHA-256,
+and fine-tuning status.
 
 ## Step 6: Production Gate Evaluation
 
@@ -105,9 +116,11 @@ git pull --ff-only origin main
 Interpretation:
 
 - Exit code `0` and `Flag: PASS`: paste the full evaluation output. The agent
-  will prepare the promotion branch after explicit human approval.
+  will prepare the promotion branch after explicit human approval and update
+  the artifact ledger.
 - Exit code `1` and `Flag: FAIL`: paste the full output. The checkpoint must be
-  rejected and documented; do not promote it.
+  rejected and documented in readiness docs and the artifact ledger; do not
+  promote it.
 - Exit code `2`: paste the error. The run is blocked by environment, split, or
   checkpoint loading problems.
 
@@ -116,4 +129,7 @@ Interpretation:
 Do not copy checkpoint artifacts into `models/` or update `models/registry.json`
 until the evaluation passes all gates and the human explicitly approves
 promotion. The agent performs the promotion branch, docs update, validation, and
-GitHub merge after that approval.
+GitHub merge after that approval. Because local CNN model paths are ignored to
+make `git add .` safe, approved promotion may require an intentional
+`git add -f` for the selected checkpoint artifacts; document that exception in
+the promotion PR.

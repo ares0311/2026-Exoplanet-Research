@@ -17,7 +17,9 @@ MANIFEST
 
 # Virtual environments
 .venv/
+.venv*/
 venv/
+venv*/
 env/
 .env
 
@@ -57,6 +59,7 @@ checkpoints/
 # Production-approved checkpoints are committed only after gate approval.
 models/cnn/
 models/cnn_*/
+models/cnn*/
 
 # This repository does not currently use a committed uv lockfile.
 uv.lock
@@ -86,13 +89,16 @@ rad.json
 *.flf
 TestResults.xml
 
-# Runtime automation state. Keep the top-level logs directory, not generated DBs.
-logs/*.sqlite
-logs/*.sqlite3
-logs/*.db
-logs/*.db-shm
-logs/*.db-wal
+# Runtime automation state. Keep only committed documentation/ignore sentinels.
+logs/*
+!logs/
+!logs/.gitignore
+!logs/README.md
 
-# Runtime report exports.
-reports/background/*.md
-reports/background/*.html
+# Runtime report exports. Keep only committed documentation/ignore sentinels.
+reports/*
+!reports/
+!reports/README.md
+!reports/background/
+reports/background/*
+!reports/background/.gitignore
