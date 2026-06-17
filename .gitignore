@@ -47,9 +47,19 @@ data/*.pkl
 data/*.pickle
 data/*.json
 data/*.jsonl
+data/*_splits/
+data/new_tess_targets.txt
 
 # Download checkpoints (local resume state — never committed)
 checkpoints/
+
+# Local CNN training experiments and rejected checkpoints.
+# Production-approved checkpoints are committed only after gate approval.
+models/cnn/
+models/cnn_*/
+
+# This repository does not currently use a committed uv lockfile.
+uv.lock
 
 # IDE / editor
 .vscode/
