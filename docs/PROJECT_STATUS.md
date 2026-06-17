@@ -85,30 +85,28 @@ reports/background/*.html
 
 **Production ML Tier 2 — checkpoint generalization**
 
-- The label gate is open, but the existing 2,623-row local corpus is invalid.
+- The label gate is open, but no CNN checkpoint has passed the production gate.
 - The first seed-42 checkpoint completed training but was rejected on 2026-06-10.
 - Held-out test AUC was 0.7404 and calibrated F1 was 0.6297, below the documented 0.85 and 0.80 targets.
 - Validation-fitted Platt calibration worsened test Brier score and ECE, so no calibration or checkpoint artifact was promoted into `models/`.
 - A 2026-06-10 audit found that every nominally usable snippet had `epoch_bjd=0.0`, so catalog transit events were not centered in phase.
-- The old corpus, original seed-42 split, and temporary replacement split are retired. Fetch/download now reject missing or non-BJD epochs and expose an offline corpus audit.
-- Architecture and evaluation details: `docs/CNN_SPEC.md`.
-- Next outside blocker: rebuild the local epoch-corrected TESS corpus from scratch and pass its audit before model selection resumes.
+- The old corpus, original seed-42 split, and temporary replacement split are retired.
+- The local TESS v2 corpus is complete, and the local Kepler corpus is complete at 7,454 rows as of 2026-06-17.
+- Tiny corrupt Kepler Lightkurve cache files were quarantined locally before training resumed.
+- Architecture details: `docs/CNN_SPEC.md`.
+- Human local runbook: `docs/CNN_PRODUCTION_RUNBOOK.md`.
+- Next outside blocker: build and validate Kepler CNN splits on the user's Mac, then run Kepler pretraining, TESS fine-tuning, and production gate evaluation from the runbook.
 
 ---
 
 ## Next Actions
 
-1. TODO when back on the local Mac: stop any leftover Kepler fetch wrapper, verify `wc -l data/kepler_snippets.jsonl` is `7454`, then build and validate the Kepler CNN splits with `caffeinate -i .venv/bin/python Skills/build_cnn_training_data.py data/kepler_snippets.jsonl --output-dir data/kepler_cnn_splits` and `.venv/bin/python Skills/cnn_split_validator.py data/kepler_cnn_splits`.
-2. Run `python Skills/tier2_progress_reporter.py --labels data/exofop_ctoi_labels.json --output reports/tier2_status.md --json-output reports/tier2_status.json` to produce offline CNN readiness artifacts.
-3. Run `python Skills/count_tess_labels.py` only when live ExoFOP access is intentionally approved, then run `python Skills/tess_label_check_summary.py` to inspect the local SQLite audit history.
-4. Rebuild and audit the epoch-corrected CNN corpus, create a fresh sealed promotion split, then resume grouped development experiments; do not reuse any artifact derived from the zero-epoch corpus.
-5. Use `toi_checker.py` before investing pipeline time on new live targets.
-6. Use `batch_scan.py` + `alert_filter.py` + `rank_candidates.py` + `watchlist.py` for systematic follow-up.
-7. Use `multi_sector_phase_compare.py` to inspect sector-to-sector depth and phase consistency before advancing multi-sector follow-up targets.
-8. Use `candidate_dashboard_export.py` to build static local review dashboards from existing candidate JSON outputs, including optional phase-fold plot artifact paths when available.
-9. Use `candidate_api.py` to serve existing local candidate JSON, optional read-only background SQLite summaries, `/artifact.json` review bundles, and opt-in CORS for separate local frontends.
-10. Use `candidate_browser_ui.py` for an interactive local browser UI with embedded-data/API modes and optional phase-fold plot previews.
-11. Keep CTOI/community candidate ingestion opt-in and outside default training; the fixture-backed source contract now lives in `docs/CTOI_SOURCE_CONTRACT.md`.
+1. TODO when back on the local Mac: follow `docs/CNN_PRODUCTION_RUNBOOK.md` Step 0 and Step 1 exactly, then paste back the split summary and validator result before training.
+2. If the Kepler split validator reports `PASS`, continue with `docs/CNN_PRODUCTION_RUNBOOK.md` Step 2 for Kepler pretraining and paste back the final training result plus SHA-256.
+3. After agent review of the Kepler pretraining result, run Step 3 and Step 4 for TESS split validation and fine-tuning, then paste back the final training result plus SHA-256.
+4. Run Step 5 production gate evaluation. Promote nothing unless the evaluator reports `Flag: PASS`, raw test AUC is at least 0.85, calibrated test F1 is at least 0.80, and calibrated Brier/ECE are no worse than raw.
+5. If the gate passes, request explicit human approval to promote the checkpoint; the agent then updates `models/`, registry metadata, readiness docs, and GitHub.
+6. If the gate fails, document the rejection in `docs/PRODUCTION_READINESS.md` and start the next T1-1 planning cycle from the observed failure mode.
 
 Live-network note: the CNN gate check was not run during the latest local
 maintenance pass because it queries ExoFOP and requires intentional live network

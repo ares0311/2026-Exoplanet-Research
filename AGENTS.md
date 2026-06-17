@@ -64,7 +64,7 @@ When the user must take an action to unblock a gap:
 
 ---
 
-## HANDOFF STATE — 2026-06-15 (READ THIS FIRST)
+## HANDOFF STATE — 2026-06-17 (READ THIS FIRST)
 
 **The only active gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80).**
 
@@ -73,23 +73,25 @@ When the user must take an action to unblock a gap:
 | Item | State |
 |---|---|
 | TESS v2 snippets (`data/tess_snippets_v2.jsonl`) | **COMPLETE** — 2,619 snippets on user's Mac |
-| Kepler snippets (`data/kepler_snippets.jsonl`) | **IN PROGRESS** — was ~6,066/7,454 at 18:30 ET 2026-06-16 and still running |
-| CNN training pipeline | **BLOCKED** — waiting for Kepler download to finish |
+| Kepler snippets (`data/kepler_snippets.jsonl`) | **COMPLETE** — 7,454 snippets on user's Mac |
+| CNN training pipeline | **READY FOR HUMAN LOCAL RUN** — next step is Kepler split build/validation |
 | XGBoost Tier 1 | Done |
 | Stacking Tier 3 scaffold | Done |
 
 ### First action for the incoming agent
 
-Ask the user to run these two commands and paste the output:
+If the user is at the Mac, ask them to run these commands and paste the output:
 
 ```bash
+git pull --ff-only origin main
 wc -l data/kepler_snippets.jsonl
 ps aux | grep fetch_kepler | grep -v grep
 ```
 
-- Line count = **7,454** → Kepler download complete. Proceed to the CNN training pipeline below.
-- Line count < 7,454 and process **alive** → still running; tell the user to let it finish and check back.
-- Line count < 7,454 and **no process** → download died; give the user this single-line restart command (single line — do NOT use backslash continuations). The bounded worker count keeps MAST pressure low while avoiding the old strictly serial path:
+- Line count = **7,454** and no fetch process → proceed with `docs/CNN_PRODUCTION_RUNBOOK.md`.
+- Line count = **7,454** and a fetch wrapper is still alive → stop it before training; the corpus is complete.
+- Line count < **7,454** and process **alive** → still running; tell the user to let it finish and check back.
+- Line count < **7,454** and **no process** → download died; give the user this single-line restart command (single line — do NOT use backslash continuations). The bounded worker count keeps MAST pressure low while avoiding the old strictly serial path:
 
 ```
 caffeinate -dims bash -c 'while true; do .venv/bin/python Skills/fetch_kepler_lc_snippets.py --output data/kepler_snippets.jsonl --workers 3 --request-delay 0.5; echo "[$(date +%T)] Ended. Resuming in 30s..."; sleep 30; done'
@@ -100,21 +102,17 @@ light curve once, folds all KOIs for that star locally, and writes JSONL from
 the main process only. Resume uses `(kepid, period, epoch, label)`, not just
 `kepid`, so multi-KOI systems are not skipped accidentally.
 
-### CNN training pipeline (run after Kepler download completes)
+### CNN production runbook
 
-Prepend `git pull origin main` to every user recipe. All commands run on the user's Mac from the repo root. Each training command takes hours — always use `caffeinate -dims`.
+Use `docs/CNN_PRODUCTION_RUNBOOK.md` for the authoritative copy-paste
+Kepler-pretraining, TESS-fine-tuning, evaluation, and promotion workflow.
+Do not use stale aliases such as `--splits-dir`, `--output-dir` for
+`train_cnn.py`, or `--pretrained`; the accepted flags are `--split-dir`,
+`--checkpoint-dir`, and `--pretrained-checkpoint`.
 
-```
-git pull origin main
-python Skills/build_cnn_training_data.py data/kepler_snippets.jsonl --output-dir data/kepler_cnn_splits
-python Skills/cnn_split_validator.py data/kepler_cnn_splits
-caffeinate -dims python Skills/train_cnn.py --splits-dir data/kepler_cnn_splits --output-dir models/cnn_kepler/
-python Skills/build_cnn_training_data.py data/tess_snippets_v2.jsonl --output-dir data/tess_cnn_splits
-caffeinate -dims python Skills/train_cnn.py --splits-dir data/tess_cnn_splits --output-dir models/cnn_tess/ --pretrained models/cnn_kepler/best.pt
-python Skills/cnn_calibrator.py --checkpoint models/cnn_tess/best.pt --splits-dir data/tess_cnn_splits --output models/cnn_tess/calibration.json
-```
-
-Gate: AUC ≥ 0.85, F1 ≥ 0.80. Architecture spec: `docs/CNN_SPEC.md`.
+Gate: raw held-out AUC ≥ 0.85, calibrated held-out F1 ≥ 0.80, and Platt
+calibration must not worsen held-out Brier score or ECE. Architecture spec:
+`docs/CNN_SPEC.md`.
 
 **Why transfer learning?** TESS-only training hits a hard ~0.78 AUC ceiling at 1,425 examples. Pre-training on the large Kepler corpus then fine-tuning on TESS v2 is the only validated path past this ceiling.
 
@@ -124,14 +122,17 @@ Gate: AUC ≥ 0.85, F1 ≥ 0.80. Architecture spec: `docs/CNN_SPEC.md`.
 
 Large training data files are stored on the user's local Mac and are **never committed to the repository**. Before proposing or executing any CNN training task, ask the user to confirm current file state.
 
-| File | Status (as of 2026-06-15) | Description |
+| File | Status | Description |
 |---|---|---|
 | `data/tess_snippets_v2.jsonl` | **COMPLETE** — 2,619 snippets | TESS phase-folded snippets; merged from two download runs; 56 targets had permanent MAST 404s |
-| `data/kepler_snippets.jsonl` | **IN PROGRESS** — ~6,066/7,454 as of 2026-06-16 18:30 ET | Kepler 30-min long-cadence confirmed planets + FPs; auto-restart download running on Mac |
+| `data/kepler_snippets.jsonl` | **COMPLETE** — 7,454 snippets as of 2026-06-17 | Kepler 30-min long-cadence confirmed planets + FPs; corrupt tiny Lightkurve cache files quarantined locally |
 
 The Kepler download uses `author="Kepler"` (prevents HLSP/IRIS cache corruption) and `socket.setdefaulttimeout(120)` (prevents WiFi-drop hangs). It resumes automatically from where it left off. The optimized path groups pending KOIs by `kepid`, fetches each KIC once, and supports polite bounded concurrency via `--workers 3 --request-delay 0.5`.
 
-**Do not assume these files are complete or present on the agent's server.** They exist only on the user's Mac. The CNN training pipeline cannot proceed until the user confirms `data/kepler_snippets.jsonl` is complete and pastes the line count.
+**Do not assume these files are present on the agent's server.** They exist only
+on the user's Mac. If the user is away from the Mac, agent-side work is limited
+to runbook, validation, promotion-gate, and documentation hardening until the
+human can run the local commands in `docs/CNN_PRODUCTION_RUNBOOK.md`.
 
 ---
 

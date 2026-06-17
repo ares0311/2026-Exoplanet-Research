@@ -194,8 +194,13 @@ class TestEvaluateCnnCheckpoint:
         )
         assert result.flag == "LOAD_ERROR"
 
-    def test_pass_with_good_model(self, tmp_path: Path) -> None:
+    def test_pass_with_good_model(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import Skills.evaluate_cnn_checkpoint as mod
+
         split_dir = _make_splits(tmp_path, n=40)
+        monkeypatch.setattr(mod, "_apply_platt", lambda raw, a, b: raw)
         result = evaluate_cnn_checkpoint(
             split_dir,
             tmp_path / "fake.pt",
@@ -243,9 +248,14 @@ class TestEvaluateCnnCheckpoint:
         assert isinstance(result.platt_a, float)
         assert isinstance(result.platt_b, float)
 
-    def test_calibration_json_written_on_pass(self, tmp_path: Path) -> None:
+    def test_calibration_json_written_on_pass(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import Skills.evaluate_cnn_checkpoint as mod
+
         split_dir = _make_splits(tmp_path, n=40)
         cal_path = tmp_path / "calibration.json"
+        monkeypatch.setattr(mod, "_apply_platt", lambda raw, a, b: raw)
         evaluate_cnn_checkpoint(
             split_dir,
             tmp_path / "fake.pt",
@@ -259,6 +269,33 @@ class TestEvaluateCnnCheckpoint:
         assert "platt_a" in cal
         assert "platt_b" in cal
         assert cal.get("flag") == "OK"
+
+    def test_calibration_worsening_blocks_promotion(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import Skills.evaluate_cnn_checkpoint as mod
+
+        split_dir = _make_splits(tmp_path, n=40)
+        cal_path = tmp_path / "calibration.json"
+        monkeypatch.setattr(mod, "_apply_platt", lambda raw, a, b: 0.5)
+
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            gate_auc=0.5,
+            gate_f1=0.5,
+            output_calibration=cal_path,
+            model_fn=lambda fluxes: [
+                0.9 if flux[100] < 1.0 else 0.1 for flux in fluxes
+            ],
+        )
+
+        assert result.flag == "FAIL"
+        assert not result.passed
+        assert result.test_metrics_raw is not None
+        assert result.test_metrics_cal is not None
+        assert result.test_metrics_cal.brier > result.test_metrics_raw.brier
+        assert not cal_path.exists()
 
     def test_calibration_json_not_written_on_fail(self, tmp_path: Path) -> None:
         split_dir = _make_splits(tmp_path, n=40)

@@ -2,7 +2,8 @@
 
 Fits Platt calibration on the validation split, evaluates on the sealed
 test split, and checks whether the checkpoint passes the production gates
-(default: raw AUC ≥ 0.85, calibrated F1 ≥ 0.80).
+(default: raw AUC ≥ 0.85, calibrated F1 ≥ 0.80, calibrated Brier/ECE no
+worse than raw Brier/ECE).
 
 Saves calibration JSON alongside the checkpoint when gates pass.
 
@@ -286,14 +287,16 @@ def evaluate_cnn_checkpoint(
 ) -> CnnEvalResult:
     """Evaluate a CNN checkpoint (or ensemble) against production gates.
 
-    Fits Platt calibration on the validation split, evaluates on the sealed
-    test split with and without calibration, and checks AUC and F1 gates.
+    Fits Platt calibration on the validation split, evaluates on the sealed test
+    split with and without calibration, and checks raw AUC, calibrated F1, and
+    calibration non-regression gates.
 
     Args:
         split_dir: Directory containing ``val.json`` and ``test.json``.
         checkpoint_path: Path to the primary ``.pt`` file (used for config).
         gate_auc: Minimum raw AUC on the test split to pass (default 0.85).
         gate_f1: Minimum calibrated F1 on the test split to pass (default 0.80).
+            Calibration must also avoid worsening test Brier score or ECE.
         output_calibration: If provided, write calibration JSON here on pass.
         model_fn: Injectable inference function for testing.
         checkpoint_paths: If provided, run ensemble inference by averaging
@@ -442,7 +445,15 @@ def evaluate_cnn_checkpoint(
     test_probs_cal = [_apply_platt(p, platt_a, platt_b) for p in test_probs]
     test_metrics_cal = _compute_metrics(test_labels, test_probs_cal)
 
-    passed = test_metrics_raw.auc >= gate_auc and test_metrics_cal.f1 >= gate_f1
+    calibration_not_worse = (
+        test_metrics_cal.brier <= test_metrics_raw.brier
+        and test_metrics_cal.ece <= test_metrics_raw.ece
+    )
+    passed = (
+        test_metrics_raw.auc >= gate_auc
+        and test_metrics_cal.f1 >= gate_f1
+        and calibration_not_worse
+    )
 
     # Save calibration JSON if requested and gates pass
     if output_calibration is not None and passed:
@@ -458,6 +469,9 @@ def evaluate_cnn_checkpoint(
                 "gate_auc": gate_auc,
                 "gate_f1": gate_f1,
                 "test_auc_raw": test_metrics_raw.auc,
+                "test_f1_raw": test_metrics_raw.f1,
+                "test_brier_raw": test_metrics_raw.brier,
+                "test_ece_raw": test_metrics_raw.ece,
                 "test_f1_cal": test_metrics_cal.f1,
                 "test_brier_cal": test_metrics_cal.brier,
                 "test_ece_cal": test_metrics_cal.ece,
@@ -484,7 +498,8 @@ def format_eval_result(result: CnnEvalResult) -> str:
     lines = [
         "## CNN Checkpoint Evaluation",
         f"- Flag: {result.flag}",
-        f"- Gates: AUC ≥ {result.gate_auc}, calibrated F1 ≥ {result.gate_f1}",
+        f"- Gates: raw AUC ≥ {result.gate_auc}, calibrated F1 ≥ {result.gate_f1}, "
+        "calibrated Brier/ECE no worse than raw",
         f"- Platt calibration: A={result.platt_a}, B={result.platt_b}",
     ]
     if result.val_metrics_raw is not None:
