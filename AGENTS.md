@@ -134,6 +134,34 @@ on the user's Mac. If the user is away from the Mac, agent-side work is limited
 to runbook, validation, promotion-gate, and documentation hardening until the
 human can run the local commands in `docs/CNN_PRODUCTION_RUNBOOK.md`.
 
+## Git-Add-Safe Artifact Policy — Mandatory
+
+The standard operator cadence is `git add .`. If that command would stage local
+corpora, split outputs, checkpoints, runtime logs, generated reports, virtual
+environments, rejected experiments, or cache files, the repository is wrong and
+`.gitignore` must be fixed before continuing.
+
+Other coding agents may only see GitHub. Therefore local-only artifacts must be
+ignored, but their production-relevant state must be committed in
+`docs/LOCAL_ARTIFACT_LEDGER.md` and
+`artifacts/manifests/local_artifacts.json`.
+
+When any ignored artifact affects T1-1 or another production gate, update the
+ledger in the same PR as the code, runbook, or readiness change. The ledger must
+answer, from GitHub alone:
+
+1. Which local artifact paths are expected
+2. Whether each artifact is missing, pending, valid, rejected, or promoted
+3. The latest known counts, hashes, validation results, and approval state
+4. The exact next command the human or agent should run
+
+Do not rely on chat context, local terminal scrollback, or uncommitted files for
+artifact state. A production-approved CNN checkpoint is the only CNN artifact
+class that may move from ignored local state into `models/`, and only after the
+evaluator passes and the human explicitly approves promotion. Because CNN model
+paths are ignored defensively, approved promotion may require an intentional
+`git add -f` that is documented in the promotion PR.
+
 ---
 
 ## Read First
@@ -145,6 +173,7 @@ Before writing code, recover project context from committed files. Read:
 - `docs/PIPELINE_SPEC.md` — end-to-end pipeline architecture
 - `docs/PROJECT_STATUS.md` — current active state and next work
 - `docs/DECISIONS.md` — durable architectural decisions
+- `docs/LOCAL_ARTIFACT_LEDGER.md` — GitHub-visible state for ignored local artifacts
 - `CONTRIBUTING.md` — setup, validation, and contribution policy
 
 Do not rely on chat context, memory, or prior conversation history as the source of truth.

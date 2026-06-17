@@ -140,6 +140,30 @@ Print a startup banner before any loop. Print a completion or early-stop line at
 - `pip install` with `(.venv)` active is always venv-scoped and safe
 - Fix SSL/package issues inside the venv only
 
+### Git-Add-Safe Artifact Policy — MANDATORY
+
+The standard operator cadence is `git add .`. The repository must make that
+safe. If `git add .` would stage local corpora, generated splits, checkpoints,
+runtime logs, generated reports, virtual environments, rejected experiments, or
+cache files, fix `.gitignore` before continuing.
+
+Other coding agents may only see GitHub. Local-only artifacts stay ignored, but
+their production-relevant state must be committed in:
+
+- `docs/LOCAL_ARTIFACT_LEDGER.md`
+- `artifacts/manifests/local_artifacts.json`
+
+Whenever an ignored artifact affects T1-1 or another production gate, update
+the ledger in the same PR as the code, runbook, or readiness change. GitHub
+must show expected paths, current status, counts/hashes/validation results,
+approval state, and exact next commands. Do not leave artifact truth only in
+chat context, terminal output, or local files.
+
+A production-approved CNN checkpoint is the only CNN artifact class that may be
+promoted from ignored local state into `models/`, and only after evaluator PASS
+plus explicit human approval. Because CNN model paths are ignored defensively,
+promotion may require a documented `git add -f`.
+
 ---
 
 ## Standing Rules

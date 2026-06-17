@@ -64,6 +64,25 @@ PYTHONPATH=src python3 -m exo_toolkit.cli validation-summary
 
 Generated SQLite databases and background report exports are runtime artifacts. Do not commit them unless a future decision explicitly promotes a fixture artifact.
 
+## Local Artifact Policy
+
+The standard operator cadence is `git add .`, so `.gitignore` must protect the
+repository from accidental local artifact commits. Do not commit raw corpora,
+generated split files, intermediate checkpoints, runtime SQLite logs, generated
+reports, virtual environments, caches, or rejected experiments.
+
+If an ignored local artifact affects production readiness, update
+`docs/LOCAL_ARTIFACT_LEDGER.md` and
+`artifacts/manifests/local_artifacts.json` in the same PR. GitHub must contain
+enough artifact state for another coding agent to continue without chat context
+or local terminal scrollback.
+
+Production-approved CNN artifacts are the exception: after evaluator PASS and
+explicit human approval, commit the selected checkpoint, calibration metadata,
+registry update, and reproducibility manifest under `models/`. Because CNN
+model paths are ignored by default, that promotion may require an intentional
+`git add -f` documented in the promotion PR.
+
 ## Local Performance Guidance
 
 For local hardware details and recommended worker/thread defaults, see `docs/SYSTEM_PROFILE.md`.
