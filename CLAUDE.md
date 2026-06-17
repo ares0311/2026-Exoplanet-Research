@@ -1142,17 +1142,17 @@ These large data files live only on the user's local Mac. They are never committ
 | File | Location | Status | Notes |
 |---|---|---|---|
 | `data/tess_snippets_v2.jsonl` | Local Mac | **COMPLETE** — 2,619 snippets | Merged from `tess_snippets.jsonl` + `tess_snippets_expansion.jsonl`; 56 targets had permanent MAST 404s and were skipped |
-| `data/kepler_snippets.jsonl` | Local Mac | **COMPLETE** — 7,454 snippets as of 2026-06-17 | Kepler 30-min long-cadence, confirmed planets + FPs from KOI table; corrupt tiny Lightkurve cache files quarantined locally |
+| `data/kepler_snippets.jsonl` | Local Mac | **REJECTED** — 7,454 rows but 7,132 non-finite flux rows as of 2026-06-17 | Preserve as `data/kepler_snippets_nan_corrupt_20260617.jsonl`, then rebuild with the fixed fetcher |
 
 **Kepler download auto-restart command** (only if the file is below 7,454 rows and no fetch process is alive):
 ```
 caffeinate -dims bash -c 'while true; do .venv/bin/python Skills/fetch_kepler_lc_snippets.py --output data/kepler_snippets.jsonl --workers 3 --request-delay 0.5; echo "[$(date +%T)] Ended. Resuming in 30s..."; sleep 30; done'
 ```
-This command uses `author="Kepler"` to skip HLSP/IRIS corrupted cache files and `socket.setdefaulttimeout(120)` to prevent indefinite hangs on WiFi drops. Resume is automatic. The optimized fetcher groups pending KOIs by `kepid`, fetches each KIC light curve once, folds all KOIs for that star locally, writes JSONL from the main process only, and uses `(kepid, period, epoch, label)` as the resume key so multi-KOI systems are not skipped accidentally.
+This command uses `author="Kepler"` to skip HLSP/IRIS corrupted cache files and `socket.setdefaulttimeout(120)` to prevent indefinite hangs on WiFi drops. Resume is automatic. The optimized fetcher groups pending KOIs by `kepid`, fetches each KIC light curve once, filters non-finite time/flux samples before phase binning, folds all KOIs for that star locally, writes JSONL from the main process only, and uses `(kepid, period, epoch, label)` as the resume key so multi-KOI systems are not skipped accidentally.
 
 ### Next Step — HANDOFF 2026-06-17
 
-**Status: Kepler corpus complete; CNN training is ready for the next human local run.**
+**Status: pre-fix Kepler corpus rejected; rebuild Kepler JSONL before CNN training.**
 
 #### Incoming agent: do this first
 
@@ -1163,8 +1163,8 @@ wc -l data/kepler_snippets.jsonl
 ps aux | grep fetch_kepler | grep -v grep
 ```
 
-- **7,454 lines, no process** → proceed with `docs/CNN_PRODUCTION_RUNBOOK.md`.
-- **7,454 lines, fetch wrapper alive** → stop the wrapper before training; the corpus is complete.
+- **7,454 lines on the pre-fix file** → do **not** train; follow `docs/CNN_PRODUCTION_RUNBOOK.md` Step 1 to preserve and rebuild the Kepler JSONL.
+- **7,454 lines, fetch wrapper alive** → stop the wrapper before rebuilding; the old corpus is not training-ready.
 - **< 7,454, process alive** → still running; wait and check back when done.
 - **< 7,454, no process found** → died; give the user this single line to restart (no backslash continuations — paste as one line):
 
@@ -1175,7 +1175,7 @@ caffeinate -dims bash -c 'while true; do .venv/bin/python Skills/fetch_kepler_lc
 #### Corpus status
 
 - **TESS v2**: `data/tess_snippets_v2.jsonl` — 2,619 snippets (COMPLETE; 56 targets had permanent MAST 404s)
-- **Kepler**: `data/kepler_snippets.jsonl` — 7,454 snippets (COMPLETE as of 2026-06-17); corrupt tiny Lightkurve cache files quarantined locally
+- **Kepler**: `data/kepler_snippets.jsonl` — REJECTED as of 2026-06-17; 7,454 rows existed but 7,132 contained non-finite flux, leaving only 322 finite examples after filtering
 
 #### CNN production runbook
 

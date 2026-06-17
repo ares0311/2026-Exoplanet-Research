@@ -97,6 +97,33 @@ def test_load_training_examples_from_jsonl_and_skip_error_rows(tmp_path: Path) -
     assert examples[0].normalization == "local_median_mad"
 
 
+def test_load_training_examples_accepts_kepler_rows_without_phase(tmp_path: Path) -> None:
+    n_bins = 11
+    path = _write_jsonl(
+        tmp_path / "kepler_snippets.jsonl",
+        [
+            {
+                "tic_id": 0,
+                "kepid": 757450,
+                "label": 1,
+                "period_days": 8.8849,
+                "epoch_bjd": 2455002.99,
+                "flux": [0.99 if i == n_bins // 2 else 1.0 for i in range(n_bins)],
+                "source": "kepler",
+                "n_bins": n_bins,
+            }
+        ],
+    )
+
+    examples = load_training_examples([path])
+
+    assert len(examples) == 1
+    assert examples[0].example_id == "kepler_snippets_0_KIC757450_1"
+    assert examples[0].group_id == "kepid:757450"
+    assert len(examples[0].phase) == n_bins
+    assert examples[0].phase[0] == pytest.approx(-0.5 + 0.5 / n_bins)
+
+
 def test_load_training_examples_rejects_invalid_jsonl(tmp_path: Path) -> None:
     path = tmp_path / "bad.jsonl"
     path.write_text('{"tic_id": 1}\nnot-json\n', encoding="utf-8")
@@ -121,6 +148,21 @@ def test_load_training_examples_skips_malformed_rows(tmp_path: Path) -> None:
     )
     examples = load_training_examples([path])
     assert len(examples) == 1
+
+
+def test_load_training_examples_skips_nonfinite_flux_rows(tmp_path: Path) -> None:
+    path = _write_jsonl(
+        tmp_path / "bad_flux.jsonl",
+        [
+            _snippet(tic_id=1, label=1),
+            {**_snippet(tic_id=2, label=0), "flux": [1.0, float("nan"), 1.0]},
+        ],
+    )
+
+    examples = load_training_examples([path])
+
+    assert len(examples) == 1
+    assert examples[0].tic_id == 1
 
 
 def test_load_training_examples_requires_matching_phase_flux_lengths(tmp_path: Path) -> None:
@@ -181,6 +223,33 @@ def test_split_examples_keeps_same_tic_in_one_split(tmp_path: Path) -> None:
     assert sum(
         example.tic_id == 500 for split_rows in splits.values() for example in split_rows
     ) == 2
+
+
+def test_split_examples_keeps_same_kepler_star_in_one_split(tmp_path: Path) -> None:
+    rows = []
+    for label in (0, 1):
+        for idx in range(6):
+            kepid = 500 if idx < 2 else 1000 * label + idx + 1
+            row = _snippet(tic_id=0, label=label, source="kepler")
+            row["kepid"] = kepid
+            row.pop("phase")
+            row["n_bins"] = len(row["flux"])
+            rows.append(row)
+    path = _write_jsonl(tmp_path / "kepler.jsonl", rows)
+
+    splits = split_examples(load_training_examples([path]), SplitConfig(seed=8))
+
+    containing_splits = {
+        split_name
+        for split_name, split_rows in splits.items()
+        if any(example.group_id == "kepid:500" for example in split_rows)
+    }
+    assert len(containing_splits) == 1
+    assert sum(
+        example.group_id == "kepid:500"
+        for split_rows in splits.values()
+        for example in split_rows
+    ) == 4
 
 
 def test_split_examples_non_stratified_preserves_total(tmp_path: Path) -> None:

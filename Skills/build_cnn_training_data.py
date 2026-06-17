@@ -17,6 +17,7 @@ format_split_summary(manifest) -> str
 from __future__ import annotations
 
 import json
+import math
 import os
 import random
 import tempfile
@@ -43,6 +44,7 @@ class TrainingExample:
     flux: tuple[float, ...]
     source: str
     source_file: str
+    group_id: str | None = None
     augmentation: str | None = None
     normalization: str = "local_median_mad"
 
@@ -206,11 +208,12 @@ def _training_example(
     row_index: int,
 ) -> TrainingExample | None:
     label = _label(row.get("label"))
-    phase = _float_tuple(row.get("phase"))
     flux = _float_tuple(row.get("flux"))
+    phase = _phase_tuple(row, n_flux=len(flux))
     if label is None or not phase or not flux or len(phase) != len(flux):
         return None
     tic_id = _tic_id(row)
+    group_id = _group_id(row, tic_id=tic_id)
     source = str(
         row.get("source")
         or row.get("label_source")
@@ -231,7 +234,7 @@ def _training_example(
     example_id = str(
         row.get("example_id")
         or row.get("candidate_id")
-        or f"{Path(source_file).stem}_{row_index}_TIC{tic_id}_{label}"
+        or _fallback_example_id(source_file, row_index, row, tic_id, label)
     )
     return TrainingExample(
         example_id=example_id,
@@ -241,6 +244,7 @@ def _training_example(
         flux=normalized.flux,
         source=source,
         source_file=source_file,
+        group_id=group_id,
         augmentation=str(augmentation) if augmentation is not None else None,
         normalization=normalized.normalization,
     )
@@ -249,11 +253,12 @@ def _training_example(
 def _group_examples(examples: list[TrainingExample]) -> list[list[TrainingExample]]:
     grouped: dict[tuple[str, int | str], list[TrainingExample]] = {}
     for example in examples:
-        key: tuple[str, int | str] = (
-            ("tic", example.tic_id)
-            if example.tic_id > 0
-            else ("example", example.example_id)
-        )
+        if example.group_id:
+            key: tuple[str, int | str] = ("group", example.group_id)
+        elif example.tic_id > 0:
+            key = ("tic", example.tic_id)
+        else:
+            key = ("example", example.example_id)
         grouped.setdefault(key, []).append(example)
     return [grouped[key] for key in sorted(grouped, key=lambda item: (item[0], str(item[1])))]
 
@@ -280,10 +285,53 @@ def _float_tuple(value: Any) -> tuple[float, ...]:
     result: list[float] = []
     for item in value:
         try:
-            result.append(float(item))
+            number = float(item)
         except (TypeError, ValueError):
             return ()
+        if not math.isfinite(number):
+            return ()
+        result.append(number)
     return tuple(result)
+
+
+def _phase_tuple(row: dict[str, Any], *, n_flux: int) -> tuple[float, ...]:
+    phase = _float_tuple(row.get("phase"))
+    if phase:
+        return phase
+    if n_flux <= 0:
+        return ()
+    try:
+        n_bins = int(row.get("n_bins", n_flux))
+    except (TypeError, ValueError):
+        return ()
+    if n_bins != n_flux:
+        return ()
+    return tuple(-0.5 + (index + 0.5) / n_flux for index in range(n_flux))
+
+
+def _group_id(row: dict[str, Any], *, tic_id: int) -> str | None:
+    for key, prefix in (
+        ("group_id", "group"),
+        ("kepid", "kepid"),
+        ("kic_id", "kic"),
+        ("original_tic_id", "tic"),
+    ):
+        value = row.get(key)
+        if value is None or value == "":
+            continue
+        return f"{prefix}:{value}"
+    return f"tic:{tic_id}" if tic_id > 0 else None
+
+
+def _fallback_example_id(
+    source_file: str,
+    row_index: int,
+    row: dict[str, Any],
+    tic_id: int,
+    label: int,
+) -> str:
+    target = f"KIC{row['kepid']}" if row.get("kepid") not in (None, "") else f"TIC{tic_id}"
+    return f"{Path(source_file).stem}_{row_index}_{target}_{label}"
 
 
 def _validate_config(config: SplitConfig) -> None:

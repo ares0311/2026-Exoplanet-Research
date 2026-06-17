@@ -14,10 +14,15 @@ Production gates:
 
 ## Current State
 
-- `data/kepler_snippets.jsonl`: complete locally at `7454` rows.
+- `data/kepler_snippets.jsonl`: rejected on 2026-06-17 despite `7454` rows.
+  The file contained non-finite flux values in `7132` rows; after finite-value
+  filtering only `322` examples remained, which is not enough for transfer
+  learning.
 - Tiny corrupt Kepler Lightkurve cache files were moved to
   `$HOME/.lightkurve/cache/quarantine_corrupt_kepler_fits`.
-- Next human-at-Mac action: build and validate Kepler CNN splits.
+- Fetch and split code now rejects non-finite flux, reconstructs the phase grid
+  for Kepler snippets, and groups Kepler KOIs by `kepid` to avoid split leakage.
+- Next human-at-Mac action: rebuild the Kepler JSONL with the fixed fetcher.
 
 ## Step 0: Sync And Verify
 
@@ -30,7 +35,24 @@ wc -l data/kepler_snippets.jsonl data/tess_snippets_v2.jsonl
 Paste back the Python path, Torch version, and line counts if anything differs
 from Python `3.14.3`, venv Python, Kepler `7454`, or TESS `2619`.
 
-## Step 1: Build Kepler Splits
+## Step 1: Rebuild Kepler JSONL
+
+The previous `7454`-row file must not be used for training. Preserve it for
+forensics, then rebuild from cached/downloaded Kepler light curves with finite
+time/flux filtering enabled.
+
+```bash
+git pull --ff-only origin main
+mv data/kepler_snippets.jsonl data/kepler_snippets_nan_corrupt_20260617.jsonl
+caffeinate -dims .venv/bin/python Skills/fetch_kepler_lc_snippets.py --output data/kepler_snippets.jsonl --workers 3 --request-delay 0.5 --no-resume
+wc -l data/kepler_snippets.jsonl
+```
+
+Stop and paste back the final fetch summary and line count. Do not build splits
+unless the fetch reports `Flag: OK` and the line count is close to the expected
+KOI table size.
+
+## Step 2: Build Kepler Splits
 
 ```bash
 git pull --ff-only origin main
@@ -41,7 +63,7 @@ caffeinate -i .venv/bin/python Skills/build_cnn_training_data.py data/kepler_sni
 Stop and paste back the split summary and validator result. Do not train if the
 validator does not report `PASS`.
 
-## Step 2: Kepler Pretraining
+## Step 3: Kepler Pretraining
 
 ```bash
 git pull --ff-only origin main
@@ -52,7 +74,7 @@ shasum -a 256 checkpoints/cnn_kepler_pretrain/best.pt
 Paste back the final training result and SHA-256. The agent reviews this before
 TESS fine-tuning.
 
-## Step 3: Build TESS Splits
+## Step 4: Build TESS Splits
 
 ```bash
 git pull --ff-only origin main
@@ -63,7 +85,7 @@ caffeinate -i .venv/bin/python Skills/build_cnn_training_data.py data/tess_snipp
 Stop and paste back the split summary and validator result. Do not fine-tune if
 the validator does not report `PASS`.
 
-## Step 4: TESS Fine-Tuning
+## Step 5: TESS Fine-Tuning
 
 ```bash
 git pull --ff-only origin main
@@ -73,7 +95,7 @@ shasum -a 256 checkpoints/cnn_tess_finetuned/best.pt
 
 Paste back the final training result and SHA-256.
 
-## Step 5: Production Gate Evaluation
+## Step 6: Production Gate Evaluation
 
 ```bash
 git pull --ff-only origin main
@@ -89,7 +111,7 @@ Interpretation:
 - Exit code `2`: paste the error. The run is blocked by environment, split, or
   checkpoint loading problems.
 
-## Step 6: Promotion Only After Approval
+## Step 7: Promotion Only After Approval
 
 Do not copy checkpoint artifacts into `models/` or update `models/registry.json`
 until the evaluation passes all gates and the human explicitly approves

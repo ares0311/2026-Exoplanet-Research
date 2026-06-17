@@ -73,8 +73,8 @@ When the user must take an action to unblock a gap:
 | Item | State |
 |---|---|
 | TESS v2 snippets (`data/tess_snippets_v2.jsonl`) | **COMPLETE** — 2,619 snippets on user's Mac |
-| Kepler snippets (`data/kepler_snippets.jsonl`) | **COMPLETE** — 7,454 snippets on user's Mac |
-| CNN training pipeline | **READY FOR HUMAN LOCAL RUN** — next step is Kepler split build/validation |
+| Kepler snippets (`data/kepler_snippets.jsonl`) | **REJECTED** — 7,454 rows but 7,132 rows had non-finite flux |
+| CNN training pipeline | **BLOCKED** — rebuild Kepler JSONL with finite-flux fetcher before split/training |
 | XGBoost Tier 1 | Done |
 | Stacking Tier 3 scaffold | Done |
 
@@ -88,8 +88,8 @@ wc -l data/kepler_snippets.jsonl
 ps aux | grep fetch_kepler | grep -v grep
 ```
 
-- Line count = **7,454** and no fetch process → proceed with `docs/CNN_PRODUCTION_RUNBOOK.md`.
-- Line count = **7,454** and a fetch wrapper is still alive → stop it before training; the corpus is complete.
+- Line count = **7,454** on the pre-fix file → do **not** train; follow `docs/CNN_PRODUCTION_RUNBOOK.md` Step 1 to preserve and rebuild the Kepler JSONL.
+- Line count = **7,454** and a fetch wrapper is still alive → stop it before rebuilding; the old corpus is not training-ready.
 - Line count < **7,454** and process **alive** → still running; tell the user to let it finish and check back.
 - Line count < **7,454** and **no process** → download died; give the user this single-line restart command (single line — do NOT use backslash continuations). The bounded worker count keeps MAST pressure low while avoiding the old strictly serial path:
 
@@ -125,9 +125,9 @@ Large training data files are stored on the user's local Mac and are **never com
 | File | Status | Description |
 |---|---|---|
 | `data/tess_snippets_v2.jsonl` | **COMPLETE** — 2,619 snippets | TESS phase-folded snippets; merged from two download runs; 56 targets had permanent MAST 404s |
-| `data/kepler_snippets.jsonl` | **COMPLETE** — 7,454 snippets as of 2026-06-17 | Kepler 30-min long-cadence confirmed planets + FPs; corrupt tiny Lightkurve cache files quarantined locally |
+| `data/kepler_snippets.jsonl` | **REJECTED** — 7,454 rows but 7,132 non-finite flux rows as of 2026-06-17 | Preserve as `data/kepler_snippets_nan_corrupt_20260617.jsonl`, then rebuild with the fixed fetcher |
 
-The Kepler download uses `author="Kepler"` (prevents HLSP/IRIS cache corruption) and `socket.setdefaulttimeout(120)` (prevents WiFi-drop hangs). It resumes automatically from where it left off. The optimized path groups pending KOIs by `kepid`, fetches each KIC once, and supports polite bounded concurrency via `--workers 3 --request-delay 0.5`.
+The Kepler download uses `author="Kepler"` (prevents HLSP/IRIS cache corruption) and `socket.setdefaulttimeout(120)` (prevents WiFi-drop hangs). It resumes automatically from where it left off. The optimized path groups pending KOIs by `kepid`, fetches each KIC once, filters non-finite time/flux samples before phase binning, and supports polite bounded concurrency via `--workers 3 --request-delay 0.5`.
 
 **Do not assume these files are present on the agent's server.** They exist only
 on the user's Mac. If the user is away from the Mac, agent-side work is limited

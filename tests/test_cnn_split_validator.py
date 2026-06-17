@@ -183,6 +183,20 @@ def test_duplicate_tic_id_across_splits_reports_leakage(tmp_path: Path) -> None:
     assert "tic_id_leakage" in _codes(split_dir)
 
 
+def test_duplicate_group_id_across_splits_reports_leakage(tmp_path: Path) -> None:
+    split_dir = _valid_split_dir(tmp_path)
+    train_payload = _split_payload(split_dir, "train")
+    val_payload = _split_payload(split_dir, "val")
+    train_payload["examples"][0]["tic_id"] = 0
+    val_payload["examples"][0]["tic_id"] = 0
+    train_payload["examples"][0]["group_id"] = "kepid:757450"
+    val_payload["examples"][0]["group_id"] = "kepid:757450"
+    _write_split_payload(split_dir, "train", train_payload)
+    _write_split_payload(split_dir, "val", val_payload)
+
+    assert "group_id_leakage" in _codes(split_dir)
+
+
 def test_live_services_true_reports_error(tmp_path: Path) -> None:
     split_dir = _valid_split_dir(tmp_path)
     manifest = _read_manifest(split_dir)
