@@ -18,7 +18,7 @@ fetch_koi_table(max_rows) -> list[dict]
 build_kepler_snippet(kepid, label, period_days, epoch_bjd, *, n_bins,
                      lc_fetcher) -> KoiSnippetResult
 build_kepler_snippets(koi_rows, *, n_bins, output_path, lc_fetcher,
-                      resume, max_errors) -> int
+                      resume, max_errors, workers) -> int
 """
 from __future__ import annotations
 
@@ -27,6 +27,7 @@ import json
 import socket
 import time
 from collections.abc import Callable
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -57,6 +58,29 @@ class KoiSnippetResult:
     epoch_bjd: float
     n_bins: int
     flag: str             # "OK" | "NO_LIGHTKURVE" | "NO_DATA" | "SHORT" | "ERROR"
+
+
+@dataclass(frozen=True)
+class KoiTask:
+    """Validated KOI row ready for light-curve fetching and phase folding."""
+
+    row_index: int
+    kepid: int
+    kepoi_name: str
+    label: int
+    period_days: float
+    epoch_bjd: float
+    n_bins: int
+
+
+@dataclass(frozen=True)
+class KicGroupResult:
+    """Result from processing all KOIs for one KIC light curve."""
+
+    kepid: int
+    row_indices: tuple[int, ...]
+    records: tuple[dict, ...]
+    flags: tuple[str, ...]
 
 
 # ---------------------------------------------------------------------------
@@ -267,6 +291,161 @@ def build_kepler_snippet(
     )
 
 
+def _task_from_row(row: dict, row_index: int, n_bins: int) -> KoiTask | None:
+    try:
+        kepid = int(row.get("kepid", 0))
+        disposition = str(row.get("koi_disposition", ""))
+        period = float(row.get("koi_period", 0.0))
+        time0bk = float(row.get("koi_time0bk", 0.0))
+    except (TypeError, ValueError):
+        return None
+    epoch_bjd = time0bk + _KEPLER_BJD_OFFSET
+    if kepid <= 0 or period <= 0 or epoch_bjd <= _KEPLER_BJD_OFFSET:
+        return None
+    return KoiTask(
+        row_index=row_index,
+        kepid=kepid,
+        kepoi_name=str(row.get("kepoi_name", "")),
+        label=1 if disposition == "CONFIRMED" else 0,
+        period_days=period,
+        epoch_bjd=epoch_bjd,
+        n_bins=n_bins,
+    )
+
+
+def _task_key(task: KoiTask) -> tuple[int, float, float, int]:
+    return (
+        task.kepid,
+        round(task.period_days, 12),
+        round(task.epoch_bjd, 8),
+        task.label,
+    )
+
+
+def _completed_keys(output_path: Path) -> set[tuple[int, float, float, int]]:
+    completed: set[tuple[int, float, float, int]] = set()
+    if not output_path.exists():
+        return completed
+    with output_path.open(encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+                completed.add(
+                    (
+                        int(row.get("kepid", -1)),
+                        round(float(row.get("period_days", 0.0)), 12),
+                        round(float(row.get("epoch_bjd", 0.0)), 8),
+                        int(row.get("label", -1)),
+                    )
+                )
+            except (json.JSONDecodeError, TypeError, ValueError):
+                pass
+    return completed
+
+
+def _group_tasks_by_kic(tasks: list[KoiTask]) -> list[list[KoiTask]]:
+    groups: dict[int, list[KoiTask]] = {}
+    for task in tasks:
+        groups.setdefault(task.kepid, []).append(task)
+    return [
+        sorted(group, key=lambda task: task.row_index)
+        for _kepid, group in sorted(groups.items())
+    ]
+
+
+def _record_from_result(result: KoiSnippetResult, task: KoiTask) -> dict:
+    return {
+        "tic_id": 0,
+        "kepid": task.kepid,
+        "kepoi_name": task.kepoi_name,
+        "label": task.label,
+        "flux": list(result.flux),
+        "source": "kepler",
+        "period_days": task.period_days,
+        "epoch_bjd": task.epoch_bjd,
+        "n_bins": task.n_bins,
+    }
+
+
+def _result_from_curve(
+    task: KoiTask,
+    time_bjd: list[float],
+    flux: list[float],
+) -> KoiSnippetResult:
+    if len(time_bjd) < task.n_bins:
+        return KoiSnippetResult(
+            kepid=task.kepid, label=task.label, flux=(),
+            period_days=task.period_days, epoch_bjd=task.epoch_bjd,
+            n_bins=task.n_bins, flag="SHORT",
+        )
+    bins = _phase_fold_bin(
+        time_bjd,
+        flux,
+        task.period_days,
+        task.epoch_bjd,
+        task.n_bins,
+    )
+    return KoiSnippetResult(
+        kepid=task.kepid,
+        label=task.label,
+        flux=tuple(_normalise(bins)),
+        period_days=task.period_days,
+        epoch_bjd=task.epoch_bjd,
+        n_bins=task.n_bins,
+        flag="OK",
+    )
+
+
+def _process_kic_group(
+    tasks: list[KoiTask],
+    *,
+    lc_fetcher: Callable | None,
+) -> KicGroupResult:
+    task0 = tasks[0]
+    fetcher = lc_fetcher or _default_lc_fetcher
+    try:
+        fetched = fetcher(task0.kepid, task0.period_days, task0.epoch_bjd)
+    except Exception as exc:
+        return KicGroupResult(
+            kepid=task0.kepid,
+            row_indices=tuple(task.row_index for task in tasks),
+            records=(),
+            flags=tuple(f"ERROR:{exc}" for _task in tasks),
+        )
+
+    if fetched is None:
+        try:
+            import lightkurve  # noqa: F401
+        except ImportError:
+            flag = "NO_LIGHTKURVE"
+        else:
+            flag = "NO_DATA"
+        return KicGroupResult(
+            kepid=task0.kepid,
+            row_indices=tuple(task.row_index for task in tasks),
+            records=(),
+            flags=tuple(flag for _task in tasks),
+        )
+
+    time_bjd, flux = fetched
+    records: list[dict] = []
+    flags: list[str] = []
+    for task in tasks:
+        result = _result_from_curve(task, time_bjd, flux)
+        flags.append(result.flag)
+        if result.flag == "OK":
+            records.append(_record_from_result(result, task))
+    return KicGroupResult(
+        kepid=task0.kepid,
+        row_indices=tuple(task.row_index for task in tasks),
+        records=tuple(records),
+        flags=tuple(flags),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Batch builder
 # ---------------------------------------------------------------------------
@@ -280,19 +459,24 @@ def build_kepler_snippets(
     lc_fetcher: Callable | None = None,
     resume: bool = True,
     max_errors: int = 50,
+    workers: int = 1,
+    request_delay: float = 0.25,
 ) -> int:
     """Build phase-folded CNN snippets for a list of KOI rows.
 
-    Writes one JSONL record per successful snippet.  Skips already-written
-    kepids when ``resume=True``.
+    Writes one JSONL record per successful snippet. Skips already-written KOI
+    signatures when ``resume=True``. Multiple KOIs around the same KIC share
+    one light-curve fetch, then fold locally at each KOI period/epoch.
 
     Args:
         koi_rows: List of dicts (from :func:`fetch_koi_table`).
         n_bins: Number of phase bins per snippet.
         output_path: Destination JSONL file path.
         lc_fetcher: Injectable light-curve fetcher.
-        resume: Skip kepids already present in output_path.
-        max_errors: Abort after this many consecutive errors.
+        resume: Skip KOI signatures already present in output_path.
+        max_errors: Abort after this many consecutive failed KIC groups.
+        workers: Bounded thread count for concurrent KIC fetches.
+        request_delay: Delay between worker submissions when ``workers > 1``.
 
     Returns:
         Number of snippets written.
@@ -300,102 +484,155 @@ def build_kepler_snippets(
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    already_done: set[int] = set()
-    if resume and output_path.exists():
-        with output_path.open(encoding="utf-8") as fh:
-            for line in fh:
-                line = line.strip()
-                if line:
-                    try:
-                        row = json.loads(line)
-                        already_done.add(int(row.get("kepid", -1)))
-                    except json.JSONDecodeError:
-                        pass
-
-    n_total = len(koi_rows)
+    completed = _completed_keys(output_path) if resume else set()
+    tasks = [
+        task
+        for index, row in enumerate(koi_rows, 1)
+        if (task := _task_from_row(row, index, n_bins)) is not None
+    ]
+    pending_tasks = [task for task in tasks if not (resume and _task_key(task) in completed)]
+    task_groups = _group_tasks_by_kic(pending_tasks)
+    n_total = len(tasks)
     n_written = 0
     n_errors = 0
     consecutive_errors = 0
     start = time.monotonic()
+    workers = max(1, int(workers))
 
     print(
-        f"Building Kepler snippets: {n_total} KOIs  resume={resume}  "
-        f"already_done={len(already_done)}  output={output_path}",
+        f"Building Kepler snippets: {n_total} valid KOIs  resume={resume}  "
+        f"already_done={len(completed)}  pending={len(pending_tasks)}  "
+        f"kic_groups={len(task_groups)}  workers={workers}  output={output_path}",
         flush=True,
     )
 
     write_mode = "a" if resume else "w"
     with output_path.open(write_mode, encoding="utf-8") as fh:
-        for i, row in enumerate(koi_rows, 1):
-            kepid = int(row.get("kepid", 0))
-            disposition = str(row.get("koi_disposition", ""))
-            period = float(row.get("koi_period", 0.0))
-            time0bk = float(row.get("koi_time0bk", 0.0))
-            epoch_bjd = time0bk + _KEPLER_BJD_OFFSET
-
-            if kepid in already_done:
-                continue
-            if period <= 0 or epoch_bjd <= _KEPLER_BJD_OFFSET:
-                continue
-
-            label = 1 if disposition == "CONFIRMED" else 0
-
-            result = build_kepler_snippet(
-                kepid, label, period, epoch_bjd,
-                n_bins=n_bins, lc_fetcher=lc_fetcher,
-            )
-
-            elapsed = time.monotonic() - start
-            rate = i / elapsed if elapsed > 0 else 1.0
-            remaining = (n_total - i) / rate
-            eta = (
-                f"{remaining/60:.0f}m{remaining%60:.0f}s"
-                if remaining > 90
-                else f"{remaining:.0f}s"
-            )
-
-            if result.flag == "OK":
-                record = {
-                    "tic_id": 0,
-                    "kepid": kepid,
-                    "label": label,
-                    "flux": list(result.flux),
-                    "source": "kepler",
-                    "period_days": period,
-                    "epoch_bjd": epoch_bjd,
-                    "n_bins": n_bins,
-                }
-                fh.write(json.dumps(record) + "\n")
-                fh.flush()
-                n_written += 1
-                consecutive_errors = 0
-                print(
-                    f"  [{i}/{n_total}] {datetime.now().strftime('%H:%M:%S')}"
-                    f" KIC {kepid} label={label}"
-                    f"  written={n_written}  elapsed={elapsed:.0f}s  ETA={eta}",
-                    flush=True,
-                )
-            else:
-                n_errors += 1
-                consecutive_errors += 1
-                print(
-                    f"  [{i}/{n_total}] {datetime.now().strftime('%H:%M:%S')}"
-                    f" KIC {kepid} SKIP flag={result.flag}"
-                    f"  errors={n_errors}  elapsed={elapsed:.0f}s  ETA={eta}",
-                    flush=True,
+        if workers == 1:
+            for group_index, group in enumerate(task_groups, 1):
+                group_result = _process_kic_group(group, lc_fetcher=lc_fetcher)
+                wrote, failed = _write_group_result(fh, group_result)
+                n_written += wrote
+                n_errors += failed
+                consecutive_errors = 0 if wrote else consecutive_errors + failed
+                _print_group_progress(
+                    group_index,
+                    len(task_groups),
+                    group_result,
+                    n_written,
+                    n_errors,
+                    start,
                 )
                 if consecutive_errors >= max_errors:
                     print(
-                        f"Aborting: {consecutive_errors} consecutive errors.",
+                        f"Aborting: {consecutive_errors} consecutive KIC-group errors.",
                         flush=True,
                     )
                     break
+        else:
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                in_flight = {}
+                next_group_index = 1
+                completed_groups = 0
+                should_abort = False
+
+                while next_group_index <= len(task_groups) and len(in_flight) < workers:
+                    group = task_groups[next_group_index - 1]
+                    future = executor.submit(
+                        _process_kic_group,
+                        group,
+                        lc_fetcher=lc_fetcher,
+                    )
+                    in_flight[future] = next_group_index
+                    next_group_index += 1
+                    if request_delay > 0:
+                        time.sleep(request_delay)
+
+                while in_flight:
+                    done, _pending = wait(in_flight, return_when=FIRST_COMPLETED)
+                    for future in done:
+                        in_flight.pop(future)
+                        group_result = future.result()
+                        completed_groups += 1
+                        wrote, failed = _write_group_result(fh, group_result)
+                        n_written += wrote
+                        n_errors += failed
+                        consecutive_errors = 0 if wrote else consecutive_errors + failed
+                        _print_group_progress(
+                            completed_groups,
+                            len(task_groups),
+                            group_result,
+                            n_written,
+                            n_errors,
+                            start,
+                        )
+                        if consecutive_errors >= max_errors:
+                            print(
+                                f"Aborting: {consecutive_errors} consecutive KIC-group errors.",
+                                flush=True,
+                            )
+                            should_abort = True
+                            break
+                    if should_abort:
+                        for future in in_flight:
+                            future.cancel()
+                        break
+                    while next_group_index <= len(task_groups) and len(in_flight) < workers:
+                        group = task_groups[next_group_index - 1]
+                        future = executor.submit(
+                            _process_kic_group,
+                            group,
+                            lc_fetcher=lc_fetcher,
+                        )
+                        in_flight[future] = next_group_index
+                        next_group_index += 1
+                        if request_delay > 0:
+                            time.sleep(request_delay)
 
     print(
         f"Done. {n_written} snippets written, {n_errors} skipped/errors.",
         flush=True,
     )
     return n_written
+
+
+def _write_group_result(handle, group_result: KicGroupResult) -> tuple[int, int]:
+    for record in group_result.records:
+        handle.write(json.dumps(record) + "\n")
+    if group_result.records:
+        handle.flush()
+    return len(group_result.records), sum(
+        1 for flag in group_result.flags if flag != "OK"
+    )
+
+
+def _print_group_progress(
+    group_index: int,
+    n_groups: int,
+    group_result: KicGroupResult,
+    n_written: int,
+    n_errors: int,
+    start: float,
+) -> None:
+    elapsed = time.monotonic() - start
+    rate = group_index / elapsed if elapsed > 0 else 1.0
+    remaining = (n_groups - group_index) / rate
+    eta = (
+        f"{remaining/60:.0f}m{remaining%60:.0f}s"
+        if remaining > 90
+        else f"{remaining:.0f}s"
+    )
+    ok_count = len(group_result.records)
+    fail_count = sum(1 for flag in group_result.flags if flag != "OK")
+    flags = ",".join(sorted(set(group_result.flags))) if group_result.flags else "EMPTY"
+    print(
+        f"  [KIC {group_index}/{n_groups}] {datetime.now().strftime('%H:%M:%S')}"
+        f" KIC {group_result.kepid} rows={len(group_result.row_indices)}"
+        f" ok={ok_count} fail={fail_count} flags={flags}"
+        f"  written={n_written} errors={n_errors}"
+        f"  elapsed={elapsed:.0f}s  ETA={eta}",
+        flush=True,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -430,6 +667,20 @@ def _cli(argv: list[str] | None = None) -> int:
         help="Abort after this many consecutive fetch errors (default: 50)",
     )
     parser.add_argument(
+        "--workers", type=int, default=1, metavar="N",
+        help=(
+            "Concurrent KIC light-curve fetches. Use 2-4 to speed up while "
+            "staying polite to MAST (default: 1)."
+        ),
+    )
+    parser.add_argument(
+        "--request-delay", type=float, default=0.25, metavar="SEC",
+        help=(
+            "Delay between worker submissions when --workers > 1 "
+            "(default: 0.25)."
+        ),
+    )
+    parser.add_argument(
         "--no-resume", action="store_true",
         help="Start fresh even if output file exists",
     )
@@ -455,6 +706,8 @@ def _cli(argv: list[str] | None = None) -> int:
         output_path=args.output,
         resume=not args.no_resume,
         max_errors=args.max_errors,
+        workers=args.workers,
+        request_delay=args.request_delay,
     )
     print(f"Flag: OK  snippets_written={n}")
     return 0

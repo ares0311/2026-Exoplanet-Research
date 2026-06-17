@@ -73,7 +73,7 @@ When the user must take an action to unblock a gap:
 | Item | State |
 |---|---|
 | TESS v2 snippets (`data/tess_snippets_v2.jsonl`) | **COMPLETE** — 2,619 snippets on user's Mac |
-| Kepler snippets (`data/kepler_snippets.jsonl`) | **IN PROGRESS** — was ~922/7,454 at 09:00 UTC 2026-06-15; ETA ~Mon 2026-06-16 evening |
+| Kepler snippets (`data/kepler_snippets.jsonl`) | **IN PROGRESS** — was ~6,066/7,454 at 18:30 ET 2026-06-16 and still running |
 | CNN training pipeline | **BLOCKED** — waiting for Kepler download to finish |
 | XGBoost Tier 1 | Done |
 | Stacking Tier 3 scaffold | Done |
@@ -89,11 +89,16 @@ ps aux | grep fetch_kepler | grep -v grep
 
 - Line count = **7,454** → Kepler download complete. Proceed to the CNN training pipeline below.
 - Line count < 7,454 and process **alive** → still running; tell the user to let it finish and check back.
-- Line count < 7,454 and **no process** → download died; give the user this single-line restart command (single line — do NOT use backslash continuations):
+- Line count < 7,454 and **no process** → download died; give the user this single-line restart command (single line — do NOT use backslash continuations). The bounded worker count keeps MAST pressure low while avoiding the old strictly serial path:
 
 ```
-caffeinate -dims bash -c 'while true; do python Skills/fetch_kepler_lc_snippets.py --output data/kepler_snippets.jsonl; echo "[$(date +%T)] Ended. Resuming in 30s..."; sleep 30; done'
+caffeinate -dims bash -c 'while true; do .venv/bin/python Skills/fetch_kepler_lc_snippets.py --output data/kepler_snippets.jsonl --workers 3 --request-delay 0.5; echo "[$(date +%T)] Ended. Resuming in 30s..."; sleep 30; done'
 ```
+
+`fetch_kepler_lc_snippets.py` groups pending KOIs by `kepid`, fetches each KIC
+light curve once, folds all KOIs for that star locally, and writes JSONL from
+the main process only. Resume uses `(kepid, period, epoch, label)`, not just
+`kepid`, so multi-KOI systems are not skipped accidentally.
 
 ### CNN training pipeline (run after Kepler download completes)
 
@@ -122,9 +127,9 @@ Large training data files are stored on the user's local Mac and are **never com
 | File | Status (as of 2026-06-15) | Description |
 |---|---|---|
 | `data/tess_snippets_v2.jsonl` | **COMPLETE** — 2,619 snippets | TESS phase-folded snippets; merged from two download runs; 56 targets had permanent MAST 404s |
-| `data/kepler_snippets.jsonl` | **IN PROGRESS** — ~922/7,454 as of 2026-06-15 09:00 UTC | Kepler 30-min long-cadence confirmed planets + FPs; auto-restart download running on Mac |
+| `data/kepler_snippets.jsonl` | **IN PROGRESS** — ~6,066/7,454 as of 2026-06-16 18:30 ET | Kepler 30-min long-cadence confirmed planets + FPs; auto-restart download running on Mac |
 
-The Kepler download uses `author="Kepler"` (prevents HLSP/IRIS cache corruption) and `socket.setdefaulttimeout(120)` (prevents WiFi-drop hangs). It resumes automatically from where it left off.
+The Kepler download uses `author="Kepler"` (prevents HLSP/IRIS cache corruption) and `socket.setdefaulttimeout(120)` (prevents WiFi-drop hangs). It resumes automatically from where it left off. The optimized path groups pending KOIs by `kepid`, fetches each KIC once, and supports polite bounded concurrency via `--workers 3 --request-delay 0.5`.
 
 **Do not assume these files are complete or present on the agent's server.** They exist only on the user's Mac. The CNN training pipeline cannot proceed until the user confirms `data/kepler_snippets.jsonl` is complete and pastes the line count.
 

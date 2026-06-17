@@ -145,6 +145,24 @@ class TestBuildKeplerSnippets:
             return times, flux
         return fetcher
 
+    def _make_duplicate_kic_rows(self) -> list[dict]:
+        return [
+            {
+                "kepid": "100",
+                "kepoi_name": "K00001.01",
+                "koi_disposition": "CONFIRMED",
+                "koi_period": "3.5",
+                "koi_time0bk": "100.0",
+            },
+            {
+                "kepid": "100",
+                "kepoi_name": "K00001.02",
+                "koi_disposition": "FALSE POSITIVE",
+                "koi_period": "7.5",
+                "koi_time0bk": "120.0",
+            },
+        ]
+
     def test_writes_ok_snippets(self, tmp_path: Path) -> None:
         koi_rows = self._make_koi_rows(3)
         out = tmp_path / "kepler_snippets.jsonl"
@@ -181,6 +199,75 @@ class TestBuildKeplerSnippets:
         )
         # Only 2 new ones written (102 and 103)
         assert n == 2
+
+    def test_same_kic_fetches_once_and_writes_all_koi_rows(self, tmp_path: Path) -> None:
+        calls: list[int] = []
+
+        def fetcher(kepid, period, epoch):
+            calls.append(kepid)
+            return self._make_fetcher()(kepid, period, epoch)
+
+        out = tmp_path / "kepler_snippets.jsonl"
+        n = build_kepler_snippets(
+            self._make_duplicate_kic_rows(),
+            n_bins=11,
+            output_path=out,
+            lc_fetcher=fetcher,
+            resume=False,
+            max_errors=10,
+        )
+
+        rows = [json.loads(line) for line in out.read_text().splitlines()]
+        assert n == 2
+        assert calls == [100]
+        assert {row["kepoi_name"] for row in rows} == {"K00001.01", "K00001.02"}
+
+    def test_resume_uses_koi_signature_not_only_kepid(self, tmp_path: Path) -> None:
+        out = tmp_path / "kepler_snippets.jsonl"
+        out.write_text(
+            json.dumps({
+                "kepid": 100,
+                "kepoi_name": "K00001.01",
+                "label": 1,
+                "flux": [],
+                "source": "kepler",
+                "period_days": 3.5,
+                "epoch_bjd": 2454933.0,
+                "tic_id": 0,
+                "n_bins": 11,
+            }) + "\n",
+            encoding="utf-8",
+        )
+
+        n = build_kepler_snippets(
+            self._make_duplicate_kic_rows(),
+            n_bins=11,
+            output_path=out,
+            lc_fetcher=self._make_fetcher(),
+            resume=True,
+            max_errors=10,
+        )
+
+        rows = [json.loads(line) for line in out.read_text().splitlines()]
+        assert n == 1
+        assert len(rows) == 2
+        assert {row["kepoi_name"] for row in rows} == {"K00001.01", "K00001.02"}
+
+    def test_bounded_workers_write_all_rows(self, tmp_path: Path) -> None:
+        out = tmp_path / "kepler_snippets.jsonl"
+        n = build_kepler_snippets(
+            self._make_koi_rows(4),
+            n_bins=11,
+            output_path=out,
+            lc_fetcher=self._make_fetcher(),
+            resume=False,
+            max_errors=10,
+            workers=2,
+            request_delay=0,
+        )
+
+        assert n == 4
+        assert len(out.read_text().strip().splitlines()) == 4
 
     def test_no_resume_overwrites(self, tmp_path: Path) -> None:
         out = tmp_path / "out.jsonl"
