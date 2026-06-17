@@ -98,16 +98,17 @@ reports/background/*.html
 
 ## Next Actions
 
-1. Run `python Skills/tier2_progress_reporter.py --labels data/exofop_ctoi_labels.json --output reports/tier2_status.md --json-output reports/tier2_status.json` to produce offline CNN readiness artifacts.
-2. Run `python Skills/count_tess_labels.py` only when live ExoFOP access is intentionally approved, then run `python Skills/tess_label_check_summary.py` to inspect the local SQLite audit history.
-3. Rebuild and audit the epoch-corrected CNN corpus, create a fresh sealed promotion split, then resume grouped development experiments; do not reuse any artifact derived from the zero-epoch corpus.
-4. Use `toi_checker.py` before investing pipeline time on new live targets.
-5. Use `batch_scan.py` + `alert_filter.py` + `rank_candidates.py` + `watchlist.py` for systematic follow-up.
-6. Use `multi_sector_phase_compare.py` to inspect sector-to-sector depth and phase consistency before advancing multi-sector follow-up targets.
-7. Use `candidate_dashboard_export.py` to build static local review dashboards from existing candidate JSON outputs, including optional phase-fold plot artifact paths when available.
-8. Use `candidate_api.py` to serve existing local candidate JSON, optional read-only background SQLite summaries, `/artifact.json` review bundles, and opt-in CORS for separate local frontends.
-9. Use `candidate_browser_ui.py` for an interactive local browser UI with embedded-data/API modes and optional phase-fold plot previews.
-10. Keep CTOI/community candidate ingestion opt-in and outside default training; the fixture-backed source contract now lives in `docs/CTOI_SOURCE_CONTRACT.md`.
+1. TODO when back on the local Mac: stop any leftover Kepler fetch wrapper, verify `wc -l data/kepler_snippets.jsonl` is `7454`, then build and validate the Kepler CNN splits with `caffeinate -i .venv/bin/python Skills/build_cnn_training_data.py data/kepler_snippets.jsonl --output-dir data/kepler_cnn_splits` and `.venv/bin/python Skills/cnn_split_validator.py data/kepler_cnn_splits`.
+2. Run `python Skills/tier2_progress_reporter.py --labels data/exofop_ctoi_labels.json --output reports/tier2_status.md --json-output reports/tier2_status.json` to produce offline CNN readiness artifacts.
+3. Run `python Skills/count_tess_labels.py` only when live ExoFOP access is intentionally approved, then run `python Skills/tess_label_check_summary.py` to inspect the local SQLite audit history.
+4. Rebuild and audit the epoch-corrected CNN corpus, create a fresh sealed promotion split, then resume grouped development experiments; do not reuse any artifact derived from the zero-epoch corpus.
+5. Use `toi_checker.py` before investing pipeline time on new live targets.
+6. Use `batch_scan.py` + `alert_filter.py` + `rank_candidates.py` + `watchlist.py` for systematic follow-up.
+7. Use `multi_sector_phase_compare.py` to inspect sector-to-sector depth and phase consistency before advancing multi-sector follow-up targets.
+8. Use `candidate_dashboard_export.py` to build static local review dashboards from existing candidate JSON outputs, including optional phase-fold plot artifact paths when available.
+9. Use `candidate_api.py` to serve existing local candidate JSON, optional read-only background SQLite summaries, `/artifact.json` review bundles, and opt-in CORS for separate local frontends.
+10. Use `candidate_browser_ui.py` for an interactive local browser UI with embedded-data/API modes and optional phase-fold plot previews.
+11. Keep CTOI/community candidate ingestion opt-in and outside default training; the fixture-backed source contract now lives in `docs/CTOI_SOURCE_CONTRACT.md`.
 
 Live-network note: the CNN gate check was not run during the latest local
 maintenance pass because it queries ExoFOP and requires intentional live network
