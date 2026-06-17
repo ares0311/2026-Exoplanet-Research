@@ -1,6 +1,6 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-06-13 (tenth candidate [ensemble] rejected; systematic ceiling confirmed; Path A [more data] + Path B [Kepler transfer learning] authorized)
+Last reviewed: 2026-06-17 (Kepler corpus complete locally; production CNN runbook and stricter calibration gate recorded)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
 Test baseline: 2,003 default tests passing, 2 integration_live deselected
@@ -29,10 +29,11 @@ production scoring.
 ### T1-1: Production Tier 2 CNN Checkpoint
 
 - **What is missing**: A CNN checkpoint that passes held-out performance and calibration gates
-- **Gate status**: **OPEN** — 2,037 snippets (1,012 positive CP+KP + 1,025 negative FP+FA); corpus valid as of 2026-06-12
+- **Gate status**: **OPEN** — awaiting Kepler pretraining, TESS fine-tuning, and held-out production evaluation from `docs/CNN_PRODUCTION_RUNBOOK.md`
 - **Code status**: Training and state-dict inference paths are operational; the package scorer reconstructs the trained architecture and fails closed when loading fails
-- **Local corpus status**: **VALID as of 2026-06-12** — 2,037 snippets (1,012 positive CP+KP, 1,025 negative FP+FA, ratio 0.99); zero-epoch corpus retired and rebuilt from scratch with valid BJD epochs; label bug fixed (KP→1); MAST throttling fix applied (`bbb0877`)
-- **Data policy**: A future audit-passing replacement corpus will be the authorized local T1-1 training input and remain uncommitted under `docs/SYSTEM_PROFILE.md` and DECISION-014
+- **Prior local corpus status**: **VALID as of 2026-06-12** — 2,037 snippets (1,012 positive CP+KP, 1,025 negative FP+FA, ratio 0.99); zero-epoch corpus retired and rebuilt from scratch with valid BJD epochs; label bug fixed (KP→1); MAST throttling fix applied (`bbb0877`)
+- **Local corpus status**: **READY FOR LOCAL TRAINING** — TESS v2 complete at 2,619 snippets; Kepler complete at 7,454 snippets as of 2026-06-17; corrupt tiny Kepler Lightkurve cache files quarantined locally
+- **Data policy**: Local CNN corpora, splits, checkpoints, and training logs remain uncommitted unless a future promotion decision explicitly commits a production checkpoint, calibration metadata, registry entry, and reproducibility manifest under `models/`
 - **Retired splits**: The seed-42 1,837 / 392 / 394 split and temporary 1,492 / 369 / 368 replacement split were both derived from the invalid zero-epoch corpus and must not be reused
 - **Rejected candidate 1**: SHA-256 `e02af3903ab65f4af4f3f05f95dd6da8815a6746fea1bf2eac67bbba3555d6c6`, trained on Python 3.14.3 with PyTorch 2.12.0 on the invalid zero-epoch corpus; best epoch 5, validation AUC 0.7476; test raw AUC 0.7404, F1 0.5804, Brier 0.2131, ECE 0.0716; Platt calibration threshold 0.503 produced test F1 0.6297, Brier 0.2295, ECE 0.1273; **REJECTED** — AUC and F1 below targets, calibration worsened both Brier and ECE
 - **Rejected candidate 2**: Trained on Python 3.14.3 with PyTorch 2.12.0 on the valid 2026-06-12 corpus (2,037 snippets); splits: 1,425 train / 306 val / 306 test; default config (LR=1e-3, weight_decay=1e-4, dropout 0.5/0.3, aug_noise=0.02); best epoch 4, validation AUC 0.8177, F1 0.7711; test raw AUC 0.7180, F1 0.6998, Brier 0.2153, ECE 0.0646; Platt calibration A=1.5546, B=−0.7152, threshold 0.43 produced test F1 0.6998, Brier 0.2237, ECE 0.0730; **REJECTED** — test AUC 0.7180 < 0.85 gate, test F1 0.6998 < 0.80 gate, calibration worsened both Brier and ECE; val→test AUC gap of 10 points (0.8177→0.7180) indicates insufficient regularization
@@ -50,7 +51,9 @@ production scoring.
 - **Authorized path forward — BOTH Path A and Path B run in parallel**:
   - **Path A — More labeled TESS data**: Download additional phase-folded snippets from MAST for ExoFOP confirmed planets and confirmed false positives; target ≥ 5,000 training examples; retrain with expanded corpus
   - **Path B — Kepler→TESS transfer learning**: Pre-train CNN on Kepler TCE phase-folded light curves (tens of thousands of examples); fine-tune final dense layers on 1,425 TESS examples; most robust path to exceeding 0.85 test AUC on current TESS snippet count
-- **Gate check**: `python Skills/count_tess_labels.py`
+- **Current authorized runbook**: `docs/CNN_PRODUCTION_RUNBOOK.md`
+- **Current promotion gate**: raw held-out test AUC ≥ 0.85; calibrated held-out test F1 ≥ 0.80; Platt calibration must not worsen held-out test Brier score or ECE
+- **Gate check**: `.venv/bin/python Skills/evaluate_cnn_checkpoint.py --split-dir data/tess_cnn_splits --checkpoint checkpoints/cnn_tess_finetuned/best.pt --output-calibration checkpoints/cnn_tess_finetuned/calibration.json`
 - **Architecture spec**: `docs/CNN_SPEC.md`
 - **Artifact policy**: Commit the validated production checkpoint, calibration metadata, model registry entry, and reproducibility manifest under `models/` after all production-readiness checks pass
 
@@ -145,8 +148,7 @@ These are enforced in code and must never be bypassed:
 
 | Blocker | What Is Needed | Who |
 |---|---|---|
-| CNN retraining run | Run training recipe after splits are built and validated | Human |
-| CNN retraining run | Run the next approved training recipe in `.venv` after the rebuilt corpus passes audit | Human |
+| CNN split/training run | Run `docs/CNN_PRODUCTION_RUNBOOK.md` Steps 0-5 on the local Mac in `.venv` | Human |
 | CNN production promotion | Validate, calibrate, register, and commit only a checkpoint that passes held-out gates | Agent + human approval |
 | Stacking weight calibration | Tune blend weights on held-out calibration set | Agent after T1-1 resolved |
 
