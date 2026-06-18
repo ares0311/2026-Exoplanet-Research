@@ -161,6 +161,7 @@ def _augment_training_batch(x, config: CnnTrainingConfig):  # noqa: ANN001, ANN2
             -config.augmentation_shift_bins,
             config.augmentation_shift_bins + 1,
             (x.shape[0],),
+            device=x.device,
         ).tolist()
         x = torch.stack([torch.roll(xi, int(s), dims=-1) for xi, s in zip(x, shifts, strict=True)])
     return x
@@ -245,6 +246,41 @@ def _set_conv_frozen(model, frozen: bool) -> None:  # noqa: ANN001
     """Freeze or unfreeze the conv submodule parameters."""
     for p in model.conv.parameters():
         p.requires_grad_(not frozen)
+
+
+def _resolve_torch_device(requested: str):  # noqa: ANN201
+    """Resolve the requested PyTorch device with accelerator-first defaults."""
+    import torch
+
+    requested = requested.strip().lower()
+    mps_backend = getattr(torch.backends, "mps", None)
+    mps_available = bool(mps_backend is not None and mps_backend.is_available())
+    cuda_available = bool(torch.cuda.is_available())
+
+    if requested == "auto":
+        if mps_available:
+            return torch.device("mps")
+        if cuda_available:
+            return torch.device("cuda")
+        return torch.device("cpu")
+    if requested == "mps" and not mps_available:
+        print(
+            "Warning: requested device=mps but MPS is unavailable; falling back to CPU.",
+            flush=True,
+        )
+        return torch.device("cpu")
+    if requested == "cuda" and not cuda_available:
+        print(
+            "Warning: requested device=cuda but CUDA is unavailable; falling back to CPU.",
+            flush=True,
+        )
+        return torch.device("cpu")
+    return torch.device(requested)
+
+
+def _cpu_state_dict(model) -> dict:  # noqa: ANN001
+    """Return a CPU-backed state dict so checkpoints stay portable."""
+    return {name: tensor.detach().cpu() for name, tensor in model.state_dict().items()}
 
 
 def train_cnn(
@@ -383,8 +419,13 @@ def train_cnn(
         y = torch.tensor(labels, dtype=torch.float32)
         return x, y
 
+    device = _resolve_torch_device(config.device)
     x_train, y_train = _examples_to_tensors(train_examples)
     x_val, y_val = _examples_to_tensors(val_examples)
+    x_train = x_train.to(device)
+    y_train = y_train.to(device)
+    x_val = x_val.to(device)
+    y_val = y_val.to(device)
 
     model = _build_torch_model(config)
 
@@ -396,6 +437,8 @@ def train_cnn(
             print(f"Loaded pretrained weights from {pretrained_checkpoint}", flush=True)
         else:
             print(f"Warning: pretrained checkpoint not found: {pretrained_checkpoint}", flush=True)
+
+    model = model.to(device)
 
     freeze_epochs = config.freeze_conv_epochs
     if freeze_epochs > 0:
@@ -444,7 +487,8 @@ def train_cnn(
     print(
         f"Training: {n_train} train / {len(x_val)} val"
         f" | batch={batch_size} max_epochs={config.max_epochs}"
-        f" | early_stop patience={config.early_stopping_patience}",
+        f" | early_stop patience={config.early_stopping_patience}"
+        f" | device={device}",
         flush=True,
     )
 
@@ -461,7 +505,7 @@ def train_cnn(
             )
         # --- training ---
         model.train()
-        perm = torch.randperm(n_train)
+        perm = torch.randperm(n_train, device=device)
         x_shuf = x_train[perm]
         y_shuf = y_train[perm]
         total_train_loss = 0.0
@@ -490,8 +534,8 @@ def train_cnn(
             val_pred = model(x_val)
             val_loss_t = criterion(val_pred, y_val)
             val_loss = val_loss_t.item()
-            y_prob_list = val_pred.tolist()
-            y_true_list = y_val.tolist()
+            y_prob_list = val_pred.detach().cpu().tolist()
+            y_true_list = y_val.detach().cpu().tolist()
 
         val_auc = _compute_auc(
             [int(v) for v in y_true_list],
@@ -510,7 +554,7 @@ def train_cnn(
 
         # Save per-epoch checkpoint
         epoch_ckpt = str(checkpoint_dir / f"epoch_{epoch:04d}.pt")
-        torch.save(model.state_dict(), epoch_ckpt)
+        torch.save(_cpu_state_dict(model), epoch_ckpt)
 
         # Track for metrics.json
         metrics_records.append(
@@ -532,7 +576,7 @@ def train_cnn(
             best_val_auc = val_auc
             best_epoch = epoch
             patience_counter = 0
-            torch.save(model.state_dict(), best_checkpoint)
+            torch.save(_cpu_state_dict(model), best_checkpoint)
         else:
             patience_counter += 1
 
@@ -642,6 +686,19 @@ def _cli(argv: list[str] | None = None) -> int:
         help="Override the seed in the config (controls model init and augmentation RNG).",
     )
     parser.add_argument(
+        "--device",
+        choices=("auto", "cpu", "mps", "cuda"),
+        default=None,
+        help="Override config device. 'auto' prefers Apple MPS, then CUDA, then CPU.",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Override config batch size for local hardware benchmarking.",
+    )
+    parser.add_argument(
         "--pretrained-checkpoint", type=Path, default=None, metavar="PT",
         help="Load conv weights from this checkpoint before training (transfer learning).",
     )
@@ -653,9 +710,16 @@ def _cli(argv: list[str] | None = None) -> int:
         from cnn_training_config import default_config, load_config
 
     cfg = load_config(args.config) if args.config else default_config()
-    if args.seed is not None:
+    if args.seed is not None or args.device is not None or args.batch_size is not None:
         import dataclasses
-        cfg = dataclasses.replace(cfg, seed=args.seed)
+        overrides = {}
+        if args.seed is not None:
+            overrides["seed"] = args.seed
+        if args.device is not None:
+            overrides["device"] = args.device
+        if args.batch_size is not None:
+            overrides["batch_size"] = args.batch_size
+        cfg = dataclasses.replace(cfg, **overrides)
     result = train_cnn(
         args.split_dir,
         cfg,

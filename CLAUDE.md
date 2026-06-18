@@ -140,6 +140,27 @@ Print a startup banner before any loop. Print a completion or early-stop line at
 - `pip install` with `(.venv)` active is always venv-scoped and safe
 - Fix SSL/package issues inside the venv only
 
+### Local System Profile Optimization — MANDATORY
+
+`docs/SYSTEM_PROFILE.md` is a committed production directive. Before
+performance-sensitive changes, long-running recipes, worker-count defaults,
+batch-size defaults, cache layout changes, or AI/ML training work, read it and
+optimize defaults for the recorded MacBook Pro M4 Max profile while keeping the
+code portable and configurable.
+
+AI/ML training must use accelerator-first defaults. PyTorch training should use
+a configurable `device=auto` policy that resolves to Apple Metal/MPS on the
+recorded M4 Max when available, then CUDA when available, and CPU only when no
+accelerator is available or the operator explicitly requests CPU. Training
+startup banners must print the resolved device.
+
+Other performance-sensitive code should use bounded multiprocessing or
+multithreading when it is safe and useful. Use `docs/SYSTEM_PROFILE.md` to
+choose local worker defaults, keep at least two CPU cores free for interactive
+work, and keep live external-service jobs polite and lower-concurrency. Never
+hardcode Apple-only assumptions into scientific scoring, classification, or
+pathway logic; expose system-specific behavior through config or CLI flags.
+
 ### Git-Add-Safe Artifact Policy — MANDATORY
 
 The standard operator cadence is `git add .`. The repository must make that
@@ -1167,6 +1188,7 @@ These large data files live only on the user's local Mac. They are never committ
 |---|---|---|---|
 | `data/tess_snippets_v2.jsonl` | Local Mac | **COMPLETE** — 2,619 snippets | Merged from `tess_snippets.jsonl` + `tess_snippets_expansion.jsonl`; 56 targets had permanent MAST 404s and were skipped |
 | `data/kepler_snippets.jsonl` | Local Mac | **LOCAL VALIDATED** — 6,837 finite snippets as of 2026-06-17 | JSON parse PASS; zero non-finite flux rows; zero duplicate resume keys; split validator PASS |
+| `checkpoints/cnn_kepler_pretrain/best.pt` | Local Mac | **LOCAL PRETRAINED** — SHA-256 `65c49aaa8668fc56b5a466469937bb62beb0acf1680d985c4e570df98d0b7e11` | Best epoch 20, best val loss 0.3840, best val AUC 0.9215; produced before GPU-aware trainer patch |
 
 **Kepler retry command** (only if the human explicitly wants to retry missing
 rows after the validated split; do not use an infinite wrapper):
@@ -1180,9 +1202,9 @@ terminal failures. Console progress is not resume state. If rerunning a
 downloader reprocesses completed or terminally failed work by default, stop and
 fix the durable resume ledger before asking the human to run it again.
 
-### Next Step — HANDOFF 2026-06-17
+### Next Step — HANDOFF 2026-06-18
 
-**Status: Kepler JSONL and split are locally validated; proceed to Kepler pretraining.**
+**Status: Kepler JSONL, Kepler split, and Kepler pretraining checkpoint are locally validated; proceed to TESS split build and fine-tuning.**
 
 #### Incoming agent: do this first
 
@@ -1191,15 +1213,17 @@ Ask the user to paste the output of:
 git pull --ff-only origin main
 wc -l data/kepler_snippets.jsonl data/tess_snippets_v2.jsonl
 .venv/bin/python Skills/cnn_split_validator.py data/kepler_cnn_splits
+shasum -a 256 checkpoints/cnn_kepler_pretrain/best.pt
 ```
 
-- **6,837 Kepler lines and split validator PASS** → proceed to `docs/CNN_PRODUCTION_RUNBOOK.md` Step 3 for Kepler pretraining.
-- **Any other Kepler line count or validator FAIL** → stop and inspect the local artifact before training; do not start another infinite fetch loop.
+- **6,837 Kepler lines, split validator PASS, and pretraining SHA `65c49aaa8668fc56b5a466469937bb62beb0acf1680d985c4e570df98d0b7e11`** → proceed to `docs/CNN_PRODUCTION_RUNBOOK.md` Step 4 for TESS split build, then Step 5 fine-tuning.
+- **Any other Kepler line count, validator FAIL, missing checkpoint, or different SHA** → stop and inspect the local artifact before training; do not start another infinite fetch loop.
 
 #### Corpus status
 
 - **TESS v2**: `data/tess_snippets_v2.jsonl` — 2,619 snippets (COMPLETE; 56 targets had permanent MAST 404s)
 - **Kepler**: `data/kepler_snippets.jsonl` — LOCAL VALIDATED as of 2026-06-17; 6,837 finite snippets; labels negative=4,280 and positive=2,557; split validator PASS with train/val/test = 4,741 / 1,060 / 1,036
+- **Kepler pretrain**: `checkpoints/cnn_kepler_pretrain/best.pt` — LOCAL PRETRAINED as of 2026-06-18; SHA-256 `65c49aaa8668fc56b5a466469937bb62beb0acf1680d985c4e570df98d0b7e11`; best val AUC 0.9215
 
 #### CNN production runbook
 
@@ -1209,6 +1233,9 @@ Use `docs/CNN_PRODUCTION_RUNBOOK.md` for the authoritative copy-paste workflow.
 The accepted `train_cnn.py` flags are `--split-dir`, `--checkpoint-dir`, and
 `--pretrained-checkpoint`; do not use stale aliases such as `--splits-dir`,
 `--output-dir` for training, or `--pretrained`.
+The GPU-aware trainer accepts `--device auto|cpu|mps|cuda`; config defaults to
+`device=auto`, which should print `device=mps` on the recorded M4 Max when
+PyTorch Metal/MPS is available.
 
 Evaluation gate: raw held-out AUC ≥ 0.85, calibrated held-out F1 ≥ 0.80, and
 Platt calibration must not worsen held-out Brier score or ECE. Passing the gate

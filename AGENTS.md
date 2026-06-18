@@ -75,7 +75,8 @@ When the user must take an action to unblock a gap:
 | TESS v2 snippets (`data/tess_snippets_v2.jsonl`) | **COMPLETE** — 2,619 snippets on user's Mac |
 | Kepler snippets (`data/kepler_snippets.jsonl`) | **LOCAL VALIDATED** — 6,837 finite snippets on user's Mac; 617 KOI signatures absent/pending failure-sidecar review |
 | Kepler CNN splits (`data/kepler_cnn_splits/`) | **LOCAL VALIDATED** — validator PASS; train/val/test = 4,741 / 1,060 / 1,036 |
-| CNN training pipeline | **UNBLOCKED TO KEPLER PRETRAINING** — train from validated Kepler splits before TESS fine-tuning |
+| Kepler pretraining checkpoint (`checkpoints/cnn_kepler_pretrain/best.pt`) | **LOCAL PRETRAINED** — SHA-256 `65c49aaa8668fc56b5a466469937bb62beb0acf1680d985c4e570df98d0b7e11`; best val AUC 0.9215 |
+| CNN training pipeline | **UNBLOCKED TO TESS FINE-TUNING** — build TESS splits, fine-tune from reviewed Kepler pretrain checkpoint, then run production evaluator |
 | XGBoost Tier 1 | Done |
 | Stacking Tier 3 scaffold | Done |
 
@@ -87,10 +88,16 @@ If the user is at the Mac, ask them to run these commands and paste the output:
 git pull --ff-only origin main
 wc -l data/kepler_snippets.jsonl data/tess_snippets_v2.jsonl
 .venv/bin/python Skills/cnn_split_validator.py data/kepler_cnn_splits
+shasum -a 256 checkpoints/cnn_kepler_pretrain/best.pt
 ```
 
 - If Kepler is **6,837** and the split validator reports **PASS**, do **not**
-  rerun the fetch loop; proceed to `docs/CNN_PRODUCTION_RUNBOOK.md` Step 3.
+  rerun the fetch loop.
+- If the Kepler pretraining SHA is
+  `65c49aaa8668fc56b5a466469937bb62beb0acf1680d985c4e570df98d0b7e11`, proceed
+  to `docs/CNN_PRODUCTION_RUNBOOK.md` Step 4.
+- If the Kepler pretraining checkpoint is missing or has a different SHA, stop
+  and review the local artifact ledger and runbook before training further.
 - If the user intentionally wants to retry missing Kepler rows, use one bounded
   fetch run, not an infinite shell wrapper:
 
@@ -281,6 +288,21 @@ Pro M4 Max profile. Keep the scientific code portable and configurable: do not
 hardcode local machine assumptions into candidate detection, scoring,
 classification, or pathway logic. If code needs machine-specific behavior,
 expose it through configuration, CLI flags, or documented runtime defaults.
+
+AI/ML training code must prefer local acceleration by default. For PyTorch
+training, use a configurable `device=auto` policy that selects Apple Metal/MPS
+on the recorded M4 Max when available, then CUDA when available, and falls back
+to CPU only when no accelerator is available or the operator explicitly selects
+CPU. Startup banners for training runs must print the resolved device so the
+operator can tell whether the GPU is actually in use.
+
+Other performance-sensitive code should use bounded parallelism when it is
+scientifically safe and operationally useful. Prefer multiprocessing or
+multithreading over strictly serial loops for CPU-local batch work, starting
+near the worker counts in `docs/SYSTEM_PROFILE.md`. Live external-service
+workloads must remain polite and bounded; never use unbounded concurrency or a
+worker default that risks throttling MAST, ExoFOP, NASA Exoplanet Archive, or
+similar services. Every parallel default must remain configurable.
 
 ## macOS Long-Running Process Policy
 

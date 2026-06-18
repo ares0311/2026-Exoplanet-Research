@@ -18,6 +18,7 @@ from Skills.train_cnn import (
     _augment_training_batch,
     _compute_auc,
     _load_split,
+    _resolve_torch_device,
     format_training_result,
     train_cnn,
 )
@@ -78,6 +79,12 @@ def test_train_augmentation_changes_only_enabled_batches() -> None:
     augmented = _augment_training_batch(batch, default_config())
     assert augmented.shape == batch.shape
     assert not torch.equal(augmented, batch)
+
+
+def test_explicit_cpu_device_resolves_without_gpu() -> None:
+    pytest.importorskip("torch")
+
+    assert _resolve_torch_device("cpu").type == "cpu"
 
 
 def test_augmentation_flip_reverses_some_samples() -> None:
@@ -183,6 +190,30 @@ class TestTrainCnn:
                 str(tmp_path / "checkpoints"),
                 "--seed",
                 "42",
+            ],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert completed.returncode == 1
+        assert "ModuleNotFoundError" not in completed.stderr
+        assert "Flag:" in completed.stdout
+
+    def test_device_and_batch_size_overrides_accepted_by_cli(self, tmp_path: Path) -> None:
+        script = Path(__file__).parents[1] / "Skills" / "train_cnn.py"
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(script),
+                "--split-dir",
+                str(tmp_path / "missing"),
+                "--checkpoint-dir",
+                str(tmp_path / "checkpoints"),
+                "--device",
+                "cpu",
+                "--batch-size",
+                "8",
             ],
             cwd=tmp_path,
             capture_output=True,

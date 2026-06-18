@@ -2,7 +2,7 @@
 
 ## Status: Active Development
 ## Phase: Milestone 39 Complete — Physics, Vetting, Planning, and XGBoost Model Trained
-## Last Updated: 2026-06-10
+## Last Updated: 2026-06-18
 
 ---
 
@@ -104,18 +104,30 @@ without relying on chat context or local terminal output.
 - The rebuilt local Kepler corpus was validated on 2026-06-17: 6,837 parseable finite snippets, zero duplicate resume keys, labels negative=4,280 and positive=2,557.
 - `data/kepler_cnn_splits` passed validation on 2026-06-17 with train/val/test = 4,741 / 1,060 / 1,036.
 - Tiny corrupt Kepler Lightkurve cache files were quarantined locally before training resumed.
+- Kepler pretraining completed locally on 2026-06-18:
+  `checkpoints/cnn_kepler_pretrain/best.pt`, SHA-256
+  `65c49aaa8668fc56b5a466469937bb62beb0acf1680d985c4e570df98d0b7e11`;
+  best epoch 20, best validation loss 0.3840, best validation AUC 0.9215.
+  This was produced before the GPU-aware trainer patch; future training should
+  use `device=auto` and print the resolved device.
 - Architecture details: `docs/CNN_SPEC.md`.
 - Human local runbook: `docs/CNN_PRODUCTION_RUNBOOK.md`.
-- Next outside blocker: run Kepler pretraining on the user's Mac from the validated Kepler CNN splits.
+- Next outside blocker: build and validate TESS CNN splits on the user's Mac,
+  then fine-tune from the reviewed Kepler pretraining checkpoint.
 
 ---
 
 ## Next Actions
 
 1. Update `docs/LOCAL_ARTIFACT_LEDGER.md` and `artifacts/manifests/local_artifacts.json` after each local artifact state change so GitHub records the current corpus/split/checkpoint status.
-2. Continue with `docs/CNN_PRODUCTION_RUNBOOK.md` Step 3 for Kepler pretraining and paste back the final training result plus SHA-256.
-3. After agent review of the Kepler pretraining result, run the TESS split validation and fine-tuning steps, then paste back the final training result plus SHA-256.
-4. Run production gate evaluation. Promote nothing unless the evaluator reports `Flag: PASS`, raw test AUC is at least 0.85, calibrated test F1 is at least 0.80, and calibrated Brier/ECE are no worse than raw.
+2. Continue with `docs/CNN_PRODUCTION_RUNBOOK.md` Step 4 for TESS split build
+   and validation.
+3. Run Step 5 TESS fine-tuning from
+   `checkpoints/cnn_kepler_pretrain/best.pt`, then paste back the final
+   training result plus SHA-256.
+4. Run production gate evaluation. Promote nothing unless the evaluator reports
+   `Flag: PASS`, raw test AUC is at least 0.85, calibrated test F1 is at least
+   0.80, and calibrated Brier/ECE are no worse than raw.
 5. If the gate passes, request explicit human approval to promote the checkpoint; the agent then updates `models/`, registry metadata, readiness docs, artifact ledger, and GitHub.
 6. If the gate fails, document the rejection in `docs/PRODUCTION_READINESS.md` and the artifact ledger, then start the next T1-1 planning cycle from the observed failure mode.
 
