@@ -3,7 +3,7 @@
 Last reviewed: 2026-06-18 (Path A TESS inventory too small; T1-1 remains open)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 2,190 default tests passing, 2 integration_live deselected
+Test baseline: 2,191 default tests passing, 2 integration_live deselected
 
 ---
 
@@ -114,7 +114,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
 | 82 production-critical Skills/ | ✅ |
-| 2,190 default tests, ruff clean, mypy clean | ✅ |
+| 2,191 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---

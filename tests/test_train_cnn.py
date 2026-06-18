@@ -55,7 +55,15 @@ class TestComputeAuc:
         y_true = [1, 0, 1, 0]
         y_pred = [0.5, 0.5, 0.5, 0.5]
         auc = _compute_auc(y_true, y_pred)
-        assert 0.0 <= auc <= 1.0
+        assert auc == pytest.approx(0.5, abs=1e-9)
+
+    def test_tied_scores_are_order_independent(self) -> None:
+        y_true_a = [1, 1, 0, 0]
+        y_true_b = list(reversed(y_true_a))
+        y_pred = [0.5, 0.5, 0.5, 0.5]
+        assert _compute_auc(y_true_a, y_pred) == pytest.approx(
+            _compute_auc(y_true_b, y_pred), abs=1e-9
+        )
 
     def test_empty_returns_half(self) -> None:
         auc = _compute_auc([], [])
