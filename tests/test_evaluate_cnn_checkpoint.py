@@ -208,6 +208,88 @@ class TestEvaluateCnnCheckpoint:
         )
         assert result.flag == "LOAD_ERROR"
 
+    def test_missing_flux_fails_closed(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path, n=40)
+        data = json.loads((split_dir / "val.json").read_text())
+        del data["examples"][0]["flux"]
+        (split_dir / "val.json").write_text(json.dumps(data))
+
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            model_fn=_dummy_model_fn_pass,
+        )
+        assert result.flag == "INVALID_SPLIT"
+        assert not result.passed
+
+    def test_non_binary_label_fails_closed(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path, n=40)
+        data = json.loads((split_dir / "val.json").read_text())
+        data["examples"][0]["label"] = 2
+        (split_dir / "val.json").write_text(json.dumps(data))
+
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            model_fn=_dummy_model_fn_pass,
+        )
+        assert result.flag == "INVALID_SPLIT"
+        assert not result.passed
+
+    def test_string_label_fails_closed(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path, n=40)
+        data = json.loads((split_dir / "val.json").read_text())
+        data["examples"][0]["label"] = "1"
+        (split_dir / "val.json").write_text(json.dumps(data))
+
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            model_fn=_dummy_model_fn_pass,
+        )
+        assert result.flag == "INVALID_SPLIT"
+        assert not result.passed
+
+    def test_non_finite_flux_fails_closed(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path, n=40)
+        data = json.loads((split_dir / "test.json").read_text())
+        data["examples"][0]["flux"][0] = math.nan
+        (split_dir / "test.json").write_text(json.dumps(data))
+
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            model_fn=_dummy_model_fn_pass,
+        )
+        assert result.flag == "INVALID_SPLIT"
+        assert not result.passed
+
+    def test_non_numeric_flux_fails_closed(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path, n=40)
+        data = json.loads((split_dir / "test.json").read_text())
+        data["examples"][0]["flux"][0] = "1.0"
+        (split_dir / "test.json").write_text(json.dumps(data))
+
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            model_fn=_dummy_model_fn_pass,
+        )
+        assert result.flag == "INVALID_SPLIT"
+        assert not result.passed
+
+    def test_invalid_json_fails_closed(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path, n=40)
+        (split_dir / "val.json").write_text("{")
+
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            model_fn=_dummy_model_fn_pass,
+        )
+        assert result.flag == "INVALID_SPLIT"
+        assert not result.passed
+
     def test_wrong_prediction_count_fails_closed(self, tmp_path: Path) -> None:
         split_dir = _make_splits(tmp_path, n=40)
         result = evaluate_cnn_checkpoint(
