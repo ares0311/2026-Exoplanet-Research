@@ -73,8 +73,9 @@ When the user must take an action to unblock a gap:
 | Item | State |
 |---|---|
 | TESS v2 snippets (`data/tess_snippets_v2.jsonl`) | **COMPLETE** — 2,619 snippets on user's Mac |
-| Kepler snippets (`data/kepler_snippets.jsonl`) | **REJECTED** — 7,454 rows but 7,132 rows had non-finite flux |
-| CNN training pipeline | **BLOCKED** — rebuild Kepler JSONL with finite-flux fetcher before split/training |
+| Kepler snippets (`data/kepler_snippets.jsonl`) | **LOCAL VALIDATED** — 6,837 finite snippets on user's Mac; 617 KOI signatures absent/pending failure-sidecar review |
+| Kepler CNN splits (`data/kepler_cnn_splits/`) | **LOCAL VALIDATED** — validator PASS; train/val/test = 4,741 / 1,060 / 1,036 |
+| CNN training pipeline | **UNBLOCKED TO KEPLER PRETRAINING** — train from validated Kepler splits before TESS fine-tuning |
 | XGBoost Tier 1 | Done |
 | Stacking Tier 3 scaffold | Done |
 
@@ -84,23 +85,26 @@ If the user is at the Mac, ask them to run these commands and paste the output:
 
 ```bash
 git pull --ff-only origin main
-wc -l data/kepler_snippets.jsonl
-ps aux | grep fetch_kepler | grep -v grep
+wc -l data/kepler_snippets.jsonl data/tess_snippets_v2.jsonl
+.venv/bin/python Skills/cnn_split_validator.py data/kepler_cnn_splits
 ```
 
-- Line count = **7,454** on the pre-fix file → do **not** train; follow `docs/CNN_PRODUCTION_RUNBOOK.md` Step 1 to preserve and rebuild the Kepler JSONL.
-- Line count = **7,454** and a fetch wrapper is still alive → stop it before rebuilding; the old corpus is not training-ready.
-- Line count < **7,454** and process **alive** → still running; tell the user to let it finish and check back.
-- Line count < **7,454** and **no process** → download died; give the user this single-line restart command (single line — do NOT use backslash continuations). The bounded worker count keeps MAST pressure low while avoiding the old strictly serial path:
+- If Kepler is **6,837** and the split validator reports **PASS**, do **not**
+  rerun the fetch loop; proceed to `docs/CNN_PRODUCTION_RUNBOOK.md` Step 3.
+- If the user intentionally wants to retry missing Kepler rows, use one bounded
+  fetch run, not an infinite shell wrapper:
 
 ```
-caffeinate -dims bash -c 'while true; do .venv/bin/python Skills/fetch_kepler_lc_snippets.py --output data/kepler_snippets.jsonl --workers 3 --request-delay 0.5; echo "[$(date +%T)] Ended. Resuming in 30s..."; sleep 30; done'
+caffeinate -dims .venv/bin/python Skills/fetch_kepler_lc_snippets.py --output data/kepler_snippets.jsonl --workers 3 --request-delay 0.5 --retry-failures
 ```
 
 `fetch_kepler_lc_snippets.py` groups pending KOIs by `kepid`, fetches each KIC
 light curve once, folds all KOIs for that star locally, and writes JSONL from
 the main process only. Resume uses `(kepid, period, epoch, label)`, not just
-`kepid`, so multi-KOI systems are not skipped accidentally.
+`kepid`, so multi-KOI systems are not skipped accidentally. Resume also uses
+`data/kepler_snippets.jsonl.failures.jsonl` as a durable sidecar for terminal
+failures; ordinary reruns must skip both successful snippets and terminal
+failures. Use `--retry-failures` only when explicitly rechecking missing rows.
 
 ### CNN production runbook
 
@@ -125,9 +129,14 @@ Large training data files are stored on the user's local Mac and are **never com
 | File | Status | Description |
 |---|---|---|
 | `data/tess_snippets_v2.jsonl` | **COMPLETE** — 2,619 snippets | TESS phase-folded snippets; merged from two download runs; 56 targets had permanent MAST 404s |
-| `data/kepler_snippets.jsonl` | **REJECTED** — 7,454 rows but 7,132 non-finite flux rows as of 2026-06-17 | Preserve as `data/kepler_snippets_nan_corrupt_20260617.jsonl`, then rebuild with the fixed fetcher |
+| `data/kepler_snippets.jsonl` | **LOCAL VALIDATED** — 6,837 finite snippets as of 2026-06-17 | JSON parse PASS; zero non-finite flux rows; zero duplicate resume keys; split validator PASS |
 
-The Kepler download uses `author="Kepler"` (prevents HLSP/IRIS cache corruption) and `socket.setdefaulttimeout(120)` (prevents WiFi-drop hangs). It resumes automatically from where it left off. The optimized path groups pending KOIs by `kepid`, fetches each KIC once, filters non-finite time/flux samples before phase binning, and supports polite bounded concurrency via `--workers 3 --request-delay 0.5`.
+The Kepler download uses `author="Kepler"` (prevents HLSP/IRIS cache corruption) and `socket.setdefaulttimeout(120)` (prevents WiFi-drop hangs). It resumes automatically from durable success keys plus the failure sidecar. The optimized path groups pending KOIs by `kepid`, fetches each KIC once, filters non-finite time/flux samples before phase binning, and supports polite bounded concurrency via `--workers 3 --request-delay 0.5`.
+
+Any long-running local data pull must have durable resume state for both
+successful outputs and terminal failures. Console progress is not a checkpoint.
+If rerunning a downloader reprocesses completed or terminally failed work by
+default, stop and fix resume state before asking the human to run it again.
 
 **Do not assume these files are present on the agent's server.** They exist only
 on the user's Mac. If the user is away from the Mac, agent-side work is limited

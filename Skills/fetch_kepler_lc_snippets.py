@@ -29,7 +29,7 @@ import re
 import socket
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from datetime import datetime
@@ -95,7 +95,11 @@ class KicGroupResult:
     kepid: int
     row_indices: tuple[int, ...]
     records: tuple[dict, ...]
+    failures: tuple[dict, ...]
     flags: tuple[str, ...]
+
+
+_TERMINAL_FAILURE_FLAGS = frozenset({"NO_DATA", "SHORT", "NONFINITE"})
 
 
 # ---------------------------------------------------------------------------
@@ -412,6 +416,34 @@ def _completed_keys(output_path: Path) -> set[tuple[int, float, float, int]]:
     return completed
 
 
+def _terminal_failure_keys(failure_log_path: Path) -> set[tuple[int, float, float, int]]:
+    failures: set[tuple[int, float, float, int]] = set()
+    if not failure_log_path.exists():
+        return failures
+    with failure_log_path.open(encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+                if row.get("flag") not in _TERMINAL_FAILURE_FLAGS:
+                    continue
+                failures.add(_key_from_mapping(row))
+            except (json.JSONDecodeError, TypeError, ValueError):
+                pass
+    return failures
+
+
+def _key_from_mapping(row: dict) -> tuple[int, float, float, int]:
+    return (
+        int(row.get("kepid", -1)),
+        round(float(row.get("period_days", 0.0)), 12),
+        round(float(row.get("epoch_bjd", 0.0)), 8),
+        int(row.get("label", -1)),
+    )
+
+
 def _group_tasks_by_kic(tasks: list[KoiTask]) -> list[list[KoiTask]]:
     groups: dict[int, list[KoiTask]] = {}
     for task in tasks:
@@ -433,6 +465,20 @@ def _record_from_result(result: KoiSnippetResult, task: KoiTask) -> dict:
         "period_days": task.period_days,
         "epoch_bjd": task.epoch_bjd,
         "n_bins": task.n_bins,
+    }
+
+
+def _failure_record(task: KoiTask, flag: str) -> dict:
+    return {
+        "kepid": task.kepid,
+        "kepoi_name": task.kepoi_name,
+        "label": task.label,
+        "period_days": task.period_days,
+        "epoch_bjd": task.epoch_bjd,
+        "n_bins": task.n_bins,
+        "row_index": task.row_index,
+        "flag": flag,
+        "terminal": flag in _TERMINAL_FAILURE_FLAGS,
     }
 
 
@@ -493,6 +539,7 @@ def _process_kic_group(
             kepid=task0.kepid,
             row_indices=tuple(task.row_index for task in tasks),
             records=(),
+            failures=tuple(_failure_record(task, f"ERROR:{exc}") for task in tasks),
             flags=tuple(f"ERROR:{exc}" for _task in tasks),
         )
 
@@ -507,23 +554,34 @@ def _process_kic_group(
             kepid=task0.kepid,
             row_indices=tuple(task.row_index for task in tasks),
             records=(),
+            failures=tuple(_failure_record(task, flag) for task in tasks),
             flags=tuple(flag for _task in tasks),
         )
 
     time_bjd, flux = fetched
     records: list[dict] = []
+    failures: list[dict] = []
     flags: list[str] = []
     for task in tasks:
         result = _result_from_curve(task, time_bjd, flux)
         flags.append(result.flag)
         if result.flag == "OK":
             records.append(_record_from_result(result, task))
+        else:
+            failures.append(_failure_record(task, result.flag))
     return KicGroupResult(
         kepid=task0.kepid,
         row_indices=tuple(task.row_index for task in tasks),
         records=tuple(records),
+        failures=tuple(failures),
         flags=tuple(flags),
     )
+
+
+def _default_failure_log_path(output_path: Path) -> Path:
+    if output_path.suffix:
+        return output_path.with_suffix(output_path.suffix + ".failures.jsonl")
+    return output_path.with_name(output_path.name + ".failures.jsonl")
 
 
 # ---------------------------------------------------------------------------
@@ -541,6 +599,8 @@ def build_kepler_snippets(
     max_errors: int = 50,
     workers: int = 1,
     request_delay: float = 0.25,
+    failure_log_path: Path | None = None,
+    retry_failures: bool = False,
 ) -> int:
     """Build phase-folded CNN snippets for a list of KOI rows.
 
@@ -557,20 +617,31 @@ def build_kepler_snippets(
         max_errors: Abort after this many consecutive failed KIC groups.
         workers: Bounded thread count for concurrent KIC fetches.
         request_delay: Delay between worker submissions when ``workers > 1``.
+        failure_log_path: JSONL sidecar for failed KOI signatures.
+        retry_failures: Reprocess terminal failures already listed in
+            ``failure_log_path``.
 
     Returns:
         Number of snippets written.
     """
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    failure_log_path = failure_log_path or _default_failure_log_path(output_path)
+    failure_log_path.parent.mkdir(parents=True, exist_ok=True)
 
     completed = _completed_keys(output_path) if resume else set()
+    terminal_failures = (
+        _terminal_failure_keys(failure_log_path)
+        if resume and not retry_failures
+        else set()
+    )
     tasks = [
         task
         for index, row in enumerate(koi_rows, 1)
         if (task := _task_from_row(row, index, n_bins)) is not None
     ]
-    pending_tasks = [task for task in tasks if not (resume and _task_key(task) in completed)]
+    done_keys = completed | terminal_failures
+    pending_tasks = [task for task in tasks if not (resume and _task_key(task) in done_keys)]
     task_groups = _group_tasks_by_kic(pending_tasks)
     n_total = len(tasks)
     n_written = 0
@@ -581,16 +652,19 @@ def build_kepler_snippets(
 
     _safe_print(
         f"Building Kepler snippets: {n_total} valid KOIs  resume={resume}  "
-        f"already_done={len(completed)}  pending={len(pending_tasks)}  "
+        f"already_done={len(completed)}  terminal_failures={len(terminal_failures)}  "
+        f"pending={len(pending_tasks)}  "
         f"kic_groups={len(task_groups)}  workers={workers}  output={output_path}"
     )
 
     write_mode = "a" if resume else "w"
-    with output_path.open(write_mode, encoding="utf-8") as fh:
+    with output_path.open(write_mode, encoding="utf-8") as fh, failure_log_path.open(
+        write_mode, encoding="utf-8"
+    ) as failure_fh:
         if workers == 1:
             for group_index, group in enumerate(task_groups, 1):
                 group_result = _process_kic_group(group, lc_fetcher=lc_fetcher)
-                wrote, failed = _write_group_result(fh, group_result)
+                wrote, failed = _write_group_result(fh, failure_fh, group_result)
                 n_written += wrote
                 n_errors += failed
                 consecutive_errors = 0 if wrote else consecutive_errors + failed
@@ -632,7 +706,7 @@ def build_kepler_snippets(
                         in_flight.pop(future)
                         group_result = future.result()
                         completed_groups += 1
-                        wrote, failed = _write_group_result(fh, group_result)
+                        wrote, failed = _write_group_result(fh, failure_fh, group_result)
                         n_written += wrote
                         n_errors += failed
                         consecutive_errors = 0 if wrote else consecutive_errors + failed
@@ -670,14 +744,28 @@ def build_kepler_snippets(
     return n_written
 
 
-def _write_group_result(handle, group_result: KicGroupResult) -> tuple[int, int]:
+def _write_group_result(
+    handle,
+    failure_handle,
+    group_result: KicGroupResult,
+) -> tuple[int, int]:
     for record in group_result.records:
         handle.write(json.dumps(record) + "\n")
     if group_result.records:
         handle.flush()
+    _write_failure_records(failure_handle, group_result.failures)
     return len(group_result.records), sum(
         1 for flag in group_result.flags if flag != "OK"
     )
+
+
+def _write_failure_records(handle, failures: Iterable[dict]) -> None:
+    wrote = False
+    for failure in failures:
+        handle.write(json.dumps(failure) + "\n")
+        wrote = True
+    if wrote:
+        handle.flush()
 
 
 def _print_group_progress(
@@ -763,6 +851,21 @@ def _cli(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--failure-log",
+        type=Path,
+        default=None,
+        metavar="JSONL",
+        help=(
+            "Failure sidecar JSONL. Defaults to OUTPUT.failures.jsonl and is "
+            "used by --resume to skip terminal failures."
+        ),
+    )
+    parser.add_argument(
+        "--retry-failures",
+        action="store_true",
+        help="Retry terminal failures from the failure sidecar instead of skipping them.",
+    )
+    parser.add_argument(
         "--no-resume", action="store_true",
         help="Start fresh even if output file exists",
     )
@@ -789,6 +892,8 @@ def _cli(argv: list[str] | None = None) -> int:
         max_errors=args.max_errors,
         workers=args.workers,
         request_delay=args.request_delay,
+        failure_log_path=args.failure_log,
+        retry_failures=args.retry_failures,
     )
     _safe_print(f"Flag: OK  snippets_written={n}")
     return 0

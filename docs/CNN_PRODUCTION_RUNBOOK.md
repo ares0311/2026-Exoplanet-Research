@@ -16,15 +16,18 @@ Production gates:
 
 ## Current State
 
-- `data/kepler_snippets.jsonl`: rejected on 2026-06-17 despite `7454` rows.
-  The file contained non-finite flux values in `7132` rows; after finite-value
-  filtering only `322` examples remained, which is not enough for transfer
-  learning.
+- `data/kepler_snippets.jsonl`: locally validated on 2026-06-17 with `6837`
+  parseable finite snippets, zero duplicate resume keys, labels negative=4,280
+  and positive=2,557.
+- `data/kepler_cnn_splits`: locally validated on 2026-06-17 with validator
+  PASS; train/val/test = 4,741 / 1,060 / 1,036.
 - Tiny corrupt Kepler Lightkurve cache files were moved to
   `$HOME/.lightkurve/cache/quarantine_corrupt_kepler_fits`.
-- Fetch and split code now rejects non-finite flux, reconstructs the phase grid
-  for Kepler snippets, and groups Kepler KOIs by `kepid` to avoid split leakage.
-- Next human-at-Mac action: rebuild the Kepler JSONL with the fixed fetcher.
+- Fetch and split code rejects non-finite flux, reconstructs the phase grid
+  for Kepler snippets, groups Kepler KOIs by `kepid` to avoid split leakage,
+  and records terminal fetch failures in a JSONL sidecar so ordinary resume
+  does not reprocess failed rows forever.
+- Next human-at-Mac action: run Kepler pretraining from the validated splits.
 - After every local artifact state change, update the artifact ledger so agents
   that can only see GitHub know whether the corpus, splits, checkpoint, or
   promotion gate is missing, pending, valid, rejected, or approved.
@@ -34,29 +37,33 @@ Production gates:
 ```bash
 git pull --ff-only origin main
 .venv/bin/python -c "import sys, torch; assert sys.version_info[:3] == (3,14,3); assert sys.prefix != sys.base_prefix; print(sys.executable); print(torch.__version__)"
+.venv/bin/python Skills/cnn_split_validator.py data/kepler_cnn_splits
 wc -l data/kepler_snippets.jsonl data/tess_snippets_v2.jsonl
 ```
 
 Paste back the Python path, Torch version, and line counts if anything differs
-from Python `3.14.3`, venv Python, Kepler `7454`, or TESS `2619`.
+from Python `3.14.3`, venv Python, Kepler `6837`, TESS `2619`, or Kepler
+split validator `PASS`.
 
-## Step 1: Rebuild Kepler JSONL
+## Step 1: Optional Kepler Missing-Row Retry
 
-The previous `7454`-row file must not be used for training. Preserve it for
-forensics, then rebuild from cached/downloaded Kepler light curves with finite
-time/flux filtering enabled.
+Skip this step when `data/kepler_snippets.jsonl` has `6837` rows and
+`data/kepler_cnn_splits` validates. The current corpus is finite and usable for
+Kepler pretraining.
+
+If a human explicitly wants to retry missing rows, run one bounded fetch. Do
+not use an infinite shell wrapper. Ordinary resume skips successful snippets
+and terminal failures from `data/kepler_snippets.jsonl.failures.jsonl`; use
+`--retry-failures` only for an intentional recheck.
 
 ```bash
 git pull --ff-only origin main
-mv data/kepler_snippets.jsonl data/kepler_snippets_nan_corrupt_20260617.jsonl
-caffeinate -dims .venv/bin/python Skills/fetch_kepler_lc_snippets.py --output data/kepler_snippets.jsonl --workers 3 --request-delay 0.5 --no-resume
+caffeinate -dims .venv/bin/python Skills/fetch_kepler_lc_snippets.py --output data/kepler_snippets.jsonl --workers 3 --request-delay 0.5 --retry-failures
 wc -l data/kepler_snippets.jsonl
 ```
 
-Stop and paste back the final fetch summary and line count. Do not build splits
-unless the fetch reports `Flag: OK` and the line count is close to the expected
-KOI table size. After agent review, update the artifact ledger with row counts,
-finite-filter counts when available, and fetch status.
+Stop and paste back the final fetch summary and line count. After agent review,
+rebuild and validate splits if the line count changed.
 
 ## Step 2: Build Kepler Splits
 
@@ -66,9 +73,10 @@ caffeinate -i .venv/bin/python Skills/build_cnn_training_data.py data/kepler_sni
 .venv/bin/python Skills/cnn_split_validator.py data/kepler_cnn_splits
 ```
 
-Stop and paste back the split summary and validator result. Do not train if the
-validator does not report `PASS`. After agent review, update the artifact
-ledger with split counts and validator status.
+This step already passed locally on 2026-06-17 for the 6,837-row Kepler JSONL.
+Rerun it only if the Kepler JSONL changes. Do not train if the validator does
+not report `PASS`. After agent review, update the artifact ledger with split
+counts and validator status.
 
 ## Step 3: Kepler Pretraining
 

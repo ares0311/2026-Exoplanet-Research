@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 from Skills.fetch_kepler_lc_snippets import (
+    _default_failure_log_path,
     _format_flags,
     _mad,
     _median,
@@ -309,6 +310,106 @@ class TestBuildKeplerSnippets:
 
         assert n == 0
         assert not out.read_text().strip()
+
+    def test_terminal_failures_are_logged_and_skipped_on_resume(
+        self, tmp_path: Path
+    ) -> None:
+        koi_rows = self._make_koi_rows(1)
+        out = tmp_path / "kepler_snippets.jsonl"
+
+        def short_fetcher(kepid, period, epoch):
+            return [0.0, 1.0], [1.0, 1.0]
+
+        n = build_kepler_snippets(
+            koi_rows,
+            n_bins=11,
+            output_path=out,
+            lc_fetcher=short_fetcher,
+            resume=False,
+            max_errors=10,
+        )
+
+        failure_log = _default_failure_log_path(out)
+        failure_records = [json.loads(line) for line in failure_log.read_text().splitlines()]
+        assert n == 0
+        assert failure_records[0]["flag"] == "SHORT"
+        assert failure_records[0]["terminal"] is True
+
+        n = build_kepler_snippets(
+            koi_rows,
+            n_bins=11,
+            output_path=out,
+            lc_fetcher=self._make_fetcher(),
+            resume=True,
+            max_errors=10,
+        )
+
+        assert n == 0
+        assert not out.read_text().strip()
+
+    def test_retry_failures_reprocesses_terminal_failure_sidecar(
+        self, tmp_path: Path
+    ) -> None:
+        koi_rows = self._make_koi_rows(1)
+        out = tmp_path / "kepler_snippets.jsonl"
+
+        def short_fetcher(kepid, period, epoch):
+            return [0.0, 1.0], [1.0, 1.0]
+
+        build_kepler_snippets(
+            koi_rows,
+            n_bins=11,
+            output_path=out,
+            lc_fetcher=short_fetcher,
+            resume=False,
+            max_errors=10,
+        )
+
+        n = build_kepler_snippets(
+            koi_rows,
+            n_bins=11,
+            output_path=out,
+            lc_fetcher=self._make_fetcher(),
+            resume=True,
+            max_errors=10,
+            retry_failures=True,
+        )
+
+        assert n == 1
+        assert len([line for line in out.read_text().splitlines() if line]) == 1
+
+    def test_retryable_errors_are_not_skipped_by_resume(self, tmp_path: Path) -> None:
+        koi_rows = self._make_koi_rows(1)
+        out = tmp_path / "kepler_snippets.jsonl"
+
+        def broken_fetcher(kepid, period, epoch):
+            raise RuntimeError("temporary network failure")
+
+        n = build_kepler_snippets(
+            koi_rows,
+            n_bins=11,
+            output_path=out,
+            lc_fetcher=broken_fetcher,
+            resume=False,
+            max_errors=10,
+        )
+
+        failure_log = _default_failure_log_path(out)
+        failure_records = [json.loads(line) for line in failure_log.read_text().splitlines()]
+        assert n == 0
+        assert failure_records[0]["flag"].startswith("ERROR:")
+        assert failure_records[0]["terminal"] is False
+
+        n = build_kepler_snippets(
+            koi_rows,
+            n_bins=11,
+            output_path=out,
+            lc_fetcher=self._make_fetcher(),
+            resume=True,
+            max_errors=10,
+        )
+
+        assert n == 1
 
     def test_no_resume_overwrites(self, tmp_path: Path) -> None:
         out = tmp_path / "out.jsonl"
