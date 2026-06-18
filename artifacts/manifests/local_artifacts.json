@@ -29,17 +29,38 @@
     {
       "path": "data/kepler_snippets.jsonl",
       "kind": "source_corpus",
-      "status": "rebuild_required_current_snapshot_absent",
+      "status": "local_validated_source",
       "git_policy": "ignored",
       "last_known": {
         "pre_fix_rejected_rows": 7454,
         "pre_fix_rejected_nonfinite_flux_rows": 7132,
         "finite_rows_after_filtering": 322,
-        "current_checkout_file_present": false,
+        "rows": 6837,
+        "positive_labels": 2557,
+        "negative_labels": 4280,
+        "json_errors": 0,
+        "nonfinite_flux_rows": 0,
+        "duplicate_resume_keys": 0,
+        "unique_kepid": 5980,
+        "missing_or_unresolved_koi_signatures": 617,
+        "current_checkout_file_present": true,
         "verified_on": "2026-06-17"
       },
-      "validation_gate": "Fetch must report Flag: OK; then build data/kepler_cnn_splits and require Skills/cnn_split_validator.py PASS.",
-      "next_action": "Run docs/CNN_PRODUCTION_RUNBOOK.md Step 1 on the local Mac."
+      "validation_gate": "data/kepler_cnn_splits validated PASS on 2026-06-17.",
+      "next_action": "Run docs/CNN_PRODUCTION_RUNBOOK.md Step 3 for Kepler pretraining."
+    },
+    {
+      "path": "data/kepler_snippets.jsonl.failures.jsonl",
+      "kind": "fetch_failure_sidecar",
+      "status": "expected_for_future_fetches",
+      "git_policy": "ignored",
+      "last_known": {
+        "current_validated_corpus_predates_sidecar": true,
+        "missing_or_unresolved_koi_signatures": 617,
+        "verified_on": "2026-06-17"
+      },
+      "validation_gate": "Future Kepler fetch reruns must skip terminal failures by default and retry them only with --retry-failures.",
+      "next_action": "Do not run another infinite fetch wrapper; use one bounded fetch only for intentional missing-row retry."
     },
     {
       "path": "data/kepler_snippets_nan_corrupt_20260617.jsonl",
@@ -52,10 +73,24 @@
     {
       "path": "data/kepler_cnn_splits/",
       "kind": "cnn_split",
-      "status": "pending_regeneration",
+      "status": "local_validated",
       "git_policy": "ignored",
-      "validation_gate": "Skills/cnn_split_validator.py data/kepler_cnn_splits must report PASS.",
-      "next_action": "Generate after rebuilt Kepler JSONL fetch completes."
+      "last_known": {
+        "total_examples": 6837,
+        "train": 4741,
+        "val": 1060,
+        "test": 1036,
+        "train_negative": 2984,
+        "train_positive": 1757,
+        "val_negative": 653,
+        "val_positive": 407,
+        "test_negative": 643,
+        "test_positive": 393,
+        "validator_status": "PASS",
+        "verified_on": "2026-06-17"
+      },
+      "validation_gate": "Skills/cnn_split_validator.py data/kepler_cnn_splits reported PASS on 2026-06-17.",
+      "next_action": "Run Kepler pretraining from data/kepler_cnn_splits."
     },
     {
       "path": "data/tess_cnn_splits/",

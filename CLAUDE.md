@@ -1166,40 +1166,40 @@ These large data files live only on the user's local Mac. They are never committ
 | File | Location | Status | Notes |
 |---|---|---|---|
 | `data/tess_snippets_v2.jsonl` | Local Mac | **COMPLETE** — 2,619 snippets | Merged from `tess_snippets.jsonl` + `tess_snippets_expansion.jsonl`; 56 targets had permanent MAST 404s and were skipped |
-| `data/kepler_snippets.jsonl` | Local Mac | **REJECTED** — 7,454 rows but 7,132 non-finite flux rows as of 2026-06-17 | Preserve as `data/kepler_snippets_nan_corrupt_20260617.jsonl`, then rebuild with the fixed fetcher |
+| `data/kepler_snippets.jsonl` | Local Mac | **LOCAL VALIDATED** — 6,837 finite snippets as of 2026-06-17 | JSON parse PASS; zero non-finite flux rows; zero duplicate resume keys; split validator PASS |
 
-**Kepler download auto-restart command** (only if the file is below 7,454 rows and no fetch process is alive):
+**Kepler retry command** (only if the human explicitly wants to retry missing
+rows after the validated split; do not use an infinite wrapper):
 ```
-caffeinate -dims bash -c 'while true; do .venv/bin/python Skills/fetch_kepler_lc_snippets.py --output data/kepler_snippets.jsonl --workers 3 --request-delay 0.5; echo "[$(date +%T)] Ended. Resuming in 30s..."; sleep 30; done'
+caffeinate -dims .venv/bin/python Skills/fetch_kepler_lc_snippets.py --output data/kepler_snippets.jsonl --workers 3 --request-delay 0.5 --retry-failures
 ```
-This command uses `author="Kepler"` to skip HLSP/IRIS corrupted cache files and `socket.setdefaulttimeout(120)` to prevent indefinite hangs on WiFi drops. Resume is automatic. The optimized fetcher groups pending KOIs by `kepid`, fetches each KIC light curve once, filters non-finite time/flux samples before phase binning, folds all KOIs for that star locally, writes JSONL from the main process only, and uses `(kepid, period, epoch, label)` as the resume key so multi-KOI systems are not skipped accidentally.
+This command uses `author="Kepler"` to skip HLSP/IRIS corrupted cache files and `socket.setdefaulttimeout(120)` to prevent indefinite hangs on WiFi drops. Resume is automatic from successful JSONL records plus `data/kepler_snippets.jsonl.failures.jsonl`. The optimized fetcher groups pending KOIs by `kepid`, fetches each KIC light curve once, filters non-finite time/flux samples before phase binning, folds all KOIs for that star locally, writes JSONL from the main process only, and uses `(kepid, period, epoch, label)` as the resume key so multi-KOI systems are not skipped accidentally.
+
+Any long-running local data pull must checkpoint both successful outputs and
+terminal failures. Console progress is not resume state. If rerunning a
+downloader reprocesses completed or terminally failed work by default, stop and
+fix the durable resume ledger before asking the human to run it again.
 
 ### Next Step — HANDOFF 2026-06-17
 
-**Status: pre-fix Kepler corpus rejected; rebuild Kepler JSONL before CNN training.**
+**Status: Kepler JSONL and split are locally validated; proceed to Kepler pretraining.**
 
 #### Incoming agent: do this first
 
 Ask the user to paste the output of:
 ```bash
 git pull --ff-only origin main
-wc -l data/kepler_snippets.jsonl
-ps aux | grep fetch_kepler | grep -v grep
+wc -l data/kepler_snippets.jsonl data/tess_snippets_v2.jsonl
+.venv/bin/python Skills/cnn_split_validator.py data/kepler_cnn_splits
 ```
 
-- **7,454 lines on the pre-fix file** → do **not** train; follow `docs/CNN_PRODUCTION_RUNBOOK.md` Step 1 to preserve and rebuild the Kepler JSONL.
-- **7,454 lines, fetch wrapper alive** → stop the wrapper before rebuilding; the old corpus is not training-ready.
-- **< 7,454, process alive** → still running; wait and check back when done.
-- **< 7,454, no process found** → died; give the user this single line to restart (no backslash continuations — paste as one line):
-
-```
-caffeinate -dims bash -c 'while true; do .venv/bin/python Skills/fetch_kepler_lc_snippets.py --output data/kepler_snippets.jsonl --workers 3 --request-delay 0.5; echo "[$(date +%T)] Ended. Resuming in 30s..."; sleep 30; done'
-```
+- **6,837 Kepler lines and split validator PASS** → proceed to `docs/CNN_PRODUCTION_RUNBOOK.md` Step 3 for Kepler pretraining.
+- **Any other Kepler line count or validator FAIL** → stop and inspect the local artifact before training; do not start another infinite fetch loop.
 
 #### Corpus status
 
 - **TESS v2**: `data/tess_snippets_v2.jsonl` — 2,619 snippets (COMPLETE; 56 targets had permanent MAST 404s)
-- **Kepler**: `data/kepler_snippets.jsonl` — REJECTED as of 2026-06-17; 7,454 rows existed but 7,132 contained non-finite flux, leaving only 322 finite examples after filtering
+- **Kepler**: `data/kepler_snippets.jsonl` — LOCAL VALIDATED as of 2026-06-17; 6,837 finite snippets; labels negative=4,280 and positive=2,557; split validator PASS with train/val/test = 4,741 / 1,060 / 1,036
 
 #### CNN production runbook
 
