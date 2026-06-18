@@ -1,4 +1,5 @@
 """Tests for Skills/cnn_threshold_optimizer.py"""
+import math
 import sys
 from pathlib import Path
 
@@ -48,6 +49,46 @@ def test_empty_invalid():
 
 def test_mismatched_lengths_invalid():
     r = optimize_threshold([1, 0], [0.9])
+    assert r.flag == "INVALID"
+
+
+def test_unknown_objective_invalid():
+    r = optimize_threshold(_Y_TRUE, _Y_SCORE, objective="accuracy")
+    assert r.flag == "INVALID"
+
+
+def test_zero_steps_invalid():
+    r = optimize_threshold(_Y_TRUE, _Y_SCORE, n_steps=0)
+    assert r.flag == "INVALID"
+
+
+def test_negative_steps_invalid():
+    r = optimize_threshold(_Y_TRUE, _Y_SCORE, n_steps=-1)
+    assert r.flag == "INVALID"
+
+
+def test_non_binary_label_invalid():
+    r = optimize_threshold([1, 2, 0], [0.9, 0.8, 0.1])
+    assert r.flag == "INVALID"
+
+
+def test_bool_label_invalid():
+    r = optimize_threshold([True, 0, 1], [0.9, 0.2, 0.8])  # type: ignore[list-item]
+    assert r.flag == "INVALID"
+
+
+def test_nan_score_invalid():
+    r = optimize_threshold([1, 0], [math.nan, 0.2])
+    assert r.flag == "INVALID"
+
+
+def test_out_of_range_score_invalid():
+    r = optimize_threshold([1, 0], [1.1, 0.2])
+    assert r.flag == "INVALID"
+
+
+def test_string_score_invalid():
+    r = optimize_threshold([1, 0], ["0.9", 0.2])  # type: ignore[list-item]
     assert r.flag == "INVALID"
 
 
