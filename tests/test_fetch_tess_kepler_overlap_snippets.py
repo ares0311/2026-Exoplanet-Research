@@ -1,0 +1,313 @@
+"""Tests for fetch_tess_kepler_overlap_snippets.py."""
+from __future__ import annotations
+
+import json
+
+from Skills.fetch_tess_kepler_overlap_snippets import (
+    KoiRow,
+    _normalise,
+    _phase_fold_bin,
+    build_koi_tess_snippet,
+    build_koi_tess_snippets,
+    fetch_koi_table,
+)
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+_CONFIRMED_ROW = KoiRow(
+    kepid=757099,
+    kepoi_name="K00001.01",
+    disposition="CONFIRMED",
+    period_days=2.4706,
+    epoch_bkjd=120.7285,
+)
+
+_FP_ROW = KoiRow(
+    kepid=1026032,
+    kepoi_name="K00002.01",
+    disposition="FALSE POSITIVE",
+    period_days=2.2047,
+    epoch_bkjd=65.9417,
+)
+
+
+def _make_lc_fetcher(n_points: int = 500):
+    """Injectable fetcher returning a flat sinusoid in full BJD."""
+    import math
+
+    def fetcher(kepid: int, period: float, epoch_bjd: float):
+        # Simple flat signal with a tiny transit dip at phase 0.
+        time_bjd = [epoch_bjd + i * period / n_points for i in range(n_points)]
+        flux = []
+        for t in time_bjd:
+            ph = ((t - epoch_bjd) % period) / period
+            ph = ph - 1.0 if ph >= 0.5 else ph
+            flux.append(1.0 - 0.01 * math.exp(-200 * ph**2))
+        return time_bjd, flux
+
+    return fetcher
+
+
+def _no_data_fetcher(kepid: int, period: float, epoch_bjd: float):
+    return None
+
+
+def _error_fetcher(kepid: int, period: float, epoch_bjd: float):
+    raise RuntimeError("network failure")
+
+
+# ---------------------------------------------------------------------------
+# _phase_fold_bin
+# ---------------------------------------------------------------------------
+
+
+def test_phase_fold_bin_length():
+    time = [float(i) for i in range(100)]
+    flux = [1.0] * 100
+    result = _phase_fold_bin(time, flux, period=10.0, epoch=0.0, n_bins=20)
+    assert len(result) == 20
+
+
+def test_phase_fold_bin_skips_nonfinite():
+    import math
+    time = [0.0, float("nan"), 2.0]
+    flux = [1.0, 1.0, 1.0]
+    result = _phase_fold_bin(time, flux, period=5.0, epoch=0.0, n_bins=10)
+    assert len(result) == 10
+    assert all(math.isfinite(v) for v in result)
+
+
+def test_phase_fold_bin_empty_bin_defaults_to_one():
+    # Only one point; all other bins should default to 1.0.
+    result = _phase_fold_bin([0.0], [0.5], period=10.0, epoch=0.0, n_bins=5)
+    filled = [v for v in result if v != 1.0]
+    empty = [v for v in result if v == 1.0]
+    assert len(filled) == 1
+    assert len(empty) == 4
+
+
+# ---------------------------------------------------------------------------
+# _normalise
+# ---------------------------------------------------------------------------
+
+
+def test_normalise_length():
+    result = _normalise([1.0, 1.1, 0.9, 1.05, 0.95])
+    assert len(result) == 5
+
+
+def test_normalise_rejects_nonfinite():
+    result = _normalise([1.0, float("nan"), 0.9])
+    assert result == []
+
+
+def test_normalise_constant_returns_zeros():
+    result = _normalise([1.0] * 10)
+    assert result == [0.0] * 10
+
+
+# ---------------------------------------------------------------------------
+# KoiRow label derivation
+# ---------------------------------------------------------------------------
+
+
+def test_confirmed_row_gives_label_1():
+    fetcher = _make_lc_fetcher()
+    r = build_koi_tess_snippet(_CONFIRMED_ROW, n_bins=201, lc_fetcher=fetcher)
+    assert r.label == 1
+
+
+def test_fp_row_gives_label_0():
+    fetcher = _make_lc_fetcher()
+    r = build_koi_tess_snippet(_FP_ROW, n_bins=201, lc_fetcher=fetcher)
+    assert r.label == 0
+
+
+# ---------------------------------------------------------------------------
+# build_koi_tess_snippet — happy path
+# ---------------------------------------------------------------------------
+
+
+def test_snippet_ok_flag():
+    r = build_koi_tess_snippet(_CONFIRMED_ROW, n_bins=201, lc_fetcher=_make_lc_fetcher())
+    assert r.flag == "OK"
+
+
+def test_snippet_correct_n_bins():
+    r = build_koi_tess_snippet(_CONFIRMED_ROW, n_bins=201, lc_fetcher=_make_lc_fetcher())
+    assert len(r.flux) == 201
+
+
+def test_snippet_flux_all_finite():
+    import math
+    r = build_koi_tess_snippet(_CONFIRMED_ROW, n_bins=201, lc_fetcher=_make_lc_fetcher())
+    assert all(math.isfinite(v) for v in r.flux)
+
+
+def test_snippet_epoch_bjd_conversion():
+    # epoch_bjd = epoch_bkjd + 2454833
+    r = build_koi_tess_snippet(_CONFIRMED_ROW, n_bins=201, lc_fetcher=_make_lc_fetcher())
+    expected_epoch = _CONFIRMED_ROW.epoch_bkjd + 2454833.0
+    assert abs(r.epoch_bjd - expected_epoch) < 1e-6
+
+
+def test_snippet_period_preserved():
+    r = build_koi_tess_snippet(_CONFIRMED_ROW, n_bins=201, lc_fetcher=_make_lc_fetcher())
+    assert abs(r.period_days - _CONFIRMED_ROW.period_days) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# build_koi_tess_snippet — failure paths
+# ---------------------------------------------------------------------------
+
+
+def test_snippet_no_data_flag():
+    r = build_koi_tess_snippet(_CONFIRMED_ROW, n_bins=201, lc_fetcher=_no_data_fetcher)
+    assert r.flag in {"NO_DATA", "NO_LIGHTKURVE"}
+
+
+def test_snippet_error_flag():
+    r = build_koi_tess_snippet(_CONFIRMED_ROW, n_bins=201, lc_fetcher=_error_fetcher)
+    assert r.flag.startswith("ERROR:")
+
+
+def test_snippet_short_flag():
+    def short_fetcher(kepid, period, epoch_bjd):
+        return [epoch_bjd], [1.0]  # only 1 point — not enough
+
+    r = build_koi_tess_snippet(_CONFIRMED_ROW, n_bins=201, lc_fetcher=short_fetcher)
+    assert r.flag == "SHORT"
+
+
+# ---------------------------------------------------------------------------
+# build_koi_tess_snippets — batch runner
+# ---------------------------------------------------------------------------
+
+
+def test_batch_writes_jsonl(tmp_path):
+    out = tmp_path / "overlap.jsonl"
+    rows = [_CONFIRMED_ROW, _FP_ROW]
+    n = build_koi_tess_snippets(
+        rows, n_bins=201, output_path=out, lc_fetcher=_make_lc_fetcher()
+    )
+    assert n == 2
+    lines = [json.loads(ln) for ln in out.read_text().splitlines() if ln.strip()]
+    assert len(lines) == 2
+
+
+def test_batch_jsonl_fields(tmp_path):
+    out = tmp_path / "overlap.jsonl"
+    build_koi_tess_snippets(
+        [_CONFIRMED_ROW], n_bins=201, output_path=out, lc_fetcher=_make_lc_fetcher()
+    )
+    obj = json.loads(out.read_text().strip())
+    assert "tic_id" in obj
+    assert "label" in obj
+    assert "flux" in obj
+    assert "source" in obj
+    assert obj["source"] == "koi_tess_overlap"
+    assert "kepoi_name" in obj
+
+
+def test_batch_resume_skips_done(tmp_path):
+    out = tmp_path / "overlap.jsonl"
+    rows = [_CONFIRMED_ROW, _FP_ROW]
+    # First run — writes 2 snippets.
+    n1 = build_koi_tess_snippets(
+        rows, n_bins=201, output_path=out, lc_fetcher=_make_lc_fetcher()
+    )
+    assert n1 == 2
+    # Second run — both are already done; should write 0 new snippets.
+    n2 = build_koi_tess_snippets(
+        rows, n_bins=201, output_path=out, lc_fetcher=_make_lc_fetcher()
+    )
+    assert n2 == 0
+    # Total lines should still be 2.
+    lines = [ln for ln in out.read_text().splitlines() if ln.strip()]
+    assert len(lines) == 2
+
+
+def test_batch_max_errors_stops_early(tmp_path):
+    out = tmp_path / "overlap.jsonl"
+    # 5 rows, all will error, max_errors=3.
+    rows = [_CONFIRMED_ROW] * 5
+    n = build_koi_tess_snippets(
+        rows, n_bins=201, output_path=out,
+        lc_fetcher=_error_fetcher, max_errors=3,
+    )
+    assert n == 0
+
+
+def test_batch_creates_parent_dirs(tmp_path):
+    out = tmp_path / "subdir" / "nested" / "out.jsonl"
+    build_koi_tess_snippets(
+        [_CONFIRMED_ROW], n_bins=201, output_path=out, lc_fetcher=_make_lc_fetcher()
+    )
+    assert out.exists()
+
+
+# ---------------------------------------------------------------------------
+# fetch_koi_table — offline unit test with mock server response
+# ---------------------------------------------------------------------------
+
+
+def test_fetch_koi_table_parses_records(tmp_path):
+    mock_data = json.dumps([
+        {
+            "kepid": 757099,
+            "kepoi_name": "K00001.01",
+            "koi_disposition": "CONFIRMED",
+            "koi_period": 2.4706,
+            "koi_time0bk": 120.7285,
+        },
+        {
+            "kepid": 1026032,
+            "kepoi_name": "K00002.01",
+            "koi_disposition": "FALSE POSITIVE",
+            "koi_period": 2.2047,
+            "koi_time0bk": 65.9417,
+        },
+    ])
+    # Write to a temp file and use a file:// URL.
+    f = tmp_path / "koi.json"
+    f.write_text(mock_data, encoding="utf-8")
+    rows = fetch_koi_table(f"file://{f}")
+    assert len(rows) == 2
+    confirmed = [r for r in rows if r.disposition == "CONFIRMED"]
+    fp = [r for r in rows if r.disposition == "FALSE POSITIVE"]
+    assert len(confirmed) == 1
+    assert len(fp) == 1
+
+
+def test_fetch_koi_table_rejects_invalid_disposition(tmp_path):
+    mock_data = json.dumps([
+        {
+            "kepid": 999,
+            "kepoi_name": "K00099.01",
+            "koi_disposition": "CANDIDATE",
+            "koi_period": 5.0,
+            "koi_time0bk": 100.0,
+        },
+    ])
+    f = tmp_path / "koi.json"
+    f.write_text(mock_data, encoding="utf-8")
+    rows = fetch_koi_table(f"file://{f}")
+    assert rows == []
+
+
+def test_fetch_koi_table_rejects_missing_period(tmp_path):
+    mock_data = json.dumps([
+        {
+            "kepid": 999,
+            "kepoi_name": "K00099.01",
+            "koi_disposition": "CONFIRMED",
+            "koi_period": None,
+            "koi_time0bk": 100.0,
+        },
+    ])
+    f = tmp_path / "koi.json"
+    f.write_text(mock_data, encoding="utf-8")
+    rows = fetch_koi_table(f"file://{f}")
+    assert rows == []
