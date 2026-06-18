@@ -47,7 +47,7 @@
         "verified_on": "2026-06-17"
       },
       "validation_gate": "data/kepler_cnn_splits validated PASS on 2026-06-17.",
-      "next_action": "Run docs/CNN_PRODUCTION_RUNBOOK.md Step 3 for Kepler pretraining."
+      "next_action": "Use the completed Kepler MPS pretraining checkpoint for TESS fine-tuning."
     },
     {
       "path": "data/kepler_snippets.jsonl.failures.jsonl",
@@ -103,20 +103,22 @@
     {
       "path": "checkpoints/cnn_kepler_pretrain/",
       "kind": "checkpoint_dir",
-      "status": "local_pretrained",
+      "status": "local_pretrained_mps",
       "git_policy": "ignored",
       "last_known": {
         "checkpoint": "checkpoints/cnn_kepler_pretrain/best.pt",
-        "sha256": "65c49aaa8668fc56b5a466469937bb62beb0acf1680d985c4e570df98d0b7e11",
+        "sha256": "c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7",
         "python": "3.14.3",
         "torch": "2.12.0",
-        "best_epoch": 20,
-        "best_val_loss": 0.384,
-        "best_val_auc": 0.9215,
-        "epochs_run": 35,
-        "final_epoch": 35,
-        "final_val_auc": 0.9113,
-        "produced_before_gpu_aware_trainer": true,
+        "device": "mps",
+        "best_epoch": 19,
+        "best_val_loss": 0.3905,
+        "best_val_auc": 0.9186,
+        "epochs_run": 34,
+        "final_epoch": 34,
+        "final_val_auc": 0.9123,
+        "runtime_seconds": 26,
+        "produced_with_gpu_aware_trainer": true,
         "verified_on": "2026-06-18"
       },
       "validation_gate": "Use as transfer-learning source only; production approval still requires TESS fine-tuning plus evaluator PASS.",
@@ -128,7 +130,7 @@
       "status": "pending_training",
       "git_policy": "ignored",
       "validation_gate": "Skills/evaluate_cnn_checkpoint.py must report Flag: PASS.",
-      "next_action": "Fine-tune only after Kepler pretraining review."
+      "next_action": "Fine-tune from the MPS Kepler pretrain checkpoint after TESS split validation."
     },
     {
       "path": "models/cnn*/",

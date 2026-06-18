@@ -106,14 +106,13 @@ without relying on chat context or local terminal output.
 - Tiny corrupt Kepler Lightkurve cache files were quarantined locally before training resumed.
 - Kepler pretraining completed locally on 2026-06-18:
   `checkpoints/cnn_kepler_pretrain/best.pt`, SHA-256
-  `65c49aaa8668fc56b5a466469937bb62beb0acf1680d985c4e570df98d0b7e11`;
-  best epoch 20, best validation loss 0.3840, best validation AUC 0.9215.
-  This was produced before the GPU-aware trainer patch; future training should
-  use `device=auto` and print the resolved device.
+  `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`;
+  startup banner `device=mps`; best epoch 19, best validation loss 0.3905,
+  best validation AUC 0.9186.
 - Architecture details: `docs/CNN_SPEC.md`.
 - Human local runbook: `docs/CNN_PRODUCTION_RUNBOOK.md`.
 - Next outside blocker: build and validate TESS CNN splits on the user's Mac,
-  then fine-tune from the reviewed Kepler pretraining checkpoint.
+  then fine-tune from the MPS Kepler pretraining checkpoint.
 
 ---
 
