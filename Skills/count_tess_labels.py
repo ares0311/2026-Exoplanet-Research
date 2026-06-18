@@ -52,17 +52,99 @@ _EXIT_GATE_OPEN = 0
 _EXIT_GATE_CLOSED = 1
 _EXIT_ERROR = 2
 
+_LOG_COLUMNS = (
+    "id",
+    "schema_version",
+    "started_at",
+    "finished_at",
+    "elapsed_ms",
+    "source_url",
+    "min_total",
+    "min_positive",
+    "cp",
+    "kp",
+    "fp",
+    "fa",
+    "positive",
+    "negative",
+    "total",
+    "gate_open",
+    "exit_code",
+    "status",
+    "error_message",
+)
+_LOG_COLUMN_SET = set(_LOG_COLUMNS)
 
 _LOG_COLUMN_MIGRATIONS: dict[str, str] = {
     "schema_version": f"INTEGER NOT NULL DEFAULT {_LOG_SCHEMA_VERSION}",
+    "started_at": "TEXT NOT NULL DEFAULT ''",
+    "finished_at": "TEXT NOT NULL DEFAULT ''",
+    "elapsed_ms": "INTEGER NOT NULL DEFAULT 0",
     "source_url": f"TEXT NOT NULL DEFAULT '{_EXOFOP_URL}'",
     "min_total": f"INTEGER NOT NULL DEFAULT {_CNN_MIN_TOTAL}",
     "min_positive": f"INTEGER NOT NULL DEFAULT {_CNN_MIN_POSITIVE}",
+    "cp": "INTEGER",
     "kp": "INTEGER",
+    "fp": "INTEGER",
     "fa": "INTEGER",
+    "positive": "INTEGER",
     "negative": "INTEGER",
+    "total": "INTEGER",
+    "gate_open": "INTEGER",
+    "exit_code": f"INTEGER NOT NULL DEFAULT {_EXIT_ERROR}",
+    "status": "TEXT NOT NULL DEFAULT 'unknown'",
     "error_message": "TEXT",
 }
+
+
+def _create_log_table(conn: sqlite3.Connection, table_name: str) -> None:
+    conn.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS {table_name} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            schema_version INTEGER NOT NULL,
+            started_at TEXT NOT NULL,
+            finished_at TEXT NOT NULL,
+            elapsed_ms INTEGER NOT NULL,
+            source_url TEXT NOT NULL,
+            min_total INTEGER NOT NULL,
+            min_positive INTEGER NOT NULL,
+            cp INTEGER,
+            kp INTEGER,
+            fp INTEGER,
+            fa INTEGER,
+            positive INTEGER,
+            negative INTEGER,
+            total INTEGER,
+            gate_open INTEGER,
+            exit_code INTEGER NOT NULL,
+            status TEXT NOT NULL,
+            error_message TEXT
+        )
+        """
+    )
+
+
+def _rebuild_legacy_log_table(conn: sqlite3.Connection) -> None:
+    """Replace a legacy audit-log table with the canonical schema."""
+    existing_columns = {
+        str(row[1])
+        for row in conn.execute("PRAGMA table_info(tess_label_checks)").fetchall()
+    }
+    copy_columns = [column for column in _LOG_COLUMNS if column in existing_columns]
+    conn.execute("DROP TABLE IF EXISTS tess_label_checks__new")
+    _create_log_table(conn, "tess_label_checks__new")
+    if copy_columns:
+        column_csv = ", ".join(copy_columns)
+        conn.execute(
+            f"""
+            INSERT INTO tess_label_checks__new ({column_csv})
+            SELECT {column_csv}
+            FROM tess_label_checks
+            """
+        )
+    conn.execute("DROP TABLE tess_label_checks")
+    conn.execute("ALTER TABLE tess_label_checks__new RENAME TO tess_label_checks")
 
 
 def _utc_now() -> str:
@@ -147,35 +229,7 @@ def initialize_log_db(db_path: Path) -> Path:
     """Create or migrate the SQLite audit-log schema if needed."""
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(db_path) as conn:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS tess_label_checks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                schema_version INTEGER NOT NULL,
-                started_at TEXT NOT NULL,
-                finished_at TEXT NOT NULL,
-                elapsed_ms INTEGER NOT NULL,
-                source_url TEXT NOT NULL,
-                min_total INTEGER NOT NULL,
-                min_positive INTEGER NOT NULL,
-                cp INTEGER,
-                kp INTEGER,
-                fp INTEGER,
-                fa INTEGER,
-                positive INTEGER,
-                negative INTEGER,
-                total INTEGER,
-                gate_open INTEGER,
-                exit_code INTEGER NOT NULL,
-                status TEXT NOT NULL,
-                error_message TEXT
-            )
-            """
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tess_label_checks_started "
-            "ON tess_label_checks(started_at)"
-        )
+        _create_log_table(conn, "tess_label_checks")
         existing_columns = {
             str(row[1])
             for row in conn.execute("PRAGMA table_info(tess_label_checks)").fetchall()
@@ -183,6 +237,16 @@ def initialize_log_db(db_path: Path) -> Path:
         for column, definition in _LOG_COLUMN_MIGRATIONS.items():
             if column not in existing_columns:
                 conn.execute(f"ALTER TABLE tess_label_checks ADD COLUMN {column} {definition}")
+        migrated_columns = {
+            str(row[1])
+            for row in conn.execute("PRAGMA table_info(tess_label_checks)").fetchall()
+        }
+        if any(column not in _LOG_COLUMN_SET for column in migrated_columns):
+            _rebuild_legacy_log_table(conn)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tess_label_checks_started "
+            "ON tess_label_checks(started_at)"
+        )
     return db_path
 
 

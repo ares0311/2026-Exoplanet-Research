@@ -122,7 +122,7 @@ def test_cli_writes_success_log_for_open_gate(tmp_path: Path) -> None:
     assert row["error_message"] is None
 
 
-def test_cli_migrates_legacy_log_without_threshold_columns(tmp_path: Path) -> None:
+def test_cli_migrates_legacy_log_missing_insert_columns(tmp_path: Path) -> None:
     db_path = tmp_path / "logs" / "tess_label_check.sqlite3"
     db_path.parent.mkdir(parents=True)
     with sqlite3.connect(db_path) as conn:
@@ -135,17 +135,14 @@ def test_cli_migrates_legacy_log_without_threshold_columns(tmp_path: Path) -> No
                 finished_at TEXT NOT NULL,
                 elapsed_ms INTEGER NOT NULL,
                 source_url TEXT NOT NULL,
+                threshold INTEGER NOT NULL,
                 cp INTEGER,
-                kp INTEGER,
                 fp INTEGER,
-                fa INTEGER,
-                positive INTEGER,
-                negative INTEGER,
+                eb INTEGER,
                 total INTEGER,
                 gate_open INTEGER,
                 exit_code INTEGER NOT NULL,
-                status TEXT NOT NULL,
-                error_message TEXT
+                status TEXT NOT NULL
             )
             """
         )
@@ -162,9 +159,21 @@ def test_cli_migrates_legacy_log_without_threshold_columns(tmp_path: Path) -> No
             for column in conn.execute("PRAGMA table_info(tess_label_checks)").fetchall()
         }
     assert code == 0
-    assert {"min_total", "min_positive"}.issubset(columns)
+    assert {
+        "min_total",
+        "min_positive",
+        "kp",
+        "fa",
+        "positive",
+        "negative",
+        "error_message",
+    }.issubset(columns)
+    assert "threshold" not in columns
+    assert "eb" not in columns
     assert row["min_total"] == 600
     assert row["min_positive"] == 400
+    assert row["positive"] == 450
+    assert row["negative"] == 250
     assert row["status"] == "success"
 
 
