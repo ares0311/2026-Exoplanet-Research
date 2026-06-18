@@ -492,15 +492,17 @@ Fixture-only status checks can use
 Live ExoFOP gate count, when network access is intentionally approved:
 
 ```bash
-python Skills/count_tess_labels.py
+git pull origin main
+.venv/bin/python Skills/count_tess_labels.py
 # Prints the current CP count and writes logs/tess_label_check.sqlite3.
 ```
 
 Summarize local live-check history without a network call:
 
 ```bash
-python Skills/tess_label_check_summary.py
-python Skills/tess_label_check_summary.py --json
+git pull origin main
+.venv/bin/python Skills/tess_label_check_summary.py
+.venv/bin/python Skills/tess_label_check_summary.py --json
 ```
 
 ---

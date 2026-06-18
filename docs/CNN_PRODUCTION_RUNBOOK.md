@@ -42,6 +42,10 @@ Production gates:
 - Production gate evaluation rejected that checkpoint: test raw AUC 0.8115,
   raw F1 0.7523, calibrated F1 0.7508, calibrated Brier 0.1966, and calibrated
   ECE 0.1152. Do not promote this checkpoint.
+- Next approved strategy: Path A, expand usable labeled TESS snippets from
+  ExoFOP TOI/CTOI before another CNN promotion attempt. Only proceed to a new
+  candidate-12 training run after the expanded corpus and split validator show
+  enough additional usable examples to justify it.
 - After every local artifact state change, update the artifact ledger so agents
   that can only see GitHub know whether the corpus, splits, checkpoint, or
   promotion gate is missing, pending, valid, rejected, or approved.
@@ -167,7 +171,53 @@ calibrated ECE `0.1152`. The next runbook action is not to rerun this same
 fine-tune; start a new T1-1 planning cycle around more usable TESS labels,
 better label quality, or a materially different CNN/transfer strategy.
 
-## Step 7: Promotion Only After Approval
+## Step 7: Candidate 12 Path A — Expand TESS Labels
+
+This is the approved next strategy after candidate 11 failed. The goal is to
+increase TESS-domain signal before training again. Do not rerun the same
+`checkpoints/cnn_tess_finetuned` fine-tune as a promotion attempt.
+
+First inventory newly labeled ExoFOP TOI/CTOI targets that are absent from the
+current v2 corpus:
+
+```bash
+git pull origin main
+.venv/bin/python Skills/count_tess_labels.py
+.venv/bin/python Skills/fetch_additional_tess_labels.py --corpus data/tess_snippets_v2.jsonl --output data/new_tess_targets.txt
+wc -l data/new_tess_targets.txt
+```
+
+Stop here and paste back the label-count output, expansion summary, and
+`wc -l` result. The agent must review the count, positive/negative balance,
+and source mix before any long MAST snippet fetch. If too few new usable
+targets are available, start a new T1-1 planning cycle instead of training.
+
+If the inventory justifies a long fetch, download snippets for the new target
+JSON. This command is resumable and prints progress:
+
+```bash
+git pull origin main
+caffeinate -dims .venv/bin/python Skills/fetch_tess_lc_snippets.py --rows data/new_tess_targets.json --output data/tess_snippets_expansion_v3.jsonl --max-errors 100
+wc -l data/tess_snippets_expansion_v3.jsonl
+```
+
+Stop here and paste back the final fetch summary and line count. The agent must
+audit the expansion JSONL before merge/split rebuild.
+
+After agent approval, merge the expansion corpus and build validated v3 splits:
+
+```bash
+git pull origin main
+cat data/tess_snippets_v2.jsonl data/tess_snippets_expansion_v3.jsonl > data/tess_snippets_v3.jsonl
+caffeinate -i .venv/bin/python Skills/build_cnn_training_data.py data/tess_snippets_v3.jsonl --output-dir data/tess_cnn_splits_v3
+.venv/bin/python Skills/cnn_split_validator.py data/tess_cnn_splits_v3
+```
+
+Stop here and paste back the split summary and validator output. Train a
+candidate-12 checkpoint only if the expanded split passes validation and the
+agent updates the artifact ledger with the new local artifact state.
+
+## Step 8: Promotion Only After Approval
 
 Do not copy checkpoint artifacts into `models/` or update `models/registry.json`
 until the evaluation passes all gates and the human explicitly approves
