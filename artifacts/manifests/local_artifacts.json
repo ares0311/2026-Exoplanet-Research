@@ -24,7 +24,7 @@
         "verified_on": "2026-06-17"
       },
       "validation_gate": "Build data/tess_cnn_splits and require Skills/cnn_split_validator.py PASS before fine-tuning.",
-      "next_action": "Use after Kepler pretraining is reviewed."
+      "next_action": "Use the validated data/tess_cnn_splits for TESS fine-tuning."
     },
     {
       "path": "data/kepler_snippets.jsonl",
@@ -95,10 +95,26 @@
     {
       "path": "data/tess_cnn_splits/",
       "kind": "cnn_split",
-      "status": "pending_regeneration",
+      "status": "local_validated",
       "git_policy": "ignored",
-      "validation_gate": "Skills/cnn_split_validator.py data/tess_cnn_splits must report PASS.",
-      "next_action": "Generate from data/tess_snippets_v2.jsonl before TESS fine-tuning."
+      "last_known": {
+        "total_examples": 2110,
+        "train": 1477,
+        "val": 318,
+        "test": 315,
+        "positive_labels": 1015,
+        "negative_labels": 1095,
+        "train_negative": 766,
+        "train_positive": 711,
+        "val_negative": 166,
+        "val_positive": 152,
+        "test_negative": 163,
+        "test_positive": 152,
+        "validator_status": "PASS",
+        "verified_on": "2026-06-18"
+      },
+      "validation_gate": "Skills/cnn_split_validator.py data/tess_cnn_splits reported PASS on 2026-06-18.",
+      "next_action": "Fine-tune from the MPS Kepler pretrain checkpoint."
     },
     {
       "path": "checkpoints/cnn_kepler_pretrain/",
@@ -122,7 +138,7 @@
         "verified_on": "2026-06-18"
       },
       "validation_gate": "Use as transfer-learning source only; production approval still requires TESS fine-tuning plus evaluator PASS.",
-      "next_action": "Fine-tune TESS model from checkpoints/cnn_kepler_pretrain/best.pt after TESS split validation."
+      "next_action": "Fine-tune TESS model from checkpoints/cnn_kepler_pretrain/best.pt using data/tess_cnn_splits."
     },
     {
       "path": "checkpoints/cnn_tess_finetuned/",
@@ -130,7 +146,7 @@
       "status": "pending_training",
       "git_policy": "ignored",
       "validation_gate": "Skills/evaluate_cnn_checkpoint.py must report Flag: PASS.",
-      "next_action": "Fine-tune from the MPS Kepler pretrain checkpoint after TESS split validation."
+      "next_action": "Run TESS fine-tuning from the MPS Kepler pretrain checkpoint."
     },
     {
       "path": "models/cnn*/",

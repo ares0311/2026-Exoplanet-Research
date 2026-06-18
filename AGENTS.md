@@ -76,7 +76,8 @@ When the user must take an action to unblock a gap:
 | Kepler snippets (`data/kepler_snippets.jsonl`) | **LOCAL VALIDATED** — 6,837 finite snippets on user's Mac; 617 KOI signatures absent/pending failure-sidecar review |
 | Kepler CNN splits (`data/kepler_cnn_splits/`) | **LOCAL VALIDATED** — validator PASS; train/val/test = 4,741 / 1,060 / 1,036 |
 | Kepler pretraining checkpoint (`checkpoints/cnn_kepler_pretrain/best.pt`) | **LOCAL PRETRAINED ON MPS** — SHA-256 `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`; best val AUC 0.9186 |
-| CNN training pipeline | **UNBLOCKED TO TESS FINE-TUNING** — build TESS splits, fine-tune from the MPS Kepler pretrain checkpoint, then run production evaluator |
+| TESS CNN splits (`data/tess_cnn_splits/`) | **LOCAL VALIDATED** — validator PASS; train/val/test = 1,477 / 318 / 315 |
+| CNN training pipeline | **UNBLOCKED TO TESS FINE-TUNING** — fine-tune from the MPS Kepler pretrain checkpoint, then run production evaluator |
 | XGBoost Tier 1 | Done |
 | Stacking Tier 3 scaffold | Done |
 
@@ -88,6 +89,7 @@ If the user is at the Mac, ask them to run these commands and paste the output:
 git pull --ff-only origin main
 wc -l data/kepler_snippets.jsonl data/tess_snippets_v2.jsonl
 .venv/bin/python Skills/cnn_split_validator.py data/kepler_cnn_splits
+.venv/bin/python Skills/cnn_split_validator.py data/tess_cnn_splits
 shasum -a 256 checkpoints/cnn_kepler_pretrain/best.pt
 ```
 
@@ -95,7 +97,10 @@ shasum -a 256 checkpoints/cnn_kepler_pretrain/best.pt
   rerun the fetch loop.
 - If the Kepler pretraining SHA is
   `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`, proceed
-  to `docs/CNN_PRODUCTION_RUNBOOK.md` Step 4.
+  to `docs/CNN_PRODUCTION_RUNBOOK.md` Step 5 when the TESS split validator
+  reports **PASS**.
+- If `data/tess_cnn_splits` validates with train/val/test
+  **1,477 / 318 / 315**, proceed to TESS fine-tuning.
 - If the Kepler pretraining checkpoint is missing or has a different SHA, stop
   and review the local artifact ledger and runbook before training further.
 - If the user intentionally wants to retry missing Kepler rows, use one bounded
