@@ -1,9 +1,9 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-06-18 (Kepler pretraining complete; TESS fine-tuning next)
+Last reviewed: 2026-06-18 (Kepler->TESS fine-tuned checkpoint rejected; T1-1 remains open)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 2,003 default tests passing, 2 integration_live deselected
+Test baseline: 2,155 default tests passing, 2 integration_live deselected
 
 ---
 
@@ -14,13 +14,12 @@ Test baseline: 2,003 default tests passing, 2 integration_live deselected
 | `--scorer bayesian` | **PRODUCTION READY** | None — default mode, zero external dependencies |
 | `--scorer xgboost` | **PRODUCTION READY** | None — trained on 7,586 Kepler KOIs, AUC=0.992 |
 | `--scorer ensemble` | **PRODUCTION READY** | None — conservative XGBoost+Bayesian blend when CNN absent |
-| `--scorer cnn` | **NOT READY** | T1-1: first trained checkpoint failed held-out performance and calibration gates |
+| `--scorer cnn` | **NOT READY** | T1-1: no trained checkpoint has passed held-out performance and calibration gates |
 | `--scorer full-ensemble` | **NOT READY** | T1-1: no production-approved CNN checkpoint |
 
 The system is safe to deploy now for Bayesian and XGBoost scoring modes. The
-CNN label gate is open, but the first trained checkpoint was evaluated and
-rejected; it must not be copied into `models/`, registered, or used for
-production scoring.
+CNN label gate is open, but all evaluated CNN checkpoints remain rejected; they
+must not be copied into `models/`, registered, or used for production scoring.
 
 ---
 
@@ -29,7 +28,7 @@ production scoring.
 ### T1-1: Production Tier 2 CNN Checkpoint
 
 - **What is missing**: A CNN checkpoint that passes held-out performance and calibration gates
-- **Gate status**: **OPEN** — Kepler pretraining and TESS split generation are locally complete; awaiting TESS fine-tuning and held-out production evaluation from `docs/CNN_PRODUCTION_RUNBOOK.md`
+- **Gate status**: **OPEN** — Kepler pretraining, TESS split generation, and the first Kepler->TESS fine-tune are locally complete; the fine-tuned checkpoint failed held-out production gates and must not be promoted
 - **Code status**: Training and state-dict inference paths are operational; the package scorer reconstructs the trained architecture and fails closed when loading fails
 - **Prior local corpus status**: **VALID as of 2026-06-12** — 2,037 snippets (1,012 positive CP+KP, 1,025 negative FP+FA, ratio 0.99); zero-epoch corpus retired and rebuilt from scratch with valid BJD epochs; label bug fixed (KP→1); MAST throttling fix applied (`bbb0877`)
 - **Local corpus status**: **KEPLER LOCAL VALIDATED** — TESS v2 complete at 2,619 snippets; Kepler finite rebuild has 6,837 parseable snippets with zero non-finite flux rows, zero duplicate resume keys, labels negative=4,280 and positive=2,557; `data/kepler_cnn_splits` validator PASS with train/val/test = 4,741 / 1,060 / 1,036
@@ -48,13 +47,15 @@ production scoring.
 - **Rejected candidate 9**: seed-7 splits, `cnn_retrain_v3b.json` (Conv 16/32/64, Dense 128, dropout 0.4, no flip/shift); best epoch 18, val AUC=0.7807; test raw AUC=0.7573, F1=0.7257, Brier=0.2051, ECE=0.0867; Platt A=1.5114, B=−0.7136; calibrated test F1=0.7207, Brier=0.2155, ECE=0.1230; val→test gap 2.3 pts; **REJECTED** — test AUC 0.7573 < 0.85 gate, F1 0.7207 < 0.80 gate; reducing Dense(256→128) slightly hurt val AUC without improving test AUC vs C5
 - **Rejected candidate 10 (ensemble)**: 3-seed ensemble of `cnn_retrain_v1.json` (seeds 7, 13, 99); individual val AUCs: 0.7914, 0.7848, 0.8022; ensemble val AUC=0.8022; test raw AUC=0.7670, F1=0.7317, Brier=0.2057, ECE=0.1260; Platt A=1.5945, B=−0.7796; calibrated test F1=0.7317; **REJECTED** — test AUC 0.7670 < 0.85 gate, F1 0.7317 < 0.80 gate; ensemble is *worse* than best single model (C5: 0.7758); members too correlated on 1,425 examples to provide diversity gain
 - **Systematic ceiling confirmed (candidates 2–10)**: All 10 candidates (single-model and 3-seed ensemble) produced test AUC 0.71–0.78; ceiling is a data-size constraint; 1,425 training examples cannot drive this architecture to 0.85 AUC regardless of tuning, regularization, augmentation, or ensembling strategy
+- **Rejected candidate 11 (Kepler->TESS transfer)**: `checkpoints/cnn_tess_finetuned/best.pt`, SHA-256 `3fc115b3623b2485373aefef30a7aa901e1183cc77ef4b57ce6c1f2219f49214`; trained on Python 3.14.3 with PyTorch 2.12.0 using `device=mps`; initialized from Kepler pretrain SHA `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`; TESS splits train/val/test = 1,477 / 318 / 315; `configs/cnn_tess_finetune.json` with LR=1e-4, weight_decay=1e-3, batch=64, seed=7, frozen conv layers for 15 epochs; best epoch 22, validation loss 0.5255, validation AUC 0.8408; test raw AUC=0.8115, F1=0.7523, Brier=0.1818, ECE=0.0854; Platt A=1.80214901, B=-0.77900211, threshold=0.45; calibrated test F1=0.7508, Brier=0.1966, ECE=0.1152; **REJECTED** — test AUC 0.8115 < 0.85 gate, calibrated F1 0.7508 < 0.80 gate, and calibration worsened both Brier and ECE
+- **Transfer-learning result**: Kepler pretraining lifted held-out test AUC above the prior TESS-only/ensemble range, but still missed both production thresholds. Do not rerun the same fine-tune as a promotion attempt; the next T1-1 planning cycle should add more usable TESS examples, improve label quality, or test a materially different CNN/transfer strategy with a fresh documented hypothesis.
 - **Authorized path forward — BOTH Path A and Path B run in parallel**:
   - **Path A — More labeled TESS data**: Download additional phase-folded snippets from MAST for ExoFOP confirmed planets and confirmed false positives; target ≥ 5,000 training examples; retrain with expanded corpus
-  - **Path B — Kepler→TESS transfer learning**: Pre-train CNN on the validated Kepler phase-folded corpus; fine-tune final dense layers on TESS v2 examples; most robust path to exceeding 0.85 test AUC on current TESS snippet count
+  - **Path B — Kepler→TESS transfer learning**: First MPS pretrain/fine-tune attempt is rejected; continue only with a materially changed transfer strategy or after Path A improves the TESS training signal
 - **Current authorized runbook**: `docs/CNN_PRODUCTION_RUNBOOK.md`
 - **Current promotion gate**: raw held-out test AUC ≥ 0.85; calibrated held-out test F1 ≥ 0.80; Platt calibration must not worsen held-out test Brier score or ECE
-- **Kepler pretraining gate**: **LOCAL PRETRAINED ON MPS** — `checkpoints/cnn_kepler_pretrain/best.pt`, SHA-256 `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`; Python 3.14.3 venv, PyTorch 2.12.0; startup banner `device=mps`; best epoch 19, best validation loss 0.3905, best validation AUC 0.9186; final epoch 34 val AUC 0.9123; remains local/ignored pending TESS fine-tuning and production evaluation
-- **Current data gate**: Kepler and TESS split validators passed; `data/tess_cnn_splits` has train/val/test = 1,477 / 318 / 315; next gate is TESS fine-tuning from the MPS Kepler pretraining checkpoint
+- **Kepler pretraining gate**: **LOCAL PRETRAINED ON MPS** — `checkpoints/cnn_kepler_pretrain/best.pt`, SHA-256 `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`; Python 3.14.3 venv, PyTorch 2.12.0; startup banner `device=mps`; best epoch 19, best validation loss 0.3905, best validation AUC 0.9186; final epoch 34 val AUC 0.9123; remains local/ignored and useful for future transfer experiments but does not itself satisfy production
+- **Current data gate**: Kepler and TESS split validators passed; `data/tess_cnn_splits` has train/val/test = 1,477 / 318 / 315; the first fine-tuned TESS checkpoint is rejected and no CNN artifact is approved for promotion
 - **Gate check**: `.venv/bin/python Skills/evaluate_cnn_checkpoint.py --split-dir data/tess_cnn_splits --checkpoint checkpoints/cnn_tess_finetuned/best.pt --output-calibration checkpoints/cnn_tess_finetuned/calibration.json`
 - **Architecture spec**: `docs/CNN_SPEC.md`
 - **Artifact policy**: Keep `git add .` safe through `.gitignore`; commit local artifact status in the artifact ledger; commit the validated production checkpoint, calibration metadata, model registry entry, and reproducibility manifest under `models/` only after all production-readiness checks pass and the human approves promotion
@@ -111,7 +112,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
 | 82 production-critical Skills/ | ✅ |
-| 2,003 default tests, ruff clean, mypy clean | ✅ |
+| 2,155 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -150,8 +151,8 @@ These are enforced in code and must never be bypassed:
 
 | Blocker | What Is Needed | Who |
 |---|---|---|
-| CNN fine-tuning/evaluation run | Run `docs/CNN_PRODUCTION_RUNBOOK.md` Step 5 and Step 6 using the validated TESS splits | Human |
-| CNN production promotion | Validate, calibrate, register, and commit only a checkpoint that passes held-out gates | Agent + human approval |
+| Next CNN production plan | Choose the next T1-1 strategy after candidate 11 failed: expand usable TESS labels, improve label quality, or authorize a materially different transfer/CNN experiment | Agent + human approval |
+| CNN production promotion | Validate, calibrate, register, and commit only a future checkpoint that passes held-out gates | Agent + human approval |
 | Stacking weight calibration | Tune blend weights on held-out calibration set | Agent after T1-1 resolved |
 
 ---

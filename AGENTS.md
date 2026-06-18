@@ -77,7 +77,8 @@ When the user must take an action to unblock a gap:
 | Kepler CNN splits (`data/kepler_cnn_splits/`) | **LOCAL VALIDATED** — validator PASS; train/val/test = 4,741 / 1,060 / 1,036 |
 | Kepler pretraining checkpoint (`checkpoints/cnn_kepler_pretrain/best.pt`) | **LOCAL PRETRAINED ON MPS** — SHA-256 `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`; best val AUC 0.9186 |
 | TESS CNN splits (`data/tess_cnn_splits/`) | **LOCAL VALIDATED** — validator PASS; train/val/test = 1,477 / 318 / 315 |
-| CNN training pipeline | **UNBLOCKED TO TESS FINE-TUNING** — fine-tune from the MPS Kepler pretrain checkpoint, then run production evaluator |
+| TESS fine-tuned checkpoint (`checkpoints/cnn_tess_finetuned/best.pt`) | **REJECTED** — SHA-256 `3fc115b3623b2485373aefef30a7aa901e1183cc77ef4b57ce6c1f2219f49214`; test raw AUC 0.8115; calibrated F1 0.7508; calibration worsened Brier/ECE |
+| CNN training pipeline | **BLOCKED ON NEXT T1-1 STRATEGY** — do not rerun the same fine-tune or promote the rejected checkpoint |
 | XGBoost Tier 1 | Done |
 | Stacking Tier 3 scaffold | Done |
 
@@ -100,7 +101,11 @@ shasum -a 256 checkpoints/cnn_kepler_pretrain/best.pt
   to `docs/CNN_PRODUCTION_RUNBOOK.md` Step 5 when the TESS split validator
   reports **PASS**.
 - If `data/tess_cnn_splits` validates with train/val/test
-  **1,477 / 318 / 315**, proceed to TESS fine-tuning.
+  **1,477 / 318 / 315**, do not assume that is enough for promotion; the first
+  transfer fine-tune from these splits was rejected.
+- If `checkpoints/cnn_tess_finetuned/best.pt` has SHA-256
+  `3fc115b3623b2485373aefef30a7aa901e1183cc77ef4b57ce6c1f2219f49214`, do not
+  promote it. It failed the production evaluator.
 - If the Kepler pretraining checkpoint is missing or has a different SHA, stop
   and review the local artifact ledger and runbook before training further.
 - If the user intentionally wants to retry missing Kepler rows, use one bounded
@@ -130,7 +135,10 @@ Gate: raw held-out AUC ≥ 0.85, calibrated held-out F1 ≥ 0.80, and Platt
 calibration must not worsen held-out Brier score or ECE. Architecture spec:
 `docs/CNN_SPEC.md`.
 
-**Why transfer learning?** TESS-only training hits a hard ~0.78 AUC ceiling at 1,425 examples. Pre-training on the large Kepler corpus then fine-tuning on TESS v2 is the only validated path past this ceiling.
+**Why the current checkpoint is blocked:** Kepler transfer improved over the
+old TESS-only ceiling but still missed the documented production gate. The next
+T1-1 cycle must add usable TESS signal, improve label quality, or authorize a
+materially different CNN/transfer hypothesis before another long training run.
 
 ---
 
