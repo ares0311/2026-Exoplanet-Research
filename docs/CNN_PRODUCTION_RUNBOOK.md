@@ -42,10 +42,11 @@ Production gates:
 - Production gate evaluation rejected that checkpoint: test raw AUC 0.8115,
   raw F1 0.7523, calibrated F1 0.7508, calibrated Brier 0.1966, and calibrated
   ECE 0.1152. Do not promote this checkpoint.
-- Next approved strategy: Path A, expand usable labeled TESS snippets from
-  ExoFOP TOI/CTOI before another CNN promotion attempt. Only proceed to a new
-  candidate-12 training run after the expanded corpus and split validator show
-  enough additional usable examples to justify it.
+- Path A inventory completed locally on 2026-06-18 and found only 56 new
+  labeled TIC IDs absent from `data/tess_snippets_v2.jsonl` (16 positive, 40
+  negative; 33 TOI, 23 CTOI). This is too small to justify a long MAST fetch
+  as a production-closing candidate-12 run. Do not fetch v3 snippets for
+  production from this inventory; start a new T1-1 planning cycle.
 - After every local artifact state change, update the artifact ledger so agents
   that can only see GitHub know whether the corpus, splits, checkpoint, or
   promotion gate is missing, pending, valid, rejected, or approved.
@@ -173,9 +174,9 @@ better label quality, or a materially different CNN/transfer strategy.
 
 ## Step 7: Candidate 12 Path A — Expand TESS Labels
 
-This is the approved next strategy after candidate 11 failed. The goal is to
-increase TESS-domain signal before training again. Do not rerun the same
-`checkpoints/cnn_tess_finetuned` fine-tune as a promotion attempt.
+This strategy was approved after candidate 11 failed. The goal was to increase
+TESS-domain signal before training again. The first inventory found too few
+new labels to justify a production-closing long fetch or training run.
 
 First inventory newly labeled ExoFOP TOI/CTOI targets that are absent from the
 current v2 corpus:
@@ -191,6 +192,12 @@ Stop here and paste back the label-count output, expansion summary, and
 `wc -l` result. The agent must review the count, positive/negative balance,
 and source mix before any long MAST snippet fetch. If too few new usable
 targets are available, start a new T1-1 planning cycle instead of training.
+
+Result from 2026-06-18: **too few new targets**. ExoFOP TOI live counts were
+CP=733, KP=591, FP=1,244, FA=100; expansion inventory found 56 new labeled TIC
+IDs (16 positive, 40 negative). Do not continue to the fetch step below unless
+a future planning cycle explicitly approves it for a non-production/forensic
+check.
 
 If the inventory justifies a long fetch, download snippets for the new target
 JSON. This command is resumable and prints progress:

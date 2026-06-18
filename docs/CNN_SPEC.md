@@ -263,12 +263,12 @@ not close the production gap. Kepler->TESS transfer improved held-out test AUC
 to 0.8115 but still missed the AUC/F1 production gates and worsened calibrated
 Brier/ECE.
 
-**Approved next approach**: Path A expands usable labeled TESS snippets before
-candidate-12 training. Inventory ExoFOP TOI/CTOI CP/KP/FP/FA labels absent from
-`data/tess_snippets_v2.jsonl`, fetch new snippets only after agent review of
-target count and label balance, then build and validate `data/tess_cnn_splits_v3`.
-Do not train another candidate until the v3 split validator reports PASS and
-the artifact ledger is updated.
+**Path A result**: The first expanded-label inventory found only 56 new labeled
+TIC IDs absent from `data/tess_snippets_v2.jsonl` (16 positive, 40 negative).
+That is too small to justify a long MAST fetch or candidate-12 training as a
+production-closing attempt. Do not train another candidate until a materially
+larger label source, label-quality improvement, or changed transfer/CNN
+strategy is approved and documented.
 
 ## Tenth Production Candidate Evaluation (Ensemble)
 
