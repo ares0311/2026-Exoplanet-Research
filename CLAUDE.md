@@ -250,7 +250,7 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 432 top-level test files. Local validation on 2026-06-03 passed with 6385 default tests and 2 `integration_live` tests deselected.
+**Current test surface:** 108 top-level test files. Local validation on 2026-06-18 passed with 2,155 default tests and 2 `integration_live` tests deselected.
 **Skills:** 415 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). See `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference instead of relying on this file for exhaustive per-script counts.
 
 ---
@@ -1190,6 +1190,7 @@ These large data files live only on the user's local Mac. They are never committ
 | `data/tess_cnn_splits/` | Local Mac | **LOCAL VALIDATED** — train/val/test = 1,477 / 318 / 315 | Validator PASS; train labels negative=766 positive=711; val negative=166 positive=152; test negative=163 positive=152 |
 | `data/kepler_snippets.jsonl` | Local Mac | **LOCAL VALIDATED** — 6,837 finite snippets as of 2026-06-17 | JSON parse PASS; zero non-finite flux rows; zero duplicate resume keys; split validator PASS |
 | `checkpoints/cnn_kepler_pretrain/best.pt` | Local Mac | **LOCAL PRETRAINED ON MPS** — SHA-256 `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7` | Best epoch 19, best val loss 0.3905, best val AUC 0.9186; startup banner confirmed `device=mps` |
+| `checkpoints/cnn_tess_finetuned/best.pt` | Local Mac | **REJECTED** — SHA-256 `3fc115b3623b2485373aefef30a7aa901e1183cc77ef4b57ce6c1f2219f49214` | Fine-tuned from Kepler pretrain on MPS; best val AUC 0.8408; production evaluator failed with raw test AUC 0.8115, calibrated F1 0.7508, and calibration-worsened Brier/ECE |
 
 **Kepler retry command** (only if the human explicitly wants to retry missing
 rows after the validated split; do not use an infinite wrapper):
@@ -1205,7 +1206,7 @@ fix the durable resume ledger before asking the human to run it again.
 
 ### Next Step — HANDOFF 2026-06-18
 
-**Status: Kepler JSONL, Kepler split, Kepler pretraining checkpoint, and TESS split are locally validated; proceed to TESS fine-tuning.**
+**Status: Kepler JSONL, Kepler split, Kepler pretraining checkpoint, and TESS split are locally validated; the first Kepler->TESS fine-tuned checkpoint is rejected. Do not promote it or rerun the same fine-tune as the next production attempt.**
 
 #### Incoming agent: do this first
 
@@ -1216,9 +1217,11 @@ wc -l data/kepler_snippets.jsonl data/tess_snippets_v2.jsonl
 .venv/bin/python Skills/cnn_split_validator.py data/kepler_cnn_splits
 .venv/bin/python Skills/cnn_split_validator.py data/tess_cnn_splits
 shasum -a 256 checkpoints/cnn_kepler_pretrain/best.pt
+shasum -a 256 checkpoints/cnn_tess_finetuned/best.pt
 ```
 
-- **6,837 Kepler lines, Kepler split validator PASS, TESS split validator PASS, and pretraining SHA `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`** → proceed to `docs/CNN_PRODUCTION_RUNBOOK.md` Step 5 for TESS fine-tuning.
+- **6,837 Kepler lines, Kepler split validator PASS, TESS split validator PASS, and pretraining SHA `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`** → current local prerequisites are reproducible, but the first fine-tuned checkpoint is rejected.
+- **Fine-tuned SHA `3fc115b3623b2485373aefef30a7aa901e1183cc77ef4b57ce6c1f2219f49214`** → do not promote. Production evaluator returned `Flag: FAIL` with raw test AUC 0.8115, calibrated F1 0.7508, and worsened Brier/ECE.
 - **Any other Kepler line count, validator FAIL, missing checkpoint, or different SHA** → stop and inspect the local artifact before training; do not start another infinite fetch loop.
 
 #### Corpus status
@@ -1227,10 +1230,11 @@ shasum -a 256 checkpoints/cnn_kepler_pretrain/best.pt
 - **TESS split**: `data/tess_cnn_splits/` — LOCAL VALIDATED as of 2026-06-18; total examples 2,110; train/val/test = 1,477 / 318 / 315; validator PASS
 - **Kepler**: `data/kepler_snippets.jsonl` — LOCAL VALIDATED as of 2026-06-17; 6,837 finite snippets; labels negative=4,280 and positive=2,557; split validator PASS with train/val/test = 4,741 / 1,060 / 1,036
 - **Kepler pretrain**: `checkpoints/cnn_kepler_pretrain/best.pt` — LOCAL PRETRAINED ON MPS as of 2026-06-18; SHA-256 `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`; best val AUC 0.9186
+- **TESS fine-tune**: `checkpoints/cnn_tess_finetuned/best.pt` — REJECTED as of 2026-06-18; SHA-256 `3fc115b3623b2485373aefef30a7aa901e1183cc77ef4b57ce6c1f2219f49214`; best val AUC 0.8408; test raw AUC 0.8115; calibrated F1 0.7508; calibration worsened Brier/ECE
 
 #### CNN production runbook
 
-Training strategy: TESS-only training hits a hard ~0.78 AUC ceiling at 1,425 examples. Pre-train on Kepler corpus, fine-tune on TESS v2 — this is the only validated path past the ceiling.
+Training strategy: TESS-only training hits a hard ~0.78 AUC ceiling at 1,425 examples. Kepler transfer improved held-out test AUC to 0.8115 but did not meet production gates. The next T1-1 cycle should add usable TESS labels, improve label quality, or test a materially different CNN/transfer hypothesis before another long training run.
 
 Use `docs/CNN_PRODUCTION_RUNBOOK.md` for the authoritative copy-paste workflow.
 The accepted `train_cnn.py` flags are `--split-dir`, `--checkpoint-dir`, and
@@ -1252,10 +1256,10 @@ The optional ML tiers now augment the Bayesian log-score model while preserving
 Bayesian scoring as the default fallback:
 
 **Tier 1 — XGBoost on tabular features (build first)** ✅ DONE
-**Tier 2 — 1D CNN on phase-folded flux (scaffold built; label gate OPEN; TESS and Kepler local corpora complete; training/promotion gate OPEN)**
+**Tier 2 — 1D CNN on phase-folded flux (scaffold built; label gate OPEN; TESS and Kepler local corpora complete; production checkpoint gate OPEN)**
 - Input: phase-folded, normalized flux array (treat as 1D image)
 - Learns transit morphology directly; proven architecture (Shallue & Vanderburg 2018)
-- Requires Kepler pre-training + TESS fine-tuning — TESS-only training hits ~0.78 AUC ceiling due to insufficient examples; Kepler corpus provides the volume needed for transfer learning
+- Kepler pre-training + TESS fine-tuning improved test AUC to 0.8115 but failed the 0.85/0.80 production gates; next attempt needs more usable TESS signal, better labels, or a materially different transfer/CNN strategy
 
 **Tier 3 — Stacking meta-learner** ✅ DONE
 - Simple weighted blend over outputs of XGBoost + CNN + existing Bayesian log-score model

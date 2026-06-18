@@ -34,8 +34,14 @@ Production gates:
   best epoch 19, best validation loss 0.3905, and best validation AUC 0.9186.
 - `data/tess_cnn_splits`: locally validated on 2026-06-18 with validator
   PASS; total examples = 2,110; train/val/test = 1,477 / 318 / 315.
-- Next human-at-Mac action: run TESS fine-tuning from the MPS Kepler
-  pretraining checkpoint.
+- TESS fine-tuning from the MPS Kepler pretraining checkpoint completed locally
+  on 2026-06-18 with startup banner `device=mps`; checkpoint
+  `checkpoints/cnn_tess_finetuned/best.pt`, SHA-256
+  `3fc115b3623b2485373aefef30a7aa901e1183cc77ef4b57ce6c1f2219f49214`,
+  best epoch 22, best validation loss 0.5255, and best validation AUC 0.8408.
+- Production gate evaluation rejected that checkpoint: test raw AUC 0.8115,
+  raw F1 0.7523, calibrated F1 0.7508, calibrated Brier 0.1966, and calibrated
+  ECE 0.1152. Do not promote this checkpoint.
 - After every local artifact state change, update the artifact ledger so agents
   that can only see GitHub know whether the corpus, splits, checkpoint, or
   promotion gate is missing, pending, valid, rejected, or approved.
@@ -132,6 +138,10 @@ and fine-tuning status. On the recorded M4 Max, the training startup banner
 should show `device=mps` when PyTorch Metal/MPS is available; paste back the
 banner line too if it does not.
 
+This step completed locally on 2026-06-18 with startup banner `device=mps`;
+best epoch `22`; best validation AUC `0.8408`; and SHA-256
+`3fc115b3623b2485373aefef30a7aa901e1183cc77ef4b57ce6c1f2219f49214`.
+
 ## Step 6: Production Gate Evaluation
 
 ```bash
@@ -149,6 +159,13 @@ Interpretation:
   promote it.
 - Exit code `2`: paste the error. The run is blocked by environment, split, or
   checkpoint loading problems.
+
+This step completed locally on 2026-06-18 with exit code `1` and `Flag: FAIL`.
+The evaluated checkpoint is rejected: raw test AUC `0.8115`, raw test F1
+`0.7523`, calibrated test F1 `0.7508`, calibrated Brier `0.1966`, and
+calibrated ECE `0.1152`. The next runbook action is not to rerun this same
+fine-tune; start a new T1-1 planning cycle around more usable TESS labels,
+better label quality, or a materially different CNN/transfer strategy.
 
 ## Step 7: Promotion Only After Approval
 

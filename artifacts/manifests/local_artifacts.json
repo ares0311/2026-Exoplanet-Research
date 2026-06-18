@@ -23,8 +23,8 @@
         "nonfinite_flux_rows": 509,
         "verified_on": "2026-06-17"
       },
-      "validation_gate": "Build data/tess_cnn_splits and require Skills/cnn_split_validator.py PASS before fine-tuning.",
-      "next_action": "Use the validated data/tess_cnn_splits for TESS fine-tuning."
+      "validation_gate": "Use only data/tess_cnn_splits that pass Skills/cnn_split_validator.py before any fine-tuning.",
+      "next_action": "Use only through validated splits; next T1-1 plan should expand usable TESS labels or improve label quality before another similar CNN promotion attempt."
     },
     {
       "path": "data/kepler_snippets.jsonl",
@@ -47,7 +47,7 @@
         "verified_on": "2026-06-17"
       },
       "validation_gate": "data/kepler_cnn_splits validated PASS on 2026-06-17.",
-      "next_action": "Use the completed Kepler MPS pretraining checkpoint for TESS fine-tuning."
+      "next_action": "Retain for reproducibility; the first Kepler-to-TESS fine-tune using this corpus failed production gates."
     },
     {
       "path": "data/kepler_snippets.jsonl.failures.jsonl",
@@ -114,7 +114,7 @@
         "verified_on": "2026-06-18"
       },
       "validation_gate": "Skills/cnn_split_validator.py data/tess_cnn_splits reported PASS on 2026-06-18.",
-      "next_action": "Fine-tune from the MPS Kepler pretrain checkpoint."
+      "next_action": "Retain for reproducibility; first Kepler-to-TESS fine-tune from these splits failed production gates."
     },
     {
       "path": "checkpoints/cnn_kepler_pretrain/",
@@ -137,16 +137,50 @@
         "produced_with_gpu_aware_trainer": true,
         "verified_on": "2026-06-18"
       },
-      "validation_gate": "Use as transfer-learning source only; production approval still requires TESS fine-tuning plus evaluator PASS.",
-      "next_action": "Fine-tune TESS model from checkpoints/cnn_kepler_pretrain/best.pt using data/tess_cnn_splits."
+      "validation_gate": "Use as transfer-learning source only; production approval still requires a TESS fine-tuned checkpoint with evaluator PASS.",
+      "next_action": "Retain as a local transfer-learning source; it does not satisfy production without a passing TESS fine-tuned checkpoint."
     },
     {
       "path": "checkpoints/cnn_tess_finetuned/",
       "kind": "checkpoint_dir",
-      "status": "pending_training",
+      "status": "rejected",
       "git_policy": "ignored",
-      "validation_gate": "Skills/evaluate_cnn_checkpoint.py must report Flag: PASS.",
-      "next_action": "Run TESS fine-tuning from the MPS Kepler pretrain checkpoint."
+      "last_known": {
+        "checkpoint": "checkpoints/cnn_tess_finetuned/best.pt",
+        "sha256": "3fc115b3623b2485373aefef30a7aa901e1183cc77ef4b57ce6c1f2219f49214",
+        "python": "3.14.3",
+        "torch": "2.12.0",
+        "device": "mps",
+        "pretrained_checkpoint": "checkpoints/cnn_kepler_pretrain/best.pt",
+        "pretrained_sha256": "c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7",
+        "config": "configs/cnn_tess_finetune.json",
+        "train": 1477,
+        "val": 318,
+        "test": 315,
+        "best_epoch": 22,
+        "best_val_loss": 0.5255,
+        "best_val_auc": 0.8408,
+        "epochs_run": 34,
+        "final_epoch": 34,
+        "final_train_loss": 0.6016,
+        "final_val_loss": 0.5233,
+        "final_val_auc": 0.8331,
+        "raw_test_auc": 0.8115,
+        "raw_test_f1": 0.7523,
+        "raw_test_brier": 0.1818,
+        "raw_test_ece": 0.0854,
+        "platt_a": 1.80214901,
+        "platt_b": -0.77900211,
+        "calibrated_threshold": 0.45,
+        "calibrated_test_auc": 0.8115,
+        "calibrated_test_f1": 0.7508,
+        "calibrated_test_brier": 0.1966,
+        "calibrated_test_ece": 0.1152,
+        "evaluator_flag": "FAIL",
+        "verified_on": "2026-06-18"
+      },
+      "validation_gate": "Rejected because raw held-out AUC < 0.85, calibrated F1 < 0.80, and Platt calibration worsened Brier/ECE.",
+      "next_action": "Do not promote; next T1-1 planning cycle should add TESS signal or authorize a materially different CNN/transfer experiment."
     },
     {
       "path": "models/cnn*/",
