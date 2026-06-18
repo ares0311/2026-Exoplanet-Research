@@ -22,8 +22,8 @@ network checks remain traceable without committing runtime artifacts.
 
 Usage
 -----
-    python Skills/count_tess_labels.py
-    python Skills/count_tess_labels.py --min-total 2000 --min-positive 400
+    .venv/bin/python Skills/count_tess_labels.py
+    .venv/bin/python Skills/count_tess_labels.py --min-total 2000 --min-positive 400
 """
 from __future__ import annotations
 
@@ -51,6 +51,18 @@ _LOG_SCHEMA_VERSION = 2
 _EXIT_GATE_OPEN = 0
 _EXIT_GATE_CLOSED = 1
 _EXIT_ERROR = 2
+
+
+_LOG_COLUMN_MIGRATIONS: dict[str, str] = {
+    "schema_version": f"INTEGER NOT NULL DEFAULT {_LOG_SCHEMA_VERSION}",
+    "source_url": f"TEXT NOT NULL DEFAULT '{_EXOFOP_URL}'",
+    "min_total": f"INTEGER NOT NULL DEFAULT {_CNN_MIN_TOTAL}",
+    "min_positive": f"INTEGER NOT NULL DEFAULT {_CNN_MIN_POSITIVE}",
+    "kp": "INTEGER",
+    "fa": "INTEGER",
+    "negative": "INTEGER",
+    "error_message": "TEXT",
+}
 
 
 def _utc_now() -> str:
@@ -132,7 +144,7 @@ def count_labels(
 
 
 def initialize_log_db(db_path: Path) -> Path:
-    """Create the SQLite audit-log schema if needed."""
+    """Create or migrate the SQLite audit-log schema if needed."""
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(db_path) as conn:
         conn.execute(
@@ -164,6 +176,13 @@ def initialize_log_db(db_path: Path) -> Path:
             "CREATE INDEX IF NOT EXISTS idx_tess_label_checks_started "
             "ON tess_label_checks(started_at)"
         )
+        existing_columns = {
+            str(row[1])
+            for row in conn.execute("PRAGMA table_info(tess_label_checks)").fetchall()
+        }
+        for column, definition in _LOG_COLUMN_MIGRATIONS.items():
+            if column not in existing_columns:
+                conn.execute(f"ALTER TABLE tess_label_checks ADD COLUMN {column} {definition}")
     return db_path
 
 

@@ -15,7 +15,7 @@ The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit w
 - Optional XGBoost and stacking scorer modes (Tier 1 model trained: Kepler KOI AUC=0.992)
 - SQLite-backed background automation with top-level logs
 - 415 standalone `Skills/` utility scripts
-- 108 top-level test files, 2,155 default tests passing
+- 108 top-level test files, 2,158 default tests passing
 - 27 package Python modules under `src/exo_toolkit/`
 
 Local validation note: validated on Python 3.14.3 in `.venv` with `xgboost` dependency restored and macOS OpenMP runtime (`libomp`) installed. System Python is never used.
@@ -118,13 +118,15 @@ without relying on chat context or local terminal output.
 - Production evaluation rejected that fine-tuned checkpoint: raw test AUC
   0.8115, raw test F1 0.7523, calibrated test F1 0.7508, calibrated Brier
   0.1966, and calibrated ECE 0.1152. It must not be promoted into `models/`.
-- Path A TESS expansion was approved on 2026-06-18 as the next T1-1 strategy:
-  inventory ExoFOP TOI/CTOI labels absent from `data/tess_snippets_v2.jsonl`,
-  fetch snippets only after agent review of target count and label balance,
-  then build validated `data/tess_cnn_splits_v3` before candidate-12 training.
+- Path A TESS expansion was approved on 2026-06-18 as the next T1-1 strategy
+  and started with an ExoFOP TOI/CTOI inventory against
+  `data/tess_snippets_v2.jsonl`.
+- The first Path A inventory completed locally on 2026-06-18 and found only 56
+  new labeled TIC IDs (16 positive, 40 negative). This is too small to justify
+  a long MAST fetch or candidate-12 training as a production-closing attempt.
 - Architecture details: `docs/CNN_SPEC.md`.
 - Human local runbook: `docs/CNN_PRODUCTION_RUNBOOK.md`.
-- Next outside blocker: human-at-Mac live ExoFOP inventory for Path A.
+- Next outside blocker: choose the next materially different T1-1 strategy.
 
 ---
 
@@ -133,12 +135,11 @@ without relying on chat context or local terminal output.
 1. Update `docs/LOCAL_ARTIFACT_LEDGER.md` and `artifacts/manifests/local_artifacts.json` after each local artifact state change so GitHub records the current corpus/split/checkpoint status.
 2. Do not promote `checkpoints/cnn_tess_finetuned/best.pt`; it failed the
    documented production gate.
-3. Run the approved Path A inventory when the human is back at the Mac:
-   `Skills/count_tess_labels.py` and `Skills/fetch_additional_tess_labels.py`
-   against `data/tess_snippets_v2.jsonl`.
-4. Review the new target count, positive/negative balance, and source mix
-   before any long MAST fetch. If inventory is too small, start a new T1-1
-   planning cycle instead of training.
+3. Do not run the Path A v3 MAST fetch from the 56-target inventory as a
+   production-closing attempt.
+4. Start the next T1-1 planning cycle around a materially different strategy:
+   a larger label source, a label-quality improvement path, or a changed
+   transfer/CNN approach.
 5. Promote nothing unless a future evaluator run reports `Flag: PASS`, raw test
    AUC is at least 0.85, calibrated test F1 is at least 0.80, calibrated
    Brier/ECE are no worse than raw, and the human explicitly approves
@@ -158,7 +159,7 @@ Validated on 2026-06-18:
 .venv/bin/python -m pytest
 ```
 
-Result: ruff passed, mypy passed, pytest passed with 2,155 passed, 2 deselected, and 2 Lightkurve package warnings.
+Result: ruff passed, mypy passed, pytest passed with 2,158 passed, 2 deselected, and 2 Lightkurve package warnings.
 
 ---
 

@@ -122,6 +122,52 @@ def test_cli_writes_success_log_for_open_gate(tmp_path: Path) -> None:
     assert row["error_message"] is None
 
 
+def test_cli_migrates_legacy_log_without_threshold_columns(tmp_path: Path) -> None:
+    db_path = tmp_path / "logs" / "tess_label_check.sqlite3"
+    db_path.parent.mkdir(parents=True)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE tess_label_checks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                schema_version INTEGER NOT NULL,
+                started_at TEXT NOT NULL,
+                finished_at TEXT NOT NULL,
+                elapsed_ms INTEGER NOT NULL,
+                source_url TEXT NOT NULL,
+                cp INTEGER,
+                kp INTEGER,
+                fp INTEGER,
+                fa INTEGER,
+                positive INTEGER,
+                negative INTEGER,
+                total INTEGER,
+                gate_open INTEGER,
+                exit_code INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                error_message TEXT
+            )
+            """
+        )
+
+    code = _cli(
+        ["--min-total", "600", "--min-positive", "400", "--log-db", str(db_path)],
+        read_table_fn=lambda _url, _timeout: _toi_table(cp=300, kp=150, fp=200, fa=50),
+    )
+
+    row = _read_logged_row(db_path)
+    with sqlite3.connect(db_path) as conn:
+        columns = {
+            str(column[1])
+            for column in conn.execute("PRAGMA table_info(tess_label_checks)").fetchall()
+        }
+    assert code == 0
+    assert {"min_total", "min_positive"}.issubset(columns)
+    assert row["min_total"] == 600
+    assert row["min_positive"] == 400
+    assert row["status"] == "success"
+
+
 def test_cli_writes_success_log_for_closed_gate(tmp_path: Path) -> None:
     db_path = tmp_path / "logs" / "tess_label_check.sqlite3"
 
