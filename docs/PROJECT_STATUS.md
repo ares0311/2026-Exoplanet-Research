@@ -15,7 +15,7 @@ The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit w
 - Optional XGBoost and stacking scorer modes (Tier 1 model trained: Kepler KOI AUC=0.992)
 - SQLite-backed background automation with top-level logs
 - 415 standalone `Skills/` utility scripts
-- 108 top-level test files, 2,158 default tests passing
+- 108 top-level test files, 2,165 default tests passing
 - 27 package Python modules under `src/exo_toolkit/`
 
 Local validation note: validated on Python 3.14.3 in `.venv` with `xgboost` dependency restored and macOS OpenMP runtime (`libomp`) installed. System Python is never used.
@@ -124,6 +124,9 @@ without relying on chat context or local terminal output.
 - The first Path A inventory completed locally on 2026-06-18 and found only 56
   new labeled TIC IDs (16 positive, 40 negative). This is too small to justify
   a long MAST fetch or candidate-12 training as a production-closing attempt.
+- The historical ExoMAST TESS TCE endpoint used by `Skills/tess_tce_fetcher.py`
+  returned HTTP 404 on 2026-06-18. The helper now reports `Flag: UNAVAILABLE`
+  instead of hiding the stale provider behind a generic invalid/empty result.
 - Architecture details: `docs/CNN_SPEC.md`.
 - Human local runbook: `docs/CNN_PRODUCTION_RUNBOOK.md`.
 - Next outside blocker: choose the next materially different T1-1 strategy.
@@ -138,8 +141,8 @@ without relying on chat context or local terminal output.
 3. Do not run the Path A v3 MAST fetch from the 56-target inventory as a
    production-closing attempt.
 4. Start the next T1-1 planning cycle around a materially different strategy:
-   a larger label source, a label-quality improvement path, or a changed
-   transfer/CNN approach.
+   a larger documented label source other than the stale ExoMAST TCE endpoint,
+   a label-quality improvement path, or a changed transfer/CNN approach.
 5. Promote nothing unless a future evaluator run reports `Flag: PASS`, raw test
    AUC is at least 0.85, calibrated test F1 is at least 0.80, calibrated
    Brier/ECE are no worse than raw, and the human explicitly approves
@@ -159,7 +162,7 @@ Validated on 2026-06-18:
 .venv/bin/python -m pytest
 ```
 
-Result: ruff passed, mypy passed, pytest passed with 2,158 passed, 2 deselected, and 2 Lightkurve package warnings.
+Result: ruff passed, mypy passed, pytest passed with 2,165 passed, 2 deselected, and 2 Lightkurve package warnings.
 
 ---
 

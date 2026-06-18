@@ -14,7 +14,7 @@ Usage
         --checkpoint models/cnn/best.pt \\
         --output-calibration models/cnn/calibration.json
 
-Exit codes: 0 = PASS, 1 = FAIL, 2 = NO_TORCH or data error.
+Exit codes: 0 = PASS, 1 = FAIL, 2 = NO_TORCH or data/prediction error.
 
 Public API
 ----------
@@ -77,26 +77,22 @@ class CnnEvalResult:
 
 
 def _auc_roc(y_true: list[int], y_score: list[float]) -> float:
-    """Trapezoidal ROC-AUC."""
+    """Tie-aware ROC-AUC using average ranks."""
     pos = sum(y_true)
     neg = len(y_true) - pos
     if pos == 0 or neg == 0:
         return 0.5
-    pairs = sorted(zip(y_score, y_true, strict=True), reverse=True)
-    tp = fp = 0
-    tprs = [0.0]
-    fprs = [0.0]
-    for _, label in pairs:
-        if label == 1:
-            tp += 1
-        else:
-            fp += 1
-        tprs.append(tp / pos)
-        fprs.append(fp / neg)
-    return sum(
-        (fprs[i] - fprs[i - 1]) * (tprs[i] + tprs[i - 1]) / 2
-        for i in range(1, len(fprs))
-    )
+    pairs = sorted(zip(y_score, y_true, strict=True), key=lambda p: p[0])
+    rank_sum_pos = 0.0
+    i = 0
+    while i < len(pairs):
+        j = i + 1
+        while j < len(pairs) and pairs[j][0] == pairs[i][0]:
+            j += 1
+        avg_rank = (i + 1 + j) / 2.0
+        rank_sum_pos += avg_rank * sum(label for _, label in pairs[i:j])
+        i = j
+    return (rank_sum_pos - pos * (pos + 1) / 2.0) / (pos * neg)
 
 
 def _best_f1_threshold(
@@ -156,6 +152,19 @@ def _compute_metrics(y_true: list[int], y_score: list[float]) -> CnnEvalMetrics:
         threshold=round(t, 4),
         brier=round(_brier(y_true, y_score), 6),
         ece=round(_ece(y_true, y_score), 6),
+    )
+
+
+def _valid_probabilities(probs: list[float], expected_n: int) -> bool:
+    """Return True when model outputs are finite probabilities of expected size."""
+    if len(probs) != expected_n:
+        return False
+    return all(
+        isinstance(p, int | float)
+        and not isinstance(p, bool)
+        and math.isfinite(float(p))
+        and 0.0 <= float(p) <= 1.0
+        for p in probs
     )
 
 
@@ -437,6 +446,23 @@ def evaluate_cnn_checkpoint(
                 evaluated_at=evaluated_at,
             )
 
+    if (
+        not _valid_probabilities(val_probs, len(val_labels))
+        or not _valid_probabilities(test_probs, len(test_labels))
+    ):
+        return CnnEvalResult(
+            val_metrics_raw=None,
+            test_metrics_raw=None,
+            test_metrics_cal=None,
+            platt_a=1.0,
+            platt_b=0.0,
+            gate_auc=gate_auc,
+            gate_f1=gate_f1,
+            passed=False,
+            flag="INVALID_PREDICTIONS",
+            evaluated_at=evaluated_at,
+        )
+
     val_metrics_raw = _compute_metrics(val_labels, val_probs)
     test_metrics_raw = _compute_metrics(test_labels, test_probs)
 
@@ -579,7 +605,7 @@ def _main() -> None:
 
     if result.flag == "NO_TORCH":
         sys.exit(2)
-    if result.flag in ("MISSING_SPLIT", "LOAD_ERROR"):
+    if result.flag in ("MISSING_SPLIT", "LOAD_ERROR", "INVALID_PREDICTIONS"):
         sys.exit(2)
     sys.exit(0 if result.passed else 1)
 

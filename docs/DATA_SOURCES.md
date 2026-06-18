@@ -96,6 +96,23 @@ Source contract status before any default-training integration:
 
 ---
 
+## TESS TCE Source Probe
+
+| Property | Value |
+|----------|-------|
+| Provider | STScI / MAST historical ExoMAST endpoint |
+| Historical URL | `https://exo.mast.stsci.edu/api/v0.1/exoplanets/tce/` |
+| Current status | Unavailable as of 2026-06-18: the endpoint returns HTTP 404 |
+| Script | `Skills/tess_tce_fetcher.py` |
+
+This source is **not approved** as a production T1-1 label source. The helper
+now fails closed with `Flag: UNAVAILABLE` for the stale endpoint instead of
+silently reporting an empty or invalid corpus. Do not plan a TESS TCE training
+run from this source until a current provider contract, fields, label semantics,
+rate limits, and offline fixtures are documented.
+
+---
+
 ## Caching Recommendations
 
 - Light curves: cache to `~/.lightkurve-cache/` (Lightkurve default)

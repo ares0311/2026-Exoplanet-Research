@@ -1,15 +1,16 @@
-"""Download TESS Threshold Crossing Event (TCE) list from MAST ExoMAST TAP.
+"""Inventory the experimental TESS Threshold Crossing Event (TCE) source.
 
-Fetches the TESS TCE table, which contains thousands of labeled transit events
-produced by the SPOC pipeline — the primary source of labeled data for CNN
-Tier 2 training.
+The historic ExoMAST TCE endpoint used by this helper is no longer available.
+The helper remains useful as a fail-closed source probe: it reports
+``UNAVAILABLE`` with the provider error instead of treating a stale endpoint as
+an empty training source.
 
 Public API
 ----------
 TceRecord(tic_id, tce_num, period_days, epoch_btjd, duration_hours,
           depth_ppm, snr, disposition, sectors)
 TceFetchResult(records, n_total, n_planet_candidate, n_false_positive,
-               n_not_dispositioned, flag)
+               n_not_dispositioned, flag, error_message)
 fetch_tce_table(*, max_rows, disposition_filter, fetch_fn) -> TceFetchResult
 tce_to_label_rows(result) -> list[dict]
 format_tce_summary(result) -> str
@@ -50,7 +51,8 @@ class TceFetchResult:
     n_planet_candidate: int
     n_false_positive: int
     n_not_dispositioned: int
-    flag: str  # "OK" | "EMPTY" | "INVALID"
+    flag: str  # "OK" | "EMPTY" | "INVALID" | "UNAVAILABLE"
+    error_message: str | None = None
 
 
 def _default_fetch(url: str) -> list[dict]:
@@ -64,6 +66,18 @@ def _default_fetch(url: str) -> list[dict]:
         ctx = None
     with urllib.request.urlopen(url, timeout=30, context=ctx) as resp:
         return json.loads(resp.read().decode())
+
+
+def _empty_result(flag: str, error_message: str | None = None) -> TceFetchResult:
+    return TceFetchResult(
+        records=(),
+        n_total=0,
+        n_planet_candidate=0,
+        n_false_positive=0,
+        n_not_dispositioned=0,
+        flag=flag,
+        error_message=error_message,
+    )
 
 
 def _parse_record(row: dict) -> TceRecord | None:
@@ -108,25 +122,13 @@ def fetch_tce_table(
     url = _EXOMAST_TCE_URL.format(limit=max_rows)
     try:
         raw = fetch_fn(url)
-    except Exception:
-        return TceFetchResult(
-            records=(),
-            n_total=0,
-            n_planet_candidate=0,
-            n_false_positive=0,
-            n_not_dispositioned=0,
-            flag="INVALID",
-        )
+    except Exception as exc:
+        if exc.__class__.__name__ == "HTTPError" and getattr(exc, "code", None) == 404:
+            return _empty_result("UNAVAILABLE", f"{type(exc).__name__}: {exc}")
+        return _empty_result("INVALID", f"{type(exc).__name__}: {exc}")
 
     if not isinstance(raw, list):
-        return TceFetchResult(
-            records=(),
-            n_total=0,
-            n_planet_candidate=0,
-            n_false_positive=0,
-            n_not_dispositioned=0,
-            flag="INVALID",
-        )
+        return _empty_result("INVALID", f"expected list response, got {type(raw).__name__}")
 
     records: list[TceRecord] = []
     for row in raw:
@@ -140,14 +142,7 @@ def fetch_tce_table(
         records.append(rec)
 
     if not records:
-        return TceFetchResult(
-            records=(),
-            n_total=0,
-            n_planet_candidate=0,
-            n_false_positive=0,
-            n_not_dispositioned=0,
-            flag="EMPTY",
-        )
+        return _empty_result("EMPTY")
 
     n_pc = sum(1 for r in records if r.disposition == "PC")
     n_fp = sum(1 for r in records if r.disposition in ("FP", "EB"))
@@ -206,8 +201,10 @@ def format_tce_summary(result: TceFetchResult) -> str:
         "## TESS TCE Fetch Summary\n",
         f"Flag: `{result.flag}` | Total TCEs: {result.n_total}\n",
     ]
-    if result.flag in ("EMPTY", "INVALID"):
+    if result.flag in ("EMPTY", "INVALID", "UNAVAILABLE"):
         lines.append(f"\n_{result.flag}: no records available._\n")
+        if result.error_message:
+            lines.append(f"Provider detail: `{result.error_message}`\n")
         return "\n".join(lines)
 
     lines.append("")

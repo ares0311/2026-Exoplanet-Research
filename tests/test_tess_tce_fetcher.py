@@ -1,6 +1,7 @@
 """Tests for Skills/tess_tce_fetcher.py"""
 import sys
 from pathlib import Path
+from urllib.error import HTTPError
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
@@ -74,6 +75,18 @@ def test_network_error():
         raise ConnectionError("no network")
     r = fetch_tce_table(fetch_fn=bad_fetch)
     assert r.flag == "INVALID"
+    assert r.error_message is not None
+
+
+def test_stale_endpoint_404_reports_unavailable():
+    def bad_fetch(url: str) -> list[dict]:
+        raise HTTPError(url, 404, "Not Found", hdrs=None, fp=None)
+
+    r = fetch_tce_table(fetch_fn=bad_fetch)
+
+    assert r.flag == "UNAVAILABLE"
+    assert r.error_message is not None
+    assert "404" in r.error_message
 
 
 def test_tce_to_label_rows_pc():

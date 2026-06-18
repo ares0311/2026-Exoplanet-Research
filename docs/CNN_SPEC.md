@@ -296,20 +296,20 @@ wrong direction.
 produced test AUC 0.71–0.78. The ceiling is a data-size constraint: 1,425 training
 examples cannot drive this architecture to 0.85 AUC regardless of tuning strategy.
 
-**Authorized path forward (both paths run in parallel):**
+**Current path-forward state:**
 
-- **Path A — More labeled TESS data**: Download additional phase-folded snippets
-  from MAST for ExoFOP confirmed planets and confirmed false positives beyond
-  the current 2,037-snippet corpus. Target: ≥ 5,000 training examples.
-  Gate: test AUC ≥ 0.85 after retraining on expanded corpus.
-
-- **Path B — Kepler→TESS transfer learning**: Pre-train the CNN architecture on
-  tens of thousands of Kepler TCE phase-folded light curves (Shallue & Vanderburg
-  2018 style), then fine-tune the final dense layers on the 1,425 TESS examples.
-  Kepler has ~5,000 confirmed KOIs and ~100,000 TCEs. Pre-training on this corpus
-  supplies a strong feature extractor; TESS fine-tuning adapts to cadence/pixel-scale
-  differences. This is the most robust path to exceeding 0.85 test AUC on the
-  current TESS snippet count.
+- **Path A — More labeled TESS data**: First inventory completed on 2026-06-18.
+  ExoFOP TOI/CTOI added only 56 labeled TIC IDs absent from the v2 corpus
+  (16 positive, 40 negative), too small to justify a long MAST fetch or a
+  production-closing candidate-12 training run. Continue only if a materially
+  larger or higher-quality TESS label source is identified.
+- **Path B — Kepler→TESS transfer learning**: First MPS pretrain/fine-tune
+  attempt improved test AUC to 0.8115 but still failed the raw AUC, calibrated
+  F1, and calibration non-regression gates. Continue only with a materially
+  different transfer strategy or after the TESS training signal improves.
+- **TESS TCE source probe**: The committed `Skills/tess_tce_fetcher.py`
+  endpoint is currently unavailable and must not be treated as the next large
+  TESS label source until a current provider contract is found and documented.
 
 ---
 
@@ -378,7 +378,8 @@ to fit the smaller TESS dataset.
 - **Current production gate**: open with 2,623 usable balanced TESS snippets
   from externally reviewed CP/KP and FP/FA dispositions
 - **Preferred**: 10,000+ with balanced classes
-- Sources: ExoFOP CP/FP, Planet Hunters TESS, TFOP follow-up confirmed FPs
+- Sources: ExoFOP CP/KP and FP/FA, Planet Hunters TESS, TFOP follow-up
+  confirmed FPs, or another documented high-quality TESS-domain source
 - Augmentation: time-shift, flux noise injection, phase jitter
 
 ---
