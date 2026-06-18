@@ -27,14 +27,12 @@ Production gates:
   for Kepler snippets, groups Kepler KOIs by `kepid` to avoid split leakage,
   and records terminal fetch failures in a JSONL sidecar so ordinary resume
   does not reprocess failed rows forever.
-- Kepler pretraining completed locally on 2026-06-18 with checkpoint
+- Kepler pretraining completed locally on 2026-06-18 with the GPU-aware trainer
+  and startup banner `device=mps`; checkpoint
   `checkpoints/cnn_kepler_pretrain/best.pt`, SHA-256
-  `65c49aaa8668fc56b5a466469937bb62beb0acf1680d985c4e570df98d0b7e11`,
-  best epoch 20, best validation loss 0.3840, and best validation AUC 0.9215.
-  This run used the pre-GPU-aware trainer; the checkpoint remains valid for
-  review, but future training should use `device=auto`.
-- Next human-at-Mac action: build TESS splits after the agent reviews the
-  Kepler pretraining result.
+  `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`,
+  best epoch 19, best validation loss 0.3905, and best validation AUC 0.9186.
+- Next human-at-Mac action: build TESS splits from `data/tess_snippets_v2.jsonl`.
 - After every local artifact state change, update the artifact ledger so agents
   that can only see GitHub know whether the corpus, splits, checkpoint, or
   promotion gate is missing, pending, valid, rejected, or approved.
@@ -93,9 +91,9 @@ caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/kepler_cn
 shasum -a 256 checkpoints/cnn_kepler_pretrain/best.pt
 ```
 
-This step completed locally on 2026-06-18 with best validation AUC `0.9215`
-and SHA-256
-`65c49aaa8668fc56b5a466469937bb62beb0acf1680d985c4e570df98d0b7e11`.
+This step completed locally on 2026-06-18 with startup banner `device=mps`,
+best validation AUC `0.9186`, and SHA-256
+`c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`.
 Rerun only if intentionally regenerating the checkpoint after a code or config
 change. Future reruns should print `device=mps` on the recorded M4 Max when
 Metal/MPS is available, unless the operator explicitly chooses CPU.
@@ -109,8 +107,8 @@ caffeinate -i .venv/bin/python Skills/build_cnn_training_data.py data/tess_snipp
 ```
 
 Stop and paste back the split summary and validator result. Do not fine-tune if
-the validator does not report `PASS`. After agent review, update the artifact
-ledger with split counts and validator status.
+the validator does not report `PASS`. After review, update the artifact ledger
+with split counts and validator status.
 
 ## Step 5: TESS Fine-Tuning
 

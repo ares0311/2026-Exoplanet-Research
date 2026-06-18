@@ -64,7 +64,7 @@ When the user must take an action to unblock a gap:
 
 ---
 
-## HANDOFF STATE — 2026-06-17 (READ THIS FIRST)
+## HANDOFF STATE — 2026-06-18 (READ THIS FIRST)
 
 **The only active gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80).**
 
@@ -75,8 +75,8 @@ When the user must take an action to unblock a gap:
 | TESS v2 snippets (`data/tess_snippets_v2.jsonl`) | **COMPLETE** — 2,619 snippets on user's Mac |
 | Kepler snippets (`data/kepler_snippets.jsonl`) | **LOCAL VALIDATED** — 6,837 finite snippets on user's Mac; 617 KOI signatures absent/pending failure-sidecar review |
 | Kepler CNN splits (`data/kepler_cnn_splits/`) | **LOCAL VALIDATED** — validator PASS; train/val/test = 4,741 / 1,060 / 1,036 |
-| Kepler pretraining checkpoint (`checkpoints/cnn_kepler_pretrain/best.pt`) | **LOCAL PRETRAINED** — SHA-256 `65c49aaa8668fc56b5a466469937bb62beb0acf1680d985c4e570df98d0b7e11`; best val AUC 0.9215 |
-| CNN training pipeline | **UNBLOCKED TO TESS FINE-TUNING** — build TESS splits, fine-tune from reviewed Kepler pretrain checkpoint, then run production evaluator |
+| Kepler pretraining checkpoint (`checkpoints/cnn_kepler_pretrain/best.pt`) | **LOCAL PRETRAINED ON MPS** — SHA-256 `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`; best val AUC 0.9186 |
+| CNN training pipeline | **UNBLOCKED TO TESS FINE-TUNING** — build TESS splits, fine-tune from the MPS Kepler pretrain checkpoint, then run production evaluator |
 | XGBoost Tier 1 | Done |
 | Stacking Tier 3 scaffold | Done |
 
@@ -94,7 +94,7 @@ shasum -a 256 checkpoints/cnn_kepler_pretrain/best.pt
 - If Kepler is **6,837** and the split validator reports **PASS**, do **not**
   rerun the fetch loop.
 - If the Kepler pretraining SHA is
-  `65c49aaa8668fc56b5a466469937bb62beb0acf1680d985c4e570df98d0b7e11`, proceed
+  `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`, proceed
   to `docs/CNN_PRODUCTION_RUNBOOK.md` Step 4.
 - If the Kepler pretraining checkpoint is missing or has a different SHA, stop
   and review the local artifact ledger and runbook before training further.

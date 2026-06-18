@@ -1188,7 +1188,7 @@ These large data files live only on the user's local Mac. They are never committ
 |---|---|---|---|
 | `data/tess_snippets_v2.jsonl` | Local Mac | **COMPLETE** — 2,619 snippets | Merged from `tess_snippets.jsonl` + `tess_snippets_expansion.jsonl`; 56 targets had permanent MAST 404s and were skipped |
 | `data/kepler_snippets.jsonl` | Local Mac | **LOCAL VALIDATED** — 6,837 finite snippets as of 2026-06-17 | JSON parse PASS; zero non-finite flux rows; zero duplicate resume keys; split validator PASS |
-| `checkpoints/cnn_kepler_pretrain/best.pt` | Local Mac | **LOCAL PRETRAINED** — SHA-256 `65c49aaa8668fc56b5a466469937bb62beb0acf1680d985c4e570df98d0b7e11` | Best epoch 20, best val loss 0.3840, best val AUC 0.9215; produced before GPU-aware trainer patch |
+| `checkpoints/cnn_kepler_pretrain/best.pt` | Local Mac | **LOCAL PRETRAINED ON MPS** — SHA-256 `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7` | Best epoch 19, best val loss 0.3905, best val AUC 0.9186; startup banner confirmed `device=mps` |
 
 **Kepler retry command** (only if the human explicitly wants to retry missing
 rows after the validated split; do not use an infinite wrapper):
@@ -1216,14 +1216,14 @@ wc -l data/kepler_snippets.jsonl data/tess_snippets_v2.jsonl
 shasum -a 256 checkpoints/cnn_kepler_pretrain/best.pt
 ```
 
-- **6,837 Kepler lines, split validator PASS, and pretraining SHA `65c49aaa8668fc56b5a466469937bb62beb0acf1680d985c4e570df98d0b7e11`** → proceed to `docs/CNN_PRODUCTION_RUNBOOK.md` Step 4 for TESS split build, then Step 5 fine-tuning.
+- **6,837 Kepler lines, split validator PASS, and pretraining SHA `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`** → proceed to `docs/CNN_PRODUCTION_RUNBOOK.md` Step 4 for TESS split build, then Step 5 fine-tuning.
 - **Any other Kepler line count, validator FAIL, missing checkpoint, or different SHA** → stop and inspect the local artifact before training; do not start another infinite fetch loop.
 
 #### Corpus status
 
 - **TESS v2**: `data/tess_snippets_v2.jsonl` — 2,619 snippets (COMPLETE; 56 targets had permanent MAST 404s)
 - **Kepler**: `data/kepler_snippets.jsonl` — LOCAL VALIDATED as of 2026-06-17; 6,837 finite snippets; labels negative=4,280 and positive=2,557; split validator PASS with train/val/test = 4,741 / 1,060 / 1,036
-- **Kepler pretrain**: `checkpoints/cnn_kepler_pretrain/best.pt` — LOCAL PRETRAINED as of 2026-06-18; SHA-256 `65c49aaa8668fc56b5a466469937bb62beb0acf1680d985c4e570df98d0b7e11`; best val AUC 0.9215
+- **Kepler pretrain**: `checkpoints/cnn_kepler_pretrain/best.pt` — LOCAL PRETRAINED ON MPS as of 2026-06-18; SHA-256 `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`; best val AUC 0.9186
 
 #### CNN production runbook
 

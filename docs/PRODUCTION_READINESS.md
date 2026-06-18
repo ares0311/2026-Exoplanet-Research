@@ -53,7 +53,7 @@ production scoring.
   - **Path B — Kepler→TESS transfer learning**: Pre-train CNN on the validated Kepler phase-folded corpus; fine-tune final dense layers on TESS v2 examples; most robust path to exceeding 0.85 test AUC on current TESS snippet count
 - **Current authorized runbook**: `docs/CNN_PRODUCTION_RUNBOOK.md`
 - **Current promotion gate**: raw held-out test AUC ≥ 0.85; calibrated held-out test F1 ≥ 0.80; Platt calibration must not worsen held-out test Brier score or ECE
-- **Kepler pretraining gate**: **LOCAL PRETRAINED** — `checkpoints/cnn_kepler_pretrain/best.pt`, SHA-256 `65c49aaa8668fc56b5a466469937bb62beb0acf1680d985c4e570df98d0b7e11`; Python 3.14.3 venv, PyTorch 2.12.0; best epoch 20, best validation loss 0.3840, best validation AUC 0.9215; final epoch 35 val AUC 0.9113; produced before GPU-aware trainer patch and remains local/ignored pending transfer-learning review
+- **Kepler pretraining gate**: **LOCAL PRETRAINED ON MPS** — `checkpoints/cnn_kepler_pretrain/best.pt`, SHA-256 `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`; Python 3.14.3 venv, PyTorch 2.12.0; startup banner `device=mps`; best epoch 19, best validation loss 0.3905, best validation AUC 0.9186; final epoch 34 val AUC 0.9123; remains local/ignored pending TESS fine-tuning and production evaluation
 - **Current data gate**: Kepler split validator passed on the rebuilt finite-flux corpus; next gate is TESS split generation and validation before fine-tuning
 - **Gate check**: `.venv/bin/python Skills/evaluate_cnn_checkpoint.py --split-dir data/tess_cnn_splits --checkpoint checkpoints/cnn_tess_finetuned/best.pt --output-calibration checkpoints/cnn_tess_finetuned/calibration.json`
 - **Architecture spec**: `docs/CNN_SPEC.md`
