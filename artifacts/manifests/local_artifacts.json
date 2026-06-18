@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "last_updated": "2026-06-17",
+  "last_updated": "2026-06-18",
   "production_gap": "T1-1: Production Tier 2 CNN Checkpoint",
   "policy": {
     "standard_operator_cadence": "git add .",
@@ -90,7 +90,7 @@
         "verified_on": "2026-06-17"
       },
       "validation_gate": "Skills/cnn_split_validator.py data/kepler_cnn_splits reported PASS on 2026-06-17.",
-      "next_action": "Run Kepler pretraining from data/kepler_cnn_splits."
+      "next_action": "Retain for reproducibility; Kepler pretraining completed from these splits."
     },
     {
       "path": "data/tess_cnn_splits/",
@@ -98,15 +98,29 @@
       "status": "pending_regeneration",
       "git_policy": "ignored",
       "validation_gate": "Skills/cnn_split_validator.py data/tess_cnn_splits must report PASS.",
-      "next_action": "Generate after Kepler pretraining review."
+      "next_action": "Generate from data/tess_snippets_v2.jsonl before TESS fine-tuning."
     },
     {
       "path": "checkpoints/cnn_kepler_pretrain/",
       "kind": "checkpoint_dir",
-      "status": "pending_training",
+      "status": "local_pretrained",
       "git_policy": "ignored",
-      "validation_gate": "Agent must review final training result and SHA-256 before TESS fine-tuning.",
-      "next_action": "Train only from validated Kepler splits."
+      "last_known": {
+        "checkpoint": "checkpoints/cnn_kepler_pretrain/best.pt",
+        "sha256": "65c49aaa8668fc56b5a466469937bb62beb0acf1680d985c4e570df98d0b7e11",
+        "python": "3.14.3",
+        "torch": "2.12.0",
+        "best_epoch": 20,
+        "best_val_loss": 0.384,
+        "best_val_auc": 0.9215,
+        "epochs_run": 35,
+        "final_epoch": 35,
+        "final_val_auc": 0.9113,
+        "produced_before_gpu_aware_trainer": true,
+        "verified_on": "2026-06-18"
+      },
+      "validation_gate": "Use as transfer-learning source only; production approval still requires TESS fine-tuning plus evaluator PASS.",
+      "next_action": "Fine-tune TESS model from checkpoints/cnn_kepler_pretrain/best.pt after TESS split validation."
     },
     {
       "path": "checkpoints/cnn_tess_finetuned/",

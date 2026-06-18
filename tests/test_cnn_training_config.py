@@ -55,6 +55,7 @@ class TestDefaultConfig:
         assert cfg.augmentation_flip is False
         assert cfg.augmentation_shift_bins == 0
         assert cfg.use_batch_norm is False
+        assert cfg.device == "auto"
 
 
 class TestValidateConfig:
@@ -125,6 +126,13 @@ class TestValidateConfig:
         assert result.ok is False
         assert any("shift_bins" in e for e in result.errors)
 
+    def test_invalid_device(self) -> None:
+        import dataclasses
+        cfg = dataclasses.replace(default_config(), device="tpu")
+        result = validate_config(cfg)
+        assert result.ok is False
+        assert any("device" in e for e in result.errors)
+
 
 class TestSerialisation:
     def test_round_trip(self) -> None:
@@ -169,6 +177,7 @@ class TestSerialisation:
             "lr_scheduler_factor",
             "min_learning_rate",
             "gradient_clip_norm",
+            "device",
             "augment",
             "augmentation_noise_fraction",
             "augmentation_scale_min",
@@ -191,6 +200,7 @@ class TestSerialisation:
             "lr_scheduler_factor",
             "min_learning_rate",
             "gradient_clip_norm",
+            "device",
             "augmentation_noise_fraction",
             "augmentation_scale_min",
             "augmentation_flip",
@@ -205,6 +215,7 @@ class TestSerialisation:
         assert config.dense_dropout_rates == (0.5, 0.5)
         assert config.weight_decay == 0.0
         assert config.selection_metric == "val_loss"
+        assert config.device == "auto"
         assert config.augmentation_flip is False
         assert config.augmentation_shift_bins == 0
         assert config.use_batch_norm is False

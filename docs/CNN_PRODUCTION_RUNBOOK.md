@@ -27,7 +27,14 @@ Production gates:
   for Kepler snippets, groups Kepler KOIs by `kepid` to avoid split leakage,
   and records terminal fetch failures in a JSONL sidecar so ordinary resume
   does not reprocess failed rows forever.
-- Next human-at-Mac action: run Kepler pretraining from the validated splits.
+- Kepler pretraining completed locally on 2026-06-18 with checkpoint
+  `checkpoints/cnn_kepler_pretrain/best.pt`, SHA-256
+  `65c49aaa8668fc56b5a466469937bb62beb0acf1680d985c4e570df98d0b7e11`,
+  best epoch 20, best validation loss 0.3840, and best validation AUC 0.9215.
+  This run used the pre-GPU-aware trainer; the checkpoint remains valid for
+  review, but future training should use `device=auto`.
+- Next human-at-Mac action: build TESS splits after the agent reviews the
+  Kepler pretraining result.
 - After every local artifact state change, update the artifact ledger so agents
   that can only see GitHub know whether the corpus, splits, checkpoint, or
   promotion gate is missing, pending, valid, rejected, or approved.
@@ -86,9 +93,12 @@ caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/kepler_cn
 shasum -a 256 checkpoints/cnn_kepler_pretrain/best.pt
 ```
 
-Paste back the final training result and SHA-256. The agent reviews this before
-TESS fine-tuning. After agent review, update the artifact ledger with checkpoint
-path, SHA-256, and pretraining status.
+This step completed locally on 2026-06-18 with best validation AUC `0.9215`
+and SHA-256
+`65c49aaa8668fc56b5a466469937bb62beb0acf1680d985c4e570df98d0b7e11`.
+Rerun only if intentionally regenerating the checkpoint after a code or config
+change. Future reruns should print `device=mps` on the recorded M4 Max when
+Metal/MPS is available, unless the operator explicitly chooses CPU.
 
 ## Step 4: Build TESS Splits
 
@@ -112,7 +122,9 @@ shasum -a 256 checkpoints/cnn_tess_finetuned/best.pt
 
 Paste back the final training result and SHA-256.
 After agent review, update the artifact ledger with checkpoint path, SHA-256,
-and fine-tuning status.
+and fine-tuning status. On the recorded M4 Max, the training startup banner
+should show `device=mps` when PyTorch Metal/MPS is available; paste back the
+banner line too if it does not.
 
 ## Step 6: Production Gate Evaluation
 

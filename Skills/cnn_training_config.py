@@ -9,7 +9,7 @@ Public API
 ConvLayerSpec(out_channels, kernel_size, pool_size)
 CnnTrainingConfig(n_bins, conv_layers, dense_units, dropout_rate,
                   dense_dropout_rates, optimizer, learning_rate, batch_size, max_epochs,
-                  early_stopping_patience, augment, seed, checkpoint_dir)
+                  early_stopping_patience, device, augment, seed, checkpoint_dir)
 CnnConfigValidation(ok, errors)
 default_config() -> CnnTrainingConfig
 load_config(path) -> CnnTrainingConfig
@@ -59,6 +59,7 @@ class CnnTrainingConfig:
     lr_scheduler_factor: float
     min_learning_rate: float
     gradient_clip_norm: float
+    device: str
     augment: bool
     augmentation_noise_fraction: float
     augmentation_scale_min: float
@@ -112,6 +113,7 @@ def default_config() -> CnnTrainingConfig:
         lr_scheduler_factor=0.5,
         min_learning_rate=1e-5,
         gradient_clip_norm=5.0,
+        device="auto",
         augment=True,
         augmentation_noise_fraction=0.02,
         augmentation_scale_min=0.95,
@@ -156,6 +158,7 @@ def _config_to_dict(config: CnnTrainingConfig) -> dict:
         "lr_scheduler_factor": config.lr_scheduler_factor,
         "min_learning_rate": config.min_learning_rate,
         "gradient_clip_norm": config.gradient_clip_norm,
+        "device": config.device,
         "augment": config.augment,
         "augmentation_noise_fraction": config.augmentation_noise_fraction,
         "augmentation_scale_min": config.augmentation_scale_min,
@@ -205,6 +208,7 @@ def _config_from_dict(d: dict) -> CnnTrainingConfig:
         lr_scheduler_factor=float(d.get("lr_scheduler_factor", 0.5)),
         min_learning_rate=float(d.get("min_learning_rate", 1e-5)),
         gradient_clip_norm=float(d.get("gradient_clip_norm", 0.0)),
+        device=str(d.get("device", "auto")),
         augment=bool(d["augment"]),
         augmentation_noise_fraction=float(d.get("augmentation_noise_fraction", 0.0)),
         augmentation_scale_min=float(d.get("augmentation_scale_min", 1.0)),
@@ -338,6 +342,11 @@ def validate_config(config: CnnTrainingConfig) -> CnnConfigValidation:
         errors.append("min_learning_rate must be in (0, learning_rate]")
     if config.gradient_clip_norm < 0.0:
         errors.append("gradient_clip_norm must be >= 0")
+    if config.device not in {"auto", "cpu", "mps", "cuda"}:
+        errors.append(
+            "device must be one of 'auto', 'cpu', 'mps', or 'cuda', "
+            f"got '{config.device}'"
+        )
     if config.augmentation_noise_fraction < 0.0:
         errors.append("augmentation_noise_fraction must be >= 0")
     if not 0.0 < config.augmentation_scale_min <= config.augmentation_scale_max:
@@ -397,6 +406,7 @@ def format_config(config: CnnTrainingConfig) -> str:
         f"- batch_size: {config.batch_size}",
         f"- max_epochs: {config.max_epochs}  patience={config.early_stopping_patience}",
         f"- selection_metric: {config.selection_metric}",
+        f"- device: {config.device}",
         f"- augment: {config.augment}  noise_fraction={config.augmentation_noise_fraction}",
         f"- augmentation_flip: {config.augmentation_flip}"
         f"  shift_bins={config.augmentation_shift_bins}",

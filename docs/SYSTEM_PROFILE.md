@@ -9,7 +9,9 @@ not replace it with chat context, private notes, or untracked local state when
 choosing worker counts, batch sizes, cache behavior, or long-running job
 recipes.
 
-Use this as an optimization guide, not as a portability requirement. The codebase should still run on smaller systems unless a task explicitly documents a higher local resource target.
+Use this as an optimization guide and default-sizing directive, not as a
+portability requirement. The codebase should still run on smaller systems
+unless a task explicitly documents a higher local resource target.
 
 Sensitive machine identifiers such as serial number, hardware UUID, provisioning UDID, and user account name are intentionally not recorded.
 
@@ -46,7 +48,17 @@ Prefer these defaults when running project code on this machine:
 - Chunk large target or sector sweeps by target, sector, or candidate batch rather than loading all mission data into memory at once.
 - Prefer memory-mapped arrays, columnar files, or streaming reads for large intermediate products.
 - Cache downloaded raw data and expensive intermediate products locally, but do not commit large mission data or generated cache directories.
-- Use the 40-core GPU or Metal acceleration only as an optional optimization path. CPU implementations should remain the default baseline until GPU behavior is tested and reproducible.
+- For AI/ML training, prefer the 40-core GPU through PyTorch Metal/MPS when
+  available. Training code should expose `device=auto` and print the resolved
+  device at startup; CPU should be an explicit override or fallback, not the
+  silent default on this Mac.
+- For non-training CPU-local batch work, prefer bounded multiprocessing or
+  multithreading over strictly serial loops when it is scientifically safe and
+  the workload is large enough to benefit. Start near the worker counts above,
+  keep concurrency configurable, and measure before raising defaults.
+- For live external-service workloads, keep concurrency lower and polite even
+  on this machine. Avoid defaults that invite throttling or repeated failed
+  network calls.
 
 ---
 
@@ -99,6 +111,17 @@ For a single large numerical job, allow native libraries to use more threads, co
 
 - Notebooks may use this system's memory and CPU headroom for exploration, but production code should keep resource limits explicit.
 - Reports should record enough provenance to reproduce results on this or another machine.
+
+### AI/ML Training
+
+- PyTorch training should use `device=auto` defaults that resolve to `mps` on
+  this Apple Silicon Mac when `torch.backends.mps.is_available()` is true.
+- Save checkpoints in a portable CPU state-dict format even when training uses
+  MPS or another accelerator.
+- Preserve deterministic seeds where supported, but record device and runtime
+  details because accelerator kernels may differ numerically from CPU kernels.
+- Keep batch size configurable. Increase batch size only after a measured run
+  confirms that validation behavior and checkpoint quality remain acceptable.
 
 ---
 

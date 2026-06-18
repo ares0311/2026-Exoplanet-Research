@@ -521,3 +521,48 @@ agents blind; committing the files themselves makes Git noisy and unsafe.
 - Keeps GitHub useful for agents that cannot see local artifacts.
 - Avoids committing large, rejected, or regenerable runtime products.
 - Preserves a reproducible path for production-approved CNN inference artifacts.
+
+---
+
+## DECISION-018: Optimize Local Runtime Defaults From `docs/SYSTEM_PROFILE.md`
+
+**Date:** 2026-06-18
+**Status:** Accepted
+
+### Context
+
+The project now depends on long-running local jobs for T1-1: CNN pretraining,
+TESS fine-tuning, held-out evaluation, and future artifact promotion. The
+operator's committed local profile is a MacBook Pro M4 Max with 16 CPU cores,
+a 40-core Apple GPU, Metal support, and 64 GB unified memory. Prior CNN
+training code used CPU silently, leaving available accelerator hardware idle.
+
+At the same time, the repository must remain portable and scientifically
+reproducible. Local optimization must not hardcode Apple-only assumptions into
+candidate detection, scoring, classification, or external-service behavior.
+
+### Decision
+
+1. Treat `docs/SYSTEM_PROFILE.md` as the authoritative default-sizing directive
+   for performance-sensitive code and long-running recipes.
+2. AI/ML training must use accelerator-first configurable defaults. PyTorch
+   training should use `device=auto`, resolving to Apple Metal/MPS when
+   available, then CUDA, and then CPU fallback.
+3. Training scripts must print the resolved device in the startup banner and
+   save portable CPU-backed checkpoints even when training uses an accelerator.
+4. CPU-local batch workloads should prefer bounded multiprocessing or
+   multithreading over strictly serial loops when that is scientifically safe
+   and operationally useful.
+5. Live external-service workloads must remain politely bounded and
+   configurable; do not use the local CPU count as permission to overwhelm MAST,
+   ExoFOP, NASA Exoplanet Archive, or similar services.
+
+### Rationale
+
+- Directly supports T1-1 by making CNN training use the local GPU where
+  available.
+- Makes performance behavior visible in console logs instead of hidden inside
+  runtime state.
+- Preserves portability through CLI/config overrides and CPU fallback.
+- Prevents future agents from treating serial CPU code as acceptable by
+  default for large local jobs.
