@@ -29,7 +29,7 @@ production scoring.
 ### T1-1: Production Tier 2 CNN Checkpoint
 
 - **What is missing**: A CNN checkpoint that passes held-out performance and calibration gates
-- **Gate status**: **OPEN** — Kepler pretraining is locally complete; awaiting TESS split generation, TESS fine-tuning, and held-out production evaluation from `docs/CNN_PRODUCTION_RUNBOOK.md`
+- **Gate status**: **OPEN** — Kepler pretraining and TESS split generation are locally complete; awaiting TESS fine-tuning and held-out production evaluation from `docs/CNN_PRODUCTION_RUNBOOK.md`
 - **Code status**: Training and state-dict inference paths are operational; the package scorer reconstructs the trained architecture and fails closed when loading fails
 - **Prior local corpus status**: **VALID as of 2026-06-12** — 2,037 snippets (1,012 positive CP+KP, 1,025 negative FP+FA, ratio 0.99); zero-epoch corpus retired and rebuilt from scratch with valid BJD epochs; label bug fixed (KP→1); MAST throttling fix applied (`bbb0877`)
 - **Local corpus status**: **KEPLER LOCAL VALIDATED** — TESS v2 complete at 2,619 snippets; Kepler finite rebuild has 6,837 parseable snippets with zero non-finite flux rows, zero duplicate resume keys, labels negative=4,280 and positive=2,557; `data/kepler_cnn_splits` validator PASS with train/val/test = 4,741 / 1,060 / 1,036
@@ -54,7 +54,7 @@ production scoring.
 - **Current authorized runbook**: `docs/CNN_PRODUCTION_RUNBOOK.md`
 - **Current promotion gate**: raw held-out test AUC ≥ 0.85; calibrated held-out test F1 ≥ 0.80; Platt calibration must not worsen held-out test Brier score or ECE
 - **Kepler pretraining gate**: **LOCAL PRETRAINED ON MPS** — `checkpoints/cnn_kepler_pretrain/best.pt`, SHA-256 `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`; Python 3.14.3 venv, PyTorch 2.12.0; startup banner `device=mps`; best epoch 19, best validation loss 0.3905, best validation AUC 0.9186; final epoch 34 val AUC 0.9123; remains local/ignored pending TESS fine-tuning and production evaluation
-- **Current data gate**: Kepler split validator passed on the rebuilt finite-flux corpus; next gate is TESS split generation and validation before fine-tuning
+- **Current data gate**: Kepler and TESS split validators passed; `data/tess_cnn_splits` has train/val/test = 1,477 / 318 / 315; next gate is TESS fine-tuning from the MPS Kepler pretraining checkpoint
 - **Gate check**: `.venv/bin/python Skills/evaluate_cnn_checkpoint.py --split-dir data/tess_cnn_splits --checkpoint checkpoints/cnn_tess_finetuned/best.pt --output-calibration checkpoints/cnn_tess_finetuned/calibration.json`
 - **Architecture spec**: `docs/CNN_SPEC.md`
 - **Artifact policy**: Keep `git add .` safe through `.gitignore`; commit local artifact status in the artifact ledger; commit the validated production checkpoint, calibration metadata, model registry entry, and reproducibility manifest under `models/` only after all production-readiness checks pass and the human approves promotion
@@ -150,8 +150,7 @@ These are enforced in code and must never be bypassed:
 
 | Blocker | What Is Needed | Who |
 |---|---|---|
-| TESS split build | Run `docs/CNN_PRODUCTION_RUNBOOK.md` Step 4 on the local Mac in `.venv` | Human |
-| CNN fine-tuning/evaluation run | Run `docs/CNN_PRODUCTION_RUNBOOK.md` Step 5 and Step 6 after TESS split validation | Human |
+| CNN fine-tuning/evaluation run | Run `docs/CNN_PRODUCTION_RUNBOOK.md` Step 5 and Step 6 using the validated TESS splits | Human |
 | CNN production promotion | Validate, calibrate, register, and commit only a checkpoint that passes held-out gates | Agent + human approval |
 | Stacking weight calibration | Tune blend weights on held-out calibration set | Agent after T1-1 resolved |
 

@@ -1187,6 +1187,7 @@ These large data files live only on the user's local Mac. They are never committ
 | File | Location | Status | Notes |
 |---|---|---|---|
 | `data/tess_snippets_v2.jsonl` | Local Mac | **COMPLETE** — 2,619 snippets | Merged from `tess_snippets.jsonl` + `tess_snippets_expansion.jsonl`; 56 targets had permanent MAST 404s and were skipped |
+| `data/tess_cnn_splits/` | Local Mac | **LOCAL VALIDATED** — train/val/test = 1,477 / 318 / 315 | Validator PASS; train labels negative=766 positive=711; val negative=166 positive=152; test negative=163 positive=152 |
 | `data/kepler_snippets.jsonl` | Local Mac | **LOCAL VALIDATED** — 6,837 finite snippets as of 2026-06-17 | JSON parse PASS; zero non-finite flux rows; zero duplicate resume keys; split validator PASS |
 | `checkpoints/cnn_kepler_pretrain/best.pt` | Local Mac | **LOCAL PRETRAINED ON MPS** — SHA-256 `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7` | Best epoch 19, best val loss 0.3905, best val AUC 0.9186; startup banner confirmed `device=mps` |
 
@@ -1204,7 +1205,7 @@ fix the durable resume ledger before asking the human to run it again.
 
 ### Next Step — HANDOFF 2026-06-18
 
-**Status: Kepler JSONL, Kepler split, and Kepler pretraining checkpoint are locally validated; proceed to TESS split build and fine-tuning.**
+**Status: Kepler JSONL, Kepler split, Kepler pretraining checkpoint, and TESS split are locally validated; proceed to TESS fine-tuning.**
 
 #### Incoming agent: do this first
 
@@ -1213,15 +1214,17 @@ Ask the user to paste the output of:
 git pull --ff-only origin main
 wc -l data/kepler_snippets.jsonl data/tess_snippets_v2.jsonl
 .venv/bin/python Skills/cnn_split_validator.py data/kepler_cnn_splits
+.venv/bin/python Skills/cnn_split_validator.py data/tess_cnn_splits
 shasum -a 256 checkpoints/cnn_kepler_pretrain/best.pt
 ```
 
-- **6,837 Kepler lines, split validator PASS, and pretraining SHA `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`** → proceed to `docs/CNN_PRODUCTION_RUNBOOK.md` Step 4 for TESS split build, then Step 5 fine-tuning.
+- **6,837 Kepler lines, Kepler split validator PASS, TESS split validator PASS, and pretraining SHA `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`** → proceed to `docs/CNN_PRODUCTION_RUNBOOK.md` Step 5 for TESS fine-tuning.
 - **Any other Kepler line count, validator FAIL, missing checkpoint, or different SHA** → stop and inspect the local artifact before training; do not start another infinite fetch loop.
 
 #### Corpus status
 
 - **TESS v2**: `data/tess_snippets_v2.jsonl` — 2,619 snippets (COMPLETE; 56 targets had permanent MAST 404s)
+- **TESS split**: `data/tess_cnn_splits/` — LOCAL VALIDATED as of 2026-06-18; total examples 2,110; train/val/test = 1,477 / 318 / 315; validator PASS
 - **Kepler**: `data/kepler_snippets.jsonl` — LOCAL VALIDATED as of 2026-06-17; 6,837 finite snippets; labels negative=4,280 and positive=2,557; split validator PASS with train/val/test = 4,741 / 1,060 / 1,036
 - **Kepler pretrain**: `checkpoints/cnn_kepler_pretrain/best.pt` — LOCAL PRETRAINED ON MPS as of 2026-06-18; SHA-256 `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`; best val AUC 0.9186
 

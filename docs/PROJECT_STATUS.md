@@ -109,26 +109,26 @@ without relying on chat context or local terminal output.
   `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`;
   startup banner `device=mps`; best epoch 19, best validation loss 0.3905,
   best validation AUC 0.9186.
+- `data/tess_cnn_splits` passed validation on 2026-06-18 with total examples
+  2,110 and train/val/test = 1,477 / 318 / 315.
 - Architecture details: `docs/CNN_SPEC.md`.
 - Human local runbook: `docs/CNN_PRODUCTION_RUNBOOK.md`.
-- Next outside blocker: build and validate TESS CNN splits on the user's Mac,
-  then fine-tune from the MPS Kepler pretraining checkpoint.
+- Next outside blocker: fine-tune from the MPS Kepler pretraining checkpoint
+  on the validated TESS CNN splits.
 
 ---
 
 ## Next Actions
 
 1. Update `docs/LOCAL_ARTIFACT_LEDGER.md` and `artifacts/manifests/local_artifacts.json` after each local artifact state change so GitHub records the current corpus/split/checkpoint status.
-2. Continue with `docs/CNN_PRODUCTION_RUNBOOK.md` Step 4 for TESS split build
-   and validation.
-3. Run Step 5 TESS fine-tuning from
+2. Run Step 5 TESS fine-tuning from
    `checkpoints/cnn_kepler_pretrain/best.pt`, then paste back the final
    training result plus SHA-256.
-4. Run production gate evaluation. Promote nothing unless the evaluator reports
+3. Run production gate evaluation. Promote nothing unless the evaluator reports
    `Flag: PASS`, raw test AUC is at least 0.85, calibrated test F1 is at least
    0.80, and calibrated Brier/ECE are no worse than raw.
-5. If the gate passes, request explicit human approval to promote the checkpoint; the agent then updates `models/`, registry metadata, readiness docs, artifact ledger, and GitHub.
-6. If the gate fails, document the rejection in `docs/PRODUCTION_READINESS.md` and the artifact ledger, then start the next T1-1 planning cycle from the observed failure mode.
+4. If the gate passes, request explicit human approval to promote the checkpoint; the agent then updates `models/`, registry metadata, readiness docs, artifact ledger, and GitHub.
+5. If the gate fails, document the rejection in `docs/PRODUCTION_READINESS.md` and the artifact ledger, then start the next T1-1 planning cycle from the observed failure mode.
 
 Live-network note: the CNN gate check was not run during the latest local
 maintenance pass because it queries ExoFOP and requires intentional live network

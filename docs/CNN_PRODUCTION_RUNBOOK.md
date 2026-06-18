@@ -32,7 +32,10 @@ Production gates:
   `checkpoints/cnn_kepler_pretrain/best.pt`, SHA-256
   `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`,
   best epoch 19, best validation loss 0.3905, and best validation AUC 0.9186.
-- Next human-at-Mac action: build TESS splits from `data/tess_snippets_v2.jsonl`.
+- `data/tess_cnn_splits`: locally validated on 2026-06-18 with validator
+  PASS; total examples = 2,110; train/val/test = 1,477 / 318 / 315.
+- Next human-at-Mac action: run TESS fine-tuning from the MPS Kepler
+  pretraining checkpoint.
 - After every local artifact state change, update the artifact ledger so agents
   that can only see GitHub know whether the corpus, splits, checkpoint, or
   promotion gate is missing, pending, valid, rejected, or approved.
@@ -109,6 +112,11 @@ caffeinate -i .venv/bin/python Skills/build_cnn_training_data.py data/tess_snipp
 Stop and paste back the split summary and validator result. Do not fine-tune if
 the validator does not report `PASS`. After review, update the artifact ledger
 with split counts and validator status.
+
+This step completed locally on 2026-06-18 with validator `PASS`; total
+examples `2,110`; train/val/test `1,477 / 318 / 315`; train labels
+negative=766 positive=711; val negative=166 positive=152; test negative=163
+positive=152.
 
 ## Step 5: TESS Fine-Tuning
 
