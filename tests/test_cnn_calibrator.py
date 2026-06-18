@@ -1,6 +1,7 @@
 """Tests for Skills.cnn_calibrator (13 tests)."""
 from __future__ import annotations
 
+import math
 import tempfile
 from pathlib import Path
 
@@ -59,6 +60,32 @@ class TestFitCnnCalibration:
 
     def test_mismatched_lengths_invalid(self) -> None:
         result = fit_cnn_calibration([1, 0, 1], [0.9, 0.1])
+        assert result.flag == "INVALID"
+
+    def test_non_finite_probability_invalid(self) -> None:
+        result = fit_cnn_calibration([1, 0, 1, 0], [0.9, 0.1, math.nan, 0.2])
+        assert result.flag == "INVALID"
+
+    def test_out_of_range_probability_invalid(self) -> None:
+        result = fit_cnn_calibration([1, 0, 1, 0], [0.9, 0.1, 1.2, 0.2])
+        assert result.flag == "INVALID"
+
+    def test_string_probability_invalid(self) -> None:
+        result = fit_cnn_calibration(
+            [1, 0, 1, 0],
+            [0.9, 0.1, "0.8", 0.2],  # type: ignore[list-item]
+        )
+        assert result.flag == "INVALID"
+
+    def test_non_binary_label_invalid(self) -> None:
+        result = fit_cnn_calibration([1, 0, 2, 0], [0.9, 0.1, 0.8, 0.2])
+        assert result.flag == "INVALID"
+
+    def test_bool_label_invalid(self) -> None:
+        result = fit_cnn_calibration(
+            [1, 0, True, 0],  # type: ignore[list-item]
+            [0.9, 0.1, 0.8, 0.2],
+        )
         assert result.flag == "INVALID"
 
     def test_platt_parameters_are_floats(self) -> None:
