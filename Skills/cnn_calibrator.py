@@ -1,6 +1,6 @@
 """Platt-scaling calibration for CNN raw output probabilities.
 
-Fits a sigmoid calibration function P_cal = 1/(1+exp(A*f+B)) using
+Fits a sigmoid calibration function P_cal = 1/(1+exp(-(A*f+B))) using
 gradient descent on binary cross-entropy loss (pure Python, no external deps).
 
 Public API
@@ -64,6 +64,22 @@ def _brier_score(y_true: list[int], y_prob: list[float]) -> float:
     return sum((p - y) ** 2 for y, p in zip(y_true, y_prob, strict=True)) / len(y_true)
 
 
+def _valid_inputs(y_true: list[int], y_prob: list[float]) -> bool:
+    """Validate binary labels and finite probabilities before calibration."""
+    if len(y_true) != len(y_prob):
+        return False
+    labels_valid = all(isinstance(y, int) and not isinstance(y, bool) and y in (0, 1)
+                       for y in y_true)
+    probs_valid = all(
+        isinstance(p, int | float)
+        and not isinstance(p, bool)
+        and math.isfinite(float(p))
+        and 0.0 <= float(p) <= 1.0
+        for p in y_prob
+    )
+    return labels_valid and probs_valid
+
+
 def _log_loss_grad(
     y_true: list[int],
     y_prob: list[float],
@@ -113,7 +129,7 @@ def fit_cnn_calibration(
     """
     fitted_at = datetime.now(UTC).isoformat()
 
-    if len(y_true) != len(y_prob):
+    if not _valid_inputs(y_true, y_prob):
         return CnnCalibrationResult(
             method="platt",
             platt_a=1.0,
