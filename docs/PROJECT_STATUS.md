@@ -118,10 +118,13 @@ without relying on chat context or local terminal output.
 - Production evaluation rejected that fine-tuned checkpoint: raw test AUC
   0.8115, raw test F1 0.7523, calibrated test F1 0.7508, calibrated Brier
   0.1966, and calibrated ECE 0.1152. It must not be promoted into `models/`.
+- Path A TESS expansion was approved on 2026-06-18 as the next T1-1 strategy:
+  inventory ExoFOP TOI/CTOI labels absent from `data/tess_snippets_v2.jsonl`,
+  fetch snippets only after agent review of target count and label balance,
+  then build validated `data/tess_cnn_splits_v3` before candidate-12 training.
 - Architecture details: `docs/CNN_SPEC.md`.
 - Human local runbook: `docs/CNN_PRODUCTION_RUNBOOK.md`.
-- Next outside blocker: choose the next T1-1 strategy after the first transfer
-  attempt failed production gates.
+- Next outside blocker: human-at-Mac live ExoFOP inventory for Path A.
 
 ---
 
@@ -130,12 +133,12 @@ without relying on chat context or local terminal output.
 1. Update `docs/LOCAL_ARTIFACT_LEDGER.md` and `artifacts/manifests/local_artifacts.json` after each local artifact state change so GitHub records the current corpus/split/checkpoint status.
 2. Do not promote `checkpoints/cnn_tess_finetuned/best.pt`; it failed the
    documented production gate.
-3. Start the next T1-1 planning cycle from the observed failure mode: Kepler
-   transfer improved over the old TESS-only ceiling but missed the 0.85 AUC and
-   0.80 F1 production thresholds.
-4. Prioritize more usable TESS labels, better label quality, or a materially
-   different CNN/transfer experiment before asking the human to run another
-   long training job.
+3. Run the approved Path A inventory when the human is back at the Mac:
+   `Skills/count_tess_labels.py` and `Skills/fetch_additional_tess_labels.py`
+   against `data/tess_snippets_v2.jsonl`.
+4. Review the new target count, positive/negative balance, and source mix
+   before any long MAST fetch. If inventory is too small, start a new T1-1
+   planning cycle instead of training.
 5. Promote nothing unless a future evaluator run reports `Flag: PASS`, raw test
    AUC is at least 0.85, calibrated test F1 is at least 0.80, calibrated
    Brier/ECE are no worse than raw, and the human explicitly approves

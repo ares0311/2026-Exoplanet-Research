@@ -117,6 +117,54 @@
       "next_action": "Retain for reproducibility; first Kepler-to-TESS fine-tune from these splits failed production gates."
     },
     {
+      "path": "data/new_tess_targets.txt + data/new_tess_targets.json",
+      "kind": "tess_expansion_inventory",
+      "status": "pending_path_a_inventory",
+      "git_policy": "ignored",
+      "last_known": {
+        "approved_strategy": "Path A: expand usable labeled TESS snippets from ExoFOP TOI/CTOI",
+        "approved_on": "2026-06-18",
+        "source_corpus": "data/tess_snippets_v2.jsonl"
+      },
+      "validation_gate": "Agent must review new target count, positive/negative label balance, and source mix before any long MAST snippet fetch.",
+      "next_action": "Human runs live ExoFOP inventory with Skills/fetch_additional_tess_labels.py."
+    },
+    {
+      "path": "data/tess_snippets_expansion_v3.jsonl",
+      "kind": "source_corpus_expansion",
+      "status": "pending_path_a_fetch",
+      "git_policy": "ignored",
+      "last_known": {
+        "target_source": "data/new_tess_targets.json",
+        "approved_on": "2026-06-18"
+      },
+      "validation_gate": "Audit JSON parseability, finite flux, label balance, and duplicate TICs before merging into a v3 corpus.",
+      "next_action": "Fetch only after agent inventory review says the target count and label mix justify a long MAST run."
+    },
+    {
+      "path": "data/tess_snippets_v3.jsonl",
+      "kind": "source_corpus",
+      "status": "pending_expanded_corpus",
+      "git_policy": "ignored",
+      "last_known": {
+        "base_corpus": "data/tess_snippets_v2.jsonl",
+        "expansion_corpus": "data/tess_snippets_expansion_v3.jsonl"
+      },
+      "validation_gate": "Build only after expansion audit passes; do not train directly from unvalidated merged data.",
+      "next_action": "Merge after agent approval, then build and validate data/tess_cnn_splits_v3."
+    },
+    {
+      "path": "data/tess_cnn_splits_v3/",
+      "kind": "cnn_split",
+      "status": "pending_expanded_split",
+      "git_policy": "ignored",
+      "last_known": {
+        "source_corpus": "data/tess_snippets_v3.jsonl"
+      },
+      "validation_gate": "Skills/cnn_split_validator.py data/tess_cnn_splits_v3 must report PASS before candidate-12 training.",
+      "next_action": "Train a candidate-12 checkpoint only if v3 split validation passes and this ledger is updated with counts."
+    },
+    {
       "path": "checkpoints/cnn_kepler_pretrain/",
       "kind": "checkpoint_dir",
       "status": "local_pretrained_mps",

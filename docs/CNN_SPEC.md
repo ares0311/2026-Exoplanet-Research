@@ -258,29 +258,17 @@ data-size constraint: 1,425 training examples with a 201-bin representation
 cannot drive a single-model CNN to 0.85 AUC. No architectural change has
 broken through this ceiling.
 
-**Next approach**: Ensemble of 3 models trained with the v1 config (best
-single-model config, test AUC=0.7758) using different random seeds.
-Ensembles reliably gain 2–4 AUC points by diversifying predictions, potentially
-reaching 0.79–0.82. Beyond that, more training data or transfer learning from
-a Kepler-pretrained model is required.
+**Historical note**: The 3-seed ensemble path was tested and rejected; it did
+not close the production gap. Kepler->TESS transfer improved held-out test AUC
+to 0.8115 but still missed the AUC/F1 production gates and worsened calibrated
+Brier/ECE.
 
-**Ensemble training recipe** (train_cnn.py now supports `--seed` override):
-```bash
-caffeinate -dims python Skills/train_cnn.py --split-dir data/cnn_splits \
-    --checkpoint-dir models/cnn_ens_s7/ --config configs/cnn_retrain_v1.json --seed 7
-caffeinate -dims python Skills/train_cnn.py --split-dir data/cnn_splits \
-    --checkpoint-dir models/cnn_ens_s13/ --config configs/cnn_retrain_v1.json --seed 13
-caffeinate -dims python Skills/train_cnn.py --split-dir data/cnn_splits \
-    --checkpoint-dir models/cnn_ens_s99/ --config configs/cnn_retrain_v1.json --seed 99
-```
-
-**Ensemble evaluation** (evaluate_cnn_checkpoint.py now accepts multiple `--checkpoint`):
-```bash
-python Skills/evaluate_cnn_checkpoint.py --split-dir data/cnn_splits \
-    --checkpoint models/cnn_ens_s7/best.pt \
-    --checkpoint models/cnn_ens_s13/best.pt \
-    --checkpoint models/cnn_ens_s99/best.pt
-```
+**Approved next approach**: Path A expands usable labeled TESS snippets before
+candidate-12 training. Inventory ExoFOP TOI/CTOI CP/KP/FP/FA labels absent from
+`data/tess_snippets_v2.jsonl`, fetch new snippets only after agent review of
+target count and label balance, then build and validate `data/tess_cnn_splits_v3`.
+Do not train another candidate until the v3 split validator reports PASS and
+the artifact ledger is updated.
 
 ## Tenth Production Candidate Evaluation (Ensemble)
 

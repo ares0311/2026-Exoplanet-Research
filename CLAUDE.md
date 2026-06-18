@@ -1191,6 +1191,7 @@ These large data files live only on the user's local Mac. They are never committ
 | `data/kepler_snippets.jsonl` | Local Mac | **LOCAL VALIDATED** — 6,837 finite snippets as of 2026-06-17 | JSON parse PASS; zero non-finite flux rows; zero duplicate resume keys; split validator PASS |
 | `checkpoints/cnn_kepler_pretrain/best.pt` | Local Mac | **LOCAL PRETRAINED ON MPS** — SHA-256 `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7` | Best epoch 19, best val loss 0.3905, best val AUC 0.9186; startup banner confirmed `device=mps` |
 | `checkpoints/cnn_tess_finetuned/best.pt` | Local Mac | **REJECTED** — SHA-256 `3fc115b3623b2485373aefef30a7aa901e1183cc77ef4b57ce6c1f2219f49214` | Fine-tuned from Kepler pretrain on MPS; best val AUC 0.8408; production evaluator failed with raw test AUC 0.8115, calibrated F1 0.7508, and calibration-worsened Brier/ECE |
+| `data/new_tess_targets.*` / `data/tess_snippets_expansion_v3.jsonl` / `data/tess_cnn_splits_v3/` | Local Mac | **APPROVED / PENDING** | Path A is approved as the next T1-1 strategy: inventory more labeled TESS targets first, fetch snippets only after agent review, then validate v3 splits before candidate-12 training |
 
 **Kepler retry command** (only if the human explicitly wants to retry missing
 rows after the validated split; do not use an infinite wrapper):
@@ -1206,13 +1207,13 @@ fix the durable resume ledger before asking the human to run it again.
 
 ### Next Step — HANDOFF 2026-06-18
 
-**Status: Kepler JSONL, Kepler split, Kepler pretraining checkpoint, and TESS split are locally validated; the first Kepler->TESS fine-tuned checkpoint is rejected. Do not promote it or rerun the same fine-tune as the next production attempt.**
+**Status: Kepler JSONL, Kepler split, Kepler pretraining checkpoint, and TESS split are locally validated; the first Kepler->TESS fine-tuned checkpoint is rejected. Path A TESS expansion is approved and pending human-at-Mac inventory. Do not promote candidate 11 or rerun the same fine-tune as the next production attempt.**
 
 #### Incoming agent: do this first
 
 Ask the user to paste the output of:
 ```bash
-git pull --ff-only origin main
+git pull origin main
 wc -l data/kepler_snippets.jsonl data/tess_snippets_v2.jsonl
 .venv/bin/python Skills/cnn_split_validator.py data/kepler_cnn_splits
 .venv/bin/python Skills/cnn_split_validator.py data/tess_cnn_splits
@@ -1222,6 +1223,13 @@ shasum -a 256 checkpoints/cnn_tess_finetuned/best.pt
 
 - **6,837 Kepler lines, Kepler split validator PASS, TESS split validator PASS, and pretraining SHA `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`** → current local prerequisites are reproducible, but the first fine-tuned checkpoint is rejected.
 - **Fine-tuned SHA `3fc115b3623b2485373aefef30a7aa901e1183cc77ef4b57ce6c1f2219f49214`** → do not promote. Production evaluator returned `Flag: FAIL` with raw test AUC 0.8115, calibrated F1 0.7508, and worsened Brier/ECE.
+- **Approved next T1-1 action** → run Path A inventory, then stop for agent review:
+  ```bash
+  git pull origin main
+  .venv/bin/python Skills/count_tess_labels.py
+  .venv/bin/python Skills/fetch_additional_tess_labels.py --corpus data/tess_snippets_v2.jsonl --output data/new_tess_targets.txt
+  wc -l data/new_tess_targets.txt
+  ```
 - **Any other Kepler line count, validator FAIL, missing checkpoint, or different SHA** → stop and inspect the local artifact before training; do not start another infinite fetch loop.
 
 #### Corpus status
@@ -1231,10 +1239,11 @@ shasum -a 256 checkpoints/cnn_tess_finetuned/best.pt
 - **Kepler**: `data/kepler_snippets.jsonl` — LOCAL VALIDATED as of 2026-06-17; 6,837 finite snippets; labels negative=4,280 and positive=2,557; split validator PASS with train/val/test = 4,741 / 1,060 / 1,036
 - **Kepler pretrain**: `checkpoints/cnn_kepler_pretrain/best.pt` — LOCAL PRETRAINED ON MPS as of 2026-06-18; SHA-256 `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`; best val AUC 0.9186
 - **TESS fine-tune**: `checkpoints/cnn_tess_finetuned/best.pt` — REJECTED as of 2026-06-18; SHA-256 `3fc115b3623b2485373aefef30a7aa901e1183cc77ef4b57ce6c1f2219f49214`; best val AUC 0.8408; test raw AUC 0.8115; calibrated F1 0.7508; calibration worsened Brier/ECE
+- **TESS expansion v3**: `data/new_tess_targets.*`, `data/tess_snippets_expansion_v3.jsonl`, `data/tess_snippets_v3.jsonl`, `data/tess_cnn_splits_v3/` — APPROVED / PENDING; inventory first, then agent review before fetch
 
 #### CNN production runbook
 
-Training strategy: TESS-only training hits a hard ~0.78 AUC ceiling at 1,425 examples. Kepler transfer improved held-out test AUC to 0.8115 but did not meet production gates. The next T1-1 cycle should add usable TESS labels, improve label quality, or test a materially different CNN/transfer hypothesis before another long training run.
+Training strategy: TESS-only training hits a hard ~0.78 AUC ceiling at 1,425 examples. Kepler transfer improved held-out test AUC to 0.8115 but did not meet production gates. The approved next T1-1 strategy is Path A: add usable TESS labels, validate v3 splits, and only then consider candidate-12 training.
 
 Use `docs/CNN_PRODUCTION_RUNBOOK.md` for the authoritative copy-paste workflow.
 The accepted `train_cnn.py` flags are `--split-dir`, `--checkpoint-dir`, and

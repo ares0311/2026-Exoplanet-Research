@@ -1,6 +1,6 @@
 """Identify TESS TIC IDs with confirmed labels not yet in the local corpus.
 
-Compares the current local TESS snippet corpus (``data/tess_snippets.jsonl``)
+Compares the current local TESS snippet corpus (``data/tess_snippets_v2.jsonl``)
 against ExoFOP TOI and CTOI disposition tables to find labeled TIC IDs not
 yet downloaded.  Writes a target list that can be fed to the TESS light curve
 downloader.
@@ -8,9 +8,9 @@ downloader.
 Output is a plain-text file of TIC IDs (one per line) and a companion JSON
 suitable for:
 
-    caffeinate -dims python Skills/fetch_tess_lc_snippets.py \
+    caffeinate -dims .venv/bin/python Skills/fetch_tess_lc_snippets.py \
         --rows data/new_tess_targets.json \
-        --output data/tess_snippets_expansion.jsonl
+        --output data/tess_snippets_expansion_v3.jsonl
 
 Public API
 ----------
@@ -41,6 +41,11 @@ _CTOI_CSV_URL = (
 # ExoFOP disposition values that yield confirmed labels
 _POSITIVE_DISPOSITIONS = {"CP", "KP"}   # Confirmed Planet, Known Planet
 _NEGATIVE_DISPOSITIONS = {"FP", "FA"}   # False Positive, False Alarm
+_DEFAULT_CORPUS_PATH = Path("data/tess_snippets_v2.jsonl")
+_DEFAULT_TARGET_PATH = Path("data/new_tess_targets.txt")
+_DEFAULT_EXPANSION_PATH = Path("data/tess_snippets_expansion_v3.jsonl")
+_DEFAULT_MERGED_CORPUS_PATH = Path("data/tess_snippets_v3.jsonl")
+_DEFAULT_SPLIT_DIR = Path("data/tess_cnn_splits_v3")
 
 
 # ---------------------------------------------------------------------------
@@ -282,12 +287,23 @@ def write_target_list(rows: list[dict], output_path: Path) -> int:
 def format_expansion_summary(
     corpus_ids: set[int],
     new_rows: list[dict],
+    *,
+    corpus_path: Path = _DEFAULT_CORPUS_PATH,
+    target_path: Path = _DEFAULT_TARGET_PATH,
+    expansion_path: Path = _DEFAULT_EXPANSION_PATH,
+    merged_corpus_path: Path = _DEFAULT_MERGED_CORPUS_PATH,
+    split_dir: Path = _DEFAULT_SPLIT_DIR,
 ) -> str:
     """Format a Markdown summary of the corpus expansion opportunity.
 
     Args:
         corpus_ids: Current corpus TIC ID set.
         new_rows: New labeled rows found.
+        corpus_path: Existing local snippet corpus path.
+        target_path: Text target list path; companion JSON is used by downloader.
+        expansion_path: Output path for newly fetched snippets.
+        merged_corpus_path: Output path for the merged v3 corpus.
+        split_dir: Output path for expanded CNN splits.
 
     Returns:
         Markdown string.
@@ -297,6 +313,7 @@ def format_expansion_summary(
     sources: dict[str, int] = {}
     for r in new_rows:
         sources[r["source"]] = sources.get(r["source"], 0) + 1
+    target_json_path = target_path.with_suffix(".json")
 
     lines = [
         "## TESS Corpus Expansion Opportunity",
@@ -317,17 +334,20 @@ def format_expansion_summary(
         "Download TESS light curves for the new TIC IDs and extract snippets:",
         "```bash",
         "git pull origin main",
-        "caffeinate -dims python Skills/fetch_tess_lc_snippets.py \\",
-        "    --rows data/new_tess_targets.json \\",
-        "    --output data/tess_snippets_expansion.jsonl",
+        "caffeinate -dims .venv/bin/python Skills/fetch_tess_lc_snippets.py \\",
+        f"    --rows {target_json_path} \\",
+        f"    --output {expansion_path} \\",
+        "    --max-errors 100",
+        f"wc -l {expansion_path}",
         "```",
         "",
         "Then merge with the existing corpus and rebuild splits:",
         "```bash",
-        "cat data/tess_snippets.jsonl data/tess_snippets_expansion.jsonl \\",
-        "    > data/tess_snippets_v2.jsonl",
-        "python Skills/build_cnn_training_data.py data/tess_snippets_v2.jsonl \\",
-        "    --output-dir data/cnn_splits_v2",
+        "git pull origin main",
+        f"cat {corpus_path} {expansion_path} > {merged_corpus_path}",
+        f"caffeinate -i .venv/bin/python Skills/build_cnn_training_data.py {merged_corpus_path} \\",
+        f"    --output-dir {split_dir}",
+        f".venv/bin/python Skills/cnn_split_validator.py {split_dir}",
         "```",
     ]
     return "\n".join(lines) + "\n"
@@ -346,14 +366,14 @@ def _cli(argv: list[str] | None = None) -> int:
         description="Find labeled TESS TIC IDs not yet in the local snippet corpus.",
     )
     parser.add_argument(
-        "--corpus", type=Path, default=Path("data/tess_snippets.jsonl"),
+        "--corpus", type=Path, default=_DEFAULT_CORPUS_PATH,
         metavar="JSONL",
-        help="Existing snippet corpus (default: data/tess_snippets.jsonl)",
+        help=f"Existing snippet corpus (default: {_DEFAULT_CORPUS_PATH})",
     )
     parser.add_argument(
-        "--output", type=Path, default=Path("data/new_tess_targets.txt"),
+        "--output", type=Path, default=_DEFAULT_TARGET_PATH,
         metavar="TXT",
-        help="Output TIC ID list (default: data/new_tess_targets.txt)",
+        help=f"Output TIC ID list (default: {_DEFAULT_TARGET_PATH})",
     )
     parser.add_argument(
         "--positive-only", action="store_true",
@@ -387,7 +407,14 @@ def _cli(argv: list[str] | None = None) -> int:
     new_rows = find_new_tic_ids(corpus_ids, all_rows, positive_only=args.positive_only)
 
     n = write_target_list(new_rows, args.output)
-    print(format_expansion_summary(corpus_ids, new_rows))
+    print(
+        format_expansion_summary(
+            corpus_ids,
+            new_rows,
+            corpus_path=args.corpus,
+            target_path=args.output,
+        )
+    )
     print(f"Flag: OK  new_tic_ids={n}  output={args.output}")
     return 0
 

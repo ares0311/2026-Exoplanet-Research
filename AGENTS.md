@@ -78,7 +78,8 @@ When the user must take an action to unblock a gap:
 | Kepler pretraining checkpoint (`checkpoints/cnn_kepler_pretrain/best.pt`) | **LOCAL PRETRAINED ON MPS** — SHA-256 `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`; best val AUC 0.9186 |
 | TESS CNN splits (`data/tess_cnn_splits/`) | **LOCAL VALIDATED** — validator PASS; train/val/test = 1,477 / 318 / 315 |
 | TESS fine-tuned checkpoint (`checkpoints/cnn_tess_finetuned/best.pt`) | **REJECTED** — SHA-256 `3fc115b3623b2485373aefef30a7aa901e1183cc77ef4b57ce6c1f2219f49214`; test raw AUC 0.8115; calibrated F1 0.7508; calibration worsened Brier/ECE |
-| CNN training pipeline | **BLOCKED ON NEXT T1-1 STRATEGY** — do not rerun the same fine-tune or promote the rejected checkpoint |
+| Path A expansion (`data/new_tess_targets.*`, `data/tess_snippets_expansion_v3.jsonl`, `data/tess_cnn_splits_v3/`) | **APPROVED / PENDING HUMAN RUN** — inventory more labeled TESS targets first; fetch snippets only after agent review |
+| CNN training pipeline | **BLOCKED ON EXPANDED TESS DATA** — do not rerun the same fine-tune or promote the rejected checkpoint |
 | XGBoost Tier 1 | Done |
 | Stacking Tier 3 scaffold | Done |
 
@@ -87,7 +88,7 @@ When the user must take an action to unblock a gap:
 If the user is at the Mac, ask them to run these commands and paste the output:
 
 ```bash
-git pull --ff-only origin main
+git pull origin main
 wc -l data/kepler_snippets.jsonl data/tess_snippets_v2.jsonl
 .venv/bin/python Skills/cnn_split_validator.py data/kepler_cnn_splits
 .venv/bin/python Skills/cnn_split_validator.py data/tess_cnn_splits
@@ -106,6 +107,18 @@ shasum -a 256 checkpoints/cnn_kepler_pretrain/best.pt
 - If `checkpoints/cnn_tess_finetuned/best.pt` has SHA-256
   `3fc115b3623b2485373aefef30a7aa901e1183cc77ef4b57ce6c1f2219f49214`, do not
   promote it. It failed the production evaluator.
+- The approved next T1-1 action is Path A inventory. Ask the human to run:
+
+```
+git pull origin main
+.venv/bin/python Skills/count_tess_labels.py
+.venv/bin/python Skills/fetch_additional_tess_labels.py --corpus data/tess_snippets_v2.jsonl --output data/new_tess_targets.txt
+wc -l data/new_tess_targets.txt
+```
+
+Review the label-count output, expansion summary, and target count before any
+long MAST snippet fetch. If there are too few new usable targets, start a new
+planning cycle instead of training.
 - If the Kepler pretraining checkpoint is missing or has a different SHA, stop
   and review the local artifact ledger and runbook before training further.
 - If the user intentionally wants to retry missing Kepler rows, use one bounded
@@ -137,8 +150,8 @@ calibration must not worsen held-out Brier score or ECE. Architecture spec:
 
 **Why the current checkpoint is blocked:** Kepler transfer improved over the
 old TESS-only ceiling but still missed the documented production gate. The next
-T1-1 cycle must add usable TESS signal, improve label quality, or authorize a
-materially different CNN/transfer hypothesis before another long training run.
+T1-1 cycle must add usable TESS signal through the approved Path A inventory
+and v3 split flow before another long training run.
 
 ---
 

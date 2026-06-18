@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 import pytest
+import Skills.fetch_tess_lc_snippets as tess_lc
 from Skills.fetch_tess_lc_snippets import (
     _mad,
     _median,
@@ -226,3 +227,34 @@ class TestBuildTessSnippets:
             lc_fetcher=self._make_fetcher(), resume=False, max_errors=10,
         )
         assert n == 0
+
+
+class TestCliDefaults:
+    def test_default_output_path_is_current_v3_expansion(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        rows_path = tmp_path / "targets.json"
+        rows_path.write_text(
+            json.dumps([
+                {
+                    "tic_id": 123,
+                    "label": 1,
+                    "period_days": 3.5,
+                    "epoch_bjd": 2458100.0,
+                }
+            ])
+        )
+        captured: dict[str, Path] = {}
+
+        def fake_build_tess_snippets(rows, *, n_bins, output_path, resume, max_errors):
+            captured["output_path"] = output_path
+            return len(rows)
+
+        monkeypatch.setattr(tess_lc, "build_tess_snippets", fake_build_tess_snippets)
+
+        rc = tess_lc._cli(["--rows", str(rows_path)])
+
+        assert rc == 0
+        assert captured["output_path"] == Path("data/tess_snippets_expansion_v3.jsonl")

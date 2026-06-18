@@ -1,4 +1,4 @@
-"""Tests for Skills.fetch_additional_tess_labels (13 tests)."""
+"""Tests for Skills.fetch_additional_tess_labels."""
 from __future__ import annotations
 
 import json
@@ -166,3 +166,16 @@ class TestFormatExpansionSummary:
         assert isinstance(result, str)
         assert "Existing corpus TIC IDs" in result
         assert "New labeled TIC IDs found: 1" in result
+
+    def test_uses_current_venv_safe_v3_expansion_recipe(self) -> None:
+        rows = [{"tic_id": 1, "label": 1, "source": "exofop_toi"}]
+        result = format_expansion_summary({100, 200}, rows)
+        assert "git pull origin main" in result
+        assert "caffeinate -dims .venv/bin/python Skills/fetch_tess_lc_snippets.py" in result
+        assert "caffeinate -i .venv/bin/python Skills/build_cnn_training_data.py" in result
+        assert "data/tess_snippets_v2.jsonl" in result
+        assert "data/tess_snippets_expansion_v3.jsonl" in result
+        assert "data/tess_snippets_v3.jsonl" in result
+        assert "data/tess_cnn_splits_v3" in result
+        assert "caffeinate -dims python" not in result
+        assert "data/cnn_splits_v2" not in result

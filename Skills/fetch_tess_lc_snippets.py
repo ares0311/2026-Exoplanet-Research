@@ -375,9 +375,9 @@ def _cli(argv: list[str] | None = None) -> int:
         help="Target list JSON (list of dicts with tic_id, label, period_days, epoch_bjd).",
     )
     parser.add_argument(
-        "--output", type=Path, default=Path("data/tess_snippets_expansion.jsonl"),
+        "--output", type=Path, default=Path("data/tess_snippets_expansion_v3.jsonl"),
         metavar="JSONL",
-        help="Output JSONL file (default: data/tess_snippets_expansion.jsonl)",
+        help="Output JSONL file (default: data/tess_snippets_expansion_v3.jsonl)",
     )
     parser.add_argument(
         "--n-bins", type=int, default=201, metavar="N",
