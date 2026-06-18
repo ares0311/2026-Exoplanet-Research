@@ -3,7 +3,7 @@
 Last reviewed: 2026-06-18 (Path A TESS inventory too small; T1-1 remains open)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 2,158 default tests passing, 2 integration_live deselected
+Test baseline: 2,165 default tests passing, 2 integration_live deselected
 
 ---
 
@@ -50,6 +50,7 @@ must not be copied into `models/`, registered, or used for production scoring.
 - **Rejected candidate 11 (Kepler->TESS transfer)**: `checkpoints/cnn_tess_finetuned/best.pt`, SHA-256 `3fc115b3623b2485373aefef30a7aa901e1183cc77ef4b57ce6c1f2219f49214`; trained on Python 3.14.3 with PyTorch 2.12.0 using `device=mps`; initialized from Kepler pretrain SHA `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`; TESS splits train/val/test = 1,477 / 318 / 315; `configs/cnn_tess_finetune.json` with LR=1e-4, weight_decay=1e-3, batch=64, seed=7, frozen conv layers for 15 epochs; best epoch 22, validation loss 0.5255, validation AUC 0.8408; test raw AUC=0.8115, F1=0.7523, Brier=0.1818, ECE=0.0854; Platt A=1.80214901, B=-0.77900211, threshold=0.45; calibrated test F1=0.7508, Brier=0.1966, ECE=0.1152; **REJECTED** — test AUC 0.8115 < 0.85 gate, calibrated F1 0.7508 < 0.80 gate, and calibration worsened both Brier and ECE
 - **Transfer-learning result**: Kepler pretraining lifted held-out test AUC above the prior TESS-only/ensemble range, but still missed both production thresholds. Do not rerun the same fine-tune as a promotion attempt; the next T1-1 cycle must add more usable TESS examples, improve label quality, or test a materially different CNN/transfer strategy with a fresh documented hypothesis.
 - **Path A inventory result**: Completed locally on 2026-06-18 against `data/tess_snippets_v2.jsonl`; ExoFOP TOI live counts CP=733, KP=591, FP=1,244, FA=100 (positive=1,324; negative=1,344; total=2,668); expansion inventory found only 56 new labeled TIC IDs (16 positive, 40 negative; 33 TOI, 23 CTOI). **Do not run the long MAST snippet fetch as a production-closing attempt**; even 100% fetch success would not materially move the CNN from 2,110 usable examples toward the ≥5,000 target.
+- **TESS TCE source probe**: `Skills/tess_tce_fetcher.py` now fails closed with `Flag: UNAVAILABLE` for the stale historical ExoMAST TCE endpoint, which returned HTTP 404 on 2026-06-18. Do not treat that endpoint as the next large TESS-domain label source unless a current provider contract is found and documented.
 - **Approved next strategy — Path A first**:
   - **Path A — More labeled TESS data**: Approved on 2026-06-18, but the first inventory found too few new labels to justify a long fetch/training cycle. Continue Path A only if a materially larger or higher-quality TESS label source is identified.
   - **Path B — Kepler→TESS transfer learning**: First MPS pretrain/fine-tune attempt is rejected; continue only with a materially changed transfer strategy or after Path A improves the TESS training signal
@@ -113,7 +114,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
 | 82 production-critical Skills/ | ✅ |
-| 2,158 default tests, ruff clean, mypy clean | ✅ |
+| 2,165 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---

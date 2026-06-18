@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -86,6 +87,19 @@ class TestAucRoc:
 
     def test_empty_returns_half(self) -> None:
         assert _auc_roc([], []) == 0.5
+
+    def test_tied_scores_return_half(self) -> None:
+        y_true = [1, 0, 1, 0]
+        y_score = [0.5, 0.5, 0.5, 0.5]
+        assert _auc_roc(y_true, y_score) == pytest.approx(0.5, abs=1e-9)
+
+    def test_ties_are_order_independent(self) -> None:
+        y_true_a = [1, 1, 0, 0]
+        y_true_b = list(reversed(y_true_a))
+        y_score = [0.5, 0.5, 0.5, 0.5]
+        assert _auc_roc(y_true_a, y_score) == pytest.approx(
+            _auc_roc(y_true_b, y_score), abs=1e-9
+        )
 
 
 class TestBestF1Threshold:
@@ -193,6 +207,50 @@ class TestEvaluateCnnCheckpoint:
             split_dir, tmp_path / "fake.pt", model_fn=_bad_fn
         )
         assert result.flag == "LOAD_ERROR"
+
+    def test_wrong_prediction_count_fails_closed(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path, n=40)
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            model_fn=lambda fluxes: [0.5] * (len(fluxes) - 1),
+        )
+        assert result.flag == "INVALID_PREDICTIONS"
+        assert not result.passed
+
+    def test_non_finite_prediction_fails_closed(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path, n=40)
+
+        def _nan_model(fluxes: list[list[float]]) -> list[float]:
+            return [math.nan if i == 0 else 0.5 for i, _ in enumerate(fluxes)]
+
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            model_fn=_nan_model,
+        )
+        assert result.flag == "INVALID_PREDICTIONS"
+        assert not result.passed
+
+    def test_out_of_range_prediction_fails_closed(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path, n=40)
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            model_fn=lambda fluxes: [1.2] * len(fluxes),
+        )
+        assert result.flag == "INVALID_PREDICTIONS"
+        assert not result.passed
+
+    def test_string_prediction_fails_closed(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path, n=40)
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            model_fn=lambda fluxes: ["0.5"] * len(fluxes),  # type: ignore[list-item]
+        )
+        assert result.flag == "INVALID_PREDICTIONS"
+        assert not result.passed
 
     def test_pass_with_good_model(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
