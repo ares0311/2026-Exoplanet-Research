@@ -72,7 +72,7 @@ When the user must take an action to unblock a gap:
 
 - Merged PR #108: hardened CNN evaluator (tie-aware ROC-AUC, fail-closed on bad predictions, stale TCE endpoint reports UNAVAILABLE).
 - Wrote `configs/cnn_tess_finetune_c12.json`: full-unfreeze fine-tune config (LR=3e-5, batch=32, patience=20, freeze_conv_epochs=0). **Ready to run — no new data needed.**
-- Wrote `Skills/fetch_tess_kepler_overlap_snippets.py` + 24 tests: downloads TESS light curves for Kepler KOI stars (confirmed planets + FPs) and folds them at Kepler ephemerides. Provides Option B corpus expansion if C12 misses the gate.
+- Wrote `Skills/fetch_tess_kepler_overlap_snippets.py` + 27 tests: downloads TESS light curves for Kepler KOI stars (confirmed planets + FPs), folds them at Kepler ephemerides, and records terminal fetch failures in a durable sidecar. Provides Option B corpus expansion if C12 misses the gate.
 - Updated `docs/CNN_PRODUCTION_RUNBOOK.md` with Step 7b (C12 full-unfreeze) and Step 7c (Kepler-TESS overlap corpus).
 
 ### Where things stand
@@ -86,22 +86,24 @@ When the user must take an action to unblock a gap:
 | TESS CNN splits (`data/tess_cnn_splits/`) | **LOCAL VALIDATED** — validator PASS; train/val/test = 1,477 / 318 / 315 |
 | TESS fine-tuned checkpoint (`checkpoints/cnn_tess_finetuned/best.pt`) | **REJECTED** — test AUC 0.8115, F1 0.7508 |
 | C12 config (`configs/cnn_tess_finetune_c12.json`) | **READY** — full-unfreeze, LR=3e-5, batch=32, patience=20 |
-| Kepler-TESS overlap script (`Skills/fetch_tess_kepler_overlap_snippets.py`) | **READY** — 24 tests passing; run only if C12 misses gate |
+| Kepler-TESS overlap script (`Skills/fetch_tess_kepler_overlap_snippets.py`) | **READY** — 27 tests passing; terminal failures use a sidecar; run only if C12 misses gate |
 | CNN training pipeline | **UNBLOCKED** — run Runbook Step 7b next |
 
 ### First action for the incoming agent
 
 **The user needs to run Runbook Step 7b.** This requires Mac access.
 
-If the user is at the Mac, give them this single command to start candidate 12:
+If the user is at the Mac, give them this command block to start candidate 12:
 
 ```
-git pull origin main && caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/tess_cnn_splits --checkpoint-dir checkpoints/cnn_tess_c12 --config configs/cnn_tess_finetune_c12.json --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt
+git pull origin main
+caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/tess_cnn_splits --checkpoint-dir checkpoints/cnn_tess_c12 --config configs/cnn_tess_finetune_c12.json --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt
 ```
 
 After it finishes, ask them to paste the final training result lines and run:
 
 ```
+git pull origin main
 shasum -a 256 checkpoints/cnn_tess_c12/best.pt
 ```
 

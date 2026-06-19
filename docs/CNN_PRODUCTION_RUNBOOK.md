@@ -253,6 +253,9 @@ This is Option B: downloads TESS light curves for ~6,500 Kepler KOI stars that M
 has re-observed with TESS. Phase-folds using Kepler ephemerides (period + epoch
 converted from BKJD to full BJD). Expected to yield 1,000–3,000 new labeled TESS
 snippets with high-quality Kepler labels (confirmed planet vs confirmed FP).
+Ordinary resume skips already written snippets and terminal failures recorded in
+`data/tess_kepler_overlap_snippets.jsonl.failures.jsonl`; use
+`--retry-failures` only for an intentional recheck of those terminal failures.
 
 **Do not run this step unless Step 7b is rejected.** It takes ~12–24 hours.
 
@@ -263,10 +266,10 @@ wc -l data/tess_kepler_overlap_snippets.jsonl
 ```
 
 Stop and paste back the final fetch summary and line count. The agent must review
-the count and label balance before merge.
+the count, terminal failure sidecar, and label balance before merge.
 
-After agent approval, merge the overlap corpus with the v2 corpus, rebuild splits,
-and train candidate 13:
+After agent approval, merge the overlap corpus with the v2 corpus and rebuild
+splits:
 
 ```bash
 git pull origin main
@@ -279,6 +282,7 @@ Stop and paste back the split summary. Then train with the existing fine-tune co
 and the Kepler pretrain checkpoint:
 
 ```bash
+git pull origin main
 caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/tess_combined_cnn_splits --checkpoint-dir checkpoints/cnn_tess_c13 --config configs/cnn_tess_finetune_c12.json --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt
 ```
 

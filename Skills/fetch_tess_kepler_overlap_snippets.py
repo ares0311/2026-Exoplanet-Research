@@ -23,6 +23,8 @@ present for provenance only.
 
 Resume is automatic: rows whose ``kepoi_name`` already appears in the output
 JSONL are skipped, including any rows written in a prior interrupted run.
+Terminal failures are recorded in ``<output>.failures.jsonl`` and skipped on
+ordinary reruns; pass ``--retry-failures`` for an intentional recheck.
 
 Run command (Mac only — requires .venv with lightkurve):
     caffeinate -dims .venv/bin/python Skills/fetch_tess_kepler_overlap_snippets.py \\
@@ -71,6 +73,7 @@ _KOI_TAP_URL = (
     "+and+koi_time0bk+is+not+null"
     "&format=json"
 )
+_TERMINAL_FAILURE_FLAGS = {"NO_LIGHTKURVE", "NO_DATA", "SHORT", "NONFINITE"}
 
 
 # ---------------------------------------------------------------------------
@@ -330,6 +333,8 @@ def build_koi_tess_snippets(
     output_path: Path,
     lc_fetcher: Callable | None = None,
     max_errors: int = 50,
+    failure_log_path: Path | None = None,
+    retry_failures: bool = False,
 ) -> int:
     """Build phase-folded TESS snippets for a list of KOI rows.
 
@@ -348,9 +353,15 @@ def build_koi_tess_snippets(
         Number of snippets written.
     """
     output_path = Path(output_path)
+    failure_log_path = (
+        Path(failure_log_path)
+        if failure_log_path is not None
+        else output_path.with_name(output_path.name + ".failures.jsonl")
+    )
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    failure_log_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Build resume set from existing output.
+    # Build resume set from existing output and durable terminal failures.
     already_done: set[str] = set()
     if output_path.exists():
         with output_path.open(encoding="utf-8") as fh:
@@ -366,23 +377,49 @@ def build_koi_tess_snippets(
                 except json.JSONDecodeError:
                     pass
 
-    pending = [r for r in rows if r.kepoi_name not in already_done]
+    already_failed: set[str] = set()
+    if not retry_failures and failure_log_path.exists():
+        with failure_log_path.open(encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                    kn = obj.get("kepoi_name")
+                    flag = obj.get("flag")
+                    if kn and flag in _TERMINAL_FAILURE_FLAGS:
+                        already_failed.add(str(kn))
+                except json.JSONDecodeError:
+                    pass
+
+    pending = [
+        r for r in rows
+        if r.kepoi_name not in already_done and r.kepoi_name not in already_failed
+    ]
     n_total = len(pending)
     n_written = 0
+    n_skipped = 0
+    n_terminal_failures = 0
     n_errors = 0
     start = time.monotonic()
 
     print(
         f"Kepler-TESS overlap fetch: {len(rows)} total KOIs, "
-        f"{len(already_done)} already done, {n_total} pending.",
+        f"{len(already_done)} already done, "
+        f"{len(already_failed)} terminal failures skipped, {n_total} pending.",
         flush=True,
     )
     print(
-        f"Output: {output_path}  n_bins={n_bins}  max_errors={max_errors}",
+        f"Output: {output_path}  failures={failure_log_path}  "
+        f"n_bins={n_bins}  max_errors={max_errors}  retry_failures={retry_failures}",
         flush=True,
     )
 
-    with output_path.open("a", encoding="utf-8") as fh:
+    with (
+        output_path.open("a", encoding="utf-8") as fh,
+        failure_log_path.open("a", encoding="utf-8") as failure_fh,
+    ):
         for i, row in enumerate(pending, 1):
             result = build_koi_tess_snippet(row, n_bins=n_bins, lc_fetcher=lc_fetcher)
             elapsed = time.monotonic() - start
@@ -417,7 +454,23 @@ def build_koi_tess_snippets(
                     flush=True,
                 )
             else:
+                n_skipped += 1
                 n_errors += 1
+                if result.flag in _TERMINAL_FAILURE_FLAGS:
+                    failure_record = {
+                        "kepoi_name": result.kepoi_name,
+                        "kepid": result.kepid,
+                        "label": result.label,
+                        "source": "koi_tess_overlap",
+                        "period_days": result.period_days,
+                        "epoch_bjd": result.epoch_bjd,
+                        "n_bins": result.n_bins,
+                        "flag": result.flag,
+                        "failed_at": datetime.now().isoformat(timespec="seconds"),
+                    }
+                    failure_fh.write(json.dumps(failure_record) + "\n")
+                    failure_fh.flush()
+                    n_terminal_failures += 1
                 print(
                     f"  [{i}/{n_total}] {datetime.now().strftime('%H:%M:%S')}"
                     f" {result.kepoi_name} KIC {result.kepid}"
@@ -434,8 +487,9 @@ def build_koi_tess_snippets(
 
     elapsed_total = time.monotonic() - start
     print(
-        f"Done. wrote={n_written} skipped={n_total - n_written - max(0, n_errors - 1)}"
-        f" total_elapsed={elapsed_total:.0f}s",
+        f"Done. wrote={n_written} skipped={n_skipped} "
+        f"terminal_failures_recorded={n_terminal_failures} "
+        f"total_elapsed={elapsed_total:.0f}s",
         flush=True,
     )
     return n_written
@@ -478,6 +532,18 @@ def _cli(argv: list[str] | None = None) -> int:
         help="Stop after N consecutive non-OK results (default: 50)",
     )
     parser.add_argument(
+        "--failure-log",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="Terminal failure JSONL sidecar (default: <output>.failures.jsonl)",
+    )
+    parser.add_argument(
+        "--retry-failures",
+        action="store_true",
+        help="Recheck rows recorded in the terminal failure sidecar.",
+    )
+    parser.add_argument(
         "--koi-url",
         default=_KOI_TAP_URL,
         metavar="URL",
@@ -502,6 +568,8 @@ def _cli(argv: list[str] | None = None) -> int:
         n_bins=args.n_bins,
         output_path=args.output,
         max_errors=args.max_errors,
+        failure_log_path=args.failure_log,
+        retry_failures=args.retry_failures,
     )
     print(f"[{datetime.now().strftime('%H:%M:%S')}] Wrote {n} snippets → {args.output}", flush=True)
     return 0

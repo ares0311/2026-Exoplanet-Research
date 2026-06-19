@@ -248,6 +248,98 @@
       "next_action": "Do not promote; next T1-1 planning cycle should add TESS signal or authorize a materially different CNN/transfer experiment."
     },
     {
+      "path": "checkpoints/cnn_tess_c12/",
+      "kind": "checkpoint_dir",
+      "status": "pending_local_run",
+      "git_policy": "ignored",
+      "last_known": {
+        "candidate": 12,
+        "generated": false,
+        "split_dir": "data/tess_cnn_splits/",
+        "pretrained_checkpoint": "checkpoints/cnn_kepler_pretrain/best.pt",
+        "pretrained_sha256": "c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7",
+        "config": "configs/cnn_tess_finetune_c12.json",
+        "strategy": "full unfreeze from epoch 1 with lower learning rate",
+        "verified_on": "2026-06-18"
+      },
+      "validation_gate": "Train only from validated data/tess_cnn_splits and evaluate with raw held-out AUC >= 0.85, calibrated F1 >= 0.80, and calibration not worsening Brier/ECE.",
+      "next_action": "Run docs/CNN_PRODUCTION_RUNBOOK.md Step 7b on the Mac, paste final training output and SHA-256, then evaluate only if validation AUC supports continuing."
+    },
+    {
+      "path": "data/tess_kepler_overlap_snippets.jsonl",
+      "kind": "source_corpus_expansion",
+      "status": "not_generated_conditional",
+      "git_policy": "ignored",
+      "last_known": {
+        "candidate_path": "C12 fallback / C13 source",
+        "generated": false,
+        "script": "Skills/fetch_tess_kepler_overlap_snippets.py",
+        "requires_c12_rejection": true,
+        "expected_runtime": "12-24 hours",
+        "verified_on": "2026-06-18"
+      },
+      "validation_gate": "Do not fetch unless C12 is rejected; after fetch, audit row count, label balance, and sidecar before merging with TESS v2.",
+      "next_action": "If C12 misses the gate, run one caffeinated Step 7c overlap fetch and paste final summary plus wc -l output."
+    },
+    {
+      "path": "data/tess_kepler_overlap_snippets.jsonl.failures.jsonl",
+      "kind": "fetch_failure_sidecar",
+      "status": "expected_for_conditional_fetch",
+      "git_policy": "ignored",
+      "last_known": {
+        "generated": false,
+        "paired_output": "data/tess_kepler_overlap_snippets.jsonl",
+        "retry_flag": "--retry-failures",
+        "verified_on": "2026-06-18"
+      },
+      "validation_gate": "Ordinary overlap reruns must skip terminal failures recorded here; reprocess only with --retry-failures.",
+      "next_action": "Review with the overlap corpus after Step 7c before building combined splits."
+    },
+    {
+      "path": "data/tess_combined_snippets.jsonl",
+      "kind": "source_corpus",
+      "status": "not_generated_conditional",
+      "git_policy": "ignored",
+      "last_known": {
+        "base_corpus": "data/tess_snippets_v2.jsonl",
+        "conditional_expansion": "data/tess_kepler_overlap_snippets.jsonl",
+        "generated": false,
+        "verified_on": "2026-06-18"
+      },
+      "validation_gate": "Build only after overlap corpus audit approves the merge.",
+      "next_action": "If approved, concatenate TESS v2 plus overlap corpus and immediately rebuild validated splits."
+    },
+    {
+      "path": "data/tess_combined_cnn_splits/",
+      "kind": "cnn_split",
+      "status": "not_generated_conditional",
+      "git_policy": "ignored",
+      "last_known": {
+        "source_corpus": "data/tess_combined_snippets.jsonl",
+        "generated": false,
+        "verified_on": "2026-06-18"
+      },
+      "validation_gate": "Skills/cnn_split_validator.py must report PASS before C13 training.",
+      "next_action": "Train C13 only after validator PASS and ledger update."
+    },
+    {
+      "path": "checkpoints/cnn_tess_c13/",
+      "kind": "checkpoint_dir",
+      "status": "not_generated_conditional",
+      "git_policy": "ignored",
+      "last_known": {
+        "candidate": 13,
+        "generated": false,
+        "split_dir": "data/tess_combined_cnn_splits/",
+        "config": "configs/cnn_tess_finetune_c12.json",
+        "pretrained_checkpoint": "checkpoints/cnn_kepler_pretrain/best.pt",
+        "requires_validated_combined_splits": true,
+        "verified_on": "2026-06-18"
+      },
+      "validation_gate": "Production promotion requires evaluator PASS and explicit human approval.",
+      "next_action": "Do not train until C12 is rejected, overlap corpus audit passes, and combined splits validate."
+    },
+    {
       "path": "models/cnn*/",
       "kind": "promotion_target",
       "status": "no_production_approved_cnn",

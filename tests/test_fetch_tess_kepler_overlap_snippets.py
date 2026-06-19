@@ -240,6 +240,56 @@ def test_batch_max_errors_stops_early(tmp_path):
     assert n == 0
 
 
+def test_batch_records_terminal_failures_in_sidecar(tmp_path):
+    out = tmp_path / "overlap.jsonl"
+    rows = [_CONFIRMED_ROW]
+    n = build_koi_tess_snippets(
+        rows, n_bins=201, output_path=out, lc_fetcher=_no_data_fetcher
+    )
+    assert n == 0
+    failure_log = out.with_name(out.name + ".failures.jsonl")
+    assert failure_log.exists()
+    failures = [json.loads(ln) for ln in failure_log.read_text().splitlines()]
+    assert len(failures) == 1
+    assert failures[0]["kepoi_name"] == _CONFIRMED_ROW.kepoi_name
+    assert failures[0]["flag"] in {"NO_DATA", "NO_LIGHTKURVE"}
+
+
+def test_batch_resume_skips_terminal_failures(tmp_path):
+    out = tmp_path / "overlap.jsonl"
+    rows = [_CONFIRMED_ROW]
+    build_koi_tess_snippets(
+        rows, n_bins=201, output_path=out, lc_fetcher=_no_data_fetcher
+    )
+
+    n = build_koi_tess_snippets(
+        rows, n_bins=201, output_path=out, lc_fetcher=_make_lc_fetcher()
+    )
+
+    assert n == 0
+    assert not out.exists() or out.read_text() == ""
+
+
+def test_batch_retry_failures_reprocesses_terminal_failures(tmp_path):
+    out = tmp_path / "overlap.jsonl"
+    rows = [_CONFIRMED_ROW]
+    build_koi_tess_snippets(
+        rows, n_bins=201, output_path=out, lc_fetcher=_no_data_fetcher
+    )
+
+    n = build_koi_tess_snippets(
+        rows,
+        n_bins=201,
+        output_path=out,
+        lc_fetcher=_make_lc_fetcher(),
+        retry_failures=True,
+    )
+
+    assert n == 1
+    lines = [json.loads(ln) for ln in out.read_text().splitlines() if ln.strip()]
+    assert len(lines) == 1
+
+
 def test_batch_creates_parent_dirs(tmp_path):
     out = tmp_path / "subdir" / "nested" / "out.jsonl"
     build_koi_tess_snippets(
