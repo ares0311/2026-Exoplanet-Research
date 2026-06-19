@@ -17,7 +17,17 @@ from Skills.promote_cnn_checkpoint import (
 # ---------------------------------------------------------------------------
 
 
-def _write_calibration(path: Path, *, flag: str = "OK", auc: float = 0.88) -> None:
+def _write_calibration(
+    path: Path,
+    *,
+    flag: str = "OK",
+    auc: float = 0.88,
+    f1: float = 0.83,
+    brier_raw: float = 0.13,
+    brier_cal: float = 0.12,
+    ece_raw: float = 0.05,
+    ece_cal: float = 0.04,
+) -> None:
     path.write_text(json.dumps({
         "method": "platt",
         "platt_a": 1.23,
@@ -27,9 +37,11 @@ def _write_calibration(path: Path, *, flag: str = "OK", auc: float = 0.88) -> No
         "gate_auc": 0.85,
         "gate_f1": 0.80,
         "test_auc_raw": auc,
-        "test_f1_cal": 0.83,
-        "test_brier_cal": 0.12,
-        "test_ece_cal": 0.04,
+        "test_f1_cal": f1,
+        "test_brier_raw": brier_raw,
+        "test_brier_cal": brier_cal,
+        "test_ece_raw": ece_raw,
+        "test_ece_cal": ece_cal,
         "flag": flag,
     }))
 
@@ -97,6 +109,61 @@ class TestPromoteCnnCheckpoint:
         result = promote_cnn_checkpoint(
             ckpt, cal, tmp_path / "registry.json"
         )
+        assert result.flag == "GATES_NOT_MET"
+
+    def test_low_auc_blocks_promotion_even_with_ok_flag(self, tmp_path: Path) -> None:
+        ckpt = tmp_path / "best.pt"
+        _write_checkpoint(ckpt)
+        cal = tmp_path / "calibration.json"
+        _write_calibration(cal, auc=0.84)
+        result = promote_cnn_checkpoint(ckpt, cal, tmp_path / "registry.json")
+        assert result.flag == "GATES_NOT_MET"
+        assert not (tmp_path / "registry.json").exists()
+
+    def test_low_f1_blocks_promotion_even_with_ok_flag(self, tmp_path: Path) -> None:
+        ckpt = tmp_path / "best.pt"
+        _write_checkpoint(ckpt)
+        cal = tmp_path / "calibration.json"
+        _write_calibration(cal, f1=0.79)
+        result = promote_cnn_checkpoint(ckpt, cal, tmp_path / "registry.json")
+        assert result.flag == "GATES_NOT_MET"
+
+    def test_worse_brier_blocks_promotion_even_with_ok_flag(self, tmp_path: Path) -> None:
+        ckpt = tmp_path / "best.pt"
+        _write_checkpoint(ckpt)
+        cal = tmp_path / "calibration.json"
+        _write_calibration(cal, brier_raw=0.10, brier_cal=0.11)
+        result = promote_cnn_checkpoint(ckpt, cal, tmp_path / "registry.json")
+        assert result.flag == "GATES_NOT_MET"
+
+    def test_worse_ece_blocks_promotion_even_with_ok_flag(self, tmp_path: Path) -> None:
+        ckpt = tmp_path / "best.pt"
+        _write_checkpoint(ckpt)
+        cal = tmp_path / "calibration.json"
+        _write_calibration(cal, ece_raw=0.03, ece_cal=0.04)
+        result = promote_cnn_checkpoint(ckpt, cal, tmp_path / "registry.json")
+        assert result.flag == "GATES_NOT_MET"
+
+    def test_non_finite_metric_blocks_promotion(self, tmp_path: Path) -> None:
+        ckpt = tmp_path / "best.pt"
+        _write_checkpoint(ckpt)
+        cal = tmp_path / "calibration.json"
+        _write_calibration(cal)
+        payload = json.loads(cal.read_text())
+        payload["test_auc_raw"] = float("nan")
+        cal.write_text(json.dumps(payload))
+        result = promote_cnn_checkpoint(ckpt, cal, tmp_path / "registry.json")
+        assert result.flag == "GATES_NOT_MET"
+
+    def test_missing_raw_calibration_metric_blocks_promotion(self, tmp_path: Path) -> None:
+        ckpt = tmp_path / "best.pt"
+        _write_checkpoint(ckpt)
+        cal = tmp_path / "calibration.json"
+        _write_calibration(cal)
+        payload = json.loads(cal.read_text())
+        del payload["test_brier_raw"]
+        cal.write_text(json.dumps(payload))
+        result = promote_cnn_checkpoint(ckpt, cal, tmp_path / "registry.json")
         assert result.flag == "GATES_NOT_MET"
 
     def test_successful_promotion(self, tmp_path: Path) -> None:

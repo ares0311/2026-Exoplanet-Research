@@ -12,6 +12,7 @@ format_threshold_result(result) -> str
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 
@@ -57,6 +58,32 @@ def _metrics_at(
     return prec, rec, f1, ba, youden
 
 
+def _valid_inputs(
+    y_true: list[int],
+    y_score: list[float],
+    objective: str,
+    n_steps: int,
+) -> bool:
+    """Return True when threshold search inputs are safe to optimize."""
+    if not y_true or len(y_true) != len(y_score):
+        return False
+    if objective not in {"f1", "balanced_accuracy", "youden_j"}:
+        return False
+    if n_steps <= 0:
+        return False
+    for label, score in zip(y_true, y_score, strict=True):
+        if not isinstance(label, int) or isinstance(label, bool) or label not in (0, 1):
+            return False
+        if (
+            not isinstance(score, int | float)
+            or isinstance(score, bool)
+            or not math.isfinite(float(score))
+            or not 0.0 <= float(score) <= 1.0
+        ):
+            return False
+    return True
+
+
 def optimize_threshold(
     y_true: list[int],
     y_score: list[float],
@@ -76,7 +103,7 @@ def optimize_threshold(
     Returns:
         ThresholdResult at the optimal threshold.
     """
-    if not y_true or len(y_true) != len(y_score):
+    if not _valid_inputs(y_true, y_score, objective, n_steps):
         return ThresholdResult(
             threshold=0.5, precision=0.0, recall=0.0, f1=0.0,
             balanced_accuracy=0.0, youden_j=0.0, n_positive=0, n_negative=0,
@@ -93,7 +120,7 @@ def optimize_threshold(
             objective=objective, flag="DEGENERATE",
         )
 
-    obj_idx = {"f1": 2, "balanced_accuracy": 3, "youden_j": 4}.get(objective, 2)
+    obj_idx = {"f1": 2, "balanced_accuracy": 3, "youden_j": 4}[objective]
 
     best_thresh = 0.5
     best_score = -1.0

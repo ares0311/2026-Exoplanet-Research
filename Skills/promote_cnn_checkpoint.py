@@ -27,6 +27,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import json
+import math
 import os
 import sys
 import tempfile
@@ -83,6 +84,50 @@ def _atomic_write_json(path: Path, payload: dict) -> None:
         with contextlib.suppress(OSError):
             os.unlink(tmp)
         raise
+
+
+def _finite_metric(cal: dict, key: str) -> float | None:
+    """Return a finite numeric calibration metric, or None when invalid."""
+    value = cal.get(key)
+    if not isinstance(value, int | float) or isinstance(value, bool):
+        return None
+    metric = float(value)
+    return metric if math.isfinite(metric) else None
+
+
+def _calibration_passes_gates(cal: dict) -> bool:
+    """Independently verify calibration JSON satisfies CNN promotion gates."""
+    if cal.get("flag") != "OK":
+        return False
+    auc = _finite_metric(cal, "test_auc_raw")
+    f1 = _finite_metric(cal, "test_f1_cal")
+    brier_cal = _finite_metric(cal, "test_brier_cal")
+    ece_cal = _finite_metric(cal, "test_ece_cal")
+    brier_raw = _finite_metric(cal, "test_brier_raw")
+    ece_raw = _finite_metric(cal, "test_ece_raw")
+    platt_a = _finite_metric(cal, "platt_a")
+    platt_b = _finite_metric(cal, "platt_b")
+    gate_auc = _finite_metric(cal, "gate_auc")
+    gate_f1 = _finite_metric(cal, "gate_f1")
+    if None in (
+        auc,
+        f1,
+        brier_cal,
+        ece_cal,
+        brier_raw,
+        ece_raw,
+        platt_a,
+        platt_b,
+        gate_auc,
+        gate_f1,
+    ):
+        return False
+    return (
+        auc >= gate_auc
+        and f1 >= gate_f1
+        and brier_cal <= brier_raw
+        and ece_cal <= ece_raw
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -161,8 +206,8 @@ def promote_cnn_checkpoint(
             flag="MISSING_FILE",
         )
 
-    # Verify evaluation passed
-    if cal.get("flag") != "OK":
+    # Verify evaluation passed and independently re-check gate metrics.
+    if not _calibration_passes_gates(cal):
         return PromotionResult(
             model_id="",
             sha256="",

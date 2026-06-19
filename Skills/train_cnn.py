@@ -73,7 +73,7 @@ class CnnTrainingResult:
 
 
 def _compute_auc(y_true: list[int], y_pred: list[float]) -> float:
-    """Compute ROC-AUC via the trapezoidal rule without sklearn.
+    """Compute tie-aware ROC-AUC using average ranks without sklearn.
 
     Args:
         y_true: Ground-truth binary labels.
@@ -89,27 +89,17 @@ def _compute_auc(y_true: list[int], y_pred: list[float]) -> float:
     if total_pos == 0 or total_neg == 0:
         return 0.5
 
-    pairs = sorted(zip(y_pred, y_true, strict=True), reverse=True)
-    tp = fp = 0
-    tps: list[int] = []
-    fps: list[int] = []
-    for _prob, label in pairs:
-        if label == 1:
-            tp += 1
-        else:
-            fp += 1
-        tps.append(tp)
-        fps.append(fp)
-
-    tprs = [t / total_pos for t in tps]
-    fprs = [f / total_neg for f in fps]
-    # prepend origin
-    tprs = [0.0] + tprs
-    fprs = [0.0] + fprs
-    auc = sum(
-        (fprs[i] - fprs[i - 1]) * (tprs[i] + tprs[i - 1]) / 2
-        for i in range(1, len(fprs))
-    )
+    pairs = sorted(zip(y_pred, y_true, strict=True), key=lambda p: p[0])
+    rank_sum_pos = 0.0
+    i = 0
+    while i < len(pairs):
+        j = i + 1
+        while j < len(pairs) and pairs[j][0] == pairs[i][0]:
+            j += 1
+        avg_rank = (i + 1 + j) / 2.0
+        rank_sum_pos += avg_rank * sum(label for _, label in pairs[i:j])
+        i = j
+    auc = (rank_sum_pos - total_pos * (total_pos + 1) / 2.0) / (total_pos * total_neg)
     return max(0.0, min(1.0, auc))
 
 

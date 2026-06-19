@@ -67,7 +67,7 @@ class CnnEvalResult:
     gate_auc: float
     gate_f1: float
     passed: bool
-    flag: str  # "PASS" | "FAIL" | "NO_TORCH" | "MISSING_SPLIT" | "LOAD_ERROR"
+    flag: str  # "PASS" | "FAIL" | "NO_TORCH" | "MISSING_SPLIT" | "INVALID_SPLIT" | "LOAD_ERROR"
     evaluated_at: str
 
 
@@ -206,26 +206,43 @@ def _apply_platt(raw: float, a: float, b: float) -> float:
 # ---------------------------------------------------------------------------
 
 
-def _load_split_examples(path: Path) -> list[dict]:
+def _load_split_examples(path: Path) -> list[dict] | None:
     raw = json.loads(path.read_text(encoding="utf-8"))
     if isinstance(raw, dict):
-        return raw.get("examples", [])
-    if isinstance(raw, list):
-        return raw
-    return []
+        examples = raw.get("examples")
+    elif isinstance(raw, list):
+        examples = raw
+    else:
+        return None
+    if not isinstance(examples, list) or not all(isinstance(ex, dict) for ex in examples):
+        return None
+    return examples
 
 
 def _examples_to_arrays(
     examples: list[dict], n_bins: int
-) -> tuple[list[list[float]], list[int]]:
+) -> tuple[list[list[float]], list[int]] | None:
     fluxes, labels = [], []
     for ex in examples:
         if "flux" not in ex or "label" not in ex:
-            continue
-        flux = list(ex["flux"])
+            return None
+        label = ex["label"]
+        if not isinstance(label, int) or isinstance(label, bool) or label not in (0, 1):
+            return None
+        if not isinstance(ex["flux"], list) or not ex["flux"]:
+            return None
+        flux = []
+        for value in ex["flux"]:
+            if (
+                not isinstance(value, int | float)
+                or isinstance(value, bool)
+                or not math.isfinite(float(value))
+            ):
+                return None
+            flux.append(float(value))
         flux = flux + [0.0] * (n_bins - len(flux)) if len(flux) < n_bins else flux[:n_bins]
         fluxes.append(flux)
-        labels.append(int(ex["label"]))
+        labels.append(label)
     return fluxes, labels
 
 
@@ -347,11 +364,56 @@ def evaluate_cnn_checkpoint(
         except Exception:
             pass
 
-    val_examples = _load_split_examples(val_path)
-    test_examples = _load_split_examples(test_path)
+    try:
+        val_examples = _load_split_examples(val_path)
+        test_examples = _load_split_examples(test_path)
+    except Exception:
+        return CnnEvalResult(
+            val_metrics_raw=None,
+            test_metrics_raw=None,
+            test_metrics_cal=None,
+            platt_a=1.0,
+            platt_b=0.0,
+            gate_auc=gate_auc,
+            gate_f1=gate_f1,
+            passed=False,
+            flag="INVALID_SPLIT",
+            evaluated_at=evaluated_at,
+        )
 
-    val_fluxes, val_labels = _examples_to_arrays(val_examples, n_bins)
-    test_fluxes, test_labels = _examples_to_arrays(test_examples, n_bins)
+    if val_examples is None or test_examples is None:
+        return CnnEvalResult(
+            val_metrics_raw=None,
+            test_metrics_raw=None,
+            test_metrics_cal=None,
+            platt_a=1.0,
+            platt_b=0.0,
+            gate_auc=gate_auc,
+            gate_f1=gate_f1,
+            passed=False,
+            flag="INVALID_SPLIT",
+            evaluated_at=evaluated_at,
+        )
+
+    val_arrays = _examples_to_arrays(val_examples, n_bins)
+    test_arrays = _examples_to_arrays(test_examples, n_bins)
+
+    if val_arrays is None or test_arrays is None:
+        return CnnEvalResult(
+            val_metrics_raw=None,
+            test_metrics_raw=None,
+            test_metrics_cal=None,
+            platt_a=1.0,
+            platt_b=0.0,
+            gate_auc=gate_auc,
+            gate_f1=gate_f1,
+            passed=False,
+            flag="INVALID_SPLIT",
+            evaluated_at=evaluated_at,
+        )
+
+    val_fluxes, val_labels = val_arrays
+    test_fluxes, test_labels = test_arrays
 
     if not val_fluxes or not test_fluxes:
         return CnnEvalResult(
@@ -605,7 +667,7 @@ def _main() -> None:
 
     if result.flag == "NO_TORCH":
         sys.exit(2)
-    if result.flag in ("MISSING_SPLIT", "LOAD_ERROR", "INVALID_PREDICTIONS"):
+    if result.flag in ("MISSING_SPLIT", "INVALID_SPLIT", "LOAD_ERROR", "INVALID_PREDICTIONS"):
         sys.exit(2)
     sys.exit(0 if result.passed else 1)
 
