@@ -64,7 +64,7 @@ When the user must take an action to unblock a gap:
 
 ---
 
-## HANDOFF STATE — 2026-06-18 updated 2026-06-18 (READ THIS FIRST)
+## HANDOFF STATE — 2026-06-18 updated 2026-06-19 (READ THIS FIRST)
 
 **The only active gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80).**
 
@@ -74,6 +74,7 @@ When the user must take an action to unblock a gap:
 - Wrote `configs/cnn_tess_finetune_c12.json`: full-unfreeze fine-tune config (LR=3e-5, batch=32, patience=20, freeze_conv_epochs=0). **Ready to run — no new data needed.**
 - Wrote `Skills/fetch_tess_kepler_overlap_snippets.py` + 27 tests: downloads TESS light curves for Kepler KOI stars (confirmed planets + FPs), folds them at Kepler ephemerides, and records terminal fetch failures in a durable sidecar. Provides Option B corpus expansion if C12 misses the gate.
 - Updated `docs/CNN_PRODUCTION_RUNBOOK.md` with Step 7b (C12 full-unfreeze) and Step 7c (Kepler-TESS overlap corpus).
+- Candidate 12 was trained and evaluated on 2026-06-19. It is **REJECTED**: best val AUC 0.8356, test raw AUC 0.8124, calibrated F1 0.7516, and calibration worsened Brier/ECE.
 
 ### Where things stand
 
@@ -85,30 +86,25 @@ When the user must take an action to unblock a gap:
 | Kepler pretraining checkpoint (`checkpoints/cnn_kepler_pretrain/best.pt`) | **LOCAL PRETRAINED** — SHA `c782d7af...`; best val AUC 0.9186 |
 | TESS CNN splits (`data/tess_cnn_splits/`) | **LOCAL VALIDATED** — validator PASS; train/val/test = 1,477 / 318 / 315 |
 | TESS fine-tuned checkpoint (`checkpoints/cnn_tess_finetuned/best.pt`) | **REJECTED** — test AUC 0.8115, F1 0.7508 |
-| C12 config (`configs/cnn_tess_finetune_c12.json`) | **READY** — full-unfreeze, LR=3e-5, batch=32, patience=20 |
-| Kepler-TESS overlap script (`Skills/fetch_tess_kepler_overlap_snippets.py`) | **READY** — 27 tests passing; terminal failures use a sidecar; run only if C12 misses gate |
-| CNN training pipeline | **UNBLOCKED** — run Runbook Step 7b next |
+| C12 checkpoint (`checkpoints/cnn_tess_c12/best.pt`) | **REJECTED** — SHA `cc8fbd20...`; test raw AUC 0.8124; calibrated F1 0.7516 |
+| Kepler-TESS overlap script (`Skills/fetch_tess_kepler_overlap_snippets.py`) | **READY** — 27 tests passing; terminal failures use a sidecar; run Step 7c next |
+| CNN training pipeline | **UNBLOCKED** — run Runbook Step 7c next |
 
 ### First action for the incoming agent
 
-**The user needs to run Runbook Step 7b.** This requires Mac access.
+**The user needs to run Runbook Step 7c.** This requires Mac access.
 
-If the user is at the Mac, give them this command block to start candidate 12:
-
-```
-git pull origin main
-caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/tess_cnn_splits --checkpoint-dir checkpoints/cnn_tess_c12 --config configs/cnn_tess_finetune_c12.json --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt
-```
-
-After it finishes, ask them to paste the final training result lines and run:
+If the user is at the Mac, give them this command block to start the Kepler-TESS overlap corpus fetch:
 
 ```
 git pull origin main
-shasum -a 256 checkpoints/cnn_tess_c12/best.pt
+caffeinate -dims .venv/bin/python Skills/fetch_tess_kepler_overlap_snippets.py --output data/tess_kepler_overlap_snippets.jsonl
+wc -l data/tess_kepler_overlap_snippets.jsonl
 ```
 
-- If best val AUC ≥ 0.85 → proceed to Runbook Step 6 evaluation.
-- If best val AUC < 0.85 → reject as candidate 12 and decide whether to run Option B (Runbook Step 7c: Kepler-TESS overlap corpus fetch, ~12–24 hours).
+After it finishes, ask them to paste the final fetch summary and line count.
+The agent must review the overlap corpus and terminal-failure sidecar before
+building combined splits.
 
 If the user is **away from their Mac**, the next agent is limited to runbook,
 validation, doc hardening, and planning until the human can run local commands.
