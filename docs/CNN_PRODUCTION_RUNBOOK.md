@@ -224,6 +224,71 @@ Stop here and paste back the split summary and validator output. Train a
 candidate-12 checkpoint only if the expanded split passes validation and the
 agent updates the artifact ledger with the new local artifact state.
 
+## Step 7b: Candidate 12 — Full-Unfreeze Fine-Tune (Try This First)
+
+**Status: READY TO RUN** — config written, existing TESS splits validated.
+This is Option A: no new data required. Runs in ~4 hours on M4 Max MPS.
+
+**Why this is different from candidate 11:** Candidate 11 (`configs/cnn_tess_finetune.json`)
+froze the conv layers for 15 epochs, then fine-tuned at LR=1e-4. The Kepler conv
+features never fully adapted to TESS cadence/noise.  This config (`configs/cnn_tess_finetune_c12.json`)
+unfreezes all layers from epoch 1 with a much lower LR (3e-5), smaller batch (32), and
+longer patience (20), giving the full network a gradual opportunity to adapt without
+catastrophic forgetting of pretrained weights.
+
+```bash
+git pull origin main
+caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/tess_cnn_splits --checkpoint-dir checkpoints/cnn_tess_c12 --config configs/cnn_tess_finetune_c12.json --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt
+shasum -a 256 checkpoints/cnn_tess_c12/best.pt
+```
+
+Stop and paste back the training result lines and SHA-256. If best val AUC ≥ 0.85,
+proceed to Step 6 evaluation (substituting `checkpoints/cnn_tess_c12`). If val AUC < 0.85,
+record as rejected and proceed to Step 7c before any further training.
+
+## Step 7c: Candidate 12 — Kepler-TESS Overlap Corpus (If 7b Misses Gate)
+
+**Status: SCRIPT READY** — `Skills/fetch_tess_kepler_overlap_snippets.py` written and tested.
+This is Option B: downloads TESS light curves for ~6,500 Kepler KOI stars that MAST
+has re-observed with TESS. Phase-folds using Kepler ephemerides (period + epoch
+converted from BKJD to full BJD). Expected to yield 1,000–3,000 new labeled TESS
+snippets with high-quality Kepler labels (confirmed planet vs confirmed FP).
+Ordinary resume skips already written snippets and terminal failures recorded in
+`data/tess_kepler_overlap_snippets.jsonl.failures.jsonl`; use
+`--retry-failures` only for an intentional recheck of those terminal failures.
+
+**Do not run this step unless Step 7b is rejected.** It takes ~12–24 hours.
+
+```bash
+git pull origin main
+caffeinate -dims .venv/bin/python Skills/fetch_tess_kepler_overlap_snippets.py --output data/tess_kepler_overlap_snippets.jsonl
+wc -l data/tess_kepler_overlap_snippets.jsonl
+```
+
+Stop and paste back the final fetch summary and line count. The agent must review
+the count, terminal failure sidecar, and label balance before merge.
+
+After agent approval, merge the overlap corpus with the v2 corpus and rebuild
+splits:
+
+```bash
+git pull origin main
+cat data/tess_snippets_v2.jsonl data/tess_kepler_overlap_snippets.jsonl > data/tess_combined_snippets.jsonl
+caffeinate -i .venv/bin/python Skills/build_cnn_training_data.py data/tess_combined_snippets.jsonl --output-dir data/tess_combined_cnn_splits --seed 7
+.venv/bin/python Skills/cnn_split_validator.py data/tess_combined_cnn_splits
+```
+
+Stop and paste back the split summary. Then train with the existing fine-tune config
+and the Kepler pretrain checkpoint:
+
+```bash
+git pull origin main
+caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/tess_combined_cnn_splits --checkpoint-dir checkpoints/cnn_tess_c13 --config configs/cnn_tess_finetune_c12.json --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt
+```
+
+Stop and paste back the training result. Then evaluate with Step 6 (substituting
+`data/tess_combined_cnn_splits` and `checkpoints/cnn_tess_c13`).
+
 ## Step 8: Promotion Only After Approval
 
 Do not copy checkpoint artifacts into `models/` or update `models/registry.json`

@@ -64,86 +64,64 @@ When the user must take an action to unblock a gap:
 
 ---
 
-## HANDOFF STATE — 2026-06-18 (READ THIS FIRST)
+## HANDOFF STATE — 2026-06-18 updated 2026-06-18 (READ THIS FIRST)
 
 **The only active gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80).**
+
+### What was done in the last session (2026-06-18)
+
+- Merged PR #108: hardened CNN evaluator (tie-aware ROC-AUC, fail-closed on bad predictions, stale TCE endpoint reports UNAVAILABLE).
+- Wrote `configs/cnn_tess_finetune_c12.json`: full-unfreeze fine-tune config (LR=3e-5, batch=32, patience=20, freeze_conv_epochs=0). **Ready to run — no new data needed.**
+- Wrote `Skills/fetch_tess_kepler_overlap_snippets.py` + 27 tests: downloads TESS light curves for Kepler KOI stars (confirmed planets + FPs), folds them at Kepler ephemerides, and records terminal fetch failures in a durable sidecar. Provides Option B corpus expansion if C12 misses the gate.
+- Updated `docs/CNN_PRODUCTION_RUNBOOK.md` with Step 7b (C12 full-unfreeze) and Step 7c (Kepler-TESS overlap corpus).
 
 ### Where things stand
 
 | Item | State |
 |---|---|
 | TESS v2 snippets (`data/tess_snippets_v2.jsonl`) | **COMPLETE** — 2,619 snippets on user's Mac |
-| Kepler snippets (`data/kepler_snippets.jsonl`) | **LOCAL VALIDATED** — 6,837 finite snippets on user's Mac; 617 KOI signatures absent/pending failure-sidecar review |
+| Kepler snippets (`data/kepler_snippets.jsonl`) | **LOCAL VALIDATED** — 6,837 finite snippets on user's Mac |
 | Kepler CNN splits (`data/kepler_cnn_splits/`) | **LOCAL VALIDATED** — validator PASS; train/val/test = 4,741 / 1,060 / 1,036 |
-| Kepler pretraining checkpoint (`checkpoints/cnn_kepler_pretrain/best.pt`) | **LOCAL PRETRAINED ON MPS** — SHA-256 `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`; best val AUC 0.9186 |
+| Kepler pretraining checkpoint (`checkpoints/cnn_kepler_pretrain/best.pt`) | **LOCAL PRETRAINED** — SHA `c782d7af...`; best val AUC 0.9186 |
 | TESS CNN splits (`data/tess_cnn_splits/`) | **LOCAL VALIDATED** — validator PASS; train/val/test = 1,477 / 318 / 315 |
-| TESS fine-tuned checkpoint (`checkpoints/cnn_tess_finetuned/best.pt`) | **REJECTED** — SHA-256 `3fc115b3623b2485373aefef30a7aa901e1183cc77ef4b57ce6c1f2219f49214`; test raw AUC 0.8115; calibrated F1 0.7508; calibration worsened Brier/ECE |
-| Path A inventory (`data/new_tess_targets.*`) | **COMPLETE / TOO SMALL** — 56 new labeled TIC IDs (16 positive, 40 negative); do not run long MAST fetch as a production-closing attempt |
-| CNN training pipeline | **BLOCKED ON NEXT T1-1 STRATEGY** — do not rerun the same fine-tune, do not fetch Path A v3 snippets for production, and do not promote the rejected checkpoint |
-| XGBoost Tier 1 | Done |
-| Stacking Tier 3 scaffold | Done |
+| TESS fine-tuned checkpoint (`checkpoints/cnn_tess_finetuned/best.pt`) | **REJECTED** — test AUC 0.8115, F1 0.7508 |
+| C12 config (`configs/cnn_tess_finetune_c12.json`) | **READY** — full-unfreeze, LR=3e-5, batch=32, patience=20 |
+| Kepler-TESS overlap script (`Skills/fetch_tess_kepler_overlap_snippets.py`) | **READY** — 27 tests passing; terminal failures use a sidecar; run only if C12 misses gate |
+| CNN training pipeline | **UNBLOCKED** — run Runbook Step 7b next |
 
 ### First action for the incoming agent
 
-If the user is at the Mac, ask them to run these commands and paste the output:
+**The user needs to run Runbook Step 7b.** This requires Mac access.
 
-```bash
+If the user is at the Mac, give them this command block to start candidate 12:
+
+```
 git pull origin main
-wc -l data/kepler_snippets.jsonl data/tess_snippets_v2.jsonl
-.venv/bin/python Skills/cnn_split_validator.py data/kepler_cnn_splits
-.venv/bin/python Skills/cnn_split_validator.py data/tess_cnn_splits
-shasum -a 256 checkpoints/cnn_kepler_pretrain/best.pt
+caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/tess_cnn_splits --checkpoint-dir checkpoints/cnn_tess_c12 --config configs/cnn_tess_finetune_c12.json --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt
 ```
 
-- If Kepler is **6,837** and the split validator reports **PASS**, do **not**
-  rerun the fetch loop.
-- If the Kepler pretraining SHA is
-  `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`, proceed
-  to `docs/CNN_PRODUCTION_RUNBOOK.md` Step 5 when the TESS split validator
-  reports **PASS**.
-- If `data/tess_cnn_splits` validates with train/val/test
-  **1,477 / 318 / 315**, do not assume that is enough for promotion; the first
-  transfer fine-tune from these splits was rejected.
-- If `checkpoints/cnn_tess_finetuned/best.pt` has SHA-256
-  `3fc115b3623b2485373aefef30a7aa901e1183cc77ef4b57ce6c1f2219f49214`, do not
-  promote it. It failed the production evaluator.
-- Path A inventory completed on 2026-06-18 and found only 56 new labeled TIC IDs
-  (16 positive, 40 negative). Do not run the long MAST snippet fetch as a
-  production-closing attempt. Start a new T1-1 planning cycle instead.
-- If the Kepler pretraining checkpoint is missing or has a different SHA, stop
-  and review the local artifact ledger and runbook before training further.
-- If the user intentionally wants to retry missing Kepler rows, use one bounded
-  fetch run, not an infinite shell wrapper:
+After it finishes, ask them to paste the final training result lines and run:
 
 ```
-caffeinate -dims .venv/bin/python Skills/fetch_kepler_lc_snippets.py --output data/kepler_snippets.jsonl --workers 3 --request-delay 0.5 --retry-failures
+git pull origin main
+shasum -a 256 checkpoints/cnn_tess_c12/best.pt
 ```
 
-`fetch_kepler_lc_snippets.py` groups pending KOIs by `kepid`, fetches each KIC
-light curve once, folds all KOIs for that star locally, and writes JSONL from
-the main process only. Resume uses `(kepid, period, epoch, label)`, not just
-`kepid`, so multi-KOI systems are not skipped accidentally. Resume also uses
-`data/kepler_snippets.jsonl.failures.jsonl` as a durable sidecar for terminal
-failures; ordinary reruns must skip both successful snippets and terminal
-failures. Use `--retry-failures` only when explicitly rechecking missing rows.
+- If best val AUC ≥ 0.85 → proceed to Runbook Step 6 evaluation.
+- If best val AUC < 0.85 → reject as candidate 12 and decide whether to run Option B (Runbook Step 7c: Kepler-TESS overlap corpus fetch, ~12–24 hours).
+
+If the user is **away from their Mac**, the next agent is limited to runbook,
+validation, doc hardening, and planning until the human can run local commands.
+Do not propose code changes that do not directly unblock T1-1.
 
 ### CNN production runbook
 
-Use `docs/CNN_PRODUCTION_RUNBOOK.md` for the authoritative copy-paste
-Kepler-pretraining, TESS-fine-tuning, evaluation, and promotion workflow.
-Do not use stale aliases such as `--splits-dir`, `--output-dir` for
-`train_cnn.py`, or `--pretrained`; the accepted flags are `--split-dir`,
-`--checkpoint-dir`, and `--pretrained-checkpoint`.
+Use `docs/CNN_PRODUCTION_RUNBOOK.md` for the authoritative copy-paste workflow.
+The correct CLI flags are `--split-dir`, `--checkpoint-dir`, and `--pretrained-checkpoint`.
+Do not use stale aliases (`--splits-dir`, `--output-dir`, `--pretrained`).
 
-Gate: raw held-out AUC ≥ 0.85, calibrated held-out F1 ≥ 0.80, and Platt
-calibration must not worsen held-out Brier score or ECE. Architecture spec:
-`docs/CNN_SPEC.md`.
-
-**Why the current checkpoint is blocked:** Kepler transfer improved over the
-old TESS-only ceiling but still missed the documented production gate. Path A
-inventory found too few new TESS labels to justify candidate-12 training. The
-next T1-1 cycle must choose a materially different strategy before another long
-data fetch or training run.
+Gate: raw held-out test AUC ≥ 0.85, calibrated held-out test F1 ≥ 0.80, and Platt
+calibration must not worsen held-out Brier score or ECE.
 
 ---
 

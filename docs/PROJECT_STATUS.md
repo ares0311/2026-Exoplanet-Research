@@ -15,7 +15,7 @@ The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit w
 - Optional XGBoost and stacking scorer modes (Tier 1 model trained: Kepler KOI AUC=0.992)
 - SQLite-backed background automation with top-level logs
 - 415 standalone `Skills/` utility scripts
-- 108 top-level test files, 2,191 default tests passing
+- 109 top-level test files, 2,218 default tests passing
 - 27 package Python modules under `src/exo_toolkit/`
 
 Local validation note: validated on Python 3.14.3 in `.venv` with `xgboost` dependency restored and macOS OpenMP runtime (`libomp`) installed. System Python is never used.
@@ -162,7 +162,7 @@ Validated on 2026-06-18:
 .venv/bin/python -m pytest
 ```
 
-Result: ruff passed, mypy passed, pytest passed with 2,191 passed, 2 deselected, and 2 Lightkurve package warnings.
+Result: ruff passed, mypy passed, pytest passed with 2,218 passed, 2 deselected, and 2 Lightkurve package warnings.
 
 ---
 
