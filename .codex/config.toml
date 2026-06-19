@@ -1,3 +1,4 @@
+sandbox_mode = "workspace-write"
 [mcp_servers.exo_project_files]
 command = "python3"
 args = ["Skills/mcp_bootstrap_server.py", "project_files"]
@@ -18,3 +19,6 @@ args = ["Skills/mcp_bootstrap_server.py", "exo_guard"]
 
 [mcp_servers.exo_guard.env]
 EXO_RESEARCH_ROOT = "."
+
+[sandbox_workspace_write]
+network_access = true
