@@ -291,6 +291,37 @@ def test_batch_retry_failures_reprocesses_terminal_failures(tmp_path):
     assert len(lines) == 1
 
 
+def test_batch_groups_same_kic_into_one_fetch(tmp_path):
+    out = tmp_path / "overlap.jsonl"
+    sibling = KoiRow(
+        kepid=_CONFIRMED_ROW.kepid,
+        kepoi_name="K00001.02",
+        disposition="FALSE POSITIVE",
+        period_days=4.12,
+        epoch_bkjd=121.0,
+    )
+    calls: list[int] = []
+    base_fetcher = _make_lc_fetcher()
+
+    def counting_fetcher(kepid: int, period: float, epoch_bjd: float):
+        calls.append(kepid)
+        return base_fetcher(kepid, period, epoch_bjd)
+
+    n = build_koi_tess_snippets(
+        [_CONFIRMED_ROW, sibling],
+        n_bins=201,
+        output_path=out,
+        lc_fetcher=counting_fetcher,
+        workers=2,
+        request_delay=0,
+    )
+
+    assert n == 2
+    assert calls == [_CONFIRMED_ROW.kepid]
+    lines = [json.loads(ln) for ln in out.read_text().splitlines() if ln.strip()]
+    assert {line["kepoi_name"] for line in lines} == {"K00001.01", "K00001.02"}
+
+
 def test_batch_creates_parent_dirs(tmp_path):
     out = tmp_path / "subdir" / "nested" / "out.jsonl"
     build_koi_tess_snippets(

@@ -28,7 +28,9 @@ ordinary reruns; pass ``--retry-failures`` for an intentional recheck.
 
 Run command (Mac only — requires .venv with lightkurve):
     caffeinate -dims .venv/bin/python Skills/fetch_tess_kepler_overlap_snippets.py \\
-        --output data/tess_kepler_overlap_snippets.jsonl
+        --output data/tess_kepler_overlap_snippets.jsonl \\
+        --workers 4 \\
+        --request-delay 0.25
 
 After download, merge with the existing TESS corpus and rebuild splits:
     cat data/tess_snippets_v2.jsonl data/tess_kepler_overlap_snippets.jsonl \\
@@ -42,7 +44,8 @@ KoiRow(kepid, kepoi_name, disposition, period_days, epoch_bkjd)
 KoiSnippetResult(kepid, kepoi_name, label, flux, period_days, epoch_bjd, n_bins, flag)
 fetch_koi_table(url) -> list[KoiRow]
 build_koi_tess_snippet(row, *, n_bins, lc_fetcher) -> KoiSnippetResult
-build_koi_tess_snippets(rows, *, n_bins, output_path, lc_fetcher, max_errors) -> int
+build_koi_tess_snippets(rows, *, n_bins, output_path, lc_fetcher, max_errors,
+                        workers, request_delay) -> int
 """
 from __future__ import annotations
 
@@ -52,7 +55,9 @@ import math
 import socket
 import ssl
 import time
+from collections import defaultdict
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -284,19 +289,37 @@ def build_koi_tess_snippet(
         )
 
     if raw is None:
-        try:
-            import lightkurve  # noqa: F401
-        except ImportError:
-            return KoiSnippetResult(
-                kepid=row.kepid, kepoi_name=row.kepoi_name, label=label,
-                flux=(), period_days=row.period_days, epoch_bjd=epoch_bjd,
-                n_bins=n_bins, flag="NO_LIGHTKURVE",
-            )
+        return _missing_light_curve_result(row, n_bins=n_bins)
+
+    return _build_koi_tess_snippet_from_raw(row, raw, n_bins=n_bins)
+
+
+def _missing_light_curve_result(row: KoiRow, *, n_bins: int) -> KoiSnippetResult:
+    label = 1 if row.disposition == "CONFIRMED" else 0
+    epoch_bjd = row.epoch_bkjd + _KEPLER_BJD_OFFSET
+    try:
+        import lightkurve  # noqa: F401
+    except ImportError:
         return KoiSnippetResult(
             kepid=row.kepid, kepoi_name=row.kepoi_name, label=label,
             flux=(), period_days=row.period_days, epoch_bjd=epoch_bjd,
-            n_bins=n_bins, flag="NO_DATA",
+            n_bins=n_bins, flag="NO_LIGHTKURVE",
         )
+    return KoiSnippetResult(
+        kepid=row.kepid, kepoi_name=row.kepoi_name, label=label,
+        flux=(), period_days=row.period_days, epoch_bjd=epoch_bjd,
+        n_bins=n_bins, flag="NO_DATA",
+    )
+
+
+def _build_koi_tess_snippet_from_raw(
+    row: KoiRow,
+    raw: tuple[list[float], list[float]],
+    *,
+    n_bins: int,
+) -> KoiSnippetResult:
+    label = 1 if row.disposition == "CONFIRMED" else 0
+    epoch_bjd = row.epoch_bkjd + _KEPLER_BJD_OFFSET
 
     time_bjd, flux = raw
     finite_pairs = [
@@ -329,6 +352,40 @@ def build_koi_tess_snippet(
     )
 
 
+def _process_kepid_group(
+    group_rows: list[KoiRow],
+    *,
+    n_bins: int,
+    lc_fetcher: Callable | None,
+) -> list[KoiSnippetResult]:
+    """Fetch one TESS light curve for a KIC and fold each KOI locally."""
+    first = group_rows[0]
+    first_epoch_bjd = first.epoch_bkjd + _KEPLER_BJD_OFFSET
+    fetcher = lc_fetcher or _default_lc_fetcher
+    try:
+        raw = fetcher(first.kepid, first.period_days, first_epoch_bjd)
+    except Exception as exc:
+        return [
+            KoiSnippetResult(
+                kepid=row.kepid,
+                kepoi_name=row.kepoi_name,
+                label=1 if row.disposition == "CONFIRMED" else 0,
+                flux=(),
+                period_days=row.period_days,
+                epoch_bjd=row.epoch_bkjd + _KEPLER_BJD_OFFSET,
+                n_bins=n_bins,
+                flag=f"ERROR:{exc}",
+            )
+            for row in group_rows
+        ]
+    if raw is None:
+        return [_missing_light_curve_result(row, n_bins=n_bins) for row in group_rows]
+    return [
+        _build_koi_tess_snippet_from_raw(row, raw, n_bins=n_bins)
+        for row in group_rows
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Batch runner
 # ---------------------------------------------------------------------------
@@ -343,6 +400,8 @@ def build_koi_tess_snippets(
     max_errors: int = 50,
     failure_log_path: Path | None = None,
     retry_failures: bool = False,
+    workers: int = 4,
+    request_delay: float = 0.25,
 ) -> int:
     """Build phase-folded TESS snippets for a list of KOI rows.
 
@@ -356,10 +415,16 @@ def build_koi_tess_snippets(
         output_path: Path to the JSONL output file.
         lc_fetcher: Injectable fetcher for testing.
         max_errors: Stop early after this many consecutive non-OK results.
+        failure_log_path: Terminal failure JSONL sidecar path.
+        retry_failures: Reprocess rows recorded in the failure sidecar.
+        workers: Number of KIC groups to process concurrently.
+        request_delay: Seconds to wait between submitting KIC fetch jobs.
 
     Returns:
         Number of snippets written.
     """
+    workers = max(1, int(workers))
+    request_delay = max(0.0, float(request_delay))
     output_path = Path(output_path)
     failure_log_path = (
         Path(failure_log_path)
@@ -401,11 +466,17 @@ def build_koi_tess_snippets(
                 except json.JSONDecodeError:
                     pass
 
-    pending = [
+    pending_rows = [
         r for r in rows
         if r.kepoi_name not in already_done and r.kepoi_name not in already_failed
     ]
-    n_total = len(pending)
+    pending_by_kepid: dict[int, list[KoiRow]] = defaultdict(list)
+    for row in pending_rows:
+        pending_by_kepid[row.kepid].append(row)
+    pending_groups = list(pending_by_kepid.values())
+    n_total = len(pending_rows)
+    n_groups = len(pending_groups)
+    n_processed = 0
     n_written = 0
     n_skipped = 0
     n_terminal_failures = 0
@@ -415,83 +486,139 @@ def build_koi_tess_snippets(
     print(
         f"Kepler-TESS overlap fetch: {len(rows)} total KOIs, "
         f"{len(already_done)} already done, "
-        f"{len(already_failed)} terminal failures skipped, {n_total} pending.",
+        f"{len(already_failed)} terminal failures skipped, "
+        f"{n_total} pending across {n_groups} KIC groups.",
         flush=True,
     )
     print(
         f"Output: {output_path}  failures={failure_log_path}  "
-        f"n_bins={n_bins}  max_errors={max_errors}  retry_failures={retry_failures}",
+        f"n_bins={n_bins}  max_errors={max_errors}  "
+        f"workers={workers}  request_delay={request_delay:.2f}s  "
+        f"retry_failures={retry_failures}",
         flush=True,
     )
 
-    with (
-        output_path.open("a", encoding="utf-8") as fh,
-        failure_log_path.open("a", encoding="utf-8") as failure_fh,
-    ):
-        for i, row in enumerate(pending, 1):
-            result = build_koi_tess_snippet(row, n_bins=n_bins, lc_fetcher=lc_fetcher)
-            elapsed = time.monotonic() - start
-            rate = i / elapsed if elapsed > 0 else float("inf")
-            remaining = (n_total - i) / rate if rate > 0 else float("inf")
-            eta = (
-                f"{remaining/60:.0f}m{remaining%60:.0f}s"
-                if remaining > 90
-                else f"{remaining:.0f}s"
+    def write_result(result: KoiSnippetResult, group_index: int, group_size: int) -> None:
+        nonlocal n_processed, n_written, n_skipped, n_terminal_failures, n_errors
+        n_processed += 1
+        elapsed = time.monotonic() - start
+        rate = n_processed / elapsed if elapsed > 0 else float("inf")
+        remaining = (n_total - n_processed) / rate if rate > 0 else float("inf")
+        eta = (
+            f"{remaining/60:.0f}m{remaining%60:.0f}s"
+            if remaining > 90
+            else f"{remaining:.0f}s"
+        )
+        group_progress = f"group={group_index}/{n_groups} group_rows={group_size}"
+        if result.flag == "OK":
+            record = {
+                "tic_id": result.kepid,
+                "label": result.label,
+                "flux": list(result.flux),
+                "source": "koi_tess_overlap",
+                "period_days": result.period_days,
+                "epoch_bjd": result.epoch_bjd,
+                "n_bins": result.n_bins,
+                "kepoi_name": result.kepoi_name,
+            }
+            fh.write(json.dumps(record) + "\n")
+            fh.flush()
+            n_written += 1
+            n_errors = 0
+            print(
+                f"  [{n_processed}/{n_total}] {datetime.now().strftime('%H:%M:%S')}"
+                f" {result.kepoi_name} KIC {result.kepid}"
+                f" label={result.label} {group_progress}"
+                f"  written={n_written}  elapsed={elapsed:.0f}s  ETA={eta}",
+                flush=True,
             )
-
-            if result.flag == "OK":
-                record = {
-                    "tic_id": result.kepid,
+        else:
+            n_skipped += 1
+            n_errors += 1
+            if result.flag in _TERMINAL_FAILURE_FLAGS:
+                failure_record = {
+                    "kepoi_name": result.kepoi_name,
+                    "kepid": result.kepid,
                     "label": result.label,
-                    "flux": list(result.flux),
                     "source": "koi_tess_overlap",
                     "period_days": result.period_days,
                     "epoch_bjd": result.epoch_bjd,
                     "n_bins": result.n_bins,
-                    "kepoi_name": result.kepoi_name,
+                    "flag": result.flag,
+                    "failed_at": datetime.now().isoformat(timespec="seconds"),
                 }
-                fh.write(json.dumps(record) + "\n")
-                fh.flush()
-                n_written += 1
-                n_errors = 0
-                print(
-                    f"  [{i}/{n_total}] {datetime.now().strftime('%H:%M:%S')}"
-                    f" {result.kepoi_name} KIC {result.kepid}"
-                    f" label={result.label}"
-                    f"  written={n_written}  elapsed={elapsed:.0f}s  ETA={eta}",
-                    flush=True,
-                )
-            else:
-                n_skipped += 1
-                n_errors += 1
-                if result.flag in _TERMINAL_FAILURE_FLAGS:
-                    failure_record = {
-                        "kepoi_name": result.kepoi_name,
-                        "kepid": result.kepid,
-                        "label": result.label,
-                        "source": "koi_tess_overlap",
-                        "period_days": result.period_days,
-                        "epoch_bjd": result.epoch_bjd,
-                        "n_bins": result.n_bins,
-                        "flag": result.flag,
-                        "failed_at": datetime.now().isoformat(timespec="seconds"),
-                    }
-                    failure_fh.write(json.dumps(failure_record) + "\n")
-                    failure_fh.flush()
-                    n_terminal_failures += 1
-                print(
-                    f"  [{i}/{n_total}] {datetime.now().strftime('%H:%M:%S')}"
-                    f" {result.kepoi_name} KIC {result.kepid}"
-                    f" SKIP flag={result.flag}"
-                    f"  errors={n_errors}  elapsed={elapsed:.0f}s  ETA={eta}",
-                    flush=True,
-                )
+                failure_fh.write(json.dumps(failure_record) + "\n")
+                failure_fh.flush()
+                n_terminal_failures += 1
+            print(
+                f"  [{n_processed}/{n_total}] {datetime.now().strftime('%H:%M:%S')}"
+                f" {result.kepoi_name} KIC {result.kepid}"
+                f" SKIP flag={result.flag} {group_progress}"
+                f"  errors={n_errors}  elapsed={elapsed:.0f}s  ETA={eta}",
+                flush=True,
+            )
+
+    with (
+        output_path.open("a", encoding="utf-8") as fh,
+        failure_log_path.open("a", encoding="utf-8") as failure_fh,
+        ThreadPoolExecutor(max_workers=workers) as executor,
+    ):
+        group_iter = iter(enumerate(pending_groups, 1))
+        future_meta = {}
+
+        def submit_next_group() -> bool:
+            try:
+                group_index, group_rows = next(group_iter)
+            except StopIteration:
+                return False
+            if request_delay > 0 and future_meta:
+                time.sleep(request_delay)
+            future = executor.submit(
+                _process_kepid_group,
+                group_rows,
+                n_bins=n_bins,
+                lc_fetcher=lc_fetcher,
+            )
+            future_meta[future] = (group_index, group_rows)
+            return True
+
+        for _ in range(min(workers, n_groups)):
+            submit_next_group()
+
+        while future_meta:
+            for future in as_completed(list(future_meta)):
+                group_index, group_rows = future_meta.pop(future)
+                break
+            group_size = len(group_rows)
+            try:
+                results = future.result()
+            except Exception as exc:
+                results = [
+                    KoiSnippetResult(
+                        kepid=row.kepid,
+                        kepoi_name=row.kepoi_name,
+                        label=1 if row.disposition == "CONFIRMED" else 0,
+                        flux=(),
+                        period_days=row.period_days,
+                        epoch_bjd=row.epoch_bkjd + _KEPLER_BJD_OFFSET,
+                        n_bins=n_bins,
+                        flag=f"ERROR:{exc}",
+                    )
+                    for row in group_rows
+                ]
+            for result in results:
+                write_result(result, group_index, group_size)
                 if n_errors >= max_errors:
                     print(
                         f"Stopping early: {n_errors} consecutive non-OK results.",
                         flush=True,
                     )
+                    for pending_future in future_meta:
+                        pending_future.cancel()
                     break
+            if n_errors >= max_errors:
+                break
+            submit_next_group()
 
     elapsed_total = time.monotonic() - start
     print(
@@ -540,6 +667,20 @@ def _cli(argv: list[str] | None = None) -> int:
         help="Stop after N consecutive non-OK results (default: 50)",
     )
     parser.add_argument(
+        "--workers",
+        type=int,
+        default=4,
+        metavar="N",
+        help="Number of KIC groups to fetch concurrently (default: 4)",
+    )
+    parser.add_argument(
+        "--request-delay",
+        type=float,
+        default=0.25,
+        metavar="SECONDS",
+        help="Delay between submitting KIC fetch jobs (default: 0.25)",
+    )
+    parser.add_argument(
         "--failure-log",
         type=Path,
         default=None,
@@ -578,6 +719,8 @@ def _cli(argv: list[str] | None = None) -> int:
         max_errors=args.max_errors,
         failure_log_path=args.failure_log,
         retry_failures=args.retry_failures,
+        workers=args.workers,
+        request_delay=args.request_delay,
     )
     print(f"[{datetime.now().strftime('%H:%M:%S')}] Wrote {n} snippets → {args.output}", flush=True)
     return 0

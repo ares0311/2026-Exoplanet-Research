@@ -256,6 +256,10 @@ This is Option B: downloads TESS light curves for ~6,500 Kepler KOI stars that M
 has re-observed with TESS. Phase-folds using Kepler ephemerides (period + epoch
 converted from BKJD to full BJD). Expected to yield 1,000–3,000 new labeled TESS
 snippets with high-quality Kepler labels (confirmed planet vs confirmed FP).
+The fetcher groups pending KOIs by KIC, fetches each KIC light curve once, folds
+all KOIs for that KIC locally, and runs a bounded rolling thread pool. The main
+thread writes successes and terminal failures as each KIC group completes, so an
+interrupted run remains safely resumable.
 Ordinary resume skips already written snippets and terminal failures recorded in
 `data/tess_kepler_overlap_snippets.jsonl.failures.jsonl`; use
 `--retry-failures` only for an intentional recheck of those terminal failures.
@@ -265,7 +269,10 @@ It takes ~12–24 hours.
 
 ```bash
 git pull origin main
-caffeinate -dims .venv/bin/python Skills/fetch_tess_kepler_overlap_snippets.py --output data/tess_kepler_overlap_snippets.jsonl
+caffeinate -dims .venv/bin/python Skills/fetch_tess_kepler_overlap_snippets.py \
+  --output data/tess_kepler_overlap_snippets.jsonl \
+  --workers 4 \
+  --request-delay 0.25
 wc -l data/tess_kepler_overlap_snippets.jsonl
 ```
 
