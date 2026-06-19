@@ -250,7 +250,7 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 109 top-level test files. Local validation on 2026-06-19 passed with 2,220 default tests and 2 `integration_live` tests deselected.
+**Current test surface:** 109 top-level test files. Local validation on 2026-06-19 passed with 2,222 default tests and 2 `integration_live` tests deselected.
 **Skills:** 415 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). See `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference instead of relying on this file for exhaustive per-script counts.
 
 ---
@@ -1193,7 +1193,7 @@ These large data files live only on the user's local Mac. They are never committ
 | `checkpoints/cnn_tess_finetuned/best.pt` | Local Mac | **REJECTED** — SHA-256 `3fc115b3623b2485373aefef30a7aa901e1183cc77ef4b57ce6c1f2219f49214` | Fine-tuned from Kepler pretrain on MPS; best val AUC 0.8408; production evaluator failed with raw test AUC 0.8115, calibrated F1 0.7508, and calibration-worsened Brier/ECE |
 | `checkpoints/cnn_tess_c12/best.pt` | Local Mac | **REJECTED** — SHA-256 `cc8fbd2004e0fd41dc48bf7f48e3d6b552c75164c62556c3a016af3ca1642ff0` | Full-unfreeze fine-tune from Kepler pretrain on MPS; test raw AUC 0.8124 and calibrated F1 0.7516; calibration worsened Brier/ECE |
 | `data/new_tess_targets.*` / `data/tess_snippets_expansion_v3.jsonl` / `data/tess_cnn_splits_v3/` | Local Mac | **INVENTORY COMPLETE / TOO SMALL** | 2026-06-18 Path A inventory found 56 new labeled TIC IDs (16 positive, 40 negative); do not fetch v3 snippets as a production-closing attempt |
-| `data/tess_kepler_overlap_snippets.jsonl` | Local Mac | **NOT GENERATED / NEXT AUTHORIZED FETCH** | Runbook Step 7c overlap corpus; fetcher is bounded-concurrent and resumable; output remains ignored until audit approves downstream merge |
+| `data/tess_kepler_overlap_snippets.jsonl` | Local Mac | **PARTIAL / NEXT AUTHORIZED FETCH** | Runbook Step 7c overlap corpus; user reported 81 lines after a crash caused by Lightkurve's thread-unsafe `download_all()` stdout wrapper; corrected fetcher is bounded-concurrent, avoids that wrapper, and resumes from existing rows; output remains ignored until audit approves downstream merge |
 | `data/tess_kepler_overlap_snippets.jsonl.failures.jsonl` | Local Mac | **EXPECTED SIDECAR** | Terminal failures are skipped on ordinary reruns; pass `--retry-failures` only for an intentional recheck |
 
 **Kepler retry command** (only if the human explicitly wants to retry missing
@@ -1221,6 +1221,15 @@ uses a bounded rolling thread pool, and writes completed groups immediately from
 the main thread. This is intentionally multithreaded rather than multiprocessed:
 the workload is live MAST/lightkurve network I/O, and `docs/SYSTEM_PROFILE.md`
 requires polite bounded concurrency for external services.
+
+Root cause of the 2026-06-19 crash: the first concurrent implementation called
+Lightkurve `SearchResult.download_all()`. Lightkurve decorates that method with
+`suppress_stdout`, which temporarily assigns process-global `sys.stdout` to an
+open `/dev/null` handle. With multiple worker threads, one worker can restore
+stdout to another worker's soon-to-close handle; the next main-thread progress
+print can then raise `ValueError: I/O operation on closed file`. The corrected
+implementation calls Lightkurve's per-file downloader directly and uses a
+fail-soft progress emitter.
 
 If the user killed a previous serial run, do not assume the partial output is
 bad. First audit the JSONL and sidecar. The corrected fetcher resumes from

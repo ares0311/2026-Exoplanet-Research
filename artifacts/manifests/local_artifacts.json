@@ -296,34 +296,39 @@
     {
       "path": "data/tess_kepler_overlap_snippets.jsonl",
       "kind": "source_corpus_expansion",
-      "status": "not_generated_next_authorized_fetch",
+      "status": "partial_resume_next",
       "git_policy": "ignored",
       "last_known": {
         "candidate_path": "C12 fallback / C13 source",
-        "generated": false,
+        "generated": true,
+        "last_reported_rows": 81,
+        "last_reported_failure": "ValueError: I/O operation on closed file during progress print after Lightkurve download_all() used a process-global suppress_stdout wrapper under concurrency",
         "script": "Skills/fetch_tess_kepler_overlap_snippets.py",
         "grouped_by_kepid": true,
         "workers_default": 4,
         "request_delay_seconds_default": 0.25,
         "writes_completed_groups_immediately": true,
+        "avoids_lightkurve_download_all": true,
+        "progress_output_fail_soft": true,
         "requires_c12_rejection": true,
         "c12_rejected": true,
         "expected_runtime": "12-24 hours",
         "verified_on": "2026-06-19"
       },
       "validation_gate": "After fetch, audit row count, label balance, and sidecar before merging with TESS v2.",
-      "next_action": "Run one caffeinated Step 7c overlap fetch with --workers 4 --request-delay 0.25 and paste final summary plus wc -l output."
+      "next_action": "Resume the caffeinated Step 7c overlap fetch with the fixed script, --workers 4, and --request-delay 0.25; paste final summary plus wc -l output."
     },
     {
       "path": "data/tess_kepler_overlap_snippets.jsonl.failures.jsonl",
       "kind": "fetch_failure_sidecar",
-      "status": "expected_for_conditional_fetch",
+      "status": "present_local_sidecar",
       "git_policy": "ignored",
       "last_known": {
-        "generated": false,
+        "generated": true,
+        "last_reported_terminal_failures": 24,
         "paired_output": "data/tess_kepler_overlap_snippets.jsonl",
         "retry_flag": "--retry-failures",
-        "verified_on": "2026-06-18"
+        "verified_on": "2026-06-19"
       },
       "validation_gate": "Ordinary overlap reruns must skip terminal failures recorded here; reprocess only with --retry-failures.",
       "next_action": "Review with the overlap corpus after Step 7c before building combined splits."
