@@ -47,6 +47,13 @@ Production gates:
   negative; 33 TOI, 23 CTOI). This is too small to justify a long MAST fetch
   as a production-closing candidate-12 run. Do not fetch v3 snippets for
   production from this inventory; start a new T1-1 planning cycle.
+- Candidate 12 full-unfreeze fine-tuning completed locally on 2026-06-19 with
+  startup banner `device=mps`; checkpoint `checkpoints/cnn_tess_c12/best.pt`,
+  SHA-256 `cc8fbd2004e0fd41dc48bf7f48e3d6b552c75164c62556c3a016af3ca1642ff0`,
+  best epoch 20, validation loss 0.5302, and validation AUC 0.8356.
+  Production gate evaluation rejected that checkpoint: test raw AUC 0.8124,
+  raw F1 0.7542, calibrated F1 0.7516, calibrated Brier 0.1979, and
+  calibrated ECE 0.1283. Do not promote this checkpoint.
 - After every local artifact state change, update the artifact ledger so agents
   that can only see GitHub know whether the corpus, splits, checkpoint, or
   promotion gate is missing, pending, valid, rejected, or approved.
@@ -224,10 +231,11 @@ Stop here and paste back the split summary and validator output. Train a
 candidate-12 checkpoint only if the expanded split passes validation and the
 agent updates the artifact ledger with the new local artifact state.
 
-## Step 7b: Candidate 12 — Full-Unfreeze Fine-Tune (Try This First)
+## Step 7b: Candidate 12 — Full-Unfreeze Fine-Tune
 
-**Status: READY TO RUN** — config written, existing TESS splits validated.
-This is Option A: no new data required. Runs in ~4 hours on M4 Max MPS.
+**Status: REJECTED** — completed locally on 2026-06-19 and missed the gate.
+Do not rerun this as a production-closing attempt without a new documented
+hypothesis.
 
 **Why this is different from candidate 11:** Candidate 11 (`configs/cnn_tess_finetune.json`)
 froze the conv layers for 15 epochs, then fine-tuned at LR=1e-4. The Kepler conv
@@ -236,17 +244,12 @@ unfreezes all layers from epoch 1 with a much lower LR (3e-5), smaller batch (32
 longer patience (20), giving the full network a gradual opportunity to adapt without
 catastrophic forgetting of pretrained weights.
 
-```bash
-git pull origin main
-caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/tess_cnn_splits --checkpoint-dir checkpoints/cnn_tess_c12 --config configs/cnn_tess_finetune_c12.json --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt
-shasum -a 256 checkpoints/cnn_tess_c12/best.pt
-```
+Result from 2026-06-19: best val AUC `0.8356`, test raw AUC `0.8124`,
+calibrated F1 `0.7516`, calibrated Brier `0.1979`, and calibrated ECE
+`0.1283`. This checkpoint is rejected. Proceed to Step 7c before any further
+training.
 
-Stop and paste back the training result lines and SHA-256. If best val AUC ≥ 0.85,
-proceed to Step 6 evaluation (substituting `checkpoints/cnn_tess_c12`). If val AUC < 0.85,
-record as rejected and proceed to Step 7c before any further training.
-
-## Step 7c: Candidate 12 — Kepler-TESS Overlap Corpus (If 7b Misses Gate)
+## Step 7c: Kepler-TESS Overlap Corpus
 
 **Status: SCRIPT READY** — `Skills/fetch_tess_kepler_overlap_snippets.py` written and tested.
 This is Option B: downloads TESS light curves for ~6,500 Kepler KOI stars that MAST
@@ -257,7 +260,8 @@ Ordinary resume skips already written snippets and terminal failures recorded in
 `data/tess_kepler_overlap_snippets.jsonl.failures.jsonl`; use
 `--retry-failures` only for an intentional recheck of those terminal failures.
 
-**Do not run this step unless Step 7b is rejected.** It takes ~12–24 hours.
+**Step 7b is rejected, so this is now the next authorized T1-1 runbook step.**
+It takes ~12–24 hours.
 
 ```bash
 git pull origin main
