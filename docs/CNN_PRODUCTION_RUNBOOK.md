@@ -260,6 +260,9 @@ The fetcher groups pending KOIs by KIC, fetches each KIC light curve once, folds
 all KOIs for that KIC locally, and runs a bounded rolling thread pool. The main
 thread writes successes and terminal failures as each KIC group completes, so an
 interrupted run remains safely resumable.
+It intentionally avoids Lightkurve `SearchResult.download_all()` because that
+method mutates process-global `sys.stdout` and is unsafe with concurrent worker
+threads.
 Ordinary resume skips already written snippets and terminal failures recorded in
 `data/tess_kepler_overlap_snippets.jsonl.failures.jsonl`; use
 `--retry-failures` only for an intentional recheck of those terminal failures.

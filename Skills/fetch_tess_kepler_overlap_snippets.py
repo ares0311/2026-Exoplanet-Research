@@ -54,6 +54,7 @@ import json
 import math
 import socket
 import ssl
+import sys
 import time
 from collections import defaultdict
 from collections.abc import Callable
@@ -80,6 +81,22 @@ _KOI_TAP_URL = (
     "&format=json"
 )
 _TERMINAL_FAILURE_FLAGS = {"NO_LIGHTKURVE", "NO_DATA", "SHORT", "NONFINITE"}
+
+
+def _emit_progress(message: str) -> None:
+    """Print progress without letting a damaged stdout kill a long run."""
+    seen: set[int] = set()
+    for stream in (sys.stdout, sys.__stdout__, sys.stderr, sys.__stderr__):
+        if stream is None or id(stream) in seen:
+            continue
+        seen.add(id(stream))
+        if getattr(stream, "closed", False):
+            continue
+        try:
+            print(message, file=stream, flush=True)
+            return
+        except (OSError, ValueError):
+            continue
 
 
 # ---------------------------------------------------------------------------
@@ -240,9 +257,22 @@ def _default_lc_fetcher(
         result = lk.search_lightcurve(f"KIC {kepid}", mission="TESS", author=author)
         if len(result) == 0:
             continue
-        lc_coll = result.download_all()
-        if lc_coll is None or len(lc_coll) == 0:
+        light_curves = []
+        for idx in range(len(result.table)):
+            # Avoid SearchResult.download_all(): Lightkurve decorates it with
+            # suppress_stdout, which mutates process-global sys.stdout and is
+            # unsafe while this script fetches KIC groups concurrently.
+            light_curves.append(
+                result._download_one(  # noqa: SLF001
+                    table=result.table[idx : idx + 1],
+                    quality_bitmask="default",
+                    download_dir=None,
+                    cutout_size=None,
+                )
+            )
+        if not light_curves:
             continue
+        lc_coll = lk.LightCurveCollection(light_curves)
         lc = lc_coll.stitch()
         with contextlib.suppress(Exception):
             lc = lc.normalize()
@@ -483,19 +513,17 @@ def build_koi_tess_snippets(
     n_errors = 0
     start = time.monotonic()
 
-    print(
+    _emit_progress(
         f"Kepler-TESS overlap fetch: {len(rows)} total KOIs, "
         f"{len(already_done)} already done, "
         f"{len(already_failed)} terminal failures skipped, "
-        f"{n_total} pending across {n_groups} KIC groups.",
-        flush=True,
+        f"{n_total} pending across {n_groups} KIC groups."
     )
-    print(
+    _emit_progress(
         f"Output: {output_path}  failures={failure_log_path}  "
         f"n_bins={n_bins}  max_errors={max_errors}  "
         f"workers={workers}  request_delay={request_delay:.2f}s  "
-        f"retry_failures={retry_failures}",
-        flush=True,
+        f"retry_failures={retry_failures}"
     )
 
     def write_result(result: KoiSnippetResult, group_index: int, group_size: int) -> None:
@@ -525,12 +553,11 @@ def build_koi_tess_snippets(
             fh.flush()
             n_written += 1
             n_errors = 0
-            print(
+            _emit_progress(
                 f"  [{n_processed}/{n_total}] {datetime.now().strftime('%H:%M:%S')}"
                 f" {result.kepoi_name} KIC {result.kepid}"
                 f" label={result.label} {group_progress}"
-                f"  written={n_written}  elapsed={elapsed:.0f}s  ETA={eta}",
-                flush=True,
+                f"  written={n_written}  elapsed={elapsed:.0f}s  ETA={eta}"
             )
         else:
             n_skipped += 1
@@ -550,12 +577,11 @@ def build_koi_tess_snippets(
                 failure_fh.write(json.dumps(failure_record) + "\n")
                 failure_fh.flush()
                 n_terminal_failures += 1
-            print(
+            _emit_progress(
                 f"  [{n_processed}/{n_total}] {datetime.now().strftime('%H:%M:%S')}"
                 f" {result.kepoi_name} KIC {result.kepid}"
                 f" SKIP flag={result.flag} {group_progress}"
-                f"  errors={n_errors}  elapsed={elapsed:.0f}s  ETA={eta}",
-                flush=True,
+                f"  errors={n_errors}  elapsed={elapsed:.0f}s  ETA={eta}"
             )
 
     with (
@@ -609,10 +635,7 @@ def build_koi_tess_snippets(
             for result in results:
                 write_result(result, group_index, group_size)
                 if n_errors >= max_errors:
-                    print(
-                        f"Stopping early: {n_errors} consecutive non-OK results.",
-                        flush=True,
-                    )
+                    _emit_progress(f"Stopping early: {n_errors} consecutive non-OK results.")
                     for pending_future in future_meta:
                         pending_future.cancel()
                     break
@@ -621,11 +644,10 @@ def build_koi_tess_snippets(
             submit_next_group()
 
     elapsed_total = time.monotonic() - start
-    print(
+    _emit_progress(
         f"Done. wrote={n_written} skipped={n_skipped} "
         f"terminal_failures_recorded={n_terminal_failures} "
-        f"total_elapsed={elapsed_total:.0f}s",
-        flush=True,
+        f"total_elapsed={elapsed_total:.0f}s"
     )
     return n_written
 
@@ -700,16 +722,12 @@ def _cli(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    print(
-        f"[{datetime.now().strftime('%H:%M:%S')}] Fetching KOI table from NASA TAP...",
-        flush=True,
-    )
+    _emit_progress(f"[{datetime.now().strftime('%H:%M:%S')}] Fetching KOI table from NASA TAP...")
     rows = fetch_koi_table(args.koi_url)
-    print(
+    _emit_progress(
         f"[{datetime.now().strftime('%H:%M:%S')}] Loaded {len(rows)} KOI rows"
         f" ({sum(1 for r in rows if r.disposition == 'CONFIRMED')} CONFIRMED,"
-        f" {sum(1 for r in rows if r.disposition == 'FALSE POSITIVE')} FALSE POSITIVE).",
-        flush=True,
+        f" {sum(1 for r in rows if r.disposition == 'FALSE POSITIVE')} FALSE POSITIVE)."
     )
 
     n = build_koi_tess_snippets(
@@ -722,7 +740,7 @@ def _cli(argv: list[str] | None = None) -> int:
         workers=args.workers,
         request_delay=args.request_delay,
     )
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] Wrote {n} snippets → {args.output}", flush=True)
+    _emit_progress(f"[{datetime.now().strftime('%H:%M:%S')}] Wrote {n} snippets -> {args.output}")
     return 0
 
 

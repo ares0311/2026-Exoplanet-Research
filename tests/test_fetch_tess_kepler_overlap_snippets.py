@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import json
+import sys
+from io import StringIO
+from types import SimpleNamespace
 
 import Skills.fetch_tess_kepler_overlap_snippets as overlap
 from Skills.fetch_tess_kepler_overlap_snippets import (
@@ -320,6 +323,74 @@ def test_batch_groups_same_kic_into_one_fetch(tmp_path):
     assert calls == [_CONFIRMED_ROW.kepid]
     lines = [json.loads(ln) for ln in out.read_text().splitlines() if ln.strip()]
     assert {line["kepoi_name"] for line in lines} == {"K00001.01", "K00001.02"}
+
+
+def test_batch_progress_survives_closed_stdout(tmp_path, monkeypatch):
+    out = tmp_path / "overlap.jsonl"
+    closed_stdout = StringIO()
+    closed_stdout.close()
+    monkeypatch.setattr(sys, "stdout", closed_stdout)
+
+    n = build_koi_tess_snippets(
+        [_CONFIRMED_ROW],
+        n_bins=201,
+        output_path=out,
+        lc_fetcher=_make_lc_fetcher(),
+        workers=1,
+        request_delay=0,
+    )
+
+    assert n == 1
+    assert len([ln for ln in out.read_text().splitlines() if ln.strip()]) == 1
+
+
+def test_default_lc_fetcher_avoids_download_all(monkeypatch):
+    calls = {"download_one": 0}
+
+    class FakeTable:
+        def __len__(self):
+            return 1
+
+        def __getitem__(self, key):
+            return self
+
+    class FakeSearchResult:
+        table = FakeTable()
+
+        def __len__(self):
+            return 1
+
+        def download_all(self):
+            raise AssertionError("download_all mutates process-global stdout")
+
+        def _download_one(self, *, table, quality_bitmask, download_dir, cutout_size):
+            calls["download_one"] += 1
+            return SimpleNamespace(
+                time=SimpleNamespace(value=[0.0, 1.0, 2.0]),
+                flux=SimpleNamespace(value=[1.0, 0.9, 1.1]),
+                normalize=lambda: SimpleNamespace(
+                    time=SimpleNamespace(value=[0.0, 1.0, 2.0]),
+                    flux=SimpleNamespace(value=[1.0, 0.9, 1.1]),
+                ),
+            )
+
+    class FakeCollection:
+        def __init__(self, curves):
+            self.curves = curves
+
+        def stitch(self):
+            return self.curves[0]
+
+    fake_lk = SimpleNamespace(
+        search_lightcurve=lambda *args, **kwargs: FakeSearchResult(),
+        LightCurveCollection=FakeCollection,
+    )
+    monkeypatch.setitem(sys.modules, "lightkurve", fake_lk)
+
+    raw = overlap._default_lc_fetcher(123, 2.0, 2454900.0)
+
+    assert raw is not None
+    assert calls == {"download_one": 1}
 
 
 def test_batch_creates_parent_dirs(tmp_path):
