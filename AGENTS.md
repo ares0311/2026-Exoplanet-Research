@@ -94,6 +94,19 @@ When the user must take an action to unblock a gap:
 
 **The user needs to run Runbook Step 7c.** This requires Mac access.
 
+Important correction: do **not** use any older Step 7c command that omits
+`--workers` and `--request-delay`. The overlap fetcher was updated after a
+serial-run mistake. The authorized version groups pending KOIs by KIC, runs a
+bounded rolling thread pool, and writes each completed group's successes or
+terminal failures immediately from the main thread. This keeps the run
+stoppable/restartable while satisfying the local-system performance directive.
+
+If the user started or killed an older serial overlap run, do not delete partial
+output by default. The new run will resume from existing successful JSONL rows
+and terminal failures in `data/tess_kepler_overlap_snippets.jsonl.failures.jsonl`.
+Only remove or repair the partial artifact after an explicit JSONL/sidecar audit
+shows corruption.
+
 If the user is at the Mac, give them this command block to start the Kepler-TESS overlap corpus fetch:
 
 ```

@@ -1191,7 +1191,10 @@ These large data files live only on the user's local Mac. They are never committ
 | `data/kepler_snippets.jsonl` | Local Mac | **LOCAL VALIDATED** — 6,837 finite snippets as of 2026-06-17 | JSON parse PASS; zero non-finite flux rows; zero duplicate resume keys; split validator PASS |
 | `checkpoints/cnn_kepler_pretrain/best.pt` | Local Mac | **LOCAL PRETRAINED ON MPS** — SHA-256 `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7` | Best epoch 19, best val loss 0.3905, best val AUC 0.9186; startup banner confirmed `device=mps` |
 | `checkpoints/cnn_tess_finetuned/best.pt` | Local Mac | **REJECTED** — SHA-256 `3fc115b3623b2485373aefef30a7aa901e1183cc77ef4b57ce6c1f2219f49214` | Fine-tuned from Kepler pretrain on MPS; best val AUC 0.8408; production evaluator failed with raw test AUC 0.8115, calibrated F1 0.7508, and calibration-worsened Brier/ECE |
+| `checkpoints/cnn_tess_c12/best.pt` | Local Mac | **REJECTED** — SHA-256 `cc8fbd2004e0fd41dc48bf7f48e3d6b552c75164c62556c3a016af3ca1642ff0` | Full-unfreeze fine-tune from Kepler pretrain on MPS; test raw AUC 0.8124 and calibrated F1 0.7516; calibration worsened Brier/ECE |
 | `data/new_tess_targets.*` / `data/tess_snippets_expansion_v3.jsonl` / `data/tess_cnn_splits_v3/` | Local Mac | **INVENTORY COMPLETE / TOO SMALL** | 2026-06-18 Path A inventory found 56 new labeled TIC IDs (16 positive, 40 negative); do not fetch v3 snippets as a production-closing attempt |
+| `data/tess_kepler_overlap_snippets.jsonl` | Local Mac | **NOT GENERATED / NEXT AUTHORIZED FETCH** | Runbook Step 7c overlap corpus; fetcher is bounded-concurrent and resumable; output remains ignored until audit approves downstream merge |
+| `data/tess_kepler_overlap_snippets.jsonl.failures.jsonl` | Local Mac | **EXPECTED SIDECAR** | Terminal failures are skipped on ordinary reruns; pass `--retry-failures` only for an intentional recheck |
 
 **Kepler retry command** (only if the human explicitly wants to retry missing
 rows after the validated split; do not use an infinite wrapper):
@@ -1205,24 +1208,42 @@ terminal failures. Console progress is not resume state. If rerunning a
 downloader reprocesses completed or terminally failed work by default, stop and
 fix the durable resume ledger before asking the human to run it again.
 
-### Next Step — HANDOFF 2026-06-18
+### Next Step — HANDOFF 2026-06-19
 
-**Status: Kepler JSONL, Kepler split, Kepler pretraining checkpoint, and TESS split are locally validated; the first Kepler->TESS fine-tuned checkpoint is rejected. Path A TESS expansion inventory found too few new labels. Do not promote candidate 11, rerun the same fine-tune, or fetch v3 snippets from the 56-target inventory as the next production attempt.**
+**Status: Kepler JSONL, Kepler split, Kepler pretraining checkpoint, TESS split, candidate 11, and candidate 12 are locally validated/evaluated. Candidate 11 and C12 are rejected. Path A TESS expansion inventory found too few new labels. The only authorized next production attempt for T1-1 is Runbook Step 7c: build the Kepler-TESS overlap corpus, audit it, then train C13 only if the audit passes.**
+
+#### Critical correction for incoming agents
+
+An older Step 7c command was given without explicit concurrency flags. Do **not**
+repeat that command. The current `Skills/fetch_tess_kepler_overlap_snippets.py`
+implementation groups pending KOIs by KIC, fetches each KIC light curve once,
+uses a bounded rolling thread pool, and writes completed groups immediately from
+the main thread. This is intentionally multithreaded rather than multiprocessed:
+the workload is live MAST/lightkurve network I/O, and `docs/SYSTEM_PROFILE.md`
+requires polite bounded concurrency for external services.
+
+If the user killed a previous serial run, do not assume the partial output is
+bad. First audit the JSONL and sidecar. The corrected fetcher resumes from
+successful rows and terminal failures, so partial good rows are useful resume
+state.
 
 #### Incoming agent: do this first
 
-Ask the user to paste the output of:
+Ask the user to run/paste this only from a local checkout that has pulled GitHub
+`main`:
 ```bash
 git pull origin main
-wc -l data/kepler_snippets.jsonl data/tess_snippets_v2.jsonl
-.venv/bin/python Skills/cnn_split_validator.py data/kepler_cnn_splits
-.venv/bin/python Skills/cnn_split_validator.py data/tess_cnn_splits
-shasum -a 256 checkpoints/cnn_kepler_pretrain/best.pt
-shasum -a 256 checkpoints/cnn_tess_finetuned/best.pt
+caffeinate -dims .venv/bin/python Skills/fetch_tess_kepler_overlap_snippets.py \
+  --output data/tess_kepler_overlap_snippets.jsonl \
+  --workers 4 \
+  --request-delay 0.25
+wc -l data/tess_kepler_overlap_snippets.jsonl
 ```
 
-- **6,837 Kepler lines, Kepler split validator PASS, TESS split validator PASS, and pretraining SHA `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`** → current local prerequisites are reproducible, but the first fine-tuned checkpoint is rejected.
-- **Fine-tuned SHA `3fc115b3623b2485373aefef30a7aa901e1183cc77ef4b57ce6c1f2219f49214`** → do not promote. Production evaluator returned `Flag: FAIL` with raw test AUC 0.8115, calibrated F1 0.7508, and worsened Brier/ECE.
+After it finishes, review `data/tess_kepler_overlap_snippets.jsonl` and
+`data/tess_kepler_overlap_snippets.jsonl.failures.jsonl` before building
+combined splits. Do not train C13 until the overlap corpus count, label balance,
+JSON validity, and sidecar look production-usable.
 - **Path A inventory result** → completed on 2026-06-18: 56 new labeled TIC IDs
   (16 positive, 40 negative). Too small for a production-closing candidate-12
   fetch/training run.
