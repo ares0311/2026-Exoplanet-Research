@@ -302,13 +302,17 @@
         "candidate_path": "C12 fallback / C13 source",
         "generated": false,
         "script": "Skills/fetch_tess_kepler_overlap_snippets.py",
+        "grouped_by_kepid": true,
+        "workers_default": 4,
+        "request_delay_seconds_default": 0.25,
+        "writes_completed_groups_immediately": true,
         "requires_c12_rejection": true,
         "c12_rejected": true,
         "expected_runtime": "12-24 hours",
         "verified_on": "2026-06-19"
       },
       "validation_gate": "After fetch, audit row count, label balance, and sidecar before merging with TESS v2.",
-      "next_action": "Run one caffeinated Step 7c overlap fetch and paste final summary plus wc -l output."
+      "next_action": "Run one caffeinated Step 7c overlap fetch with --workers 4 --request-delay 0.25 and paste final summary plus wc -l output."
     },
     {
       "path": "data/tess_kepler_overlap_snippets.jsonl.failures.jsonl",
