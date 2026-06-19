@@ -50,6 +50,7 @@ import contextlib
 import json
 import math
 import socket
+import ssl
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -170,7 +171,14 @@ def fetch_koi_table(url: str = _KOI_TAP_URL) -> list[KoiRow]:
     Raises:
         RuntimeError: If the table cannot be fetched or parsed.
     """
-    with urlopen(url, timeout=120) as resp:  # noqa: S310
+    try:
+        import certifi
+
+        ctx: ssl.SSLContext | None = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        ctx = None
+
+    with urlopen(url, timeout=120, context=ctx) as resp:  # noqa: S310
         raw = json.loads(resp.read())
 
     rows: list[KoiRow] = []

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 
+import Skills.fetch_tess_kepler_overlap_snippets as overlap
 from Skills.fetch_tess_kepler_overlap_snippets import (
     KoiRow,
     _normalise,
@@ -329,6 +330,43 @@ def test_fetch_koi_table_parses_records(tmp_path):
     fp = [r for r in rows if r.disposition == "FALSE POSITIVE"]
     assert len(confirmed) == 1
     assert len(fp) == 1
+
+
+def test_fetch_koi_table_uses_certifi_ssl_context(monkeypatch):
+    mock_data = json.dumps([
+        {
+            "kepid": 757099,
+            "kepoi_name": "K00001.01",
+            "koi_disposition": "CONFIRMED",
+            "koi_period": 2.4706,
+            "koi_time0bk": 120.7285,
+        },
+    ]).encode()
+    captured: dict[str, object] = {}
+
+    class _Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return mock_data
+
+    def fake_urlopen(url, *, timeout, context):  # noqa: ANN001, ANN202
+        captured["url"] = url
+        captured["timeout"] = timeout
+        captured["context"] = context
+        return _Response()
+
+    monkeypatch.setattr(overlap, "urlopen", fake_urlopen)
+
+    rows = fetch_koi_table("https://example.invalid/tap")
+
+    assert len(rows) == 1
+    assert captured["timeout"] == 120
+    assert captured["context"] is not None
 
 
 def test_fetch_koi_table_rejects_invalid_disposition(tmp_path):
