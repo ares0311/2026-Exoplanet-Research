@@ -315,8 +315,8 @@
         "labels": "KOI disposition CONFIRMED -> 1, FALSE POSITIVE -> 0",
         "verified_on": "2026-06-20"
       },
-      "validation_gate": "Combine with data/tess_snippets_v2.jsonl; validate combined splits with cnn_split_validator.py before C13 training.",
-      "next_action": "cat data/tess_snippets_v2.jsonl data/tess_kepler_overlap_snippets.jsonl > data/tess_combined_snippets.jsonl"
+      "validation_gate": "Combined corpus built; combined splits validated PASS; C13 trained and rejected.",
+      "next_action": "Retain; C14 authorized on same combined splits with low-LR config."
     },
     {
       "path": "data/tess_kepler_overlap_snippets.jsonl.failures.jsonl",
@@ -338,53 +338,103 @@
     {
       "path": "data/tess_combined_snippets.jsonl",
       "kind": "source_corpus",
-      "status": "not_built_authorized",
+      "status": "built",
       "git_policy": "ignored",
       "last_known": {
         "base_corpus": "data/tess_snippets_v2.jsonl",
         "expansion_corpus": "data/tess_kepler_overlap_snippets.jsonl",
-        "target_rows": 7483,
-        "generated": false,
+        "rows": 7483,
+        "generated": true,
         "build_command": "cat data/tess_snippets_v2.jsonl data/tess_kepler_overlap_snippets.jsonl > data/tess_combined_snippets.jsonl",
-        "updated_on": "2026-06-20"
+        "verified_on": "2026-06-20"
       },
-      "validation_gate": "Verify row count matches sum of source corpora before building splits.",
-      "next_action": "Build now; then run build_cnn_training_data.py with --seed 7."
+      "validation_gate": "Row count verified = sum of source corpora (2619 + 4864 = 7483).",
+      "next_action": "Retain; do not rebuild unless a new corpus expansion is authorized."
     },
     {
       "path": "data/tess_combined_cnn_splits/",
       "kind": "cnn_split",
-      "status": "not_built_authorized",
+      "status": "local_validated",
       "git_policy": "ignored",
       "last_known": {
         "source_corpus": "data/tess_combined_snippets.jsonl",
-        "target_train_approx": 5200,
-        "target_val_approx": 1100,
-        "target_test_approx": 1100,
         "seed": 7,
-        "build_command": ".venv/bin/python Skills/build_cnn_training_data.py data/tess_combined_snippets.jsonl --output-dir data/tess_combined_cnn_splits --seed 7",
-        "generated": false,
-        "updated_on": "2026-06-20"
+        "train": 4892,
+        "val": 1049,
+        "test": 1033,
+        "validator_status": "PASS",
+        "verified_on": "2026-06-20"
       },
-      "validation_gate": "Skills/cnn_split_validator.py must report PASS before C13 training.",
-      "next_action": "Build after combined corpus is ready; validate; train C13 only after PASS."
+      "validation_gate": "Skills/cnn_split_validator.py reported PASS on 2026-06-20.",
+      "next_action": "Retain; use for C14 training with configs/cnn_tess_finetune_c12.json (LR=3e-5)."
     },
     {
       "path": "checkpoints/cnn_tess_c13/",
       "kind": "checkpoint_dir",
-      "status": "not_trained_authorized",
+      "status": "rejected",
       "git_policy": "ignored",
       "last_known": {
         "candidate": 13,
+        "generated": true,
+        "checkpoint": "checkpoints/cnn_tess_c13/best.pt",
+        "sha256": "pending_retrieval",
+        "device": "mps",
+        "split_dir": "data/tess_combined_cnn_splits/",
+        "pretrained_checkpoint": "checkpoints/cnn_kepler_pretrain/best.pt",
+        "config": "default (LR=1e-3)",
+        "train": 4892,
+        "val": 1049,
+        "test": 1033,
+        "best_epoch": 8,
+        "best_val_loss": 0.8197,
+        "best_val_auc": 0.8195,
+        "early_stop_epoch": 18,
+        "root_cause": "LR=1e-3 too high for pretrained init; val_loss spiked epoch 5 (0.8421) while train_loss fell to 0.2247 — severe overfitting",
+        "raw_val_n": 1049,
+        "raw_val_auc": 0.8195,
+        "raw_val_f1": 0.7825,
+        "raw_val_brier": 0.1772,
+        "raw_val_ece": 0.0823,
+        "raw_test_n": 1033,
+        "raw_test_auc": 0.8342,
+        "raw_test_f1": 0.796,
+        "raw_test_brier": 0.1664,
+        "raw_test_ece": 0.0625,
+        "platt_a": 1.78234347,
+        "platt_b": -0.76273353,
+        "calibrated_threshold": 0.47,
+        "calibrated_test_auc": 0.8342,
+        "calibrated_test_f1": 0.796,
+        "calibrated_test_brier": 0.1828,
+        "calibrated_test_ece": 0.1334,
+        "evaluator_flag": "FAIL",
+        "verified_on": "2026-06-20"
+      },
+      "validation_gate": "Rejected: AUC 0.8342 < 0.85, calibration worsened Brier (0.1664→0.1828) and ECE (0.0625→0.1334). Root cause: LR too high.",
+      "next_action": "Do not promote. C14 uses configs/cnn_tess_finetune_c12.json (LR=3e-5) on same combined splits."
+    },
+    {
+      "path": "checkpoints/cnn_tess_c14/",
+      "kind": "checkpoint_dir",
+      "status": "not_trained_authorized",
+      "git_policy": "ignored",
+      "last_known": {
+        "candidate": 14,
         "generated": false,
         "split_dir": "data/tess_combined_cnn_splits/",
         "pretrained_checkpoint": "checkpoints/cnn_kepler_pretrain/best.pt",
-        "train_command": "caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/tess_combined_cnn_splits --checkpoint-dir checkpoints/cnn_tess_c13 --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt --device auto",
-        "eval_command": ".venv/bin/python Skills/evaluate_cnn_checkpoint.py --split-dir data/tess_combined_cnn_splits --checkpoint checkpoints/cnn_tess_c13/best.pt --output-calibration checkpoints/cnn_tess_c13/calibration.json",
+        "config": "configs/cnn_tess_finetune_c12.json",
+        "config_lr": 3e-5,
+        "config_batch": 32,
+        "config_patience": 20,
+        "config_strategy": "full unfreeze from epoch 1",
+        "train_command": "caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/tess_combined_cnn_splits --checkpoint-dir checkpoints/cnn_tess_c14 --config configs/cnn_tess_finetune_c12.json --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt --device auto",
+        "eval_command": ".venv/bin/python Skills/evaluate_cnn_checkpoint.py --split-dir data/tess_combined_cnn_splits --checkpoint checkpoints/cnn_tess_c14/best.pt --output-calibration checkpoints/cnn_tess_c14/calibration.json",
+        "rationale": "100x lower LR than C13 to prevent pretrained-weight destabilization; same combined corpus (4892 train examples)",
         "updated_on": "2026-06-20"
       },
       "validation_gate": "Raw held-out AUC >= 0.85, calibrated F1 >= 0.80, calibration must not worsen Brier/ECE.",
-      "next_action": "Train after split validator PASS; evaluate with evaluate_cnn_checkpoint.py; promote only after evaluator PASS plus explicit human approval."
+      "next_action": "Run train command after git pull origin main; paste SHA and evaluator output for ledger update."
     },
     {
       "path": "models/cnn*/",

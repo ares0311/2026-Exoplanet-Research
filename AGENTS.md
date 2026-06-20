@@ -64,18 +64,16 @@ When the user must take an action to unblock a gap:
 
 ---
 
-## HANDOFF STATE — 2026-06-18 updated 2026-06-20 (READ THIS FIRST)
+## HANDOFF STATE — 2026-06-18 updated 2026-06-20b (READ THIS FIRST)
 
 **The only active gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80).**
 
 ### What was done in the last session (2026-06-20)
 
-- **Path B Kepler-TESS overlap corpus COMPLETE** — `Skills/fetch_tess_kepler_overlap_snippets.py` ran to completion across multiple sessions (~11.8 hours total, 4 workers, 0.25–1.0 s/worker request delay).
-- Final corpus: `data/tess_kepler_overlap_snippets.jsonl` has **4,864 snippets** (3,352 prior sessions + 1,512 final session wrote=1,512 skipped=1,243).
-- Terminal failure sidecar: `data/tess_kepler_overlap_snippets.jsonl.failures.jsonl` has ~2,716 entries (NO_DATA/SHORT/NONFINITE/NO_LIGHTKURVE — correctly excluded on resume).
-- Combined projection: TESS v2 (2,619) + overlap (4,864) = **~7,483 total snippets before dedup**, ~5× more than the 1,477 TESS training examples that caused the systematic AUC ceiling.
-- Updated `docs/LOCAL_ARTIFACT_LEDGER.md` and `artifacts/manifests/local_artifacts.json` with overlap corpus state.
-- Updated `docs/PRODUCTION_READINESS.md` with overlap corpus completion and C13 plan.
+- **C13 REJECTED** — Combined corpus training with default LR=1e-3. Best epoch 8 of 18 (early stop); val_auc=0.8195; test raw AUC=0.8342, F1=0.7960, Brier=0.1664, ECE=0.0625; Platt calibration worsened Brier (0.1828) and ECE (0.1334). Root cause: LR=1e-3 too high for pretrained init — val_loss spiked at epoch 5 and diverged; train_loss fell to 0.2247 while val_loss rose to 1.3230.
+- **Positive progress**: Test AUC 0.8342 is +2.2 pts above C12 (0.8124); raw F1 0.7960 is +4.2 pts above C12 (0.7542). The corpus expansion broke the data-size ceiling. Test AUC > val AUC for first time — model generalizes when LR is not derailing training.
+- **Combined splits validated and retained**: `data/tess_combined_cnn_splits/` is VALIDATED (train 4,892 / val 1,049 / test 1,033; PASS). Do not rebuild.
+- **C14 hypothesis**: Same combined splits + `configs/cnn_tess_finetune_c12.json` (LR=3e-5, batch=32, patience=20). LR 100× lower than C13 should prevent the val_loss spike and allow stable training to a higher AUC plateau.
 
 ### Where things stand
 
@@ -83,67 +81,41 @@ When the user must take an action to unblock a gap:
 |---|---|
 | TESS v2 snippets (`data/tess_snippets_v2.jsonl`) | **COMPLETE** — 2,619 snippets on user's Mac |
 | Kepler snippets (`data/kepler_snippets.jsonl`) | **LOCAL VALIDATED** — 6,837 finite snippets on user's Mac |
-| Kepler CNN splits (`data/kepler_cnn_splits/`) | **LOCAL VALIDATED** — validator PASS; train/val/test = 4,741 / 1,060 / 1,036 |
 | Kepler pretraining checkpoint (`checkpoints/cnn_kepler_pretrain/best.pt`) | **LOCAL PRETRAINED** — SHA `c782d7af...`; best val AUC 0.9186 |
-| TESS CNN splits (`data/tess_cnn_splits/`) | **LOCAL VALIDATED** — validator PASS; train/val/test = 1,477 / 318 / 315 (superseded for C13) |
-| TESS fine-tuned checkpoint (`checkpoints/cnn_tess_finetuned/best.pt`) | **REJECTED** — test AUC 0.8115, F1 0.7508 |
-| C12 checkpoint (`checkpoints/cnn_tess_c12/best.pt`) | **REJECTED** — SHA `cc8fbd20...`; test raw AUC 0.8124; calibrated F1 0.7516 |
-| Kepler-TESS overlap corpus (`data/tess_kepler_overlap_snippets.jsonl`) | **COMPLETE** — 4,864 snippets; ~2,716 terminal failures in sidecar |
-| Combined corpus (`data/tess_combined_snippets.jsonl`) | **NOT BUILT** — human must `cat` TESS v2 + overlap |
-| Combined CNN splits (`data/tess_combined_cnn_splits/`) | **NOT BUILT** — build after combined corpus |
-| C13 checkpoint (`checkpoints/cnn_tess_c13/`) | **NOT TRAINED** — train from combined splits with Kepler pretrain |
-| CNN training pipeline | **UNBLOCKED** — build combined corpus + C13 training next |
+| Kepler-TESS overlap corpus (`data/tess_kepler_overlap_snippets.jsonl`) | **COMPLETE** — 4,864 snippets |
+| Combined corpus (`data/tess_combined_snippets.jsonl`) | **BUILT** — 7,483 rows |
+| Combined CNN splits (`data/tess_combined_cnn_splits/`) | **VALIDATED** — validator PASS; train 4,892 / val 1,049 / test 1,033 |
+| C13 checkpoint (`checkpoints/cnn_tess_c13/best.pt`) | **REJECTED** — test AUC 0.8342 < 0.85; cal worsened Brier/ECE |
+| C14 checkpoint (`checkpoints/cnn_tess_c14/`) | **NOT TRAINED** — train with C12 config (LR=3e-5) on combined splits |
+| CNN training pipeline | **UNBLOCKED** — train C14 next |
 
 ### First action for the incoming agent
 
-**The user needs to build combined splits and train C13.** This requires Mac access.
+**The user needs to train C14.** This requires Mac access. Splits are already built and validated.
 
-Give the user these commands in order:
-
-**Step 1 — Verify local state and build combined corpus:**
 ```bash
 git pull origin main
-wc -l data/tess_kepler_overlap_snippets.jsonl data/tess_snippets_v2.jsonl
-shasum -a 256 checkpoints/cnn_kepler_pretrain/best.pt
-cat data/tess_snippets_v2.jsonl data/tess_kepler_overlap_snippets.jsonl > data/tess_combined_snippets.jsonl
-wc -l data/tess_combined_snippets.jsonl
-```
-Expected: overlap≈4864 lines, tess_v2≈2619 lines, Kepler SHA `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`, combined≈7483 lines. Any major divergence — stop and report.
-
-**Step 2 — Build and validate combined splits:**
-```bash
-caffeinate -i .venv/bin/python Skills/build_cnn_training_data.py \
-  data/tess_combined_snippets.jsonl \
-  --output-dir data/tess_combined_cnn_splits \
-  --seed 7
-.venv/bin/python Skills/cnn_split_validator.py data/tess_combined_cnn_splits
-```
-Expected: validator prints `Status: PASS`. If FAIL — stop and paste output.
-
-**Step 3 — Train C13:**
-```bash
 caffeinate -dims .venv/bin/python Skills/train_cnn.py \
   --split-dir data/tess_combined_cnn_splits \
-  --checkpoint-dir checkpoints/cnn_tess_c13 \
+  --checkpoint-dir checkpoints/cnn_tess_c14 \
+  --config configs/cnn_tess_finetune_c12.json \
   --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt \
   --device auto
 ```
-Paste the full training output when done, then run:
-```bash
-shasum -a 256 checkpoints/cnn_tess_c13/best.pt
-```
 
-**Step 4 — Evaluate C13:**
+After training, get the SHA and evaluate:
 ```bash
+shasum -a 256 checkpoints/cnn_tess_c14/best.pt
 .venv/bin/python Skills/evaluate_cnn_checkpoint.py \
   --split-dir data/tess_combined_cnn_splits \
-  --checkpoint checkpoints/cnn_tess_c13/best.pt \
-  --output-calibration checkpoints/cnn_tess_c13/calibration.json
+  --checkpoint checkpoints/cnn_tess_c14/best.pt \
+  --output-calibration checkpoints/cnn_tess_c14/calibration.json
 ```
-Paste the full output including the `Flag: PASS` or `Flag: FAIL` line.
+
+Paste full output including `Flag: PASS` or `Flag: FAIL` line.
 
 - If `Flag: PASS` → report metrics, request human approval for promotion.
-- If `Flag: FAIL` → record as C13 rejection, state root cause, plan next attempt.
+- If `Flag: FAIL` → record as C14 rejection, state root cause, plan next attempt.
 
 If the user is **away from their Mac**, the next agent is limited to runbook,
 validation, doc hardening, and planning until the human can run local commands.
