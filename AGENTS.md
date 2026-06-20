@@ -64,17 +64,16 @@ When the user must take an action to unblock a gap:
 
 ---
 
-## HANDOFF STATE — 2026-06-18 updated 2026-06-19 (READ THIS FIRST)
+## HANDOFF STATE — 2026-06-18 updated 2026-06-20c (READ THIS FIRST)
 
 **The only active gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80).**
 
-### What was done in the last session (2026-06-18)
+### What was done in the last session (2026-06-20)
 
-- Merged PR #108: hardened CNN evaluator (tie-aware ROC-AUC, fail-closed on bad predictions, stale TCE endpoint reports UNAVAILABLE).
-- Wrote `configs/cnn_tess_finetune_c12.json`: full-unfreeze fine-tune config (LR=3e-5, batch=32, patience=20, freeze_conv_epochs=0). **Ready to run — no new data needed.**
-- Wrote `Skills/fetch_tess_kepler_overlap_snippets.py` + 31 tests: downloads TESS light curves for Kepler KOI stars (confirmed planets + FPs), folds them at Kepler ephemerides, groups work by KIC, runs a bounded rolling thread pool, avoids Lightkurve's thread-unsafe `download_all()` stdout wrapper, and records terminal fetch failures in a durable sidecar. Provides Option B corpus expansion if C12 misses the gate.
-- Updated `docs/CNN_PRODUCTION_RUNBOOK.md` with Step 7b (C12 full-unfreeze) and Step 7c (Kepler-TESS overlap corpus).
-- Candidate 12 was trained and evaluated on 2026-06-19. It is **REJECTED**: best val AUC 0.8356, test raw AUC 0.8124, calibrated F1 0.7516, and calibration worsened Brier/ECE.
+- **C13 REJECTED** — Combined corpus training with default LR=1e-3. Best epoch 8 of 18 (early stop); val_auc=0.8195; test raw AUC=0.8342, F1=0.7960, Brier=0.1664, ECE=0.0625; Platt worsened Brier and ECE. Root cause: LR=1e-3 too high — val_loss spiked and diverged.
+- **C14 REJECTED** — Same combined splits + low-LR config (LR=3e-5). Training was stable (no spike) but val AUC plateaued at 0.8116 from epoch 56 onward; test raw AUC=0.8319, F1=0.7859, Brier=0.1663, ECE=0.0273; Platt worsened Brier (0.1932) and ECE (0.1441). Root cause: LR=3e-5 too conservative — scheduler decayed to 1.17e-7 by epoch 79, locking model into local optimum below C13's ceiling. Notably, raw ECE=0.0273 is excellent; Platt is confirmed as the calibration problem (now 4 consecutive candidates).
+- **Combined splits retained**: `data/tess_combined_cnn_splits/` remains VALIDATED (train 4,892 / val 1,049 / test 1,033). Do not rebuild.
+- **Two-dimensional problem now isolated**: (1) AUC gap — need val AUC ≥ 0.83 to project test AUC ≥ 0.85; LR=1e-4 (between C13/C14 extremes) plus on-the-fly augmentation to close the train (0.48) vs val (0.77) loss gap. (2) Calibration gate — Platt (A≈1.7) overcorrects an already well-calibrated model; switch to temperature scaling or skip when raw ECE ≤ 0.05.
 
 ### Where things stand
 
@@ -82,52 +81,65 @@ When the user must take an action to unblock a gap:
 |---|---|
 | TESS v2 snippets (`data/tess_snippets_v2.jsonl`) | **COMPLETE** — 2,619 snippets on user's Mac |
 | Kepler snippets (`data/kepler_snippets.jsonl`) | **LOCAL VALIDATED** — 6,837 finite snippets on user's Mac |
-| Kepler CNN splits (`data/kepler_cnn_splits/`) | **LOCAL VALIDATED** — validator PASS; train/val/test = 4,741 / 1,060 / 1,036 |
 | Kepler pretraining checkpoint (`checkpoints/cnn_kepler_pretrain/best.pt`) | **LOCAL PRETRAINED** — SHA `c782d7af...`; best val AUC 0.9186 |
-| TESS CNN splits (`data/tess_cnn_splits/`) | **LOCAL VALIDATED** — validator PASS; train/val/test = 1,477 / 318 / 315 |
-| TESS fine-tuned checkpoint (`checkpoints/cnn_tess_finetuned/best.pt`) | **REJECTED** — test AUC 0.8115, F1 0.7508 |
-| C12 checkpoint (`checkpoints/cnn_tess_c12/best.pt`) | **REJECTED** — SHA `cc8fbd20...`; test raw AUC 0.8124; calibrated F1 0.7516 |
-| Kepler-TESS overlap script (`Skills/fetch_tess_kepler_overlap_snippets.py`) | **READY** — 31 focused tests passing; bounded KIC-group concurrency; avoids thread-unsafe Lightkurve stdout wrapper; terminal failures use a sidecar; run Step 7c next |
-| CNN training pipeline | **UNBLOCKED** — run Runbook Step 7c next |
+| Kepler-TESS overlap corpus (`data/tess_kepler_overlap_snippets.jsonl`) | **COMPLETE** — 4,864 snippets |
+| Combined corpus (`data/tess_combined_snippets.jsonl`) | **BUILT** — 7,483 rows |
+| Combined CNN splits (`data/tess_combined_cnn_splits/`) | **VALIDATED** — validator PASS; train 4,892 / val 1,049 / test 1,033 |
+| C13 checkpoint (`checkpoints/cnn_tess_c13/best.pt`) | **REJECTED** — test AUC 0.8342, LR=1e-3 too high (val_loss diverged) |
+| C14 checkpoint (`checkpoints/cnn_tess_c14/best.pt`) | **REJECTED** — test AUC 0.8319, LR=3e-5 too low (converged below C13 ceiling) |
+| C15 checkpoint (`checkpoints/cnn_tess_c15/`) | **NOT TRAINED** — [AGENT] add augmentation to `train_cnn.py` + new config LR=1e-4 first |
+| CNN training pipeline | **TWO [AGENT] CHANGES NEEDED BEFORE C15 TRAINING** |
 
 ### First action for the incoming agent
 
-**The user needs to run Runbook Step 7c.** This requires Mac access.
+**Two [AGENT] code changes are required before C15 training, then one [HUMAN] training run.**
 
-Important correction: do **not** use any older Step 7c command that omits
-`--workers` and `--request-delay`. The overlap fetcher was updated after a
-serial-run mistake. The authorized version groups pending KOIs by KIC, runs a
-bounded rolling thread pool, and writes each completed group's successes or
-terminal failures immediately from the main thread. This keeps the run
-stoppable/restartable while satisfying the local-system performance directive.
-It also avoids Lightkurve's `SearchResult.download_all()` path because that
-method temporarily mutates process-global `sys.stdout`; in worker threads this
-can leave stdout closed and crash progress printing with `ValueError: I/O
-operation on closed file`.
+#### [AGENT] Step 1: Add on-the-fly augmentation to `train_cnn.py`
 
-If the user started or killed an older serial overlap run, do not delete partial
-output by default. The new run will resume from existing successful JSONL rows
-and terminal failures in `data/tess_kepler_overlap_snippets.jsonl.failures.jsonl`.
-Only remove or repair the partial artifact after an explicit JSONL/sidecar audit
-shows corruption.
+The train/val loss gap (0.48 vs 0.77 in C14) confirms overfitting on 4,892 training examples.
+Add gaussian noise + phase shift augmentation to the training DataLoader in `Skills/train_cnn.py`.
+Use `cnn_feature_augmenter.py`'s `augment_snippet` logic inline (do not require it as an import).
+Gate augmentation behind an `--augment` CLI flag (default: off for reproducibility).
 
-If the user is at the Mac, give them this command block to start the Kepler-TESS overlap corpus fetch:
+#### [AGENT] Step 2: Create `configs/cnn_tess_c15.json`
 
-```
+LR=1e-4 is the sweet spot hypothesis:
+- C13 at LR=1e-3 found val AUC 0.8195 but with catastrophic val_loss spike
+- C14 at LR=3e-5 was stable but plateaued below 0.8116 (scheduler decayed LR to ~0)
+- LR=1e-4 (10× above C14, 10× below C13) should explore wider parameter space without destabilizing pretrained weights
+
+Config: LR=1e-4, batch=32, patience=20, full-unfreeze from epoch 1.
+
+#### [HUMAN] Step 3: Train C15
+
+```bash
 git pull origin main
-caffeinate -dims .venv/bin/python Skills/fetch_tess_kepler_overlap_snippets.py \
-  --output data/tess_kepler_overlap_snippets.jsonl \
-  --workers 4 \
-  --request-delay 0.25
-wc -l data/tess_kepler_overlap_snippets.jsonl
+caffeinate -dims .venv/bin/python Skills/train_cnn.py \
+  --split-dir data/tess_combined_cnn_splits \
+  --checkpoint-dir checkpoints/cnn_tess_c15 \
+  --config configs/cnn_tess_c15.json \
+  --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt \
+  --device auto \
+  --augment
 ```
 
-After it finishes, ask them to paste the final fetch summary and line count.
-The agent must review the overlap corpus and terminal-failure sidecar before
-building combined splits.
+After training:
+```bash
+shasum -a 256 checkpoints/cnn_tess_c15/best.pt
+.venv/bin/python Skills/evaluate_cnn_checkpoint.py \
+  --split-dir data/tess_combined_cnn_splits \
+  --checkpoint checkpoints/cnn_tess_c15/best.pt \
+  --output-calibration checkpoints/cnn_tess_c15/calibration.json
+```
 
-If the user is **away from their Mac**, the next agent is limited to runbook,
-validation, doc hardening, and planning until the human can run local commands.
+Paste full output including `Flag: PASS` or `Flag: FAIL` line.
+
+- If `Flag: PASS` → report metrics, request human approval for promotion.
+- If `Flag: FAIL` → record rejection, state root cause, plan C16.
+
+**Note on calibration:** Raw ECE has been 0.02–0.06 across all recent candidates (model is already well-calibrated). Platt (A≈1.7) consistently overcorrects. A future [AGENT] task should modify `evaluate_cnn_checkpoint.py` to use temperature scaling or skip calibration when raw ECE ≤ 0.05. Do not change the gate without explicit human approval.
+
+If the user is **away from their Mac**, the next agent can do the [AGENT] steps (augmentation + new config) but cannot run [HUMAN] training.
 Do not propose code changes that do not directly unblock T1-1.
 
 ### CNN production runbook
@@ -149,6 +161,8 @@ Large training data files are stored on the user's local Mac and are **never com
 |---|---|---|
 | `data/tess_snippets_v2.jsonl` | **COMPLETE** — 2,619 snippets | TESS phase-folded snippets; merged from two download runs; 56 targets had permanent MAST 404s |
 | `data/kepler_snippets.jsonl` | **LOCAL VALIDATED** — 6,837 finite snippets as of 2026-06-17 | JSON parse PASS; zero non-finite flux rows; zero duplicate resume keys; split validator PASS |
+| `data/tess_kepler_overlap_snippets.jsonl` | **COMPLETE** — 4,864 snippets as of 2026-06-20 | Kepler KOI stars folded at Kepler ephemerides; TESS-domain labels from KOI disposition; ~2,716 terminal failures in sidecar |
+| `data/tess_combined_snippets.jsonl` | **BUILT** — 7,483 rows | Concatenation of TESS v2 + overlap; used for `data/tess_combined_cnn_splits/`; do not rebuild |
 
 The Kepler download uses `author="Kepler"` (prevents HLSP/IRIS cache corruption) and `socket.setdefaulttimeout(120)` (prevents WiFi-drop hangs). It resumes automatically from durable success keys plus the failure sidecar. The optimized path groups pending KOIs by `kepid`, fetches each KIC once, filters non-finite time/flux samples before phase binning, and supports polite bounded concurrency via `--workers 3 --request-delay 0.5`.
 
