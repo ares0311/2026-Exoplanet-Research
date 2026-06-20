@@ -87,30 +87,12 @@ When the user must take an action to unblock a gap:
 | Combined CNN splits (`data/tess_combined_cnn_splits/`) | **VALIDATED** — validator PASS; train 4,892 / val 1,049 / test 1,033 |
 | C13 checkpoint (`checkpoints/cnn_tess_c13/best.pt`) | **REJECTED** — test AUC 0.8342, LR=1e-3 too high (val_loss diverged) |
 | C14 checkpoint (`checkpoints/cnn_tess_c14/best.pt`) | **REJECTED** — test AUC 0.8319, LR=3e-5 too low (converged below C13 ceiling) |
-| C15 checkpoint (`checkpoints/cnn_tess_c15/`) | **NOT TRAINED** — [AGENT] add augmentation to `train_cnn.py` + new config LR=1e-4 first |
-| CNN training pipeline | **TWO [AGENT] CHANGES NEEDED BEFORE C15 TRAINING** |
+| C15 checkpoint (`checkpoints/cnn_tess_c15/`) | **NOT TRAINED** — `configs/cnn_tess_c15.json` now committed; ready to train |
+| CNN training pipeline | **UNBLOCKED** — train C15 next |
 
 ### First action for the incoming agent
 
-**Two [AGENT] code changes are required before C15 training, then one [HUMAN] training run.**
-
-#### [AGENT] Step 1: Add on-the-fly augmentation to `train_cnn.py`
-
-The train/val loss gap (0.48 vs 0.77 in C14) confirms overfitting on 4,892 training examples.
-Add gaussian noise + phase shift augmentation to the training DataLoader in `Skills/train_cnn.py`.
-Use `cnn_feature_augmenter.py`'s `augment_snippet` logic inline (do not require it as an import).
-Gate augmentation behind an `--augment` CLI flag (default: off for reproducibility).
-
-#### [AGENT] Step 2: Create `configs/cnn_tess_c15.json`
-
-LR=1e-4 is the sweet spot hypothesis:
-- C13 at LR=1e-3 found val AUC 0.8195 but with catastrophic val_loss spike
-- C14 at LR=3e-5 was stable but plateaued below 0.8116 (scheduler decayed LR to ~0)
-- LR=1e-4 (10× above C14, 10× below C13) should explore wider parameter space without destabilizing pretrained weights
-
-Config: LR=1e-4, batch=32, patience=20, full-unfreeze from epoch 1.
-
-#### [HUMAN] Step 3: Train C15
+**The user needs to train C15.** `configs/cnn_tess_c15.json` is already committed. Splits are validated and reusable. No code changes needed — augmentation was already enabled in the config.
 
 ```bash
 git pull origin main
@@ -119,8 +101,7 @@ caffeinate -dims .venv/bin/python Skills/train_cnn.py \
   --checkpoint-dir checkpoints/cnn_tess_c15 \
   --config configs/cnn_tess_c15.json \
   --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt \
-  --device auto \
-  --augment
+  --device auto
 ```
 
 After training:
@@ -137,9 +118,11 @@ Paste full output including `Flag: PASS` or `Flag: FAIL` line.
 - If `Flag: PASS` → report metrics, request human approval for promotion.
 - If `Flag: FAIL` → record rejection, state root cause, plan C16.
 
+**C15 hypothesis:** LR=1e-4 is intermediate between C13 (1e-3, too high — val_loss spiked) and C14 (3e-5, too low — scheduler decayed LR to near-zero at epoch 79). `min_learning_rate` raised to 1e-6, `lr_scheduler_patience` raised to 10 so LR exploration has more time at each level before decaying. Augmentation was already enabled in C14 (noise_fraction=0.05, scale 0.9–1.1); it is unchanged in C15.
+
 **Note on calibration:** Raw ECE has been 0.02–0.06 across all recent candidates (model is already well-calibrated). Platt (A≈1.7) consistently overcorrects. A future [AGENT] task should modify `evaluate_cnn_checkpoint.py` to use temperature scaling or skip calibration when raw ECE ≤ 0.05. Do not change the gate without explicit human approval.
 
-If the user is **away from their Mac**, the next agent can do the [AGENT] steps (augmentation + new config) but cannot run [HUMAN] training.
+If the user is **away from their Mac**, no training can proceed.
 Do not propose code changes that do not directly unblock T1-1.
 
 ### CNN production runbook
