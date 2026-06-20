@@ -64,17 +64,18 @@ When the user must take an action to unblock a gap:
 
 ---
 
-## HANDOFF STATE — 2026-06-18 updated 2026-06-19 (READ THIS FIRST)
+## HANDOFF STATE — 2026-06-18 updated 2026-06-20 (READ THIS FIRST)
 
 **The only active gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80).**
 
-### What was done in the last session (2026-06-18)
+### What was done in the last session (2026-06-20)
 
-- Merged PR #108: hardened CNN evaluator (tie-aware ROC-AUC, fail-closed on bad predictions, stale TCE endpoint reports UNAVAILABLE).
-- Wrote `configs/cnn_tess_finetune_c12.json`: full-unfreeze fine-tune config (LR=3e-5, batch=32, patience=20, freeze_conv_epochs=0). **Ready to run — no new data needed.**
-- Wrote `Skills/fetch_tess_kepler_overlap_snippets.py` + 31 tests: downloads TESS light curves for Kepler KOI stars (confirmed planets + FPs), folds them at Kepler ephemerides, groups work by KIC, runs a bounded rolling thread pool, avoids Lightkurve's thread-unsafe `download_all()` stdout wrapper, and records terminal fetch failures in a durable sidecar. Provides Option B corpus expansion if C12 misses the gate.
-- Updated `docs/CNN_PRODUCTION_RUNBOOK.md` with Step 7b (C12 full-unfreeze) and Step 7c (Kepler-TESS overlap corpus).
-- Candidate 12 was trained and evaluated on 2026-06-19. It is **REJECTED**: best val AUC 0.8356, test raw AUC 0.8124, calibrated F1 0.7516, and calibration worsened Brier/ECE.
+- **Path B Kepler-TESS overlap corpus COMPLETE** — `Skills/fetch_tess_kepler_overlap_snippets.py` ran to completion across multiple sessions (~11.8 hours total, 4 workers, 0.25–1.0 s/worker request delay).
+- Final corpus: `data/tess_kepler_overlap_snippets.jsonl` has **4,864 snippets** (3,352 prior sessions + 1,512 final session wrote=1,512 skipped=1,243).
+- Terminal failure sidecar: `data/tess_kepler_overlap_snippets.jsonl.failures.jsonl` has ~2,716 entries (NO_DATA/SHORT/NONFINITE/NO_LIGHTKURVE — correctly excluded on resume).
+- Combined projection: TESS v2 (2,619) + overlap (4,864) = **~7,483 total snippets before dedup**, ~5× more than the 1,477 TESS training examples that caused the systematic AUC ceiling.
+- Updated `docs/LOCAL_ARTIFACT_LEDGER.md` and `artifacts/manifests/local_artifacts.json` with overlap corpus state.
+- Updated `docs/PRODUCTION_READINESS.md` with overlap corpus completion and C13 plan.
 
 ### Where things stand
 
@@ -84,47 +85,65 @@ When the user must take an action to unblock a gap:
 | Kepler snippets (`data/kepler_snippets.jsonl`) | **LOCAL VALIDATED** — 6,837 finite snippets on user's Mac |
 | Kepler CNN splits (`data/kepler_cnn_splits/`) | **LOCAL VALIDATED** — validator PASS; train/val/test = 4,741 / 1,060 / 1,036 |
 | Kepler pretraining checkpoint (`checkpoints/cnn_kepler_pretrain/best.pt`) | **LOCAL PRETRAINED** — SHA `c782d7af...`; best val AUC 0.9186 |
-| TESS CNN splits (`data/tess_cnn_splits/`) | **LOCAL VALIDATED** — validator PASS; train/val/test = 1,477 / 318 / 315 |
+| TESS CNN splits (`data/tess_cnn_splits/`) | **LOCAL VALIDATED** — validator PASS; train/val/test = 1,477 / 318 / 315 (superseded for C13) |
 | TESS fine-tuned checkpoint (`checkpoints/cnn_tess_finetuned/best.pt`) | **REJECTED** — test AUC 0.8115, F1 0.7508 |
 | C12 checkpoint (`checkpoints/cnn_tess_c12/best.pt`) | **REJECTED** — SHA `cc8fbd20...`; test raw AUC 0.8124; calibrated F1 0.7516 |
-| Kepler-TESS overlap script (`Skills/fetch_tess_kepler_overlap_snippets.py`) | **READY** — 31 focused tests passing; bounded KIC-group concurrency; avoids thread-unsafe Lightkurve stdout wrapper; terminal failures use a sidecar; run Step 7c next |
-| CNN training pipeline | **UNBLOCKED** — run Runbook Step 7c next |
+| Kepler-TESS overlap corpus (`data/tess_kepler_overlap_snippets.jsonl`) | **COMPLETE** — 4,864 snippets; ~2,716 terminal failures in sidecar |
+| Combined corpus (`data/tess_combined_snippets.jsonl`) | **NOT BUILT** — human must `cat` TESS v2 + overlap |
+| Combined CNN splits (`data/tess_combined_cnn_splits/`) | **NOT BUILT** — build after combined corpus |
+| C13 checkpoint (`checkpoints/cnn_tess_c13/`) | **NOT TRAINED** — train from combined splits with Kepler pretrain |
+| CNN training pipeline | **UNBLOCKED** — build combined corpus + C13 training next |
 
 ### First action for the incoming agent
 
-**The user needs to run Runbook Step 7c.** This requires Mac access.
+**The user needs to build combined splits and train C13.** This requires Mac access.
 
-Important correction: do **not** use any older Step 7c command that omits
-`--workers` and `--request-delay`. The overlap fetcher was updated after a
-serial-run mistake. The authorized version groups pending KOIs by KIC, runs a
-bounded rolling thread pool, and writes each completed group's successes or
-terminal failures immediately from the main thread. This keeps the run
-stoppable/restartable while satisfying the local-system performance directive.
-It also avoids Lightkurve's `SearchResult.download_all()` path because that
-method temporarily mutates process-global `sys.stdout`; in worker threads this
-can leave stdout closed and crash progress printing with `ValueError: I/O
-operation on closed file`.
+Give the user these commands in order:
 
-If the user started or killed an older serial overlap run, do not delete partial
-output by default. The new run will resume from existing successful JSONL rows
-and terminal failures in `data/tess_kepler_overlap_snippets.jsonl.failures.jsonl`.
-Only remove or repair the partial artifact after an explicit JSONL/sidecar audit
-shows corruption.
-
-If the user is at the Mac, give them this command block to start the Kepler-TESS overlap corpus fetch:
-
-```
+**Step 1 — Verify local state and build combined corpus:**
+```bash
 git pull origin main
-caffeinate -dims .venv/bin/python Skills/fetch_tess_kepler_overlap_snippets.py \
-  --output data/tess_kepler_overlap_snippets.jsonl \
-  --workers 4 \
-  --request-delay 0.25
-wc -l data/tess_kepler_overlap_snippets.jsonl
+wc -l data/tess_kepler_overlap_snippets.jsonl data/tess_snippets_v2.jsonl
+shasum -a 256 checkpoints/cnn_kepler_pretrain/best.pt
+cat data/tess_snippets_v2.jsonl data/tess_kepler_overlap_snippets.jsonl > data/tess_combined_snippets.jsonl
+wc -l data/tess_combined_snippets.jsonl
+```
+Expected: overlap≈4864 lines, tess_v2≈2619 lines, Kepler SHA `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`, combined≈7483 lines. Any major divergence — stop and report.
+
+**Step 2 — Build and validate combined splits:**
+```bash
+caffeinate -i .venv/bin/python Skills/build_cnn_training_data.py \
+  data/tess_combined_snippets.jsonl \
+  --output-dir data/tess_combined_cnn_splits \
+  --seed 7
+.venv/bin/python Skills/cnn_split_validator.py data/tess_combined_cnn_splits
+```
+Expected: validator prints `Status: PASS`. If FAIL — stop and paste output.
+
+**Step 3 — Train C13:**
+```bash
+caffeinate -dims .venv/bin/python Skills/train_cnn.py \
+  --split-dir data/tess_combined_cnn_splits \
+  --checkpoint-dir checkpoints/cnn_tess_c13 \
+  --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt \
+  --device auto
+```
+Paste the full training output when done, then run:
+```bash
+shasum -a 256 checkpoints/cnn_tess_c13/best.pt
 ```
 
-After it finishes, ask them to paste the final fetch summary and line count.
-The agent must review the overlap corpus and terminal-failure sidecar before
-building combined splits.
+**Step 4 — Evaluate C13:**
+```bash
+.venv/bin/python Skills/evaluate_cnn_checkpoint.py \
+  --split-dir data/tess_combined_cnn_splits \
+  --checkpoint checkpoints/cnn_tess_c13/best.pt \
+  --output-calibration checkpoints/cnn_tess_c13/calibration.json
+```
+Paste the full output including the `Flag: PASS` or `Flag: FAIL` line.
+
+- If `Flag: PASS` → report metrics, request human approval for promotion.
+- If `Flag: FAIL` → record as C13 rejection, state root cause, plan next attempt.
 
 If the user is **away from their Mac**, the next agent is limited to runbook,
 validation, doc hardening, and planning until the human can run local commands.
@@ -149,6 +168,8 @@ Large training data files are stored on the user's local Mac and are **never com
 |---|---|---|
 | `data/tess_snippets_v2.jsonl` | **COMPLETE** — 2,619 snippets | TESS phase-folded snippets; merged from two download runs; 56 targets had permanent MAST 404s |
 | `data/kepler_snippets.jsonl` | **LOCAL VALIDATED** — 6,837 finite snippets as of 2026-06-17 | JSON parse PASS; zero non-finite flux rows; zero duplicate resume keys; split validator PASS |
+| `data/tess_kepler_overlap_snippets.jsonl` | **COMPLETE** — 4,864 snippets as of 2026-06-20 | Kepler KOI stars folded at Kepler ephemerides; TESS-domain labels from KOI disposition; ~2,716 terminal failures in sidecar |
+| `data/tess_combined_snippets.jsonl` | **NOT BUILT** — target ≈7,483 rows | `cat data/tess_snippets_v2.jsonl data/tess_kepler_overlap_snippets.jsonl` — build before C13 split generation |
 
 The Kepler download uses `author="Kepler"` (prevents HLSP/IRIS cache corruption) and `socket.setdefaulttimeout(120)` (prevents WiFi-drop hangs). It resumes automatically from durable success keys plus the failure sidecar. The optimized path groups pending KOIs by `kepid`, fetches each KIC once, filters non-finite time/flux samples before phase binning, and supports polite bounded concurrency via `--workers 3 --request-delay 0.5`.
 

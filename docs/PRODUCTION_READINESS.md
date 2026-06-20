@@ -1,6 +1,6 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-06-19 (candidate 12 rejected; T1-1 remains open)
+Last reviewed: 2026-06-20 (Path B Kepler-TESS overlap corpus complete — 4,864 snippets; C13 combined training next)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
 Test baseline: 2,222 default tests passing, 2 integration_live deselected
@@ -52,15 +52,17 @@ must not be copied into `models/`, registered, or used for production scoring.
 - **Transfer-learning result**: Kepler pretraining lifted held-out test AUC above the prior TESS-only/ensemble range, but both transfer candidates plateaued near test AUC 0.812 and calibrated F1 0.75. Do not rerun either fine-tune as a promotion attempt; the next T1-1 cycle must add more usable TESS-domain signal or improve label quality before another CNN promotion attempt.
 - **Path A inventory result**: Completed locally on 2026-06-18 against `data/tess_snippets_v2.jsonl`; ExoFOP TOI live counts CP=733, KP=591, FP=1,244, FA=100 (positive=1,324; negative=1,344; total=2,668); expansion inventory found only 56 new labeled TIC IDs (16 positive, 40 negative; 33 TOI, 23 CTOI). **Do not run the long MAST snippet fetch as a production-closing attempt**; even 100% fetch success would not materially move the CNN from 2,110 usable examples toward the ≥5,000 target.
 - **TESS TCE source probe**: `Skills/tess_tce_fetcher.py` now fails closed with `Flag: UNAVAILABLE` for the stale historical ExoMAST TCE endpoint, which returned HTTP 404 on 2026-06-18. Do not treat that endpoint as the next large TESS-domain label source unless a current provider contract is found and documented.
-- **Approved next strategy — add TESS-domain signal**:
-  - **Path A — More labeled TESS data**: Approved on 2026-06-18, but the first inventory found too few new labels to justify a long fetch/training cycle. Continue Path A only if a materially larger or higher-quality TESS label source is identified.
-  - **Path B — Kepler-TESS overlap corpus**: Authorized next runbook path after candidate 12 rejection; fetch TESS light curves for Kepler KOI stars, audit the resulting corpus and failure sidecar, then build combined splits only if the corpus is usable
-  - **Path C — Kepler→TESS transfer learning**: First frozen-conv and full-unfreeze MPS fine-tune attempts are rejected; continue only after adding TESS-domain signal or improving label quality
+- **Path B corpus result (2026-06-20)**: `Skills/fetch_tess_kepler_overlap_snippets.py` completed across multiple sessions (~11.8 h total, 4 workers, polite 0.25–1.0 s/worker request delay); `data/tess_kepler_overlap_snippets.jsonl` has **4,864 snippets**; `data/tess_kepler_overlap_snippets.jsonl.failures.jsonl` has ~2,716 terminal failures (NO_DATA/SHORT/NONFINITE/NO_LIGHTKURVE — correctly excluded). Combined corpus projection: TESS v2 (2,619) + overlap (4,864) = **~7,483 total snippets before dedup/filtering**, ~5× the 1,477 training examples that caused the systematic AUC ceiling.
+- **Approved next strategy — C13 combined corpus training**:
+  - **Path B — Kepler-TESS overlap corpus**: COMPLETE as of 2026-06-20; `data/tess_kepler_overlap_snippets.jsonl` available locally on user's Mac.
+  - **C13 training plan**: Build `data/tess_combined_snippets.jsonl` by concatenating TESS v2 + overlap; build `data/tess_combined_cnn_splits/` with `Skills/build_cnn_training_data.py --seed 7`; train from combined splits with `checkpoints/cnn_kepler_pretrain/best.pt` as pretrained init.
+  - **Path A — More labeled TESS data**: Closed as insufficient; 56-target inventory is too small.
+  - **Path C — Kepler→TESS transfer learning**: Continues via C13 which uses Kepler pretrain as init; continue after C13 result is known.
 - **Current authorized runbook**: `docs/CNN_PRODUCTION_RUNBOOK.md`
 - **Current promotion gate**: raw held-out test AUC ≥ 0.85; calibrated held-out test F1 ≥ 0.80; Platt calibration must not worsen held-out test Brier score or ECE
-- **Kepler pretraining gate**: **LOCAL PRETRAINED ON MPS** — `checkpoints/cnn_kepler_pretrain/best.pt`, SHA-256 `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`; Python 3.14.3 venv, PyTorch 2.12.0; startup banner `device=mps`; best epoch 19, best validation loss 0.3905, best validation AUC 0.9186; final epoch 34 val AUC 0.9123; remains local/ignored and useful for future transfer experiments but does not itself satisfy production
-- **Current data gate**: Kepler and TESS split validators passed; `data/tess_cnn_splits` has train/val/test = 1,477 / 318 / 315; candidates 11 and 12 are rejected and no CNN artifact is approved for promotion; the next authorized runbook step is the Kepler-TESS overlap corpus fetch if the human approves the long local run
-- **Gate check**: `.venv/bin/python Skills/evaluate_cnn_checkpoint.py --split-dir data/tess_cnn_splits --checkpoint checkpoints/cnn_tess_finetuned/best.pt --output-calibration checkpoints/cnn_tess_finetuned/calibration.json`
+- **Kepler pretraining gate**: **LOCAL PRETRAINED ON MPS** — `checkpoints/cnn_kepler_pretrain/best.pt`, SHA-256 `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`; Python 3.14.3 venv, PyTorch 2.12.0; startup banner `device=mps`; best epoch 19, best validation loss 0.3905, best validation AUC 0.9186; final epoch 34 val AUC 0.9123; use as pretrained init for C13
+- **Current data gate**: Overlap corpus complete (4,864 snippets); combined splits not yet built; C13 not yet trained; no CNN checkpoint approved for promotion
+- **Gate check (C13)**: `.venv/bin/python Skills/evaluate_cnn_checkpoint.py --split-dir data/tess_combined_cnn_splits --checkpoint checkpoints/cnn_tess_c13/best.pt --output-calibration checkpoints/cnn_tess_c13/calibration.json`
 - **Architecture spec**: `docs/CNN_SPEC.md`
 - **Artifact policy**: Keep `git add .` safe through `.gitignore`; commit local artifact status in the artifact ledger; commit the validated production checkpoint, calibration metadata, model registry entry, and reproducibility manifest under `models/` only after all production-readiness checks pass and the human approves promotion
 
