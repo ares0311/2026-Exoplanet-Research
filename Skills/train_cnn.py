@@ -430,9 +430,10 @@ def train_cnn(
             }
             skipped = [k for k in state if k not in compatible]
             model.load_state_dict(compatible, strict=False)
+            n_ok, n_skip = len(compatible), len(skipped)
             print(
                 f"Loaded pretrained weights from {pretrained_checkpoint} "
-                f"({len(compatible)} tensors matched, {len(skipped)} skipped due to shape mismatch)",
+                f"({n_ok} matched, {n_skip} skipped — shape mismatch)",
                 flush=True,
             )
         else:
