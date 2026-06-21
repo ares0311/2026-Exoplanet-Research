@@ -10,12 +10,14 @@ from Skills.evaluate_cnn_checkpoint import (
     CnnEvalMetrics,
     CnnEvalResult,
     _apply_platt,
+    _apply_temperature,
     _auc_roc,
     _best_f1_threshold,
     _brier,
     _compute_metrics,
     _ece,
     _fit_platt,
+    _fit_temperature,
     evaluate_cnn_checkpoint,
     format_eval_result,
 )
@@ -152,6 +154,45 @@ class TestFitPlatt:
     def test_apply_platt_in_range(self) -> None:
         result = _apply_platt(0.5, 1.0, 0.0)
         assert 0.0 < result < 1.0
+
+
+class TestFitTemperature:
+    def test_temperature_converges(self) -> None:
+        y_true = [1, 1, 0, 0]
+        y_prob = [0.9, 0.8, 0.2, 0.1]
+        t = _fit_temperature(y_true, y_prob)
+        assert isinstance(t, float)
+        assert t > 0.0
+
+    def test_discriminating_model_sharpens(self) -> None:
+        # Any model that correctly ranks pos > neg has T < 1: sharpening reduces NLL
+        y_true = [1, 1, 0, 0]
+        y_prob = [0.9, 0.85, 0.15, 0.1]
+        t = _fit_temperature(y_true, y_prob)
+        # T is clamped at 0.1 minimum; for a discriminating model T <= 1.0
+        assert 0.1 <= t <= 1.0
+
+    def test_apply_temperature_identity_at_one(self) -> None:
+        # T=1 should be nearly identity (only clamping differs)
+        result = _apply_temperature(0.7, 1.0)
+        assert abs(result - 0.7) < 1e-4
+
+    def test_apply_temperature_in_range(self) -> None:
+        for raw in [0.1, 0.5, 0.9]:
+            result = _apply_temperature(raw, 1.5)
+            assert 0.0 < result < 1.0
+
+    def test_high_temperature_softens(self) -> None:
+        # T > 1 should pull probabilities toward 0.5
+        raw = 0.9
+        result = _apply_temperature(raw, 3.0)
+        assert result < raw  # moves toward 0.5
+
+    def test_low_temperature_sharpens(self) -> None:
+        # T < 1 should push probabilities away from 0.5
+        raw = 0.7
+        result = _apply_temperature(raw, 0.5)
+        assert result > raw  # moves away from 0.5
 
 
 class TestComputeMetrics:
@@ -340,7 +381,7 @@ class TestEvaluateCnnCheckpoint:
         import Skills.evaluate_cnn_checkpoint as mod
 
         split_dir = _make_splits(tmp_path, n=40)
-        monkeypatch.setattr(mod, "_apply_platt", lambda raw, a, b: raw)
+        monkeypatch.setattr(mod, "_apply_temperature", lambda raw, t: raw)
         result = evaluate_cnn_checkpoint(
             split_dir,
             tmp_path / "fake.pt",
@@ -376,7 +417,7 @@ class TestEvaluateCnnCheckpoint:
         assert result.test_metrics_raw is not None
         assert result.test_metrics_cal is not None
 
-    def test_platt_params_set(self, tmp_path: Path) -> None:
+    def test_temp_param_set(self, tmp_path: Path) -> None:
         split_dir = _make_splits(tmp_path)
         result = evaluate_cnn_checkpoint(
             split_dir,
@@ -385,8 +426,8 @@ class TestEvaluateCnnCheckpoint:
             gate_f1=0.5,
             model_fn=_dummy_model_fn_pass,
         )
-        assert isinstance(result.platt_a, float)
-        assert isinstance(result.platt_b, float)
+        assert isinstance(result.temp, float)
+        assert result.temp > 0.0
 
     def test_calibration_json_written_on_pass(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -395,7 +436,7 @@ class TestEvaluateCnnCheckpoint:
 
         split_dir = _make_splits(tmp_path, n=40)
         cal_path = tmp_path / "calibration.json"
-        monkeypatch.setattr(mod, "_apply_platt", lambda raw, a, b: raw)
+        monkeypatch.setattr(mod, "_apply_temperature", lambda raw, t: raw)
         evaluate_cnn_checkpoint(
             split_dir,
             tmp_path / "fake.pt",
@@ -406,8 +447,8 @@ class TestEvaluateCnnCheckpoint:
         )
         assert cal_path.exists()
         cal = json.loads(cal_path.read_text())
-        assert "platt_a" in cal
-        assert "platt_b" in cal
+        assert "temperature" in cal
+        assert cal.get("method") == "temperature"
         assert cal.get("flag") == "OK"
 
     def test_calibration_worsening_blocks_promotion(
@@ -417,7 +458,7 @@ class TestEvaluateCnnCheckpoint:
 
         split_dir = _make_splits(tmp_path, n=40)
         cal_path = tmp_path / "calibration.json"
-        monkeypatch.setattr(mod, "_apply_platt", lambda raw, a, b: 0.5)
+        monkeypatch.setattr(mod, "_apply_temperature", lambda raw, t: 0.5)
 
         result = evaluate_cnn_checkpoint(
             split_dir,
@@ -588,8 +629,7 @@ class TestFormatEvalResult:
             val_metrics_raw=None,
             test_metrics_raw=None,
             test_metrics_cal=None,
-            platt_a=1.0,
-            platt_b=0.0,
+            temp=1.0,
             gate_auc=0.85,
             gate_f1=0.80,
             passed=False,
