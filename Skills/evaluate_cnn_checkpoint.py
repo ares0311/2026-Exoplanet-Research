@@ -1,9 +1,14 @@
 """Evaluate a trained CNN checkpoint against held-out promotion gates.
 
-Fits Platt calibration on the validation split, evaluates on the sealed
-test split, and checks whether the checkpoint passes the production gates
-(default: raw AUC ≥ 0.85, calibrated F1 ≥ 0.80, calibrated Brier/ECE no
-worse than raw Brier/ECE).
+Fits temperature scaling calibration on the validation split, evaluates on
+the sealed test split, and checks whether the checkpoint passes the production
+gates (default: raw AUC ≥ 0.85, calibrated F1 ≥ 0.80, calibrated Brier/ECE
+no worse than raw Brier/ECE).
+
+Temperature scaling divides the pre-sigmoid logit by a scalar T (fitted on
+the val split via NLL minimisation). T=1 is the identity; T>1 softens;
+T<1 sharpens. When the model is already well-calibrated, T≈1 and the
+calibrated metrics are nearly identical to the raw metrics.
 
 Saves calibration JSON alongside the checkpoint when gates pass.
 
@@ -20,7 +25,7 @@ Public API
 ----------
 CnnEvalMetrics(n, auc, f1, threshold, brier, ece)
 CnnEvalResult(val_metrics_raw, test_metrics_raw, test_metrics_cal,
-              platt_a, platt_b, gate_auc, gate_f1, passed, flag, evaluated_at)
+              temp, gate_auc, gate_f1, passed, flag, evaluated_at)
 evaluate_cnn_checkpoint(split_dir, checkpoint_path, *, gate_auc, gate_f1,
                         output_calibration, model_fn) -> CnnEvalResult
 format_eval_result(result) -> str
@@ -62,8 +67,7 @@ class CnnEvalResult:
     val_metrics_raw: CnnEvalMetrics | None
     test_metrics_raw: CnnEvalMetrics | None
     test_metrics_cal: CnnEvalMetrics | None
-    platt_a: float
-    platt_b: float
+    temp: float  # temperature scaling parameter (1.0 = identity)
     gate_auc: float
     gate_f1: float
     passed: bool
@@ -202,6 +206,42 @@ def _apply_platt(raw: float, a: float, b: float) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Temperature scaling calibration
+# ---------------------------------------------------------------------------
+
+
+def _logit(p: float) -> float:
+    p = max(1e-7, min(1.0 - 1e-7, p))
+    return math.log(p / (1.0 - p))
+
+
+def _fit_temperature(
+    y_true: list[int], y_prob: list[float], max_iter: int = 500, lr: float = 0.05
+) -> float:
+    """Return temperature T that minimises NLL via gradient descent on val set.
+
+    p_cal = sigmoid(logit(p_raw) / T).  T=1 is identity; T>1 softens; T<1
+    sharpens.  When the model is already calibrated, T converges near 1.0 and
+    calibrated metrics stay close to raw metrics.
+    """
+    t = 1.0
+    logits = [_logit(p) for p in y_prob]
+    for _ in range(max_iter):
+        grad = 0.0
+        for yt, f in zip(y_true, logits, strict=True):
+            p_cal = _sigmoid(f / t)
+            # dL/dT = -(p_cal - y) * f / T^2  (summed, then averaged)
+            grad += -(p_cal - yt) * f / (t * t)
+        t -= lr * grad / len(y_true)
+        t = max(0.1, t)  # prevent collapse
+    return t
+
+
+def _apply_temperature(raw: float, t: float) -> float:
+    return max(1e-7, min(1.0 - 1e-7, _sigmoid(_logit(raw) / t)))
+
+
+# ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
 
@@ -313,9 +353,9 @@ def evaluate_cnn_checkpoint(
 ) -> CnnEvalResult:
     """Evaluate a CNN checkpoint (or ensemble) against production gates.
 
-    Fits Platt calibration on the validation split, evaluates on the sealed test
-    split with and without calibration, and checks raw AUC, calibrated F1, and
-    calibration non-regression gates.
+    Fits temperature scaling calibration on the validation split, evaluates on
+    the sealed test split with and without calibration, and checks raw AUC,
+    calibrated F1, and calibration non-regression gates.
 
     Args:
         split_dir: Directory containing ``val.json`` and ``test.json``.
@@ -346,8 +386,7 @@ def evaluate_cnn_checkpoint(
                 val_metrics_raw=None,
                 test_metrics_raw=None,
                 test_metrics_cal=None,
-                platt_a=1.0,
-                platt_b=0.0,
+                temp=1.0,
                 gate_auc=gate_auc,
                 gate_f1=gate_f1,
                 passed=False,
@@ -372,8 +411,7 @@ def evaluate_cnn_checkpoint(
             val_metrics_raw=None,
             test_metrics_raw=None,
             test_metrics_cal=None,
-            platt_a=1.0,
-            platt_b=0.0,
+            temp=1.0,
             gate_auc=gate_auc,
             gate_f1=gate_f1,
             passed=False,
@@ -386,8 +424,7 @@ def evaluate_cnn_checkpoint(
             val_metrics_raw=None,
             test_metrics_raw=None,
             test_metrics_cal=None,
-            platt_a=1.0,
-            platt_b=0.0,
+            temp=1.0,
             gate_auc=gate_auc,
             gate_f1=gate_f1,
             passed=False,
@@ -403,8 +440,7 @@ def evaluate_cnn_checkpoint(
             val_metrics_raw=None,
             test_metrics_raw=None,
             test_metrics_cal=None,
-            platt_a=1.0,
-            platt_b=0.0,
+            temp=1.0,
             gate_auc=gate_auc,
             gate_f1=gate_f1,
             passed=False,
@@ -420,8 +456,7 @@ def evaluate_cnn_checkpoint(
             val_metrics_raw=None,
             test_metrics_raw=None,
             test_metrics_cal=None,
-            platt_a=1.0,
-            platt_b=0.0,
+            temp=1.0,
             gate_auc=gate_auc,
             gate_f1=gate_f1,
             passed=False,
@@ -439,8 +474,7 @@ def evaluate_cnn_checkpoint(
                 val_metrics_raw=None,
                 test_metrics_raw=None,
                 test_metrics_cal=None,
-                platt_a=1.0,
-                platt_b=0.0,
+                temp=1.0,
                 gate_auc=gate_auc,
                 gate_f1=gate_f1,
                 passed=False,
@@ -456,8 +490,7 @@ def evaluate_cnn_checkpoint(
                 val_metrics_raw=None,
                 test_metrics_raw=None,
                 test_metrics_cal=None,
-                platt_a=1.0,
-                platt_b=0.0,
+                temp=1.0,
                 gate_auc=gate_auc,
                 gate_f1=gate_f1,
                 passed=False,
@@ -469,8 +502,7 @@ def evaluate_cnn_checkpoint(
                 val_metrics_raw=None,
                 test_metrics_raw=None,
                 test_metrics_cal=None,
-                platt_a=1.0,
-                platt_b=0.0,
+                temp=1.0,
                 gate_auc=gate_auc,
                 gate_f1=gate_f1,
                 passed=False,
@@ -486,8 +518,7 @@ def evaluate_cnn_checkpoint(
                 val_metrics_raw=None,
                 test_metrics_raw=None,
                 test_metrics_cal=None,
-                platt_a=1.0,
-                platt_b=0.0,
+                temp=1.0,
                 gate_auc=gate_auc,
                 gate_f1=gate_f1,
                 passed=False,
@@ -499,8 +530,7 @@ def evaluate_cnn_checkpoint(
                 val_metrics_raw=None,
                 test_metrics_raw=None,
                 test_metrics_cal=None,
-                platt_a=1.0,
-                platt_b=0.0,
+                temp=1.0,
                 gate_auc=gate_auc,
                 gate_f1=gate_f1,
                 passed=False,
@@ -516,8 +546,7 @@ def evaluate_cnn_checkpoint(
             val_metrics_raw=None,
             test_metrics_raw=None,
             test_metrics_cal=None,
-            platt_a=1.0,
-            platt_b=0.0,
+            temp=1.0,
             gate_auc=gate_auc,
             gate_f1=gate_f1,
             passed=False,
@@ -528,9 +557,9 @@ def evaluate_cnn_checkpoint(
     val_metrics_raw = _compute_metrics(val_labels, val_probs)
     test_metrics_raw = _compute_metrics(test_labels, test_probs)
 
-    # Fit Platt calibration on val predictions
-    platt_a, platt_b = _fit_platt(val_labels, val_probs)
-    test_probs_cal = [_apply_platt(p, platt_a, platt_b) for p in test_probs]
+    # Fit temperature scaling on val predictions, apply to test
+    temp = _fit_temperature(val_labels, val_probs)
+    test_probs_cal = [_apply_temperature(p, temp) for p in test_probs]
     test_metrics_cal = _compute_metrics(test_labels, test_probs_cal)
 
     calibration_not_worse = (
@@ -549,9 +578,8 @@ def evaluate_cnn_checkpoint(
         _atomic_write_json(
             output_calibration,
             {
-                "method": "platt",
-                "platt_a": round(platt_a, 8),
-                "platt_b": round(platt_b, 8),
+                "method": "temperature",
+                "temperature": round(temp, 8),
                 "n_val_samples": len(val_labels),
                 "fitted_at": evaluated_at,
                 "gate_auc": gate_auc,
@@ -571,8 +599,7 @@ def evaluate_cnn_checkpoint(
         val_metrics_raw=val_metrics_raw,
         test_metrics_raw=test_metrics_raw,
         test_metrics_cal=test_metrics_cal,
-        platt_a=round(platt_a, 8),
-        platt_b=round(platt_b, 8),
+        temp=round(temp, 8),
         gate_auc=gate_auc,
         gate_f1=gate_f1,
         passed=passed,
@@ -588,7 +615,7 @@ def format_eval_result(result: CnnEvalResult) -> str:
         f"- Flag: {result.flag}",
         f"- Gates: raw AUC ≥ {result.gate_auc}, calibrated F1 ≥ {result.gate_f1}, "
         "calibrated Brier/ECE no worse than raw",
-        f"- Platt calibration: A={result.platt_a}, B={result.platt_b}",
+        f"- Temperature scaling: T={result.temp}",
     ]
     if result.val_metrics_raw is not None:
         m = result.val_metrics_raw
