@@ -99,24 +99,53 @@ def build_joint_splits(
     val_pos, val_neg = _label_counts(tess_val)
     test_pos, test_neg = _label_counts(tess_test)
 
+    n_train = len(joint_train)
+    n_val = len(tess_val)
+    n_test = len(tess_test)
+    total_pos = joint_pos + val_pos + test_pos
+    total_neg = joint_neg + val_neg + test_neg
+
     manifest = {
-        "tess_split_dir": str(tess_split_dir),
-        "kepler_split_dir": str(kepler_split_dir),
-        "output_dir": str(output_dir),
-        "seed": seed,
+        # Fields required by cnn_split_validator.py
+        "n_examples": n_train + n_val + n_test,
+        "split_counts": {"train": n_train, "val": n_val, "test": n_test},
+        "label_counts": {"0": total_neg, "1": total_pos},
+        "split_label_counts": {
+            "train": {"0": joint_neg, "1": joint_pos},
+            "val": {"0": val_neg, "1": val_pos},
+            "test": {"0": test_neg, "1": test_pos},
+        },
+        "split_files": {
+            "train": "train.json",
+            "val": "val.json",
+            "test": "test.json",
+        },
+        "live_services": False,
+        "source_files": [str(tess_split_dir), str(kepler_split_dir)],
+        "language_guardrail": (
+            "offline CNN preparation only; no candidate confirmation or discovery claim"
+        ),
+        "config": {
+            "tess_split_dir": str(tess_split_dir),
+            "kepler_split_dir": str(kepler_split_dir),
+            "output_dir": str(output_dir),
+            "seed": seed,
+            "max_kepler": max_kepler,
+        },
+        # Provenance fields for C17 tracking
         "tess_train_n": len(tess_train),
         "tess_train_positive": tess_pos,
         "tess_train_negative": tess_neg,
         "kepler_train_n": len(kepler_train),
         "kepler_train_positive": kepler_pos,
         "kepler_train_negative": kepler_neg,
-        "joint_train_n": len(joint_train),
+        "joint_train_n": n_train,
         "joint_train_positive": joint_pos,
         "joint_train_negative": joint_neg,
-        "val_n": len(tess_val),
+        "val_n": n_val,
         "val_positive": val_pos,
         "val_negative": val_neg,
-        "test_n": len(tess_test),
+        "test_n": n_test,
         "test_positive": test_pos,
         "test_negative": test_neg,
     }
