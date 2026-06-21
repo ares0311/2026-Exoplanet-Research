@@ -64,17 +64,14 @@ When the user must take an action to unblock a gap:
 
 ---
 
-## HANDOFF STATE — 2026-06-18 updated 2026-06-20d (READ THIS FIRST)
+## HANDOFF STATE — 2026-06-21 (READ THIS FIRST)
 
 **The only active gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80).**
 
-### What was done in the last session (2026-06-20)
+### What was done in the last session (2026-06-21)
 
-- **C13 REJECTED** — Combined corpus training with default LR=1e-3. Best epoch 8 of 18 (early stop); val_auc=0.8195; test raw AUC=0.8342, F1=0.7960, Brier=0.1664, ECE=0.0625; Platt worsened Brier and ECE. Root cause: LR=1e-3 too high — val_loss spiked and diverged.
-- **C14 REJECTED** — Same combined splits + low-LR config (LR=3e-5). Training was stable (no spike) but val AUC plateaued at 0.8116 from epoch 56 onward; test raw AUC=0.8319, F1=0.7859, Brier=0.1663, ECE=0.0273; Platt worsened Brier (0.1932) and ECE (0.1441). Root cause: LR=3e-5 too conservative — scheduler decayed to 1.17e-7 by epoch 79, locking model into local optimum below C13's ceiling.
-- **C15 REJECTED** — Intermediate LR=1e-4, min_lr=1e-6, scheduler_patience=10. Model peaked at epoch 16 (val_auc=0.8162, train_loss=0.46) then overfit hard: val_loss climbed 34% (0.77→1.03) over 20 patience epochs while train_loss fell to 0.28; SHA-256 `34f50183d19b73cdee48bbd1cc3a3680173c802faf5c9d4227369c75c772128c`; test raw AUC=0.8353, F1=0.7949, Brier=0.1642, ECE=0.0427; Platt A=1.73766998, threshold=0.52; calibrated F1=0.7938, Brier=0.1888, ECE=0.1389. Root cause: **LR tuning exhausted** — C13/C14/C15 all plateau at test AUC 0.83–0.84 regardless of LR. Primary bottleneck is overfitting at weight_decay=1e-3 / use_batch_norm=false; LR is no longer the variable to tune.
-- **Combined splits retained**: `data/tess_combined_cnn_splits/` remains VALIDATED (train 4,892 / val 1,049 / test 1,033). Do not rebuild.
-- **Bottleneck now isolated**: LR tuning is exhausted. C16 switches lever to regularization: `use_batch_norm=true` + `weight_decay=1e-2` (10× stronger L2). BN was rejected as C6 (22 batches/epoch — stats too sparse); now 153 batches/epoch (4892/32) — stats converge. Platt (A≈1.74) is the 5th consecutive calibration failure; a future [AGENT] task can replace Platt with temperature scaling when authorized.
+- **C16 REJECTED** — BN + strong L2 (use_batch_norm=true, weight_decay=1e-2). Pretrain load: 8 tensors matched / 4 skipped (shape mismatch) — BatchNorm layers shift Sequential indices so only `conv.0` and FC layers transferred; 2nd and 3rd conv layers trained from random init. Best epoch 10, val_auc=0.6650; val_loss exploded 0.78→3.83 over 35 epochs; train_loss fell 1.77→0.33; early stop epoch 35. Evaluator not run — val AUC far below 0.85 gate. **Catastrophically worse than C13–C15.** Root cause: BN index shift → partial pretrain transfer → random-init conv layers + weight_decay=1e-2 → immediate catastrophic overfitting.
+- **Strategy exhaustion declared**: LR tuning (C13 1e-3, C14 3e-5, C15 1e-4) → consistent 0.83–0.84 ceiling. BN+WD regularization (C16) → 0.67 failure. Both approaches exhausted. The 0.83–0.84 ceiling is most likely a data ceiling.
 
 ### Where things stand
 
@@ -89,40 +86,14 @@ When the user must take an action to unblock a gap:
 | C13 checkpoint (`checkpoints/cnn_tess_c13/best.pt`) | **REJECTED** — test AUC 0.8342, LR=1e-3 too high (val_loss diverged) |
 | C14 checkpoint (`checkpoints/cnn_tess_c14/best.pt`) | **REJECTED** — test AUC 0.8319, LR=3e-5 too low (converged below C13 ceiling) |
 | C15 checkpoint (`checkpoints/cnn_tess_c15/best.pt`) | **REJECTED** — test AUC 0.8353, LR tuning exhausted; model overfit at epoch 16 |
-| C16 checkpoint (`checkpoints/cnn_tess_c16/`) | **NOT TRAINED** — `configs/cnn_tess_c16.json` committed; ready to train |
-| CNN training pipeline | **UNBLOCKED** — train C16 next |
+| C16 checkpoint (`checkpoints/cnn_tess_c16/best.pt`) | **REJECTED** — val AUC 0.6650, catastrophic; BN+WD approach failed |
+| CNN training pipeline | **BLOCKED** — T1-1 planning cycle required before next candidate |
 
 ### First action for the incoming agent
 
-**The user needs to train C16.** `configs/cnn_tess_c16.json` is already committed. Splits are validated and reusable. No code changes needed.
+**Do not start another training run without a T1-1 planning cycle.** LR tuning (C13–C15) and BN+WD regularization (C16) are both exhausted. The next attempt must address data quality/quantity or use a materially different architecture strategy. Read `docs/PRODUCTION_READINESS.md` and `docs/CNN_PRODUCTION_RUNBOOK.md` for full history, then present the human with a concrete plan that names the new lever being pulled (e.g., train from scratch without pretrain, expand TESS labels, wider architecture, temperature scaling instead of Platt).
 
-```bash
-git pull origin main
-caffeinate -dims .venv/bin/python Skills/train_cnn.py \
-  --split-dir data/tess_combined_cnn_splits \
-  --checkpoint-dir checkpoints/cnn_tess_c16 \
-  --config configs/cnn_tess_c16.json \
-  --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt \
-  --device auto
-```
-
-After training:
-```bash
-shasum -a 256 checkpoints/cnn_tess_c16/best.pt
-.venv/bin/python Skills/evaluate_cnn_checkpoint.py \
-  --split-dir data/tess_combined_cnn_splits \
-  --checkpoint checkpoints/cnn_tess_c16/best.pt \
-  --output-calibration checkpoints/cnn_tess_c16/calibration.json
-```
-
-Paste full output including `Flag: PASS` or `Flag: FAIL` line.
-
-- If `Flag: PASS` → report metrics, request human approval for promotion.
-- If `Flag: FAIL` → record rejection, state root cause, plan C17.
-
-**C15 hypothesis:** LR=1e-4 is intermediate between C13 (1e-3, too high — val_loss spiked) and C14 (3e-5, too low — scheduler decayed LR to near-zero at epoch 79). `min_learning_rate` raised to 1e-6, `lr_scheduler_patience` raised to 10 so LR exploration has more time at each level before decaying. Augmentation was already enabled in C14 (noise_fraction=0.05, scale 0.9–1.1); it is unchanged in C15.
-
-**Note on calibration:** Raw ECE has been 0.02–0.06 across all recent candidates (model is already well-calibrated). Platt (A≈1.7) consistently overcorrects. A future [AGENT] task should modify `evaluate_cnn_checkpoint.py` to use temperature scaling or skip calibration when raw ECE ≤ 0.05. Do not change the gate without explicit human approval.
+**Note on calibration:** Raw ECE has been 0.02–0.06 across all candidates (model is already well-calibrated before Platt). Platt A≈1.7–1.8 consistently overcorrects by sharpening already-calibrated probabilities. A future [AGENT] task should replace Platt with temperature scaling in `evaluate_cnn_checkpoint.py`. Do not change the production gate definition without explicit human approval.
 
 If the user is **away from their Mac**, no training can proceed.
 Do not propose code changes that do not directly unblock T1-1.

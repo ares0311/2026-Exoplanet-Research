@@ -366,7 +366,7 @@
         "verified_on": "2026-06-20"
       },
       "validation_gate": "Skills/cnn_split_validator.py reported PASS on 2026-06-20.",
-      "next_action": "Retain; C13/C14/C15 all rejected; C16 uses same splits with use_batch_norm=true and weight_decay=1e-2."
+      "next_action": "Retain; C13/C14/C15/C16 all rejected; LR tuning and BN+WD regularization both exhausted — next candidate needs materially different approach."
     },
     {
       "path": "checkpoints/cnn_tess_c13/",
@@ -519,31 +519,36 @@
     {
       "path": "checkpoints/cnn_tess_c16/",
       "kind": "checkpoint_dir",
-      "status": "not_trained_config_ready",
+      "status": "rejected",
       "git_policy": "ignored",
       "last_known": {
         "candidate": 16,
-        "generated": false,
+        "generated": true,
+        "device": "mps",
         "split_dir": "data/tess_combined_cnn_splits/",
         "pretrained_checkpoint": "checkpoints/cnn_kepler_pretrain/best.pt",
         "config": "configs/cnn_tess_c16.json",
-        "config_committed": true,
         "config_lr": 1e-4,
         "config_weight_decay": 1e-2,
         "config_use_batch_norm": true,
-        "config_min_lr": 1e-6,
-        "config_lr_scheduler_patience": 10,
-        "config_batch": 32,
         "config_patience": 25,
-        "config_strategy": "full unfreeze from epoch 1",
         "config_augment": true,
-        "rationale": "LR tuning exhausted (C13/C14/C15 all 0.83-0.84). Overfitting is the bottleneck. use_batch_norm=true adds implicit regularization; weight_decay=1e-2 (10x stronger L2) directly combats val_loss divergence. BN was rejected as C6 (22 batches/epoch — stats too sparse); now 153 batches/epoch (4892/32) — stats converge. patience=25 gives BN models more time to stabilize.",
-        "train_command": "caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/tess_combined_cnn_splits --checkpoint-dir checkpoints/cnn_tess_c16 --config configs/cnn_tess_c16.json --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt --device auto",
-        "eval_command": ".venv/bin/python Skills/evaluate_cnn_checkpoint.py --split-dir data/tess_combined_cnn_splits --checkpoint checkpoints/cnn_tess_c16/best.pt --output-calibration checkpoints/cnn_tess_c16/calibration.json",
-        "updated_on": "2026-06-20"
+        "pretrain_tensors_matched": 8,
+        "pretrain_tensors_skipped_shape_mismatch": 4,
+        "pretrain_transfer_note": "BatchNorm layers shift Sequential indices — only conv.0 and fc layers transferred; 2nd+3rd conv layers trained from random init",
+        "train": 4892,
+        "val": 1049,
+        "best_epoch": 10,
+        "best_val_loss": 1.0478,
+        "best_val_auc": 0.6650,
+        "early_stop_epoch": 35,
+        "root_cause": "BN index shift caused catastrophic partial transfer (only conv.0 + fc transferred). Random-init 2nd+3rd conv layers combined with weight_decay=1e-2 caused val_loss explosion (0.78→3.83 over 35 epochs). val AUC never exceeded 0.6650 (barely above random); evaluator not run.",
+        "evaluator_run": false,
+        "evaluator_flag": "NOT_RUN_VAL_AUC_TOO_LOW",
+        "verified_on": "2026-06-21"
       },
-      "validation_gate": "Raw held-out AUC >= 0.85, calibrated F1 >= 0.80, calibration must not worsen Brier/ECE.",
-      "next_action": "[HUMAN] trains after git pull origin main; paste full evaluator output."
+      "validation_gate": "Rejected without evaluator run: best val AUC 0.6650 is far below the 0.85 gate. BN+strong WD approach definitively failed.",
+      "next_action": "Do not promote or rerun with BN+pretrain combination. LR tuning (C13-C15) and regularization (C16) both exhausted. Proceed to T1-1 planning cycle."
     },
     {
       "path": "models/cnn*/",
