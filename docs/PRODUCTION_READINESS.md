@@ -1,6 +1,6 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-06-21 (C16 rejected — best val AUC 0.6650, catastrophic failure; LR tuning and BN+WD regularization both exhausted; T1-1 planning cycle required)
+Last reviewed: 2026-06-21 (C17 rejected — joint Kepler+TESS training achieved val AUC 0.7859, worse than C13–C15 due to domain mismatch; C18 authorized with freeze_conv_epochs=10 on TESS-only data)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
 Test baseline: 2,222 default tests passing, 2 integration_live deselected
@@ -61,13 +61,16 @@ must not be copied into `models/`, registered, or used for production scoring.
 - **LR tuning trajectory**: C13 (LR=1e-3) → test AUC 0.8342; C14 (LR=3e-5) → test AUC 0.8319; C15 (LR=1e-4) → test AUC 0.8353. All three candidates converge at 0.83–0.84. Continued LR search is not productive.
 - **Rejected candidate 16 (C16 — BN + strong L2)**: `checkpoints/cnn_tess_c16/best.pt`; trained on Python 3.14.3 with PyTorch 2.12.1 using `device=mps`; `configs/cnn_tess_c16.json` (LR=1e-4, weight_decay=1e-2, use_batch_norm=true, patience=25, augment=true); pretrain load: **8 tensors matched, 4 skipped** (shape mismatch) — BatchNorm layers shift Sequential indices so only `conv.0` and FC layers transferred; 2nd and 3rd conv layers trained from random init; best epoch 10, val_auc=0.6650, val_loss=1.0478; val_loss exploded 0.78→3.83 over 35 epochs while train_loss fell 1.77→0.33; early stop epoch 35; evaluator not run (val AUC far below 0.85 gate). **REJECTED** — val AUC 0.6650 < 0.85 gate; catastrophically worse than C13–C15. Root cause: BN index shift causes severely partial pretrain transfer (only first conv layer out of three); random-init 2nd+3rd conv layers combined with aggressive weight_decay=1e-2 caused immediate catastrophic overfitting.
 - **Strategy exhaustion summary**: LR tuning (C13–C15, three orders of magnitude) → 0.83–0.84 ceiling. BN+WD regularization (C16) → catastrophic failure at 0.67. Both approaches exhausted. The 0.83–0.84 ceiling in C13–C15 is most likely a data ceiling, not a tuning problem.
-- **Approved next strategy — C17: joint Kepler+TESS fine-tuning (2026-06-21)**:
-  - **Hypothesis**: The 0.83–0.84 AUC ceiling in C13–C15 is a data ceiling, not a tuning problem. Adding ~4,741 Kepler train examples to the 4,892 TESS train examples creates ~9,633 joint training examples while keeping val and test TESS-only for in-domain evaluation.
-  - **Status**: `configs/cnn_tess_c17.json` committed; `Skills/build_joint_cnn_splits.py` committed; split build and training are HUMAN tasks.
-  - **Build command**: `.venv/bin/python Skills/build_joint_cnn_splits.py`
-  - **Validate splits**: `.venv/bin/python Skills/cnn_split_validator.py data/joint_cnn_splits`
-  - **Train command**: `caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/joint_cnn_splits --checkpoint-dir checkpoints/cnn_tess_c17 --config configs/cnn_tess_c17.json --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt --device auto`
-- **Current data gate**: TESS combined splits VALIDATED; Kepler splits VALIDATED; C13/C14/C15/C16 all rejected; no CNN checkpoint approved for promotion. Joint split build required before C17 training.
+- **C17 REJECTED (2026-06-21)** — joint Kepler+TESS fine-tuning:
+  - **Result**: best val AUC 0.7859 (epoch 16), early stop epoch 46; val_loss 0.79→1.42 while train_loss 0.60→0.20
+  - **Root cause**: domain mismatch. Kepler (30-min cadence) and TESS (2-min cadence) transit morphologies differ in noise profile, cadence aliasing, and phase-fold artifacts. Joint training caused the conv layers to drift toward mixed-domain representations that do not generalize to the TESS-only val set.
+  - **Do not retry joint training**. Retain `data/joint_cnn_splits/` for reproducibility.
+- **Approved next strategy — C18: FC head warm-up with frozen conv (2026-06-21)**:
+  - **Hypothesis**: Val_loss explosion in C13–C15/C17 occurs because conv+FC are simultaneously optimized from epoch 1. Freezing conv for 10 epochs lets the FC head adapt to TESS domain; by epoch 11 LR scheduler has likely reduced LR, making conv fine-tuning safer.
+  - **Status**: `configs/cnn_tess_c18.json` committed; training is a HUMAN task.
+  - **Train command**: `caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/tess_combined_cnn_splits --checkpoint-dir checkpoints/cnn_tess_c18 --config configs/cnn_tess_c18.json --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt --device auto`
+  - **Key config**: LR=1e-4, weight_decay=1e-3, augment=true, patience=25, `freeze_conv_epochs=10`
+- **Current data gate**: TESS combined splits VALIDATED; Kepler splits VALIDATED; C13–C17 all rejected; no CNN checkpoint approved for promotion. C18 is the next authorized attempt.
 - **Current authorized runbook**: `docs/CNN_PRODUCTION_RUNBOOK.md`
 - **Current promotion gate**: raw held-out test AUC ≥ 0.85; calibrated held-out test F1 ≥ 0.80; temperature scaling calibration must not worsen held-out test Brier score or ECE
 - **Calibration note**: Temperature scaling (T fitted via NLL on val split) replaced Platt scaling on 2026-06-21. Platt A≈1.7–1.8 consistently worsened calibration because raw predictions were already well-calibrated (ECE 0.02–0.06). Temperature scaling is the identity at T=1 and will not artificially sharpen probabilities.
