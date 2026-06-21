@@ -616,7 +616,8 @@
       },
       "train_command": "caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/tess_combined_cnn_splits --checkpoint-dir checkpoints/cnn_tess_c18 --config configs/cnn_tess_c18.json --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt --device auto",
       "authorized_on": "2026-06-21",
-      "next_action": "[HUMAN] train C18 and paste full output; then evaluate with evaluate_cnn_checkpoint.py using data/tess_combined_cnn_splits; promote only after evaluator PASS and explicit human approval"
+      "next_action": "[HUMAN] train C18 and paste full output; then evaluate with evaluate_cnn_checkpoint.py using data/tess_combined_cnn_splits; promote only after evaluator PASS and explicit human approval",
+      "validation_gate": "Raw held-out AUC >= 0.85, calibrated F1 >= 0.80, temperature scaling must not worsen Brier or ECE. Passing gate still requires explicit human approval."
     },
     {
       "path": "models/cnn*/",
