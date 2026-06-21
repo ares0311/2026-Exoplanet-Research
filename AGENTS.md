@@ -64,14 +64,15 @@ When the user must take an action to unblock a gap:
 
 ---
 
-## HANDOFF STATE — 2026-06-21 (READ THIS FIRST)
+## HANDOFF STATE — 2026-06-21b (READ THIS FIRST)
 
 **The only active gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80).**
 
-### What was done in the last session (2026-06-21)
+### What was done in this session (2026-06-21)
 
-- **C16 REJECTED** — BN + strong L2 (use_batch_norm=true, weight_decay=1e-2). Pretrain load: 8 tensors matched / 4 skipped (shape mismatch) — BatchNorm layers shift Sequential indices so only `conv.0` and FC layers transferred; 2nd and 3rd conv layers trained from random init. Best epoch 10, val_auc=0.6650; val_loss exploded 0.78→3.83 over 35 epochs; train_loss fell 1.77→0.33; early stop epoch 35. Evaluator not run — val AUC far below 0.85 gate. **Catastrophically worse than C13–C15.** Root cause: BN index shift → partial pretrain transfer → random-init conv layers + weight_decay=1e-2 → immediate catastrophic overfitting.
-- **Strategy exhaustion declared**: LR tuning (C13 1e-3, C14 3e-5, C15 1e-4) → consistent 0.83–0.84 ceiling. BN+WD regularization (C16) → 0.67 failure. Both approaches exhausted. The 0.83–0.84 ceiling is most likely a data ceiling.
+- **Temperature scaling live** — `Skills/evaluate_cnn_checkpoint.py` now uses temperature scaling instead of Platt. `CnnEvalResult.temp` replaces `platt_a/platt_b`. Calibration JSON writes `method=temperature` and `temperature` key. All 50 evaluator tests pass. PR #125 merged.
+- **C16 REJECTED** — previously documented. BN index shift caused partial pretrain transfer; catastrophic overfitting with weight_decay=1e-2.
+- **C17 plan authorized** — data-ceiling root cause confirmed. Next lever: joint Kepler+TESS fine-tuning. `configs/cnn_tess_c17.json` and `Skills/build_joint_cnn_splits.py` committed. PR #126 open.
 
 ### Where things stand
 
@@ -79,33 +80,60 @@ When the user must take an action to unblock a gap:
 |---|---|
 | TESS v2 snippets (`data/tess_snippets_v2.jsonl`) | **COMPLETE** — 2,619 snippets on user's Mac |
 | Kepler snippets (`data/kepler_snippets.jsonl`) | **LOCAL VALIDATED** — 6,837 finite snippets on user's Mac |
+| Kepler splits (`data/kepler_cnn_splits/`) | **LOCAL VALIDATED** — train 4,741 / val 1,060 / test 1,036 |
 | Kepler pretraining checkpoint (`checkpoints/cnn_kepler_pretrain/best.pt`) | **LOCAL PRETRAINED** — SHA `c782d7af...`; best val AUC 0.9186 |
-| Kepler-TESS overlap corpus (`data/tess_kepler_overlap_snippets.jsonl`) | **COMPLETE** — 4,864 snippets |
-| Combined corpus (`data/tess_combined_snippets.jsonl`) | **BUILT** — 7,483 rows |
-| Combined CNN splits (`data/tess_combined_cnn_splits/`) | **VALIDATED** — validator PASS; train 4,892 / val 1,049 / test 1,033 |
-| C13 checkpoint (`checkpoints/cnn_tess_c13/best.pt`) | **REJECTED** — test AUC 0.8342, LR=1e-3 too high (val_loss diverged) |
-| C14 checkpoint (`checkpoints/cnn_tess_c14/best.pt`) | **REJECTED** — test AUC 0.8319, LR=3e-5 too low (converged below C13 ceiling) |
-| C15 checkpoint (`checkpoints/cnn_tess_c15/best.pt`) | **REJECTED** — test AUC 0.8353, LR tuning exhausted; model overfit at epoch 16 |
-| C16 checkpoint (`checkpoints/cnn_tess_c16/best.pt`) | **REJECTED** — val AUC 0.6650, catastrophic; BN+WD approach failed |
-| CNN training pipeline | **BLOCKED** — T1-1 planning cycle required before next candidate |
+| Combined TESS splits (`data/tess_combined_cnn_splits/`) | **VALIDATED** — train 4,892 / val 1,049 / test 1,033 |
+| C16 checkpoint (`checkpoints/cnn_tess_c16/best.pt`) | **REJECTED** — val AUC 0.6650, catastrophic BN+WD failure |
+| Joint CNN splits (`data/joint_cnn_splits/`) | **NOT YET BUILT** — requires human to run split builder |
+| C17 checkpoint (`checkpoints/cnn_tess_c17/`) | **NOT YET TRAINED** — waiting on joint split build |
+| Evaluator calibration | **TEMPERATURE SCALING** — live on main since 2026-06-21 |
 
 ### First action for the incoming agent
 
-**Do not start another training run without a T1-1 planning cycle.** LR tuning (C13–C15) and BN+WD regularization (C16) are both exhausted. The next attempt must address data quality/quantity or use a materially different architecture strategy. Read `docs/PRODUCTION_READINESS.md` and `docs/CNN_PRODUCTION_RUNBOOK.md` for full history, then present the human with a concrete plan that names the new lever being pulled (e.g., train from scratch without pretrain, expand TESS labels, wider architecture, temperature scaling instead of Platt).
+C17 plan is authorized and code is on main. The only remaining AGENT work is to record C17 results when the human provides them. No code changes are needed before training.
 
-**Note on calibration:** Raw ECE has been 0.02–0.06 across all candidates (model is already well-calibrated before Platt). Platt A≈1.7–1.8 consistently overcorrects by sharpening already-calibrated probabilities. A future [AGENT] task should replace Platt with temperature scaling in `evaluate_cnn_checkpoint.py`. Do not change the production gate definition without explicit human approval.
+**Ask the user to run (from a freshly pulled local Mac):**
 
-If the user is **away from their Mac**, no training can proceed.
-Do not propose code changes that do not directly unblock T1-1.
+```bash
+git pull origin main
+.venv/bin/python Skills/build_joint_cnn_splits.py
+.venv/bin/python Skills/cnn_split_validator.py data/joint_cnn_splits
+```
+
+Paste the validator output. If PASS, then train:
+
+```bash
+caffeinate -dims .venv/bin/python Skills/train_cnn.py \
+  --split-dir data/joint_cnn_splits \
+  --checkpoint-dir checkpoints/cnn_tess_c17 \
+  --config configs/cnn_tess_c17.json \
+  --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt \
+  --device auto
+```
+
+After training:
+```bash
+shasum -a 256 checkpoints/cnn_tess_c17/best.pt
+.venv/bin/python Skills/evaluate_cnn_checkpoint.py \
+  --split-dir data/joint_cnn_splits \
+  --checkpoint checkpoints/cnn_tess_c17/best.pt \
+  --output-calibration checkpoints/cnn_tess_c17/calibration.json
+```
+
+Paste the full evaluator output including `Flag: PASS` or `Flag: FAIL`.
+
+- If `Flag: PASS` → report metrics, request human approval for promotion.
+- If `Flag: FAIL` → record rejection, state root cause, plan C18.
+
+If the user is **away from their Mac**, no training can proceed. No code changes are needed in the meantime.
 
 ### CNN production runbook
 
 Use `docs/CNN_PRODUCTION_RUNBOOK.md` for the authoritative copy-paste workflow.
 The correct CLI flags are `--split-dir`, `--checkpoint-dir`, and `--pretrained-checkpoint`.
-Do not use stale aliases (`--splits-dir`, `--output-dir`, `--pretrained`).
 
-Gate: raw held-out test AUC ≥ 0.85, calibrated held-out test F1 ≥ 0.80, and Platt
-calibration must not worsen held-out Brier score or ECE.
+Gate: raw held-out test AUC ≥ 0.85, calibrated held-out test F1 ≥ 0.80, and temperature
+scaling calibration must not worsen held-out Brier score or ECE.
 
 ---
 
@@ -117,8 +145,10 @@ Large training data files are stored on the user's local Mac and are **never com
 |---|---|---|
 | `data/tess_snippets_v2.jsonl` | **COMPLETE** — 2,619 snippets | TESS phase-folded snippets; merged from two download runs; 56 targets had permanent MAST 404s |
 | `data/kepler_snippets.jsonl` | **LOCAL VALIDATED** — 6,837 finite snippets as of 2026-06-17 | JSON parse PASS; zero non-finite flux rows; zero duplicate resume keys; split validator PASS |
+| `data/kepler_cnn_splits/` | **LOCAL VALIDATED** — train 4,741 / val 1,060 / test 1,036 | Kepler split used for pretraining and as the Kepler component of `data/joint_cnn_splits/` |
 | `data/tess_kepler_overlap_snippets.jsonl` | **COMPLETE** — 4,864 snippets as of 2026-06-20 | Kepler KOI stars folded at Kepler ephemerides; TESS-domain labels from KOI disposition; ~2,716 terminal failures in sidecar |
 | `data/tess_combined_snippets.jsonl` | **BUILT** — 7,483 rows | Concatenation of TESS v2 + overlap; used for `data/tess_combined_cnn_splits/`; do not rebuild |
+| `data/joint_cnn_splits/` | **NOT YET BUILT** — run `Skills/build_joint_cnn_splits.py` | C17: Kepler train (4,741) + TESS combined train (4,892) = ~9,633 joint; TESS val/test unchanged |
 
 The Kepler download uses `author="Kepler"` (prevents HLSP/IRIS cache corruption) and `socket.setdefaulttimeout(120)` (prevents WiFi-drop hangs). It resumes automatically from durable success keys plus the failure sidecar. The optimized path groups pending KOIs by `kepid`, fetches each KIC once, filters non-finite time/flux samples before phase binning, and supports polite bounded concurrency via `--workers 3 --request-delay 0.5`.
 

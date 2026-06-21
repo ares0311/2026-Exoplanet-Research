@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "last_updated": "2026-06-20",
+  "last_updated": "2026-06-21",
   "production_gap": "T1-1: Production Tier 2 CNN Checkpoint",
   "policy": {
     "standard_operator_cadence": "git add .",
@@ -548,7 +548,44 @@
         "verified_on": "2026-06-21"
       },
       "validation_gate": "Rejected without evaluator run: best val AUC 0.6650 is far below the 0.85 gate. BN+strong WD approach definitively failed.",
-      "next_action": "Do not promote or rerun with BN+pretrain combination. LR tuning (C13-C15) and regularization (C16) both exhausted. Proceed to T1-1 planning cycle."
+      "next_action": "Do not promote or rerun. C17 uses joint Kepler+TESS training to break the data-ceiling."
+    },
+    {
+      "path": "data/joint_cnn_splits/",
+      "kind": "cnn_split",
+      "status": "not_yet_built",
+      "git_policy": "ignored",
+      "last_known": {
+        "strategy": "C17: merge Kepler train (4741) + TESS combined train (4892) = ~9633 joint training examples; TESS-only val (1049) and test (1033) unchanged",
+        "build_script": "Skills/build_joint_cnn_splits.py",
+        "tess_split_dir": "data/tess_combined_cnn_splits",
+        "kepler_split_dir": "data/kepler_cnn_splits",
+        "hypothesis": "Data-ceiling at 4892 TESS examples drives 0.83-0.84 AUC; adding Kepler examples to fine-tune training should push above the ceiling while TESS-only val/test preserves in-domain evaluation",
+        "authorized_on": "2026-06-21"
+      },
+      "validation_gate": "Run Skills/cnn_split_validator.py data/joint_cnn_splits after build and confirm PASS before training C17.",
+      "next_action": "[HUMAN] git pull origin main; .venv/bin/python Skills/build_joint_cnn_splits.py; .venv/bin/python Skills/cnn_split_validator.py data/joint_cnn_splits"
+    },
+    {
+      "path": "checkpoints/cnn_tess_c17/",
+      "kind": "checkpoint_dir",
+      "status": "not_yet_trained",
+      "git_policy": "ignored",
+      "last_known": {
+        "candidate": 17,
+        "config": "configs/cnn_tess_c17.json",
+        "config_lr": 1e-4,
+        "config_weight_decay": 1e-3,
+        "config_use_batch_norm": false,
+        "config_patience": 30,
+        "config_augment": true,
+        "strategy": "Joint Kepler+TESS fine-tuning: ~9633 train examples vs 4892 for C13-C15; TESS-only val and test; Kepler pretrain init unchanged",
+        "split_dir": "data/joint_cnn_splits",
+        "pretrained_checkpoint": "checkpoints/cnn_kepler_pretrain/best.pt",
+        "authorized_on": "2026-06-21"
+      },
+      "validation_gate": "Run evaluate_cnn_checkpoint.py after training; PASS requires raw AUC >= 0.85, calibrated F1 >= 0.80, temperature scaling must not worsen Brier/ECE.",
+      "next_action": "[HUMAN] after joint splits validated: caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/joint_cnn_splits --checkpoint-dir checkpoints/cnn_tess_c17 --config configs/cnn_tess_c17.json --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt --device auto"
     },
     {
       "path": "models/cnn*/",
