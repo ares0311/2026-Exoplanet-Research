@@ -311,47 +311,74 @@ Stop and paste back the training result. Then evaluate with Step 6 (substituting
 
 ## Step 7d: C17 — Joint Kepler+TESS Fine-Tuning
 
-**Status: AUTHORIZED — split builder and config committed to main.**
+**Status: REJECTED** — completed locally on 2026-06-21, missed the gate.
 
-**Why this is different from C13–C15:** C13, C14, and C15 all used only the
-4,892 TESS combined training examples and plateaued at test AUC 0.83–0.84 regardless
-of LR (1e-3, 3e-5, 1e-4). That plateau is a data ceiling. C17 adds the 4,741 Kepler
-train examples directly to the TESS fine-tuning training set, creating ~9,633 joint
-training examples. Val and test remain TESS-only so the production gate reflects
-in-domain performance. Config uses C15 settings (LR=1e-4, WD=1e-3, no BN) with
-patience increased to 30 to give the larger dataset time to converge.
+**Why this was tried:** C13–C15 all used the 4,892 TESS combined training examples
+and plateaued at test AUC 0.83–0.84 regardless of LR tuning. The hypothesis was that
+a data ceiling was responsible and that adding 4,741 Kepler train examples to create
+~9,633 joint training examples would break through.
+
+**Result from 2026-06-21:** best epoch 16, val AUC **0.7859**, val loss 1.0534;
+early stop at epoch 46 with final train loss 0.1968 and val loss 1.42. This is
+**worse** than every prior TESS-only candidate (C13–C15 all achieved 0.81–0.84).
+Evaluator was not run; val AUC is below all prior candidates.
+
+**Root cause:** Domain mismatch. Kepler (30-min cadence, Kepler photometry) and TESS
+(2-min cadence, SPOC photometry) transit morphologies differ in noise profile, cadence
+aliasing, and phase-folding artifacts. When the conv layers are trained simultaneously
+on both domains from epoch 1, they drift toward mixed-domain representations that do
+not generalize to the TESS-only val set. Val loss exploded (0.79 → 1.42) while train
+loss fell to 0.20 — classic domain-mismatch overfitting.
+
+**Do not rerun joint Kepler+TESS training.** The joint splits (`data/joint_cnn_splits/`)
+remain locally validated and can be retained for future experiments with explicit domain
+adaptation techniques, but they must not be used as-is for another production training
+run. Proceed to Step 7e.
+
+## Step 7e: C18 — FC Head Warm-Up With Frozen Conv (TESS Only)
+
+**Status: AUTHORIZED — config committed to main.**
+
+**Why this is different from C17 and C13–C15:** C13–C15 all showed val_loss explosion
+while train_loss fell (overfitting), with the best epoch always occurring within the
+first 16–61 epochs before the conv layers drifted too far from the Kepler pretrain
+representations. C16 showed that BN+WD changes break pretrain transfer. C17 showed
+that joint Kepler+TESS training hurts TESS generalization.
+
+C18 uses `freeze_conv_epochs=10`: the conv layers are frozen for the first 10 epochs,
+so only the FC classification head adapts to TESS domain. After epoch 10 the conv
+layers are unfrozen, but by then the LR scheduler will have already reduced the
+learning rate if val_loss plateaued, making the conv fine-tuning safer. Uses TESS
+combined splits only (no Kepler mixing).
 
 ```bash
 git pull origin main
-.venv/bin/python Skills/build_joint_cnn_splits.py
-.venv/bin/python Skills/cnn_split_validator.py data/joint_cnn_splits
-```
-
-Paste back the split validator PASS/FAIL and counts before training. Then train:
-
-```bash
 caffeinate -dims .venv/bin/python Skills/train_cnn.py \
-  --split-dir data/joint_cnn_splits \
-  --checkpoint-dir checkpoints/cnn_tess_c17 \
-  --config configs/cnn_tess_c17.json \
+  --split-dir data/tess_combined_cnn_splits \
+  --checkpoint-dir checkpoints/cnn_tess_c18 \
+  --config configs/cnn_tess_c18.json \
   --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt \
   --device auto
 ```
 
-After training completes, evaluate:
+Paste back the full training result including startup banner (`device=mps`), the
+"Conv layers FROZEN" and "conv layers UNFROZEN" lines, per-epoch AUC progress, and
+final early-stop line. Then evaluate:
 
 ```bash
-shasum -a 256 checkpoints/cnn_tess_c17/best.pt
+shasum -a 256 checkpoints/cnn_tess_c18/best.pt
 .venv/bin/python Skills/evaluate_cnn_checkpoint.py \
-  --split-dir data/joint_cnn_splits \
-  --checkpoint checkpoints/cnn_tess_c17/best.pt \
-  --output-calibration checkpoints/cnn_tess_c17/calibration.json
+  --split-dir data/tess_combined_cnn_splits \
+  --checkpoint checkpoints/cnn_tess_c18/best.pt \
+  --output-calibration checkpoints/cnn_tess_c18/calibration.json
 ```
 
 Paste full output including `Flag: PASS` or `Flag: FAIL` and the SHA-256.
 
 - If `Flag: PASS` → proceed to Step 8 (promotion with human approval).
-- If `Flag: FAIL` → record rejection, document root cause, plan C18.
+- If `Flag: FAIL` → record rejection; if val AUC ≤ 0.84 again, escalate to human
+  for a strategic decision: the current architecture + TESS data budget may have
+  reached its ceiling and the gate or data collection strategy may need revision.
 
 ## Step 8: Promotion Only After Approval
 

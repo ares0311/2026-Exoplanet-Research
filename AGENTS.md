@@ -64,15 +64,16 @@ When the user must take an action to unblock a gap:
 
 ---
 
-## HANDOFF STATE — 2026-06-21b (READ THIS FIRST)
+## HANDOFF STATE — 2026-06-21c (READ THIS FIRST)
 
 **The only active gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80).**
 
 ### What was done in this session (2026-06-21)
 
-- **Temperature scaling live** — `Skills/evaluate_cnn_checkpoint.py` now uses temperature scaling instead of Platt. `CnnEvalResult.temp` replaces `platt_a/platt_b`. Calibration JSON writes `method=temperature` and `temperature` key. All 50 evaluator tests pass. PR #125 merged.
-- **C16 REJECTED** — previously documented. BN index shift caused partial pretrain transfer; catastrophic overfitting with weight_decay=1e-2.
-- **C17 plan authorized** — data-ceiling root cause confirmed. Next lever: joint Kepler+TESS fine-tuning. `configs/cnn_tess_c17.json` and `Skills/build_joint_cnn_splits.py` committed. PR #126 open.
+- **Temperature scaling live** — PR #125 merged. Platt replaced by temperature scaling in evaluator.
+- **C17 REJECTED** — joint Kepler+TESS training (9,633 examples) achieved only val AUC 0.7859, worse than C13–C15 (0.81–0.84). Root cause: domain mismatch. Kepler and TESS transit morphologies differ in cadence/noise; joint training caused val_loss explosion (0.79→1.42) while train_loss fell to 0.20.
+- **DO NOT RETRY JOINT TRAINING** — see runbook Step 7d for the full root-cause record.
+- **C18 authorized** — `configs/cnn_tess_c18.json` committed. Uses TESS combined splits only, `freeze_conv_epochs=10` to warm the FC head before unfreezing conv layers.
 
 ### Where things stand
 
@@ -83,49 +84,41 @@ When the user must take an action to unblock a gap:
 | Kepler splits (`data/kepler_cnn_splits/`) | **LOCAL VALIDATED** — train 4,741 / val 1,060 / test 1,036 |
 | Kepler pretraining checkpoint (`checkpoints/cnn_kepler_pretrain/best.pt`) | **LOCAL PRETRAINED** — SHA `c782d7af...`; best val AUC 0.9186 |
 | Combined TESS splits (`data/tess_combined_cnn_splits/`) | **VALIDATED** — train 4,892 / val 1,049 / test 1,033 |
-| C16 checkpoint (`checkpoints/cnn_tess_c16/best.pt`) | **REJECTED** — val AUC 0.6650, catastrophic BN+WD failure |
-| Joint CNN splits (`data/joint_cnn_splits/`) | **NOT YET BUILT** — requires human to run split builder |
-| C17 checkpoint (`checkpoints/cnn_tess_c17/`) | **NOT YET TRAINED** — waiting on joint split build |
+| Joint CNN splits (`data/joint_cnn_splits/`) | **LOCAL VALIDATED** — built 2026-06-21; retain for reproducibility; do not retrain from |
+| C17 checkpoint (`checkpoints/cnn_tess_c17/`) | **REJECTED** — val AUC 0.7859; domain mismatch; do not retrain |
+| C18 checkpoint (`checkpoints/cnn_tess_c18/`) | **NOT YET TRAINED** — `configs/cnn_tess_c18.json` on main |
 | Evaluator calibration | **TEMPERATURE SCALING** — live on main since 2026-06-21 |
 
 ### First action for the incoming agent
 
-C17 plan is authorized and code is on main. The only remaining AGENT work is to record C17 results when the human provides them. No code changes are needed before training.
+C18 config is on main. No code changes needed before training.
 
 **Ask the user to run (from a freshly pulled local Mac):**
 
 ```bash
 git pull origin main
-.venv/bin/python Skills/build_joint_cnn_splits.py
-.venv/bin/python Skills/cnn_split_validator.py data/joint_cnn_splits
-```
-
-Paste the validator output. If PASS, then train:
-
-```bash
 caffeinate -dims .venv/bin/python Skills/train_cnn.py \
-  --split-dir data/joint_cnn_splits \
-  --checkpoint-dir checkpoints/cnn_tess_c17 \
-  --config configs/cnn_tess_c17.json \
+  --split-dir data/tess_combined_cnn_splits \
+  --checkpoint-dir checkpoints/cnn_tess_c18 \
+  --config configs/cnn_tess_c18.json \
   --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt \
   --device auto
 ```
 
-After training:
+Paste full training output. Then evaluate:
+
 ```bash
-shasum -a 256 checkpoints/cnn_tess_c17/best.pt
+shasum -a 256 checkpoints/cnn_tess_c18/best.pt
 .venv/bin/python Skills/evaluate_cnn_checkpoint.py \
-  --split-dir data/joint_cnn_splits \
-  --checkpoint checkpoints/cnn_tess_c17/best.pt \
-  --output-calibration checkpoints/cnn_tess_c17/calibration.json
+  --split-dir data/tess_combined_cnn_splits \
+  --checkpoint checkpoints/cnn_tess_c18/best.pt \
+  --output-calibration checkpoints/cnn_tess_c18/calibration.json
 ```
 
 Paste the full evaluator output including `Flag: PASS` or `Flag: FAIL`.
 
 - If `Flag: PASS` → report metrics, request human approval for promotion.
-- If `Flag: FAIL` → record rejection, state root cause, plan C18.
-
-If the user is **away from their Mac**, no training can proceed. No code changes are needed in the meantime.
+- If `Flag: FAIL` and val AUC ≤ 0.84 again → record rejection, escalate to human for strategic decision (gate revision or new data collection). The current architecture + TESS data budget may have reached its ceiling.
 
 ### CNN production runbook
 
@@ -148,7 +141,7 @@ Large training data files are stored on the user's local Mac and are **never com
 | `data/kepler_cnn_splits/` | **LOCAL VALIDATED** — train 4,741 / val 1,060 / test 1,036 | Kepler split used for pretraining and as the Kepler component of `data/joint_cnn_splits/` |
 | `data/tess_kepler_overlap_snippets.jsonl` | **COMPLETE** — 4,864 snippets as of 2026-06-20 | Kepler KOI stars folded at Kepler ephemerides; TESS-domain labels from KOI disposition; ~2,716 terminal failures in sidecar |
 | `data/tess_combined_snippets.jsonl` | **BUILT** — 7,483 rows | Concatenation of TESS v2 + overlap; used for `data/tess_combined_cnn_splits/`; do not rebuild |
-| `data/joint_cnn_splits/` | **NOT YET BUILT** — run `Skills/build_joint_cnn_splits.py` | C17: Kepler train (4,741) + TESS combined train (4,892) = ~9,633 joint; TESS val/test unchanged |
+| `data/joint_cnn_splits/` | **LOCAL VALIDATED** — 9,633 train / 1,049 val / 1,033 test | C17 splits; retain for reproducibility; do NOT use as training input for future candidates — joint training caused domain mismatch |
 
 The Kepler download uses `author="Kepler"` (prevents HLSP/IRIS cache corruption) and `socket.setdefaulttimeout(120)` (prevents WiFi-drop hangs). It resumes automatically from durable success keys plus the failure sidecar. The optimized path groups pending KOIs by `kepid`, fetches each KIC once, filters non-finite time/flux samples before phase binning, and supports polite bounded concurrency via `--workers 3 --request-delay 0.5`.
 
