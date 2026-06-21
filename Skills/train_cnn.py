@@ -423,8 +423,18 @@ def train_cnn(
         pretrained_checkpoint = Path(pretrained_checkpoint)
         if pretrained_checkpoint.exists():
             state = torch.load(pretrained_checkpoint, map_location="cpu", weights_only=True)
-            model.load_state_dict(state, strict=False)
-            print(f"Loaded pretrained weights from {pretrained_checkpoint}", flush=True)
+            model_state = model.state_dict()
+            compatible = {
+                k: v for k, v in state.items()
+                if k in model_state and v.shape == model_state[k].shape
+            }
+            skipped = [k for k in state if k not in compatible]
+            model.load_state_dict(compatible, strict=False)
+            print(
+                f"Loaded pretrained weights from {pretrained_checkpoint} "
+                f"({len(compatible)} tensors matched, {len(skipped)} skipped due to shape mismatch)",
+                flush=True,
+            )
         else:
             print(f"Warning: pretrained checkpoint not found: {pretrained_checkpoint}", flush=True)
 
