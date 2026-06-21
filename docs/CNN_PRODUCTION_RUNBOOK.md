@@ -11,8 +11,14 @@ Production gates:
 
 - Raw held-out test AUC must be at least `0.85`.
 - Calibrated held-out test F1 must be at least `0.80`.
-- Platt calibration must not worsen held-out test Brier score or ECE.
+- Temperature scaling calibration must not worsen held-out test Brier score or ECE.
 - A passing checkpoint still requires human approval before promotion.
+
+Calibration note (2026-06-21): Temperature scaling (single scalar T fitted via NLL
+gradient descent on the val split) replaced Platt scaling. Platt A≈1.7–1.8 worsened
+Brier and ECE across all 5 Kepler→TESS candidates because raw ECE was already 0.02–0.06
+(well-calibrated). Temperature scaling converges to T≈1 for well-calibrated models and
+will not artificially sharpen already-calibrated probabilities.
 
 ## Current State
 
@@ -302,6 +308,50 @@ caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/tess_comb
 
 Stop and paste back the training result. Then evaluate with Step 6 (substituting
 `data/tess_combined_cnn_splits` and `checkpoints/cnn_tess_c13`).
+
+## Step 7d: C17 — Joint Kepler+TESS Fine-Tuning
+
+**Status: AUTHORIZED — split builder and config committed to main.**
+
+**Why this is different from C13–C15:** C13, C14, and C15 all used only the
+4,892 TESS combined training examples and plateaued at test AUC 0.83–0.84 regardless
+of LR (1e-3, 3e-5, 1e-4). That plateau is a data ceiling. C17 adds the 4,741 Kepler
+train examples directly to the TESS fine-tuning training set, creating ~9,633 joint
+training examples. Val and test remain TESS-only so the production gate reflects
+in-domain performance. Config uses C15 settings (LR=1e-4, WD=1e-3, no BN) with
+patience increased to 30 to give the larger dataset time to converge.
+
+```bash
+git pull origin main
+.venv/bin/python Skills/build_joint_cnn_splits.py
+.venv/bin/python Skills/cnn_split_validator.py data/joint_cnn_splits
+```
+
+Paste back the split validator PASS/FAIL and counts before training. Then train:
+
+```bash
+caffeinate -dims .venv/bin/python Skills/train_cnn.py \
+  --split-dir data/joint_cnn_splits \
+  --checkpoint-dir checkpoints/cnn_tess_c17 \
+  --config configs/cnn_tess_c17.json \
+  --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt \
+  --device auto
+```
+
+After training completes, evaluate:
+
+```bash
+shasum -a 256 checkpoints/cnn_tess_c17/best.pt
+.venv/bin/python Skills/evaluate_cnn_checkpoint.py \
+  --split-dir data/joint_cnn_splits \
+  --checkpoint checkpoints/cnn_tess_c17/best.pt \
+  --output-calibration checkpoints/cnn_tess_c17/calibration.json
+```
+
+Paste full output including `Flag: PASS` or `Flag: FAIL` and the SHA-256.
+
+- If `Flag: PASS` → proceed to Step 8 (promotion with human approval).
+- If `Flag: FAIL` → record rejection, document root cause, plan C18.
 
 ## Step 8: Promotion Only After Approval
 
