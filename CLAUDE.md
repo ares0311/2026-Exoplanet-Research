@@ -137,8 +137,25 @@ Print a startup banner before any loop. Print a completion or early-stop line at
 - All work happens inside the `.venv` virtual environment
 - Never run `/Applications/Python*/Install\ Certificates.command`
 - Never suggest `sudo pip install` or any path under `/Library/Frameworks/Python.framework/`
-- `pip install` with `(.venv)` active is always venv-scoped and safe
 - Fix SSL/package issues inside the venv only
+
+**Command rules — NON-NEGOTIABLE:**
+- NEVER give a bare `python` command in any recipe. Always use `.venv/bin/python`.
+- NEVER give a bare `pip` command in any recipe. Always use `.venv/bin/python -m pip`.
+- NEVER give `pip install` even if the venv appears active — the prompt cannot be trusted.
+- NEVER give `source .venv/bin/activate` as a precondition and then bare `python`/`pip` — the user may be in a different shell or the prompt may be misleading.
+- Every recipe line that touches Python must use the explicit `.venv/bin/python` prefix, e.g.:
+  ```bash
+  .venv/bin/python -m pip install torch
+  .venv/bin/python Skills/train_cnn.py ...
+  .venv/bin/python -m pytest
+  ```
+
+**`.venv` management rules — NON-NEGOTIABLE:**
+- NEVER delete or recreate `.venv` without explicit human approval.
+- NEVER create a venv with `--prompt <name>` unless that name is exactly the directory (`.venv`). A mismatched prompt causes the shell to show the wrong environment name and can mislead both the user and the agent.
+- If `.venv` appears broken (wrong Python version, missing pip, missing torch), diagnose first — state the exact observed vs. expected Python version — then ask the human for permission before proposing a rebuild.
+- Confirmed `.venv` identity: `python3.14 -m venv .venv`; prompt line in `pyvenv.cfg` must read `prompt = .venv`.
 
 ### Local System Profile Optimization — MANDATORY
 
