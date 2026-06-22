@@ -64,16 +64,16 @@ When the user must take an action to unblock a gap:
 
 ---
 
-## HANDOFF STATE — 2026-06-21c (READ THIS FIRST)
+## HANDOFF STATE — 2026-06-21d (READ THIS FIRST)
 
 **The only active gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80).**
 
 ### What was done in this session (2026-06-21)
 
 - **Temperature scaling live** — PR #125 merged. Platt replaced by temperature scaling in evaluator.
-- **C17 REJECTED** — joint Kepler+TESS training (9,633 examples) achieved only val AUC 0.7859, worse than C13–C15 (0.81–0.84). Root cause: domain mismatch. Kepler and TESS transit morphologies differ in cadence/noise; joint training caused val_loss explosion (0.79→1.42) while train_loss fell to 0.20.
-- **DO NOT RETRY JOINT TRAINING** — see runbook Step 7d for the full root-cause record.
-- **C18 authorized** — `configs/cnn_tess_c18.json` committed. Uses TESS combined splits only, `freeze_conv_epochs=10` to warm the FC head before unfreezing conv layers.
+- **C17 REJECTED** — joint Kepler+TESS training (9,633 examples) achieved only val AUC 0.7859, worse than C13–C15 (0.81–0.84). Root cause: domain mismatch. Do not retry joint training.
+- **C18 REJECTED** — `freeze_conv_epochs=10` on TESS combined splits. Best candidate so far: test AUC 0.8439, test F1 0.7979 (raw). Failed gates: raw AUC 0.8439 < 0.85 (short by 0.006); temperature scaling T=1.61 worsened already-excellent test calibration (ECE 0.0301→0.0667). See runbook Step 7e for full root-cause.
+- **C19 authorized** — `configs/cnn_tess_c19.json` committed. Uses `freeze_conv_epochs=20` (doubled from C18). Hypothesis: longer FC warm-up → lower LR at conv unfreeze → less val overconfidence → T closer to 1.0 → calibration gate passes.
 
 ### Where things stand
 
@@ -86,12 +86,13 @@ When the user must take an action to unblock a gap:
 | Combined TESS splits (`data/tess_combined_cnn_splits/`) | **VALIDATED** — train 4,892 / val 1,049 / test 1,033 |
 | Joint CNN splits (`data/joint_cnn_splits/`) | **LOCAL VALIDATED** — built 2026-06-21; retain for reproducibility; do not retrain from |
 | C17 checkpoint (`checkpoints/cnn_tess_c17/`) | **REJECTED** — val AUC 0.7859; domain mismatch; do not retrain |
-| C18 checkpoint (`checkpoints/cnn_tess_c18/`) | **NOT YET TRAINED** — `configs/cnn_tess_c18.json` on main |
+| C18 checkpoint (`checkpoints/cnn_tess_c18/`) | **REJECTED** — test AUC 0.8439, F1 0.7979 (raw); calibration gate failed (T=1.61 worsened ECE); SHA `d33c15f4...` |
+| C19 checkpoint (`checkpoints/cnn_tess_c19/`) | **NOT YET TRAINED** — `configs/cnn_tess_c19.json` on main |
 | Evaluator calibration | **TEMPERATURE SCALING** — live on main since 2026-06-21 |
 
 ### First action for the incoming agent
 
-C18 config is on main. No code changes needed before training.
+C19 config is on main. No code changes needed before training.
 
 **Ask the user to run (from a freshly pulled local Mac):**
 
@@ -99,8 +100,8 @@ C18 config is on main. No code changes needed before training.
 git pull origin main
 caffeinate -dims .venv/bin/python Skills/train_cnn.py \
   --split-dir data/tess_combined_cnn_splits \
-  --checkpoint-dir checkpoints/cnn_tess_c18 \
-  --config configs/cnn_tess_c18.json \
+  --checkpoint-dir checkpoints/cnn_tess_c19 \
+  --config configs/cnn_tess_c19.json \
   --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt \
   --device auto
 ```
@@ -108,17 +109,18 @@ caffeinate -dims .venv/bin/python Skills/train_cnn.py \
 Paste full training output. Then evaluate:
 
 ```bash
-shasum -a 256 checkpoints/cnn_tess_c18/best.pt
+shasum -a 256 checkpoints/cnn_tess_c19/best.pt
 .venv/bin/python Skills/evaluate_cnn_checkpoint.py \
   --split-dir data/tess_combined_cnn_splits \
-  --checkpoint checkpoints/cnn_tess_c18/best.pt \
-  --output-calibration checkpoints/cnn_tess_c18/calibration.json
+  --checkpoint checkpoints/cnn_tess_c19/best.pt \
+  --output-calibration checkpoints/cnn_tess_c19/calibration.json
 ```
 
-Paste the full evaluator output including `Flag: PASS` or `Flag: FAIL`.
+Paste the full evaluator output including `Flag: PASS` or `Flag: FAIL`, the SHA-256, and the temperature T value.
 
 - If `Flag: PASS` → report metrics, request human approval for promotion.
-- If `Flag: FAIL` and val AUC ≤ 0.84 again → record rejection, escalate to human for strategic decision (gate revision or new data collection). The current architecture + TESS data budget may have reached its ceiling.
+- If `Flag: FAIL` and test AUC > 0.8439 but calibration still fails → escalate to human: the calibration gate may need revision (T-scaling worsens already well-calibrated test predictions when val/test calibration differ).
+- If `Flag: FAIL` and test AUC ≤ 0.8439 → freeze_conv approach has plateaued; escalate to human for a strategic decision (new data, gate revision, or architecture change).
 
 ### CNN production runbook
 

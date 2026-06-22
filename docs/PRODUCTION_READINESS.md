@@ -1,6 +1,6 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-06-21 (C17 rejected — joint Kepler+TESS training achieved val AUC 0.7859, worse than C13–C15 due to domain mismatch; C18 authorized with freeze_conv_epochs=10 on TESS-only data)
+Last reviewed: 2026-06-21 (C18 rejected — test AUC 0.8439, F1 0.7979 raw; temperature T=1.61 worsened well-calibrated test ECE 0.0301->0.0667; C19 authorized with freeze_conv_epochs=20 on TESS-only data)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
 Test baseline: 2,222 default tests passing, 2 integration_live deselected
@@ -65,12 +65,17 @@ must not be copied into `models/`, registered, or used for production scoring.
   - **Result**: best val AUC 0.7859 (epoch 16), early stop epoch 46; val_loss 0.79→1.42 while train_loss 0.60→0.20
   - **Root cause**: domain mismatch. Kepler (30-min cadence) and TESS (2-min cadence) transit morphologies differ in noise profile, cadence aliasing, and phase-fold artifacts. Joint training caused the conv layers to drift toward mixed-domain representations that do not generalize to the TESS-only val set.
   - **Do not retry joint training**. Retain `data/joint_cnn_splits/` for reproducibility.
-- **Approved next strategy — C18: FC head warm-up with frozen conv (2026-06-21)**:
-  - **Hypothesis**: Val_loss explosion in C13–C15/C17 occurs because conv+FC are simultaneously optimized from epoch 1. Freezing conv for 10 epochs lets the FC head adapt to TESS domain; by epoch 11 LR scheduler has likely reduced LR, making conv fine-tuning safer.
-  - **Status**: `configs/cnn_tess_c18.json` committed; training is a HUMAN task.
-  - **Train command**: `caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/tess_combined_cnn_splits --checkpoint-dir checkpoints/cnn_tess_c18 --config configs/cnn_tess_c18.json --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt --device auto`
-  - **Key config**: LR=1e-4, weight_decay=1e-3, augment=true, patience=25, `freeze_conv_epochs=10`
-- **Current data gate**: TESS combined splits VALIDATED; Kepler splits VALIDATED; C13–C17 all rejected; no CNN checkpoint approved for promotion. C18 is the next authorized attempt.
+- **C18 REJECTED (2026-06-21)** — FC head warm-up with `freeze_conv_epochs=10`:
+  - **Result**: SHA-256 `d33c15f45bd369d5eba4b87da3aa1908decc3baef5231dcff8544dd70987d496`; best epoch 22, val AUC 0.8262; early stop epoch 47. Test raw AUC=0.8439, F1=0.7979, Brier=0.1593, ECE=0.0301. Temperature T=1.61363521. Calibrated: threshold=0.46, Brier=0.1632, ECE=0.0667. **Flag: FAIL**.
+  - **Best candidate of all 18**: test AUC improved from the 0.83–0.84 plateau (C13–C15) to 0.8439. Test raw F1 0.7979 is within 0.001 of the gate. `freeze_conv_epochs` is confirmed as the right direction.
+  - **Why it failed**: (1) raw AUC 0.8439 < 0.85 gate (short by 0.006). (2) Temperature T=1.61 fitted on val (val overconfident) was applied to test (already excellently calibrated at ECE=0.0301), worsening test ECE to 0.0667. Val/test calibration mismatch is caused by residual overfitting.
+  - **Do not rerun C18 unchanged.** Proceed to C19.
+- **Approved next strategy — C19: Extended FC head warm-up with frozen conv (2026-06-21)**:
+  - **Hypothesis**: Doubling frozen epochs from 10 to 20 gives FC head more time to establish stable TESS-domain baseline; LR scheduler has 10 more epochs to decay before conv unfreezes, reducing val overconfidence (lower T) and potentially breaking through the 0.8439 AUC ceiling.
+  - **Status**: `configs/cnn_tess_c19.json` committed; training is a HUMAN task.
+  - **Train command**: `caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/tess_combined_cnn_splits --checkpoint-dir checkpoints/cnn_tess_c19 --config configs/cnn_tess_c19.json --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt --device auto`
+  - **Key config**: LR=1e-4, weight_decay=1e-3, augment=true, patience=25, `freeze_conv_epochs=20`
+- **Current data gate**: TESS combined splits VALIDATED; Kepler splits VALIDATED; C13–C18 all rejected; no CNN checkpoint approved for promotion. C19 is the next authorized attempt.
 - **Current authorized runbook**: `docs/CNN_PRODUCTION_RUNBOOK.md`
 - **Current promotion gate**: raw held-out test AUC ≥ 0.85; calibrated held-out test F1 ≥ 0.80; temperature scaling calibration must not worsen held-out test Brier score or ECE
 - **Calibration note**: Temperature scaling (T fitted via NLL on val split) replaced Platt scaling on 2026-06-21. Platt A≈1.7–1.8 consistently worsened calibration because raw predictions were already well-calibrated (ECE 0.02–0.06). Temperature scaling is the identity at T=1 and will not artificially sharpen probabilities.

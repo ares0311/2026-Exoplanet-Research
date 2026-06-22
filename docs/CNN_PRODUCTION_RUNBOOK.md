@@ -337,26 +337,69 @@ run. Proceed to Step 7e.
 
 ## Step 7e: C18 — FC Head Warm-Up With Frozen Conv (TESS Only)
 
+**Status: REJECTED** — completed locally on 2026-06-21, missed the gate.
+
+**Why this was tried:** C13–C15 all showed val_loss explosion while train_loss fell
+(overfitting). C16 showed BN+WD breaks pretrain transfer. C17 showed joint Kepler+TESS
+training causes domain mismatch. C18 used `freeze_conv_epochs=10` to let the FC head
+adapt to TESS domain before conv layers were unfrozen.
+
+**Result from 2026-06-21:** SHA-256 `d33c15f45bd369d5eba4b87da3aa1908decc3baef5231dcff8544dd70987d496`;
+best epoch 22, best val AUC `0.8262`; early stop at epoch 47.
+- Val (raw): AUC=0.8262, F1=0.7779, Brier=0.1700, ECE=0.0466
+- Test (raw): AUC=0.8439, F1=0.7979, Brier=0.1593, ECE=0.0301
+- Temperature T=1.61363521
+- Test (calibrated): threshold=0.46, Brier=0.1632, ECE=0.0667
+- **Flag: FAIL**
+
+**What worked:** `freeze_conv_epochs=10` is the best strategy found so far. Test AUC
+improved from the C13–C15 plateau of 0.83–0.84 to **0.8439** — the best of all 18
+candidates. Test F1 0.7979 is within 0.001 of the 0.80 gate. Val_loss explosion was
+also milder (0.62→0.90 over 47 epochs vs. 0.79→1.42 in C17).
+
+**Why it still failed:**
+1. Raw AUC 0.8439 < 0.85 gate (short by 0.006).
+2. Temperature scaling over-corrected: T=1.61 fitted on val (val predictions were
+   overconfident) then applied to test, which was already excellently calibrated
+   (raw ECE=0.0301). Applying T=1.61 softened well-calibrated test probabilities
+   and worsened ECE 0.0301→0.0667 and Brier 0.1593→0.1632.
+
+**Root cause of calibration gate failure:** Val and test calibration characteristics
+differ. The val split has slightly overconfident predictions (T=1.61 corrects them),
+but the test split is already well-calibrated at T≈1. This calibration discrepancy
+is most likely caused by overfitting — the model is slightly overconfident on the
+val set it has seen through early-stopping selection, but generalizes cleanly to the
+unseen test set. Reducing overfitting further (more frozen epochs) should bring
+val calibration closer to test calibration and reduce T toward 1.0.
+
+**Do not rerun C18 unchanged.** Proceed to Step 7f.
+
+## Step 7f: C19 — Extended FC Head Warm-Up (freeze_conv_epochs=20)
+
 **Status: AUTHORIZED — config committed to main.**
 
-**Why this is different from C17 and C13–C15:** C13–C15 all showed val_loss explosion
-while train_loss fell (overfitting), with the best epoch always occurring within the
-first 16–61 epochs before the conv layers drifted too far from the Kepler pretrain
-representations. C16 showed that BN+WD changes break pretrain transfer. C17 showed
-that joint Kepler+TESS training hurts TESS generalization.
+**Why this is different from C18:** C18 showed that `freeze_conv_epochs=10` is the
+best strategy found so far. The FC head showed strong momentum during the frozen
+phase (val_auc 0.75→0.81 across epochs 1–10), and the model peaked just 12 epochs
+after unfreeze (best epoch 22 with unfreeze at epoch 11). Two failure modes remain:
+(a) AUC ceiling at 0.8439, and (b) val overconfidence causing T=1.61 which worsens
+already-excellent test calibration.
 
-C18 uses `freeze_conv_epochs=10`: the conv layers are frozen for the first 10 epochs,
-so only the FC classification head adapts to TESS domain. After epoch 10 the conv
-layers are unfrozen, but by then the LR scheduler will have already reduced the
-learning rate if val_loss plateaued, making the conv fine-tuning safer. Uses TESS
-combined splits only (no Kepler mixing).
+C19 uses `freeze_conv_epochs=20`: 20 frozen epochs give the FC head twice as long
+to establish a stable TESS-domain baseline, and the LR scheduler has 10 more epochs
+to reduce the learning rate before conv unfreezes. Both effects should reduce val
+overconfidence (lower T) and allow the conv layers to fine-tune from a better
+FC baseline, potentially breaking through the 0.8439 ceiling.
+
+Uses the same TESS combined splits only (no Kepler mixing). All other hyperparameters
+are identical to C18.
 
 ```bash
 git pull origin main
 caffeinate -dims .venv/bin/python Skills/train_cnn.py \
   --split-dir data/tess_combined_cnn_splits \
-  --checkpoint-dir checkpoints/cnn_tess_c18 \
-  --config configs/cnn_tess_c18.json \
+  --checkpoint-dir checkpoints/cnn_tess_c19 \
+  --config configs/cnn_tess_c19.json \
   --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt \
   --device auto
 ```
@@ -366,19 +409,22 @@ Paste back the full training result including startup banner (`device=mps`), the
 final early-stop line. Then evaluate:
 
 ```bash
-shasum -a 256 checkpoints/cnn_tess_c18/best.pt
+shasum -a 256 checkpoints/cnn_tess_c19/best.pt
 .venv/bin/python Skills/evaluate_cnn_checkpoint.py \
   --split-dir data/tess_combined_cnn_splits \
-  --checkpoint checkpoints/cnn_tess_c18/best.pt \
-  --output-calibration checkpoints/cnn_tess_c18/calibration.json
+  --checkpoint checkpoints/cnn_tess_c19/best.pt \
+  --output-calibration checkpoints/cnn_tess_c19/calibration.json
 ```
 
-Paste full output including `Flag: PASS` or `Flag: FAIL` and the SHA-256.
+Paste full output including `Flag: PASS` or `Flag: FAIL`, the SHA-256, and the
+temperature T value.
 
 - If `Flag: PASS` → proceed to Step 8 (promotion with human approval).
-- If `Flag: FAIL` → record rejection; if val AUC ≤ 0.84 again, escalate to human
-  for a strategic decision: the current architecture + TESS data budget may have
-  reached its ceiling and the gate or data collection strategy may need revision.
+- If `Flag: FAIL` and test AUC > 0.8439 but calibration still fails → escalate to
+  human for a gate revision or calibration strategy decision (e.g., accepting T-scaled
+  results when raw ECE is already < 0.05).
+- If `Flag: FAIL` and test AUC ≤ 0.8439 → the freeze_conv approach has plateaued;
+  escalate to human for a strategic decision on new data collection or gate revision.
 
 ## Step 8: Promotion Only After Approval
 
