@@ -51,6 +51,8 @@ build_k2_tess_snippets(rows, *, n_bins, output_path, lc_fetcher, max_errors,
 from __future__ import annotations
 
 import contextlib
+import csv
+import io
 import json
 import math
 import socket
@@ -63,7 +65,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import quote
+from urllib.error import HTTPError
+from urllib.parse import urlencode
 from urllib.request import urlopen
 
 # Prevent indefinite hangs when WiFi drops mid-download.
@@ -261,15 +264,25 @@ def fetch_k2_table(url: str | None = None) -> list[K2Row]:
             f" where {period_col} is not null"
             f" and {epoch_col} is not null"
         )
-        query_url = f"{_K2_TAP_BASE}?query={quote(sql)}&format=json"
+        # Use urlencode (spaces → +) and csv format — NASA TAP always supports
+        # csv; json with %20-encoded spaces has proven unreliable on k2pandc.
+        params = urlencode({"query": sql, "format": "csv", "MAXREC": "100000"})
+        query_url = f"{_K2_TAP_BASE}?{params}"
         _emit_progress(f"K2 TAP columns discovered: {col}")
         _emit_progress(f"K2 TAP query URL: {query_url}")
 
-    with urlopen(query_url, timeout=120, context=ctx) as resp:  # noqa: S310
-        raw = json.loads(resp.read())
+    try:
+        with urlopen(query_url, timeout=120, context=ctx) as resp:  # noqa: S310
+            raw_csv = resp.read().decode("utf-8", errors="replace")
+    except HTTPError as exc:
+        err_body = exc.read().decode("utf-8", errors="replace")[:1000]
+        raise RuntimeError(
+            f"K2 TAP HTTP {exc.code} ({exc.reason}): {err_body}"
+        ) from exc
 
+    reader = csv.DictReader(io.StringIO(raw_csv))
     rows: list[K2Row] = []
-    for rec in raw:
+    for rec in reader:
         try:
             epic_id = int(rec[col["epic_id"]])
             disposition = str(rec[col["disposition"]]).strip().upper()
