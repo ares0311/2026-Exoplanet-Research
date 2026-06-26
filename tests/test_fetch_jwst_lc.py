@@ -11,12 +11,10 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 from fetch_jwst_lc import (
-    JwstLcResult,
     _MJD_TO_BTJD_OFFSET,
+    JwstLcResult,
     _normalize,
     fetch_jwst_lc,
-    white_light_from_calints,
-    white_light_from_x1dints,
 )
 
 # ---------------------------------------------------------------------------
@@ -64,9 +62,6 @@ def _make_fetch_with_stub(
     product_type: str = "x1dints",
 ) -> Any:
     """Return a fetch_jwst_lc that bypasses FITS file I/O."""
-    import importlib
-    mod = importlib.import_module("fetch_jwst_lc")
-
     def _pfn(obsid: str) -> list[dict[str, str]]:
         fn = f"{obsid}_{product_type}.fits"
         return [{"filename": fn, "dataURI": f"mast:JWST/{obsid}"}]
@@ -218,7 +213,7 @@ def test_fetch_calints_success(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     assert result.n_integrations == 30
 
 
-def test_fetch_prefers_x1dints_over_calints(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_fetch_prefers_x1dints(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     import fetch_jwst_lc as mod
 
     stub = _StubExtract()

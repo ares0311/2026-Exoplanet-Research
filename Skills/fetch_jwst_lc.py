@@ -42,9 +42,10 @@ import argparse
 import json
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 
@@ -100,12 +101,15 @@ def white_light_from_x1dints(fits_path: str | Path) -> tuple[np.ndarray, np.ndar
             if ext.name in ("PRIMARY", "ASDF"):
                 continue
             # Get mid-time from extension header (MJD)
-            t_mid = ext.header.get("MJD-MID") or ext.header.get("MJD-BEG") or ext.header.get("MJD-AVG")
+            t_mid = (
+                ext.header.get("MJD-MID")
+                or ext.header.get("MJD-BEG")
+                or ext.header.get("MJD-AVG")
+            )
             if t_mid is None:
                 continue
             try:
                 data = ext.data
-                wave = data["WAVELENGTH"]
                 flux = data["FLUX"]
                 err = data.get("ERROR") or data.get("FLUX_ERROR") or np.ones_like(flux)
             except (KeyError, AttributeError):
@@ -352,9 +356,9 @@ def to_lightkurve(result: JwstLcResult) -> Any:
     The returned object is compatible with clean.py, search.py, and vet.py.
     Requires lightkurve to be installed.
     """
+    import astropy.units as u  # type: ignore[import]
     import lightkurve as lk  # type: ignore[import]
     from astropy.time import Time  # type: ignore[import]
-    import astropy.units as u  # type: ignore[import]
 
     t = Time(np.array(result.time_btjd) + 2457000, format="jd", scale="tdb")
     lc = lk.LightCurve(
@@ -413,7 +417,7 @@ def _cli() -> None:
 
         result = fetch_jwst_lc(obsid, target_name=tname, instrument=inst, cache_dir=cache_dir)
         if result is None:
-            print(f"    SKIP: no suitable products", flush=True)
+            print("    SKIP: no suitable products", flush=True)
             continue
 
         ok += 1
@@ -456,10 +460,10 @@ def _run_pipeline(result: JwstLcResult) -> None:
     clean_result = clean_lightcurve(lc)
     lc_clean = clean_result.light_curve
 
-    print(f"    PIPELINE: searching for transits...", flush=True)
+    print("    PIPELINE: searching for transits...", flush=True)
     signals = search_lightcurve(lc_clean, min_snr=5.0, max_peaks=5)
     if not signals:
-        print(f"    PIPELINE: no signals found above SNR 5.0", flush=True)
+        print("    PIPELINE: no signals found above SNR 5.0", flush=True)
     else:
         for s in signals:
             print(
