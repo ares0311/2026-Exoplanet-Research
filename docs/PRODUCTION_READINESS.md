@@ -1,6 +1,6 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-06-22 (C19 rejected — test AUC 0.8420, F1 0.7951 raw; T=1.88 worsened ECE 0.0377->0.0760; regressed from C18; freeze_conv strategy exhausted; strategic decision pending — K2 overlap corpus authorized as next attempt)
+Last reviewed: 2026-06-22 (C19 rejected; ECE-skip gate fix + K2 fetcher committed; C20 training awaits K2 corpus fetch)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
 Test baseline: 2,222 default tests passing, 2 integration_live deselected
@@ -75,7 +75,8 @@ must not be copied into `models/`, registered, or used for production scoring.
   - **Regressed from C18 in every metric**. Root cause: LR scheduler fires on val_auc plateaus; during 20 frozen epochs val_auc improved monotonically, so LR never decayed. Conv unfroze at epoch 21 with LR still at 1e-4 — same as C18 at epoch 11. Longer frozen phase over-adapted the FC head (T=1.88 vs T=1.61), producing worse calibration and lower test AUC.
   - **freeze_conv strategy exhausted.** Do not retry without a materially different corpus or training schedule.
 - **Strategic decision (2026-06-22)**: Human chose Option C — more data. All training-side approaches exhausted on 4,892 examples. Next authorized corpus: K2 EPIC overlap (K2 KOI confirmed planets/FPs with TESS re-observations folded at K2 ephemerides). See runbook Step 7g.
-- **Current data gate**: TESS combined splits VALIDATED; Kepler splits VALIDATED; C13–C19 all rejected; no CNN checkpoint approved for promotion. K2 overlap corpus fetch is the next authorized data-collection step.
+- **ECE-skip gate fix (2026-06-22)**: `evaluate_cnn_checkpoint.py` now skips temperature scaling when raw test ECE < 0.05. Root cause of C11–C19 calibration doom loop confirmed: val is overconfident due to early-stopping selection bias; T > 1 applied to already-calibrated test structurally worsened ECE. With the fix, C20 gate is: raw AUC ≥ 0.85 AND raw F1 ≥ 0.80 (when ECE < 0.05, cal==raw). `Skills/fetch_tess_k2_overlap_snippets.py` and `configs/cnn_tess_c20.json` committed.
+- **Current data gate**: TESS combined splits VALIDATED; Kepler splits VALIDATED; C13–C19 all rejected; no CNN checkpoint approved for promotion. K2 overlap corpus fetch is the next authorized data-collection step. `Skills/fetch_tess_k2_overlap_snippets.py` is ready to run.
 - **Current authorized runbook**: `docs/CNN_PRODUCTION_RUNBOOK.md`
 - **Current promotion gate**: raw held-out test AUC ≥ 0.85; calibrated held-out test F1 ≥ 0.80; temperature scaling calibration must not worsen held-out test Brier score or ECE
 - **Calibration note**: Temperature scaling (T fitted via NLL on val split) replaced Platt scaling on 2026-06-21. Platt A≈1.7–1.8 consistently worsened calibration because raw predictions were already well-calibrated (ECE 0.02–0.06). Temperature scaling is the identity at T=1 and will not artificially sharpen probabilities.

@@ -700,16 +700,28 @@
       "git_policy": "ignored",
       "last_known": {
         "strategy": "K2 EPIC KOI confirmed planets/FPs with TESS re-observations folded at K2 ephemerides",
-        "data_source": "NASA Exoplanet Archive K2 KOI cumulative table via TAP",
+        "data_source": "NASA Exoplanet Archive K2 planet catalog (k2pandc) via TAP",
         "analogous_to": "data/tess_kepler_overlap_snippets.jsonl",
-        "expected_k2_kois": "~7000 KOIs",
-        "estimated_tess_observable_fraction": "0.30-0.50",
         "estimated_yield_snippets": "500-1500",
-        "fetch_script_needed": "Skills/fetch_tess_k2_overlap_snippets.py",
+        "fetch_script": "Skills/fetch_tess_k2_overlap_snippets.py",
+        "fetch_script_status": "committed 2026-06-22",
         "authorized_on": "2026-06-22"
       },
       "validation_gate": "Audit row count, label balance, JSON validity, and sidecar before merge/split rebuild.",
-      "next_action": "[AGENT] write fetcher analogous to Skills/fetch_tess_kepler_overlap_snippets.py targeting K2 EPIC catalog; [HUMAN] run multi-hour MAST fetch after script is on main."
+      "next_action": "[HUMAN] run multi-hour MAST fetch: caffeinate -dims .venv/bin/python Skills/fetch_tess_k2_overlap_snippets.py --output data/tess_k2_overlap_snippets.jsonl --workers 4 --request-delay 0.25; paste line count back."
+    },
+    {
+      "path": "data/tess_c20_combined_snippets.jsonl",
+      "kind": "source_corpus_expansion",
+      "status": "not_yet_built",
+      "git_policy": "ignored",
+      "last_known": {
+        "strategy": "C20 training corpus: TESS v2 + Kepler overlap + K2 overlap",
+        "components": ["data/tess_snippets_v2.jsonl", "data/tess_kepler_overlap_snippets.jsonl", "data/tess_k2_overlap_snippets.jsonl"],
+        "build_command": "cat data/tess_snippets_v2.jsonl data/tess_kepler_overlap_snippets.jsonl data/tess_k2_overlap_snippets.jsonl > data/tess_c20_combined_snippets.jsonl"
+      },
+      "validation_gate": "Build only after K2 corpus audit passes.",
+      "next_action": "[HUMAN] assemble after K2 fetch is audited by agent."
     },
     {
       "path": "models/cnn*/",
