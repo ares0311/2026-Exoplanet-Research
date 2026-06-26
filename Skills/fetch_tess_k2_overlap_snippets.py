@@ -63,6 +63,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 from urllib.request import urlopen
 
 # Prevent indefinite hangs when WiFi drops mid-download.
@@ -250,15 +251,17 @@ def fetch_k2_table(url: str | None = None) -> list[K2Row]:
         disp_col = col["disposition"]
         period_col = col["period"]
         epoch_col = col["epoch"]
-        query_url = (
-            _K2_TAP_BASE
-            + f"?query=select+{epic_col},{disp_col},{period_col},{epoch_col}"
-            + "+from+k2pandc"
-            + f"+where+{disp_col}+in+('CONFIRMED','FALSE+POSITIVE')"
-            + f"+and+{period_col}+is+not+null"
-            + f"+and+{epoch_col}+is+not+null"
-            + "&format=json"
+        # Fetch all rows with valid period and epoch; filter by disposition
+        # locally in Python.  Omitting the IN clause from the SQL avoids
+        # server-side quoting ambiguity (+ vs %20 inside SQL string literals)
+        # and protects against archive disposition value renames.
+        sql = (
+            f"select {epic_col},{disp_col},{period_col},{epoch_col}"
+            f" from k2pandc"
+            f" where {period_col} is not null"
+            f" and {epoch_col} is not null"
         )
+        query_url = f"{_K2_TAP_BASE}?query={quote(sql)}&format=json"
         _emit_progress(f"K2 TAP columns discovered: {col}")
         _emit_progress(f"K2 TAP query URL: {query_url}")
 
