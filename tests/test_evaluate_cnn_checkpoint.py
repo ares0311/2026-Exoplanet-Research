@@ -638,3 +638,72 @@ class TestFormatEvalResult:
         )
         text = format_eval_result(result)
         assert "MISSING_SPLIT" in text
+
+
+# ---------------------------------------------------------------------------
+# ECE skip threshold tests
+# ---------------------------------------------------------------------------
+
+
+def _dummy_model_fn_well_calibrated(fluxes: list[list[float]]) -> list[float]:
+    """Returns prob=0.98 for transit-like snippets, 0.02 for flat ones.
+
+    With 20 positives and 20 negatives (equal split), ECE ≈ 0.02 which is
+    well below the 0.05 skip threshold.
+    """
+    probs = []
+    for flux in fluxes:
+        mid = flux[100]
+        probs.append(0.98 if mid < 1.0 else 0.02)
+    return probs
+
+
+def _dummy_model_fn_miscalibrated(fluxes: list[list[float]]) -> list[float]:
+    """Returns prob=0.7 for all inputs regardless of label.
+
+    With 50% positive rate, mean calibration error per bin is large (≥0.2).
+    """
+    return [0.7] * len(fluxes)
+
+
+class TestEceSkipThreshold:
+    def test_well_calibrated_model_skips_temperature(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path, n=40)
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            gate_auc=0.5,
+            gate_f1=0.5,
+            model_fn=_dummy_model_fn_well_calibrated,
+        )
+        assert result.temp == pytest.approx(1.0)
+
+    def test_well_calibrated_model_cal_equals_raw(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path, n=40)
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            gate_auc=0.5,
+            gate_f1=0.5,
+            model_fn=_dummy_model_fn_well_calibrated,
+        )
+        assert result.test_metrics_raw is not None
+        assert result.test_metrics_cal is not None
+        assert result.test_metrics_cal.brier == pytest.approx(
+            result.test_metrics_raw.brier, abs=1e-9
+        )
+        assert result.test_metrics_cal.ece == pytest.approx(
+            result.test_metrics_raw.ece, abs=1e-9
+        )
+
+    def test_miscalibrated_model_applies_temperature(self, tmp_path: Path) -> None:
+        split_dir = _make_splits(tmp_path, n=40)
+        result = evaluate_cnn_checkpoint(
+            split_dir,
+            tmp_path / "fake.pt",
+            gate_auc=0.5,
+            gate_f1=0.5,
+            model_fn=_dummy_model_fn_miscalibrated,
+        )
+        # Miscalibrated model (all probs=0.7, ECE well above 0.05) must apply T != 1
+        assert result.temp != pytest.approx(1.0, abs=0.01)

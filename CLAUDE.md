@@ -1225,80 +1225,58 @@ terminal failures. Console progress is not resume state. If rerunning a
 downloader reprocesses completed or terminally failed work by default, stop and
 fix the durable resume ledger before asking the human to run it again.
 
-### Next Step — HANDOFF 2026-06-19
+### Next Step — HANDOFF 2026-06-22
 
-**Status: Kepler JSONL, Kepler split, Kepler pretraining checkpoint, TESS split, candidate 11, and candidate 12 are locally validated/evaluated. Candidate 11 and C12 are rejected. Path A TESS expansion inventory found too few new labels. The only authorized next production attempt for T1-1 is Runbook Step 7c: build the Kepler-TESS overlap corpus, audit it, then train C13 only if the audit passes.**
+**Status: C13–C19 all rejected. Best candidate is C18 (test AUC 0.8439, raw ECE 0.0301). freeze_conv strategy exhausted. Human chose Option C (more data). Next authorized data step: K2 EPIC overlap corpus. Next training candidate: C20 using `configs/cnn_tess_c18.json` on expanded splits.**
 
-#### Critical correction for incoming agents
+#### Candidate history summary (what has been tried, do not repeat)
 
-An older Step 7c command was given without explicit concurrency flags. Do **not**
-repeat that command. The current `Skills/fetch_tess_kepler_overlap_snippets.py`
-implementation groups pending KOIs by KIC, fetches each KIC light curve once,
-uses a bounded rolling thread pool, and writes completed groups immediately from
-the main thread. This is intentionally multithreaded rather than multiprocessed:
-the workload is live MAST/lightkurve network I/O, and `docs/SYSTEM_PROFILE.md`
-requires polite bounded concurrency for external services.
+| Candidate | Training examples | Strategy | Test AUC | Outcome |
+|---|---|---|---|---|
+| C1–C10 | 1,425 TESS | Various LR/regularization/arch/ensemble | 0.71–0.78 | Systematic ceiling |
+| C11 | 1,477 TESS | Kepler pretrain + freeze 15 epochs | 0.8115 | REJECTED |
+| C12 | 1,477 TESS | Kepler pretrain + full unfreeze | 0.8124 | REJECTED |
+| C13 | 4,892 combined | LR=1e-3 (default) | 0.8342 | REJECTED |
+| C14 | 4,892 combined | LR=3e-5 | 0.8319 | REJECTED |
+| C15 | 4,892 combined | LR=1e-4 + augment | 0.8353 | REJECTED |
+| C16 | 4,892 combined | BN+strong WD | 0.6650 val only | REJECTED (catastrophic BN failure) |
+| C17 | 9,633 joint | Joint Kepler+TESS training | 0.7859 val only | REJECTED (domain mismatch) |
+| C18 | 4,892 combined | freeze_conv_epochs=10 | **0.8439** | REJECTED (T=1.61 worsened ECE) |
+| C19 | 4,892 combined | freeze_conv_epochs=20 | 0.8420 | REJECTED (regressed from C18) |
 
-Root cause of the 2026-06-19 crash: the first concurrent implementation called
-Lightkurve `SearchResult.download_all()`. Lightkurve decorates that method with
-`suppress_stdout`, which temporarily assigns process-global `sys.stdout` to an
-open `/dev/null` handle. With multiple worker threads, one worker can restore
-stdout to another worker's soon-to-close handle; the next main-thread progress
-print can then raise `ValueError: I/O operation on closed file`. The corrected
-implementation calls Lightkurve's per-file downloader directly and uses a
-fail-soft progress emitter.
+**Do not repeat any of these strategies with the existing corpus.**
 
-If the user killed a previous serial run, do not assume the partial output is
-bad. First audit the JSONL and sidecar. The corrected fetcher resumes from
-successful rows and terminal failures, so partial good rows are useful resume
-state.
+#### What the incoming agent must do
 
-#### Incoming agent: do this first
+1. **[AGENT]** Write `Skills/fetch_tess_k2_overlap_snippets.py` — analogous to `Skills/fetch_tess_kepler_overlap_snippets.py` but targeting the NASA Exoplanet Archive K2 KOI cumulative table (TAP endpoint). Downloads TESS photometry for K2 EPIC host stars, phase-folds at K2 ephemerides (BKJD epoch + 2454833.0 → BJD), bins to 201 bins. Same JSONL schema, same bounded thread pool pattern, same failures sidecar. Script must avoid `SearchResult.download_all()` (unsafe with threads — see existing fetcher for the correct pattern).
+2. **[AGENT]** Commit the new fetcher to `claude/review-markdown-docs-SwVnR`, push, PR, merge.
+3. **[HUMAN]** Run the K2 overlap fetch after pulling main (see runbook Step 7g for exact command).
 
-Ask the user to run/paste this only from a local checkout that has pulled GitHub
-`main`:
-```bash
-git pull origin main
-caffeinate -dims .venv/bin/python Skills/fetch_tess_kepler_overlap_snippets.py \
-  --output data/tess_kepler_overlap_snippets.jsonl \
-  --workers 4 \
-  --request-delay 0.25
-wc -l data/tess_kepler_overlap_snippets.jsonl
-```
+#### Critical constraints for the next agent
 
-After it finishes, review `data/tess_kepler_overlap_snippets.jsonl` and
-`data/tess_kepler_overlap_snippets.jsonl.failures.jsonl` before building
-combined splits. Do not train C13 until the overlap corpus count, label balance,
-JSON validity, and sidecar look production-usable.
-- **Path A inventory result** → completed on 2026-06-18: 56 new labeled TIC IDs
-  (16 positive, 40 negative). Too small for a production-closing candidate-12
-  fetch/training run.
-- **Any other Kepler line count, validator FAIL, missing checkpoint, or different SHA** → stop and inspect the local artifact before training; do not start another infinite fetch loop.
+- Calibration method is **temperature scaling** (not Platt). The evaluator was updated in PR #125. Do not reference "Platt" in new commands.
+- Best checkpoint `checkpoints/cnn_tess_c18/best.pt` (SHA `d33c15f4...`) — retain as reference; do not promote without human approval.
+- C20 training config: use `configs/cnn_tess_c18.json` (`freeze_conv_epochs=10`) — this was better than C19's 20 frozen epochs.
+- C20 split dir: `data/tess_c20_cnn_splits` (new dir; C20 must be trained on the expanded corpus including K2 overlap data).
+- Gate: raw held-out AUC ≥ 0.85, calibrated F1 ≥ 0.80, temperature scaling must not worsen Brier/ECE.
 
 #### Corpus status
 
-- **TESS v2**: `data/tess_snippets_v2.jsonl` — 2,619 snippets (COMPLETE; 56 targets had permanent MAST 404s)
-- **TESS split**: `data/tess_cnn_splits/` — LOCAL VALIDATED as of 2026-06-18; total examples 2,110; train/val/test = 1,477 / 318 / 315; validator PASS
-- **Kepler**: `data/kepler_snippets.jsonl` — LOCAL VALIDATED as of 2026-06-17; 6,837 finite snippets; labels negative=4,280 and positive=2,557; split validator PASS with train/val/test = 4,741 / 1,060 / 1,036
-- **Kepler pretrain**: `checkpoints/cnn_kepler_pretrain/best.pt` — LOCAL PRETRAINED ON MPS as of 2026-06-18; SHA-256 `c782d7af61171b3f58447f7a49343c86618c447292a71bd28d540807835787c7`; best val AUC 0.9186
-- **TESS fine-tune**: `checkpoints/cnn_tess_finetuned/best.pt` — REJECTED as of 2026-06-18; SHA-256 `3fc115b3623b2485373aefef30a7aa901e1183cc77ef4b57ce6c1f2219f49214`; best val AUC 0.8408; test raw AUC 0.8115; calibrated F1 0.7508; calibration worsened Brier/ECE
-- **TESS expansion v3**: `data/new_tess_targets.*`, `data/tess_snippets_expansion_v3.jsonl`, `data/tess_snippets_v3.jsonl`, `data/tess_cnn_splits_v3/` — INVENTORY COMPLETE / TOO SMALL; do not fetch/train from this inventory for production
+- **TESS v2**: `data/tess_snippets_v2.jsonl` — 2,619 snippets (COMPLETE)
+- **Kepler**: `data/kepler_snippets.jsonl` — LOCAL VALIDATED; 6,837 finite snippets
+- **Kepler pretrain**: `checkpoints/cnn_kepler_pretrain/best.pt` — SHA `c782d7af...`; val AUC 0.9186; **retain**
+- **TESS combined**: `data/tess_combined_snippets.jsonl` — 7,483 rows (TESS v2 + Kepler-TESS overlap)
+- **TESS combined splits**: `data/tess_combined_cnn_splits/` — LOCAL VALIDATED; train 4,892 / val 1,049 / test 1,033
+- **K2 overlap**: `data/tess_k2_overlap_snippets.jsonl` — **NOT YET BUILT**; expected 500–1,500 new snippets
+- **C20 splits**: `data/tess_c20_cnn_splits/` — **NOT YET BUILT**; will merge tess_combined + K2 overlap
 
 #### CNN production runbook
 
-Training strategy: TESS-only training hits a hard ~0.78 AUC ceiling at 1,425 examples. Kepler transfer improved held-out test AUC to 0.8115 but did not meet production gates. Path A found too few new TESS labels to close the gap. The next T1-1 cycle needs a materially different strategy before another long fetch or training run.
+Use `docs/CNN_PRODUCTION_RUNBOOK.md` for authoritative copy-paste workflow. Current authoritative step: **Step 7g** (K2 EPIC overlap corpus).
 
-Use `docs/CNN_PRODUCTION_RUNBOOK.md` for the authoritative copy-paste workflow.
-The accepted `train_cnn.py` flags are `--split-dir`, `--checkpoint-dir`, and
-`--pretrained-checkpoint`; do not use stale aliases such as `--splits-dir`,
-`--output-dir` for training, or `--pretrained`.
-The GPU-aware trainer accepts `--device auto|cpu|mps|cuda`; config defaults to
-`device=auto`, which should print `device=mps` on the recorded M4 Max when
-PyTorch Metal/MPS is available.
-
-Evaluation gate: raw held-out AUC ≥ 0.85, calibrated held-out F1 ≥ 0.80, and
-Platt calibration must not worsen held-out Brier score or ECE. Passing the gate
-still requires explicit human approval before promotion into `models/`.
+The accepted `train_cnn.py` flags are `--split-dir`, `--checkpoint-dir`, and `--pretrained-checkpoint`.
+The evaluator flag is `--output-calibration` (not `--calibration-output`).
+The GPU-aware trainer accepts `--device auto|cpu|mps|cuda`; config defaults to `device=auto`.
 
 Architecture spec: `docs/CNN_SPEC.md`
 
