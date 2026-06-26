@@ -20,7 +20,8 @@ keywords = [
   "light-curves",
   "Bayesian-scoring",
   "transit-detection",
-  "machine-learning"
+  "machine-learning",
+  "citizen-science"
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
