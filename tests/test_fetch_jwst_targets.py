@@ -1,7 +1,6 @@
 """Tests for Skills/fetch_jwst_targets.py (Option A1: JWST target discovery)."""
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -16,7 +15,6 @@ from fetch_jwst_targets import (
     format_summary,
     query_jwst_timeseries,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers

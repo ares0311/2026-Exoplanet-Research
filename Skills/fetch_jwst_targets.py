@@ -48,8 +48,9 @@ import argparse
 import json
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from typing import Any, Callable
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Data model
