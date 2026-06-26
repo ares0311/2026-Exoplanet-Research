@@ -2,7 +2,7 @@
 
 **Purpose**: Prevent doom loops. Every agent and every session must read this before doing anything.
 
-**Last updated**: 2026-06-26
+**Last updated**: 2026-06-26 (sequencing: Option A JWST integration → Option B TESS novelty restructure)
 
 ---
 
@@ -116,11 +116,61 @@ The `pathway.py` thresholds are set conservatively. They are correct. Do not cha
 
 ---
 
-## JWST: Current Stance
+## JWST: Option A — In Progress
 
-Lightkurve does NOT support JWST data natively. MAST exposes JWST metadata via `astroquery.mast`, but light-curve extraction requires custom photometry per target (not pipeline-friendly). JWST transit observations are mostly single-target programs by PIs who already know what they are observing — this is NOT a discovery frontier.
+**Authorized 2026-06-26. Build A before B.**
 
-**Current decision**: JWST integration is out of scope for the automated pipeline. Do not build JWST infrastructure. If a specific JWST target is identified by human review as a re-analysis candidate, handle it manually.
+### What JWST offers for discovery
+
+JWST does not run autonomous surveys the way TESS does. Its time-series observations are pre-planned on specific targets. The discovery opportunities are:
+
+1. **Serendipitous transits on background stars** — a JWST target field may contain background stars showing unnoticed transits in the same aperture data
+2. **Deeper photometry of TESS candidates** — re-analyze TESS candidate hosts with JWST's superior precision to confirm or reject shallow signals
+3. **Long-period candidates in JWST parallel observations** — NIRCam parallel programs observe adjacent fields opportunistically; these fields are less curated
+
+**What is accessible via MAST (astroquery):**
+- Stage 2 calibrated integrations (`_calints.fits`) — time-stamped flux per integration
+- Stage 3 extracted 1D spectra (`_x1dints.fits`, NIRISS SOSS) — time-series spectral traces
+- `astroquery.mast.Observations.query_criteria(obs_collection='JWST', dataproduct_type='timeseries')`
+
+**Lightkurve does NOT support JWST natively.** The integration uses `astroquery.mast` directly and converts JWST data products to pipeline-compatible LightCurve objects.
+
+### Option A build plan
+
+| Step | What to build | Skill |
+|------|--------------|-------|
+| A1 | Query MAST for JWST time-series observations; list available programs and targets | `Skills/fetch_jwst_targets.py` |
+| A2 | Download JWST calibrated integration products (`_calints.fits`); extract flux vs. time | `Skills/fetch_jwst_lc.py` |
+| A3 | Convert JWST data to pipeline LightCurve format; wire into `exo` CLI with `--mission JWST` | `src/exo_toolkit/fetch.py` extension |
+
+**Status**: A1 built (see below). A2 in progress. A3 after A2 validates.
+
+### Option A constraints
+
+- JWST data products are large (>100 MB per observation). Download only what is needed.
+- JWST time units are MJD (Modified Julian Date). Convert to BTJD (BJD − 2457000) before passing to `search.py`.
+- JWST calibration pipeline version varies by program. Use Stage 3 products preferentially.
+- Do NOT attempt to run BLS on JWST spectral time series (x1dints) directly — extract white-light curve first by summing across wavelength.
+
+---
+
+## TESS Target Selection: Option B — Next After A
+
+**Build after A1+A2 are committed.**
+
+Current gap: `star_scanner.py` excludes TOI list but NOT CTOI (community TOI) or confirmed exoplanet hosts from the NASA Exoplanet Archive. This means candidates already flagged by the community get re-scanned.
+
+### Option B build plan
+
+| Step | What to build | File |
+|------|--------------|------|
+| B1 | Add CTOI exclusion to `star_scanner.py::run_background_scan()` using `Skills/fetch_exofop_ctoi.py` | `Skills/star_scanner.py` |
+| B2 | Add confirmed-planet cross-check using NASA Exoplanet Archive TAP (`ps` table, `pl_tranflag=1`) | new `Skills/fetch_confirmed_hosts.py` |
+| B3 | Default `tmag_range` in `star_scanner.py` to `(12.0, 14.5)` to target faint-star novelty frontier | `Skills/star_scanner.py` |
+| B4 | Extend default `period_max` in BLS search to 500 d | `src/exo_toolkit/search.py` |
+| B5 | Run first 200-target discovery scan and document results | [HUMAN] |
+
+**Status**: Not started. Begins after A2 is committed.
 
 ---
 

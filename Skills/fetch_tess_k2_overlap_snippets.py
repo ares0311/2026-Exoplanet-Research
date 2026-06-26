@@ -51,6 +51,8 @@ build_k2_tess_snippets(rows, *, n_bins, output_path, lc_fetcher, max_errors,
 from __future__ import annotations
 
 import contextlib
+import csv
+import io
 import json
 import math
 import socket
@@ -63,7 +65,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import quote
+from urllib.error import HTTPError
+from urllib.parse import urlencode
 from urllib.request import urlopen
 
 # Prevent indefinite hangs when WiFi drops mid-download.
@@ -77,9 +80,14 @@ _K2_TAP_BASE = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
 # Column name candidates for k2pandc, checked in priority order against
 # the live TAP schema.  NASA occasionally renames columns across archive
 # versions so we discover the real names at startup rather than hardcoding.
+# K2 TAP BUG (2026-06-26): 'epic_id' appears in tap_schema.columns but causes
+# ORA-00904 in the actual query — it is an ADQL view alias that Oracle rejects.
+# k2c_objid is the real Oracle column. epic_candname ("EPIC 211311380.01") is a
+# reliable fallback parsed to int in fetch_k2_table. Never move epic_id before
+# k2c_objid — it will always fail.
 _K2_COL_CANDIDATES: dict[str, list[str]] = {
-    "epic_id":     ["epic_id"],
-    "disposition": ["k2_disposition", "disp_pou", "disposition"],
+    "epic_id":     ["k2c_objid", "epic_candname", "epicid", "epic_id"],
+    "disposition": ["k2_disposition", "k2c_disp", "disp_pou", "disposition"],
     "period":      ["pl_orbper", "period"],
     "epoch":       ["pl_tranmid", "pl_tranmidj", "t0"],
 }
@@ -202,6 +210,7 @@ def _discover_k2_columns(ctx: ssl.SSLContext | None) -> dict[str, str]:
                 str(row.get("column_name", "")).lower()
                 for row in json.loads(resp.read())
             }
+        _emit_progress(f"K2 TAP schema columns: {sorted(available)}")
     except Exception:
         pass  # discovery failed — first candidate used as fallback below
 
@@ -261,17 +270,31 @@ def fetch_k2_table(url: str | None = None) -> list[K2Row]:
             f" where {period_col} is not null"
             f" and {epoch_col} is not null"
         )
-        query_url = f"{_K2_TAP_BASE}?query={quote(sql)}&format=json"
+        # Use urlencode (spaces → +) and csv format — NASA TAP always supports
+        # csv; json with %20-encoded spaces has proven unreliable on k2pandc.
+        params = urlencode({"query": sql, "format": "csv", "MAXREC": "100000"})
+        query_url = f"{_K2_TAP_BASE}?{params}"
         _emit_progress(f"K2 TAP columns discovered: {col}")
         _emit_progress(f"K2 TAP query URL: {query_url}")
 
-    with urlopen(query_url, timeout=120, context=ctx) as resp:  # noqa: S310
-        raw = json.loads(resp.read())
+    try:
+        with urlopen(query_url, timeout=120, context=ctx) as resp:  # noqa: S310
+            raw_csv = resp.read().decode("utf-8", errors="replace")
+    except HTTPError as exc:
+        err_body = exc.read().decode("utf-8", errors="replace")[:1000]
+        raise RuntimeError(
+            f"K2 TAP HTTP {exc.code} ({exc.reason}): {err_body}"
+        ) from exc
 
+    reader = csv.DictReader(io.StringIO(raw_csv))
     rows: list[K2Row] = []
-    for rec in raw:
+    for rec in reader:
         try:
-            epic_id = int(rec[col["epic_id"]])
+            raw_epic = str(rec[col["epic_id"]]).strip()
+            # Handle "EPIC 211311380.01" (epic_candname) or plain integer (k2c_objid)
+            if raw_epic.upper().startswith("EPIC"):
+                raw_epic = raw_epic.upper().replace("EPIC", "").strip().split(".")[0]
+            epic_id = int(float(raw_epic))
             disposition = str(rec[col["disposition"]]).strip().upper()
             period = float(rec[col["period"]])
             epoch_bkjd = float(rec[col["epoch"]])
