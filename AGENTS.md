@@ -64,11 +64,11 @@ When the user must take an action to unblock a gap:
 
 ---
 
-## HANDOFF STATE — 2026-06-22b (READ THIS FIRST)
+## HANDOFF STATE — 2026-06-26 (READ THIS FIRST)
 
 **The only active gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80).**
 
-### What was done in the previous sessions (2026-06-21 – 2026-06-22)
+### What was done in the previous sessions (2026-06-21 – 2026-06-26)
 
 - **Temperature scaling live** — PR #125 merged. Platt replaced by temperature scaling in evaluator.
 - **C17 REJECTED** — joint Kepler+TESS training (9,633 examples) achieved only val AUC 0.7859, worse than C13–C15 (0.81–0.84). Root cause: domain mismatch. Do not retry joint training.
@@ -77,8 +77,11 @@ When the user must take an action to unblock a gap:
 - **freeze_conv strategy exhausted** — C18 (freeze 10) was better than C19 (freeze 20). No further freeze_conv variant is expected to break through the 0.8439 ceiling on current corpus.
 - **Strategic decision (human)** — more data. The only unexploited TESS-domain labeled source is the K2 EPIC overlap corpus (K2 planets/FPs with TESS re-observations). See runbook Step 7g.
 - **ECE-skip gate fix (2026-06-22)** — `evaluate_cnn_checkpoint.py` now skips temperature scaling when raw test ECE < 0.05. Root cause of C11–C19 calibration doom loop confirmed: val overconfident from early-stopping → T>1 fitted → applied to already-calibrated test → structurally worse ECE. With the fix, C20 gate is: raw AUC ≥ 0.85 AND raw F1 ≥ 0.80 (cal==raw when ECE < 0.05). Three new tests verify the skip path.
-- **K2 fetcher committed (2026-06-22)** — `Skills/fetch_tess_k2_overlap_snippets.py` written and committed. Ready for human to run.
+- **K2 fetcher written (2026-06-22)** — `Skills/fetch_tess_k2_overlap_snippets.py` committed.
+- **K2 TAP schema discovery fix (2026-06-26, PR #131)** — first fetch attempt crashed with HTTP 400 because k2pandc uses `disposition`/`pl_orbper`/`pl_tranmid` not the guessed names. Added `_discover_k2_columns()` to query `tap_schema.columns` at startup.
+- **K2 TAP query encoding fix (2026-06-26, PR #132)** — second HTTP 400: `'FALSE+POSITIVE'` in the SQL IN clause was not decoded as a space inside the SQL string literal by the TAP server. Fixed by: (1) dropping the disposition filter from SQL entirely — fetch all rows with valid period/epoch, filter by disposition locally; (2) using `urllib.parse.quote()` for proper percent-encoding of the query string.
 - **C20 config committed (2026-06-22)** — `configs/cnn_tess_c20.json` (identical to C18, freeze_conv_epochs=10, checkpoint_dir=checkpoints/cnn_tess_c20).
+- **Project version bumped to 0.2.0** — `pyproject.toml` updated; "citizen-science" keyword removed; status updated to "4 - Beta".
 
 ### Where things stand
 
@@ -94,13 +97,13 @@ When the user must take an action to unblock a gap:
 | C18 checkpoint (`checkpoints/cnn_tess_c18/`) | **REJECTED** — test AUC 0.8439, F1 0.7979 (raw); T=1.61 worsened ECE; SHA `d33c15f4...`; best candidate of 19 |
 | C19 checkpoint (`checkpoints/cnn_tess_c19/`) | **REJECTED** — test AUC 0.8420, F1 0.7951 (raw); T=1.88 worsened ECE; SHA `65f3721f...`; regressed from C18 |
 | ECE-skip gate fix | **LIVE** — `evaluate_cnn_checkpoint.py` updated 2026-06-22; 53/53 tests pass |
-| `Skills/fetch_tess_k2_overlap_snippets.py` | **COMMITTED** — 2026-06-22; ready for human to run |
+| `Skills/fetch_tess_k2_overlap_snippets.py` | **FIXED (2026-06-26)** — schema discovery + percent-encoded query; drop IN clause, filter locally |
 | `configs/cnn_tess_c20.json` | **COMMITTED** — 2026-06-22; identical to C18, freeze_conv_epochs=10 |
-| K2 overlap corpus (`data/tess_k2_overlap_snippets.jsonl`) | **NOT YET BUILT** — authorized in runbook Step 7g; expected to yield 500–1,500 new labeled TESS snippets |
+| K2 overlap corpus (`data/tess_k2_overlap_snippets.jsonl`) | **NOT YET BUILT** — human must run fetch after pulling main; expected 500–1,500 new labeled TESS snippets |
 
 ### First action for the incoming agent
 
-The K2 fetcher is committed. Give the human the exact run command from Step 7g-B of the runbook:
+The K2 fetcher has been fixed twice (schema discovery in PR #131, query encoding in PR #132). Always pull main before running — an older version will hit HTTP 400. Give the human:
 
 ```bash
 git pull origin main

@@ -1,6 +1,6 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-06-22 (C19 rejected; ECE-skip gate fix + K2 fetcher committed; C20 training awaits K2 corpus fetch)
+Last reviewed: 2026-06-26 (K2 TAP query encoding fixed — PR #132; version bumped to 0.2.0; C20 training awaits K2 corpus fetch)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
 Test baseline: 2,222 default tests passing, 2 integration_live deselected

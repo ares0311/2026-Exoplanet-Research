@@ -12,6 +12,7 @@ It contains the facts a coding agent needs to work productively without re-readi
 Every session must begin by reading:
 1. `AGENTS.md`
 2. `docs/PRODUCTION_READINESS.md`
+3. `docs/DISCOVERY_RUNBOOK.md`
 
 Before proposing or executing any task you must:
 1. Name the highest-priority unresolved Tier 1 gap from `docs/PRODUCTION_READINESS.md`.
@@ -23,6 +24,8 @@ Before proposing or executing any task you must:
 - Repeating work already listed under "What Is Complete" in `docs/PRODUCTION_READINESS.md`.
 - Writing "the next N utility scripts" when those scripts do not unblock a named gap.
 - Treating "Apply All System Directives" as permission to add more code — it means read the gap list and work the highest-priority gap only.
+- Running `exo background-run-once` expecting to discover new planets — background automation scans FIXTURES only (see `docs/DISCOVERY_RUNBOOK.md`).
+- Proposing CNN training before at least one real discovery scan has been completed and documented.
 
 ### When the user says "Apply All System Directives"
 1. Read `AGENTS.md` and `docs/PRODUCTION_READINESS.md`.

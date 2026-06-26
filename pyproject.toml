@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "exo-toolkit"
-version = "0.1.0"
+version = "0.2.0"
 description = "TESS/Kepler exoplanet candidate detection, vetting, scoring, and submission-pathway toolkit"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -19,10 +19,12 @@ keywords = [
   "astronomy",
   "light-curves",
   "Bayesian-scoring",
+  "transit-detection",
+  "machine-learning",
   "citizen-science"
 ]
 classifiers = [
-  "Development Status :: 2 - Pre-Alpha",
+  "Development Status :: 4 - Beta",
   "Intended Audience :: Science/Research",
   "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python :: 3",
