@@ -71,16 +71,17 @@ socket.setdefaulttimeout(120)
 _K2_BJD_OFFSET = 2454833.0   # K2 epoch (BKJD) = BJD − 2454833
 _TESS_BJD_OFFSET = 2457000.0  # TESS BTJD = BJD − 2457000
 
-# NASA Exoplanet Archive TAP: all K2 planets/FPs with valid ephemerides.
-_K2_TAP_URL = (
-    "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
-    "?query=select+epic_id,disposition,period,t0"
-    "+from+k2pandc"
-    "+where+disposition+in+('CONFIRMED','FALSE+POSITIVE')"
-    "+and+period+is+not+null"
-    "+and+t0+is+not+null"
-    "&format=json"
-)
+_K2_TAP_BASE = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
+
+# Column name candidates for k2pandc, checked in priority order against
+# the live TAP schema.  NASA occasionally renames columns across archive
+# versions so we discover the real names at startup rather than hardcoding.
+_K2_COL_CANDIDATES: dict[str, list[str]] = {
+    "epic_id":     ["epic_id"],
+    "disposition": ["k2_disposition", "disp_pou", "disposition"],
+    "period":      ["pl_orbper", "period"],
+    "epoch":       ["pl_tranmid", "pl_tranmidj", "t0"],
+}
 _TERMINAL_FAILURE_FLAGS = {"NO_LIGHTKURVE", "NO_DATA", "SHORT", "NONFINITE"}
 
 
@@ -180,11 +181,50 @@ def _normalise(flux_bins: list[float]) -> list[float]:
 # ---------------------------------------------------------------------------
 
 
-def fetch_k2_table(url: str = _K2_TAP_URL) -> list[K2Row]:
+def _discover_k2_columns(ctx: ssl.SSLContext | None) -> dict[str, str]:
+    """Query TAP schema to find the actual column names in k2pandc.
+
+    Returns a mapping ``{canonical_name: actual_column_name}`` for the four
+    fields we need.  Falls back to the first candidate for each field when the
+    schema endpoint is unreachable (e.g., in offline tests).
+    """
+    schema_url = (
+        _K2_TAP_BASE
+        + "?query=select+column_name+from+tap_schema.columns"
+        + "+where+table_name='k2pandc'"
+        + "&format=json"
+    )
+    available: set[str] = set()
+    try:
+        with urlopen(schema_url, timeout=60, context=ctx) as resp:  # noqa: S310
+            available = {
+                str(row.get("column_name", "")).lower()
+                for row in json.loads(resp.read())
+            }
+    except Exception:
+        pass  # discovery failed — first candidate used as fallback below
+
+    result: dict[str, str] = {}
+    for canonical, candidates in _K2_COL_CANDIDATES.items():
+        for c in candidates:
+            if not available or c in available:
+                result[canonical] = c
+                break
+        if canonical not in result:
+            result[canonical] = candidates[0]
+    return result
+
+
+def fetch_k2_table(url: str | None = None) -> list[K2Row]:
     """Fetch the K2 planets-and-candidates table from the NASA Exoplanet Archive TAP service.
 
+    Performs schema discovery first to find the correct column names in k2pandc,
+    then executes the real query.  This makes the fetcher resilient to NASA
+    archive column renames between versions.
+
     Args:
-        url: TAP URL (overridable for tests).
+        url: Full TAP URL override (for tests).  When None, the URL is built
+             dynamically from schema-discovered column names.
 
     Returns:
         List of :class:`K2Row` objects with valid period and epoch.
@@ -199,16 +239,39 @@ def fetch_k2_table(url: str = _K2_TAP_URL) -> list[K2Row]:
     except ImportError:
         ctx = None
 
-    with urlopen(url, timeout=120, context=ctx) as resp:  # noqa: S310
+    if url is not None:
+        # Test override: caller provides a pre-built URL and controls column names.
+        col = {"epic_id": "epic_id", "disposition": "disposition",
+               "period": "period", "epoch": "t0"}
+        query_url = url
+    else:
+        col = _discover_k2_columns(ctx)
+        epic_col = col["epic_id"]
+        disp_col = col["disposition"]
+        period_col = col["period"]
+        epoch_col = col["epoch"]
+        query_url = (
+            _K2_TAP_BASE
+            + f"?query=select+{epic_col},{disp_col},{period_col},{epoch_col}"
+            + "+from+k2pandc"
+            + f"+where+{disp_col}+in+('CONFIRMED','FALSE+POSITIVE')"
+            + f"+and+{period_col}+is+not+null"
+            + f"+and+{epoch_col}+is+not+null"
+            + "&format=json"
+        )
+        _emit_progress(f"K2 TAP columns discovered: {col}")
+        _emit_progress(f"K2 TAP query URL: {query_url}")
+
+    with urlopen(query_url, timeout=120, context=ctx) as resp:  # noqa: S310
         raw = json.loads(resp.read())
 
     rows: list[K2Row] = []
     for rec in raw:
         try:
-            epic_id = int(rec["epic_id"])
-            disposition = str(rec["disposition"]).strip().upper()
-            period = float(rec["period"])
-            epoch_bkjd = float(rec["t0"])
+            epic_id = int(rec[col["epic_id"]])
+            disposition = str(rec[col["disposition"]]).strip().upper()
+            period = float(rec[col["period"]])
+            epoch_bkjd = float(rec[col["epoch"]])
         except (KeyError, TypeError, ValueError):
             continue
         if not math.isfinite(period) or period <= 0:
@@ -717,9 +780,9 @@ def _cli(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--k2-url",
-        default=_K2_TAP_URL,
+        default=None,
         metavar="URL",
-        help="Override the NASA TAP URL for the K2 planets table",
+        help="Override the full NASA TAP URL (skips schema discovery; for testing)",
     )
     args = parser.parse_args(argv)
 

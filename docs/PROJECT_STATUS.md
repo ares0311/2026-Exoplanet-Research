@@ -1,8 +1,8 @@
 # PROJECT STATUS
 
 ## Status: Active Development
-## Phase: Milestone 39 Complete — Physics, Vetting, Planning, and XGBoost Model Trained
-## Last Updated: 2026-06-18
+## Phase: T1-1 CNN Gate — K2 corpus fetch in progress, C20 training queued
+## Last Updated: 2026-06-22
 
 ---
 
@@ -175,6 +175,28 @@ Result: ruff passed, mypy passed, pytest passed with 2,222 passed, 2 deselected,
 - `provenance_score` is computed from cadence, sector count, and pipeline quality.
 - `toi_checker.py` should be consulted before investing pipeline time on any new target.
 - Default tests must mock external services; live tests require `integration_live`.
-- Never output "confirmed planet"; use "candidate signal" or "follow-up target".
+- **Never output "confirmed planet"** — always "candidate signal" or "follow-up target". This is a hard guardrail, not a preference.
 - Background automation uses SQLite for durable state and deterministic fixtures by default.
 - Background automation obeys the human-approval gate; no external submission without review.
+
+---
+
+## Project Mission (clarified 2026-06-22)
+
+This project **identifies transit candidates for human review**. It does not confirm discoveries and makes no discovery claims.
+
+The intended workflow is:
+
+```
+Pipeline output (candidates + FPP + pathway)
+    → Human review process (separate, owner-defined)
+        → Submission of vetted candidates only
+```
+
+The pipeline's role ends at outputting a ranked candidate list with supporting diagnostics. What happens next — reviewing phase-fold plots, checking against known catalogs, consulting experts, deciding what to submit — is entirely outside this codebase and is the human operator's responsibility.
+
+This framing matters for how we evaluate data quality and model performance:
+- **TESS SPOC photometry** is the same public data professional astronomers use for transit detection. It is appropriate for identifying transit-like signals.
+- **It is not sufficient for confirmation.** Confirmation requires RV measurements, high-resolution imaging, and/or spectroscopy — none of which this pipeline provides or implies.
+- The CNN model's role is to reduce false positives in the candidate list, not to confirm planets. An AUC of 0.85 means the model ranks 85% of real transits above 85% of false positives. It is a triage tool.
+- All submission pathway labels (`tfop_ready`, `planet_hunters_discussion`, etc.) describe what kind of follow-up is appropriate, not what has been found.
