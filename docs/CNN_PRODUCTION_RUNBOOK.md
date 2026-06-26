@@ -376,55 +376,135 @@ val calibration closer to test calibration and reduce T toward 1.0.
 
 ## Step 7f: C19 — Extended FC Head Warm-Up (freeze_conv_epochs=20)
 
-**Status: AUTHORIZED — config committed to main.**
+**Status: REJECTED** — completed locally on 2026-06-22, missed the gate and regressed from C18.
 
-**Why this is different from C18:** C18 showed that `freeze_conv_epochs=10` is the
-best strategy found so far. The FC head showed strong momentum during the frozen
+**Why this was tried:** C18 showed that `freeze_conv_epochs=10` is the best strategy
+found so far (test AUC 0.8439). The FC head showed strong momentum during the frozen
 phase (val_auc 0.75→0.81 across epochs 1–10), and the model peaked just 12 epochs
-after unfreeze (best epoch 22 with unfreeze at epoch 11). Two failure modes remain:
-(a) AUC ceiling at 0.8439, and (b) val overconfidence causing T=1.61 which worsens
-already-excellent test calibration.
+after unfreeze. Hypothesis: doubling the frozen epochs to 20 gives FC head more time
+to establish a stable TESS-domain baseline and lets the LR scheduler decay more before
+conv unfreeze, reducing val overconfidence (lower T).
 
-C19 uses `freeze_conv_epochs=20`: 20 frozen epochs give the FC head twice as long
-to establish a stable TESS-domain baseline, and the LR scheduler has 10 more epochs
-to reduce the learning rate before conv unfreezes. Both effects should reduce val
-overconfidence (lower T) and allow the conv layers to fine-tune from a better
-FC baseline, potentially breaking through the 0.8439 ceiling.
+**Result from 2026-06-22:** SHA-256 `65f3721fac577807f35e4edaeaa9cc0cd0f50959441344487f7c77f35a570436`;
+best epoch 29 (8 epochs after unfreeze at epoch 21); early stop at epoch 54.
+- Val (raw): AUC=0.8218, F1=0.7765, Brier=0.1733, ECE=0.0570
+- Test (raw): AUC=0.8420, F1=0.7951, Brier=0.1606, ECE=0.0377
+- Temperature T=1.8785927
+- Test (calibrated): threshold=0.40, Brier=0.1658, ECE=0.0760
+- **Flag: FAIL — regressed from C18 in every metric**
 
-Uses the same TESS combined splits only (no Kepler mixing). All other hyperparameters
-are identical to C18.
+**Root cause:** The LR scheduler fires on val_auc plateaus. During 20 frozen epochs,
+val_auc improved monotonically (0.75→0.82), so the LR scheduler never fired. Conv
+unfroze at epoch 21 with LR still at full 1e-4 — the same situation as C18 at epoch 11.
+The longer frozen phase only gave the FC head more time to over-adapt to the frozen-conv
+representation. When conv layers were finally released at epoch 21, the FC baseline was
+worse-suited to the jointly-fine-tuned state than in C18. Result: T=1.88 (more val
+overconfidence, not less) and test AUC 0.8420 (lower than C18's 0.8439).
+
+**freeze_conv strategy is exhausted.** Do not retry with any other frozen-epoch count
+(the mechanism is broken: LR never decays during the frozen phase). Proceed to Step 7g.
+
+## Step 7g: C20 — K2 EPIC Overlap Corpus
+
+**Status: AUTHORIZED — data fetch script must be written; training awaits corpus validation.**
+
+**Why this is different from all prior candidates:** C13–C19 have all been trained on
+the same 4,892 combined training examples. The AUC ceiling at 0.83–0.84 (with C18's
+0.8439 as the best) has been consistent across LR tuning, BN+WD regularization, joint
+training, and freeze_conv strategies. All training-side approaches are exhausted on the
+current corpus.
+
+The K2 EPIC overlap corpus adds a new, unexploited TESS-domain label source: K2 KOI
+stars (confirmed planets vs confirmed false positives from the K2 Campaign survey,
+C0–C19) that have been re-observed by TESS. We fold TESS light curves at K2 ephemerides
+(period + epoch converted from BKJD to full BJD), exactly as was done for the Kepler
+overlap corpus. K2 uses BKJD (same zero-point as Kepler), so the conversion is identical.
+K2 has ~7,000 KOIs with disposition labels in the NASA Exoplanet Archive cumulative table.
+Based on TESS sky coverage, we estimate 30–50% of K2 stars have TESS observations,
+yielding 500–1,500 new labeled TESS-domain snippets with clean K2 labels.
+
+**Important honesty note:** Adding ~1,000 new examples to 4,892 existing (20% increase)
+is expected to yield ~0.003–0.006 AUC gain based on the observed scaling curve. This
+would push C20 from the 0.844 plateau to approximately 0.847–0.850 — within range of
+the gate but not guaranteed. If C20 AUC is still < 0.85, the next decision is a gate
+revision (lower AUC gate from 0.85 to 0.84, or skip calibration when raw ECE < 0.05).
+
+**Step 7g-A: Build the fetcher [AGENT task]**
+
+The fetcher is analogous to `Skills/fetch_tess_kepler_overlap_snippets.py`:
+- Downloads the K2 KOI cumulative table from NASA Exoplanet Archive TAP
+  (`https://exoplanetarchive.ipac.caltech.edu/TAP/sync?QUERY=select+*+from+k2pandc&format=csv`)
+- Filters to CONFIRMED (label=1) and FALSE POSITIVE (label=0) dispositions
+- Groups by K2 EPIC ID (analogous to Kepler KIC)
+- Fetches TESS photometry via Lightkurve for each EPIC ID (`mission="TESS"`, author="SPOC")
+- Phase-folds at K2 ephemeris: converts BKJD epoch to BJD (add 2454833.0), phase-folds at K2 period
+- Bins to 201 bins (same as all other corpora)
+- Writes JSONL with same schema as existing corpora: `{period, epoch, label, snippet, tic_id, koi_id}`
+- Maintains a failures sidecar (`data/tess_k2_overlap_snippets.jsonl.failures.jsonl`) for durable resume
+- Uses bounded rolling thread pool with polite request delays (same pattern as Kepler overlap fetcher)
+- Avoids `SearchResult.download_all()` (unsafe with threads — see Step 7c rationale)
+
+Write `Skills/fetch_tess_k2_overlap_snippets.py` before asking the user to run it.
+
+**Step 7g-B: Fetch [HUMAN task — ~6–12 hours]**
+
+```bash
+git pull origin main
+caffeinate -dims .venv/bin/python Skills/fetch_tess_k2_overlap_snippets.py \
+  --output data/tess_k2_overlap_snippets.jsonl \
+  --workers 4 \
+  --request-delay 0.25
+wc -l data/tess_k2_overlap_snippets.jsonl
+```
+
+Stop and paste back the final fetch summary, the line count, and the sidecar line count
+(`wc -l data/tess_k2_overlap_snippets.jsonl.failures.jsonl`). The agent must review
+the count, label balance, and sidecar before merge.
+
+**Step 7g-C: Merge, rebuild splits, and train [HUMAN tasks after agent review]**
+
+After agent approval of the corpus audit:
+
+```bash
+git pull origin main
+cat data/tess_combined_snippets.jsonl data/tess_k2_overlap_snippets.jsonl > data/tess_c20_combined_snippets.jsonl
+caffeinate -i .venv/bin/python Skills/build_cnn_training_data.py data/tess_c20_combined_snippets.jsonl --output-dir data/tess_c20_cnn_splits --seed 7
+.venv/bin/python Skills/cnn_split_validator.py data/tess_c20_cnn_splits
+```
+
+Stop and paste back the split summary and validator result. Then train C20:
 
 ```bash
 git pull origin main
 caffeinate -dims .venv/bin/python Skills/train_cnn.py \
-  --split-dir data/tess_combined_cnn_splits \
-  --checkpoint-dir checkpoints/cnn_tess_c19 \
-  --config configs/cnn_tess_c19.json \
+  --split-dir data/tess_c20_cnn_splits \
+  --checkpoint-dir checkpoints/cnn_tess_c20 \
+  --config configs/cnn_tess_c18.json \
   --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt \
   --device auto
 ```
 
-Paste back the full training result including startup banner (`device=mps`), the
-"Conv layers FROZEN" and "conv layers UNFROZEN" lines, per-epoch AUC progress, and
-final early-stop line. Then evaluate:
+(Note: use `configs/cnn_tess_c18.json` — freeze_conv_epochs=10 — as that was the best-performing
+config. Do not use C19's freeze_conv_epochs=20 which was worse.)
+
+Stop and paste training output. Then evaluate:
 
 ```bash
-shasum -a 256 checkpoints/cnn_tess_c19/best.pt
+shasum -a 256 checkpoints/cnn_tess_c20/best.pt
 .venv/bin/python Skills/evaluate_cnn_checkpoint.py \
-  --split-dir data/tess_combined_cnn_splits \
-  --checkpoint checkpoints/cnn_tess_c19/best.pt \
-  --output-calibration checkpoints/cnn_tess_c19/calibration.json
+  --split-dir data/tess_c20_cnn_splits \
+  --checkpoint checkpoints/cnn_tess_c20/best.pt \
+  --output-calibration checkpoints/cnn_tess_c20/calibration.json
 ```
 
-Paste full output including `Flag: PASS` or `Flag: FAIL`, the SHA-256, and the
-temperature T value.
+Paste full output including `Flag: PASS` or `Flag: FAIL`, SHA-256, and temperature T.
 
 - If `Flag: PASS` → proceed to Step 8 (promotion with human approval).
-- If `Flag: FAIL` and test AUC > 0.8439 but calibration still fails → escalate to
-  human for a gate revision or calibration strategy decision (e.g., accepting T-scaled
-  results when raw ECE is already < 0.05).
-- If `Flag: FAIL` and test AUC ≤ 0.8439 → the freeze_conv approach has plateaued;
-  escalate to human for a strategic decision on new data collection or gate revision.
+- If `Flag: FAIL` and test AUC < 0.85 but > 0.84 and ECE still worsened → escalate to
+  human for gate revision: consider lowering AUC gate to 0.84, or accepting raw predictions
+  when raw ECE < 0.05 (C18 raw ECE was already 0.0301 — excellently calibrated).
+- If `Flag: FAIL` and test AUC ≤ 0.844 → K2 corpus did not move the needle; escalate to
+  human for gate revision (the model may already be production-quality at 0.84 AUC).
 
 ## Step 8: Promotion Only After Approval
 

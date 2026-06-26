@@ -1,6 +1,6 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-06-21 (C18 rejected — test AUC 0.8439, F1 0.7979 raw; temperature T=1.61 worsened well-calibrated test ECE 0.0301->0.0667; C19 authorized with freeze_conv_epochs=20 on TESS-only data)
+Last reviewed: 2026-06-22 (C19 rejected — test AUC 0.8420, F1 0.7951 raw; T=1.88 worsened ECE 0.0377->0.0760; regressed from C18; freeze_conv strategy exhausted; strategic decision pending — K2 overlap corpus authorized as next attempt)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
 Test baseline: 2,222 default tests passing, 2 integration_live deselected
@@ -67,15 +67,15 @@ must not be copied into `models/`, registered, or used for production scoring.
   - **Do not retry joint training**. Retain `data/joint_cnn_splits/` for reproducibility.
 - **C18 REJECTED (2026-06-21)** — FC head warm-up with `freeze_conv_epochs=10`:
   - **Result**: SHA-256 `d33c15f45bd369d5eba4b87da3aa1908decc3baef5231dcff8544dd70987d496`; best epoch 22, val AUC 0.8262; early stop epoch 47. Test raw AUC=0.8439, F1=0.7979, Brier=0.1593, ECE=0.0301. Temperature T=1.61363521. Calibrated: threshold=0.46, Brier=0.1632, ECE=0.0667. **Flag: FAIL**.
-  - **Best candidate of all 18**: test AUC improved from the 0.83–0.84 plateau (C13–C15) to 0.8439. Test raw F1 0.7979 is within 0.001 of the gate. `freeze_conv_epochs` is confirmed as the right direction.
-  - **Why it failed**: (1) raw AUC 0.8439 < 0.85 gate (short by 0.006). (2) Temperature T=1.61 fitted on val (val overconfident) was applied to test (already excellently calibrated at ECE=0.0301), worsening test ECE to 0.0667. Val/test calibration mismatch is caused by residual overfitting.
-  - **Do not rerun C18 unchanged.** Proceed to C19.
-- **Approved next strategy — C19: Extended FC head warm-up with frozen conv (2026-06-21)**:
-  - **Hypothesis**: Doubling frozen epochs from 10 to 20 gives FC head more time to establish stable TESS-domain baseline; LR scheduler has 10 more epochs to decay before conv unfreezes, reducing val overconfidence (lower T) and potentially breaking through the 0.8439 AUC ceiling.
-  - **Status**: `configs/cnn_tess_c19.json` committed; training is a HUMAN task.
-  - **Train command**: `caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/tess_combined_cnn_splits --checkpoint-dir checkpoints/cnn_tess_c19 --config configs/cnn_tess_c19.json --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt --device auto`
-  - **Key config**: LR=1e-4, weight_decay=1e-3, augment=true, patience=25, `freeze_conv_epochs=20`
-- **Current data gate**: TESS combined splits VALIDATED; Kepler splits VALIDATED; C13–C18 all rejected; no CNN checkpoint approved for promotion. C19 is the next authorized attempt.
+  - **Best candidate of all 19**: test AUC improved from the 0.83–0.84 plateau (C13–C15) to 0.8439. `freeze_conv_epochs` confirmed as the right direction.
+  - **Why it failed**: (1) raw AUC 0.8439 < 0.85 gate (short by 0.006). (2) T=1.61 fitted on overconfident val then applied to already-well-calibrated test (raw ECE=0.0301), worsening ECE to 0.0667.
+  - **Do not rerun C18 unchanged.**
+- **C19 REJECTED (2026-06-22)** — Extended FC head warm-up with `freeze_conv_epochs=20`:
+  - **Result**: SHA-256 `65f3721fac577807f35e4edaeaa9cc0cd0f50959441344487f7c77f35a570436`; best epoch 29 (8 epochs after unfreeze at epoch 21); early stop epoch 54. Test raw AUC=0.8420, F1=0.7951, Brier=0.1606, ECE=0.0377. Temperature T=1.8785927. Calibrated: threshold=0.40, Brier=0.1658, ECE=0.0760. **Flag: FAIL**.
+  - **Regressed from C18 in every metric**. Root cause: LR scheduler fires on val_auc plateaus; during 20 frozen epochs val_auc improved monotonically, so LR never decayed. Conv unfroze at epoch 21 with LR still at 1e-4 — same as C18 at epoch 11. Longer frozen phase over-adapted the FC head (T=1.88 vs T=1.61), producing worse calibration and lower test AUC.
+  - **freeze_conv strategy exhausted.** Do not retry without a materially different corpus or training schedule.
+- **Strategic decision (2026-06-22)**: Human chose Option C — more data. All training-side approaches exhausted on 4,892 examples. Next authorized corpus: K2 EPIC overlap (K2 KOI confirmed planets/FPs with TESS re-observations folded at K2 ephemerides). See runbook Step 7g.
+- **Current data gate**: TESS combined splits VALIDATED; Kepler splits VALIDATED; C13–C19 all rejected; no CNN checkpoint approved for promotion. K2 overlap corpus fetch is the next authorized data-collection step.
 - **Current authorized runbook**: `docs/CNN_PRODUCTION_RUNBOOK.md`
 - **Current promotion gate**: raw held-out test AUC ≥ 0.85; calibrated held-out test F1 ≥ 0.80; temperature scaling calibration must not worsen held-out test Brier score or ECE
 - **Calibration note**: Temperature scaling (T fitted via NLL on val split) replaced Platt scaling on 2026-06-21. Platt A≈1.7–1.8 consistently worsened calibration because raw predictions were already well-calibrated (ECE 0.02–0.06). Temperature scaling is the identity at T=1 and will not artificially sharpen probabilities.

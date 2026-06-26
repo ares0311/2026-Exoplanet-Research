@@ -64,16 +64,18 @@ When the user must take an action to unblock a gap:
 
 ---
 
-## HANDOFF STATE — 2026-06-21d (READ THIS FIRST)
+## HANDOFF STATE — 2026-06-22 (READ THIS FIRST)
 
 **The only active gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80).**
 
-### What was done in this session (2026-06-21)
+### What was done in the previous sessions (2026-06-21 – 2026-06-22)
 
 - **Temperature scaling live** — PR #125 merged. Platt replaced by temperature scaling in evaluator.
 - **C17 REJECTED** — joint Kepler+TESS training (9,633 examples) achieved only val AUC 0.7859, worse than C13–C15 (0.81–0.84). Root cause: domain mismatch. Do not retry joint training.
-- **C18 REJECTED** — `freeze_conv_epochs=10` on TESS combined splits. Best candidate so far: test AUC 0.8439, test F1 0.7979 (raw). Failed gates: raw AUC 0.8439 < 0.85 (short by 0.006); temperature scaling T=1.61 worsened already-excellent test calibration (ECE 0.0301→0.0667). See runbook Step 7e for full root-cause.
-- **C19 authorized** — `configs/cnn_tess_c19.json` committed. Uses `freeze_conv_epochs=20` (doubled from C18). Hypothesis: longer FC warm-up → lower LR at conv unfreeze → less val overconfidence → T closer to 1.0 → calibration gate passes.
+- **C18 REJECTED** — `freeze_conv_epochs=10` on TESS combined splits. Best candidate so far: test AUC 0.8439, test F1 0.7979 (raw). Failed gates: raw AUC 0.8439 < 0.85 (short by 0.006); T=1.61 worsened already-excellent test calibration (ECE 0.0301→0.0667). See runbook Step 7e.
+- **C19 REJECTED** — `freeze_conv_epochs=20` (doubled from C18). SHA-256 `65f3721fac577807f35e4edaeaa9cc0cd0f50959441344487f7c77f35a570436`. Test AUC 0.8420 < C18's 0.8439 — regressed. T=1.88 worsened ECE further (0.0377→0.0760). Root cause: LR scheduler does not fire during the frozen phase (val_auc improving), so conv unfreezes at same LR=1e-4 as C18; longer frozen phase over-adapted the FC head. See runbook Step 7f.
+- **freeze_conv strategy exhausted** — C18 (freeze 10) was better than C19 (freeze 20). No further freeze_conv variant is expected to break through the 0.8439 ceiling on current corpus.
+- **Strategic decision pending** — human chose Option C (more data). The only unexploited TESS-domain labeled source is the K2 EPIC overlap corpus (K2 planets/FPs with TESS re-observations). See runbook Step 7g.
 
 ### Where things stand
 
@@ -86,41 +88,18 @@ When the user must take an action to unblock a gap:
 | Combined TESS splits (`data/tess_combined_cnn_splits/`) | **VALIDATED** — train 4,892 / val 1,049 / test 1,033 |
 | Joint CNN splits (`data/joint_cnn_splits/`) | **LOCAL VALIDATED** — built 2026-06-21; retain for reproducibility; do not retrain from |
 | C17 checkpoint (`checkpoints/cnn_tess_c17/`) | **REJECTED** — val AUC 0.7859; domain mismatch; do not retrain |
-| C18 checkpoint (`checkpoints/cnn_tess_c18/`) | **REJECTED** — test AUC 0.8439, F1 0.7979 (raw); calibration gate failed (T=1.61 worsened ECE); SHA `d33c15f4...` |
-| C19 checkpoint (`checkpoints/cnn_tess_c19/`) | **NOT YET TRAINED** — `configs/cnn_tess_c19.json` on main |
+| C18 checkpoint (`checkpoints/cnn_tess_c18/`) | **REJECTED** — test AUC 0.8439, F1 0.7979 (raw); T=1.61 worsened ECE; SHA `d33c15f4...`; best candidate of 19 |
+| C19 checkpoint (`checkpoints/cnn_tess_c19/`) | **REJECTED** — test AUC 0.8420, F1 0.7951 (raw); T=1.88 worsened ECE; SHA `65f3721f...`; regressed from C18 |
 | Evaluator calibration | **TEMPERATURE SCALING** — live on main since 2026-06-21 |
+| K2 overlap corpus (`data/tess_k2_overlap_snippets.jsonl`) | **NOT YET BUILT** — authorized in runbook Step 7g; expected to yield 500–1,500 new labeled TESS snippets |
 
 ### First action for the incoming agent
 
-C19 config is on main. No code changes needed before training.
+freeze_conv is exhausted. The next step is the K2 EPIC overlap corpus (Step 7g in the runbook). This requires a multi-hour MAST fetch — this is a HUMAN task.
 
-**Ask the user to run (from a freshly pulled local Mac):**
+**Before asking the user to run the fetch, confirm the runbook Step 7g script exists and is committed. Then provide the human with the exact command from Step 7g.**
 
-```bash
-git pull origin main
-caffeinate -dims .venv/bin/python Skills/train_cnn.py \
-  --split-dir data/tess_combined_cnn_splits \
-  --checkpoint-dir checkpoints/cnn_tess_c19 \
-  --config configs/cnn_tess_c19.json \
-  --pretrained-checkpoint checkpoints/cnn_kepler_pretrain/best.pt \
-  --device auto
-```
-
-Paste full training output. Then evaluate:
-
-```bash
-shasum -a 256 checkpoints/cnn_tess_c19/best.pt
-.venv/bin/python Skills/evaluate_cnn_checkpoint.py \
-  --split-dir data/tess_combined_cnn_splits \
-  --checkpoint checkpoints/cnn_tess_c19/best.pt \
-  --output-calibration checkpoints/cnn_tess_c19/calibration.json
-```
-
-Paste the full evaluator output including `Flag: PASS` or `Flag: FAIL`, the SHA-256, and the temperature T value.
-
-- If `Flag: PASS` → report metrics, request human approval for promotion.
-- If `Flag: FAIL` and test AUC > 0.8439 but calibration still fails → escalate to human: the calibration gate may need revision (T-scaling worsens already well-calibrated test predictions when val/test calibration differ).
-- If `Flag: FAIL` and test AUC ≤ 0.8439 → freeze_conv approach has plateaued; escalate to human for a strategic decision (new data, gate revision, or architecture change).
+If the human asks about gate revision instead of more data: read the runbook Step 7g escalation note and present Option A (gate revision: lower AUC gate to 0.84 or accept raw predictions when ECE < 0.05) alongside Option C (K2 data) with an honest assessment of each path's likelihood of success.
 
 ### CNN production runbook
 
