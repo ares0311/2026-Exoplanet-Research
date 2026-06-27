@@ -78,10 +78,11 @@ When the user must take an action to unblock a gap:
 
 | Item | State |
 |---|---|
-| Option A1 — `Skills/fetch_jwst_targets.py` | **MERGED** (PR #133 pending CI) |
-| Option A2 — `Skills/fetch_jwst_lc.py` | **MERGED** (PR #133 pending CI) |
-| Option B1–B5 — TESS target restructuring | **NOT STARTED** — start after PR #133 merges |
-| K2 corpus fetch (CNN prerequisite) | **[HUMAN]** — run after PR #133 merges |
+| Option A1 — `Skills/fetch_jwst_targets.py` | **MERGED** (PR #133) |
+| Option A2 — `Skills/fetch_jwst_lc.py` | **MERGED** (PR #133) |
+| K2 TAP ORA-00904 fix | **MERGED** (PR #134, 2026-06-27) |
+| Option B1–B5 — TESS target restructuring | **NOT STARTED** — begins after discovery scan |
+| K2 overlap corpus (`data/tess_k2_overlap_snippets.jsonl`) | **COMPLETE** — 2,086 snippets (2026-06-27) |
 
 **The only active CNN gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80).**
 
@@ -117,22 +118,21 @@ When the user must take an action to unblock a gap:
 | ECE-skip gate fix | **LIVE** — `evaluate_cnn_checkpoint.py` updated 2026-06-22; 53/53 tests pass |
 | `Skills/fetch_tess_k2_overlap_snippets.py` | **FIXED (2026-06-26)** — schema discovery + percent-encoded query; drop IN clause, filter locally |
 | `configs/cnn_tess_c20.json` | **COMMITTED** — 2026-06-22; identical to C18, freeze_conv_epochs=10 |
-| K2 overlap corpus (`data/tess_k2_overlap_snippets.jsonl`) | **NOT YET BUILT** — human must run fetch after pulling main; expected 500–1,500 new labeled TESS snippets |
+| K2 overlap corpus (`data/tess_k2_overlap_snippets.jsonl`) | **COMPLETE** — 2,086 snippets (2026-06-27; wrote=2086, skipped=174, terminal_failures=135, elapsed=2531s) |
 
 ### First action for the incoming agent
 
-The K2 fetcher has been fixed twice (schema discovery in PR #131, query encoding in PR #132). Always pull main before running — an older version will hit HTTP 400. Give the human:
+**K2 corpus is complete.** The first real discovery scan has not yet been run. This is the highest-priority action before any CNN work.
 
 ```bash
 git pull origin main
-caffeinate -dims .venv/bin/python Skills/fetch_tess_k2_overlap_snippets.py \
-  --output data/tess_k2_overlap_snippets.jsonl \
-  --workers 4 \
-  --request-delay 0.25
-wc -l data/tess_k2_overlap_snippets.jsonl
+caffeinate -dims .venv/bin/python Skills/star_scanner.py \
+  --max-stars 200 --tmag-min 12.0 --tmag-max 14.5 \
+  --log-path logs/discovery_run_001.json
+.venv/bin/python Skills/rank_candidates.py logs/discovery_run_001.json --top 20
 ```
 
-After the human pastes back the fetch summary and line count, audit the corpus (count, label balance, sidecar), then give the Step 7g-C merge+split+train+evaluate sequence.
+Do NOT proceed with CNN C20 training until the above scan is complete and has been reviewed for candidates. If zero candidates emerge after scanning ≥1,000 targets, that finding itself dictates the next priority.
 
 ### CNN production runbook
 
