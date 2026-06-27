@@ -58,7 +58,7 @@ These are ranked by novelty (most underexplored first):
 | 2 | **Recent sectors (64–68)** | SPOC output available but citizen-science attention has moved on | `select_targets()` with recent sector filter |
 | 3 | **Long-period candidates (P > 200 d)** | Most BLS searches cap at 200 d; requires multi-sector light curves | Extend `period_max` in search.py BLS call |
 | 4 | **20-second cadence targets** | Expensive to process; barely touched by any survey | MAST query with `exptime=20` |
-| 5 | **JWST targets** | Lightkurve does not support JWST natively; requires custom photometry | **IN SCOPE** — use `Skills/fetch_jwst_targets.py` to list programs and `Skills/fetch_jwst_lc.py` to extract flux (MERGED PR #133); A3 CLI wiring pending |
+| 5 | **JWST targets** | Lightkurve does not support JWST natively; requires custom photometry | **IN SCOPE** — use `Skills/fetch_jwst_targets.py` to list programs, `Skills/fetch_jwst_lc.py` to extract flux, and `exo <obsid> --mission JWST` to run the full pipeline (MERGED PR #133, #141) |
 
 **Novelty criterion**: A target is "novel" if its TIC ID does NOT appear in:
 - ExoFOP TOI list (already flagged by TESS pipeline)

@@ -81,6 +81,7 @@ When the user must take an action to unblock a gap:
 | Option A1 — `Skills/fetch_jwst_targets.py` | **MERGED** (PR #133) |
 | Option A2 — `Skills/fetch_jwst_lc.py` | **MERGED** (PR #133) |
 | K2 TAP ORA-00904 fix | **MERGED** (PR #134, 2026-06-27) |
+| Option A3 — `--mission JWST` wired into `exo` CLI | **MERGED** (PR #141, 2026-06-27) |
 | Option B1–B4 — TESS target restructuring | **MERGED** (PR #139, 2026-06-27) |
 | Option B5 — first 200-target discovery scan | **[HUMAN]** — ready to run (see First action below) |
 | K2 overlap corpus (`data/tess_k2_overlap_snippets.jsonl`) | **COMPLETE** — 2,086 snippets (2026-06-27) |

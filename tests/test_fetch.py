@@ -25,6 +25,7 @@ from exo_toolkit.fetch import (
     FetchProvenance,
     FetchResult,
     _extract_sectors,
+    _fetch_jwst,
     compute_provenance_score,
     fetch_lightcurve,
 )
@@ -186,13 +187,13 @@ class TestFetchProvenance:
         )
         assert p.sectors_or_quarters == ()
 
-    def test_all_three_missions_accepted(self) -> None:
-        for mission in ("TESS", "Kepler", "K2"):
+    def test_all_missions_accepted(self) -> None:
+        for mission in ("TESS", "Kepler", "K2", "JWST"):
             p = FetchProvenance(
                 target_id="x",
                 mission=mission,  # type: ignore[arg-type]
-                sectors_or_quarters=(1,),
-                cadence_seconds=1800.0,
+                sectors_or_quarters=(),
+                cadence_seconds=60.0,
                 pipeline="test",
                 flux_column="pdcsap_flux",
                 n_cadences=1,
@@ -596,3 +597,135 @@ class TestComputeProvenanceScore:
             _prov(cadence_seconds=_CADENCE_BEST_S, sectors=(1, 2, 3), pipeline="MYSTERY")
         )
         assert abs(score - (0.75 + 0.25 * _PIPELINE_QUALITY_DEFAULT)) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# _fetch_jwst
+# ---------------------------------------------------------------------------
+
+_FAKE_JWST_MODULE = """\
+from unittest.mock import MagicMock
+
+class JwstLcResult:
+    def __init__(self, obsid, target_name, time_btjd, flux_norm, flux_err_norm,
+                 instrument, n_integrations, product_type, warnings):
+        self.obsid = obsid
+        self.target_name = target_name
+        self.time_btjd = time_btjd
+        self.flux_norm = flux_norm
+        self.flux_err_norm = flux_err_norm
+        self.instrument = instrument
+        self.n_integrations = n_integrations
+        self.product_type = product_type
+        self.warnings = warnings
+
+def fetch_jwst_lc(obsid, **kwargs):
+    return JwstLcResult(
+        obsid=obsid,
+        target_name="test-target",
+        time_btjd=[0.0, 0.5, 1.0],
+        flux_norm=[1.0, 0.999, 1.001],
+        flux_err_norm=[0.001, 0.001, 0.001],
+        instrument="NIRSpec",
+        n_integrations=3,
+        product_type="x1dints",
+        warnings=[],
+    )
+
+def to_lightkurve(result):
+    lc = MagicMock()
+    lc.time.jd = [2457000.0 + t for t in result.time_btjd]
+    lc.flux.value = result.flux_norm
+    lc.flux_err.value = result.flux_err_norm
+    return lc
+"""
+
+_FAKE_JWST_NO_DATA = """\
+def fetch_jwst_lc(obsid, **kwargs):
+    return None
+
+def to_lightkurve(result):
+    pass
+"""
+
+
+class TestFetchJwst:
+    def _skills_dir(self, tmp_path: pytest.TempPathFactory, content: str) -> object:
+        p = tmp_path / "fetch_jwst_lc.py"
+        p.write_text(content)
+        return tmp_path
+
+    def test_returns_fetch_result(self, tmp_path: pytest.TempPathFactory) -> None:
+        skills = self._skills_dir(tmp_path, _FAKE_JWST_MODULE)
+        result = _fetch_jwst("jw12345", _skills_dir=skills)  # type: ignore[arg-type]
+        assert isinstance(result, FetchResult)
+
+    def test_provenance_mission_is_jwst(self, tmp_path: pytest.TempPathFactory) -> None:
+        skills = self._skills_dir(tmp_path, _FAKE_JWST_MODULE)
+        result = _fetch_jwst("jw12345", _skills_dir=skills)  # type: ignore[arg-type]
+        assert result.provenance.mission == "JWST"
+
+    def test_provenance_target_id_is_obsid(self, tmp_path: pytest.TempPathFactory) -> None:
+        skills = self._skills_dir(tmp_path, _FAKE_JWST_MODULE)
+        result = _fetch_jwst("jw99999", _skills_dir=skills)  # type: ignore[arg-type]
+        assert result.provenance.target_id == "jw99999"
+
+    def test_provenance_pipeline_is_jwst(self, tmp_path: pytest.TempPathFactory) -> None:
+        skills = self._skills_dir(tmp_path, _FAKE_JWST_MODULE)
+        result = _fetch_jwst("jw12345", _skills_dir=skills)  # type: ignore[arg-type]
+        assert result.provenance.pipeline == "JWST"
+
+    def test_provenance_sectors_empty(self, tmp_path: pytest.TempPathFactory) -> None:
+        skills = self._skills_dir(tmp_path, _FAKE_JWST_MODULE)
+        result = _fetch_jwst("jw12345", _skills_dir=skills)  # type: ignore[arg-type]
+        assert result.provenance.sectors_or_quarters == ()
+
+    def test_provenance_n_cadences(self, tmp_path: pytest.TempPathFactory) -> None:
+        skills = self._skills_dir(tmp_path, _FAKE_JWST_MODULE)
+        result = _fetch_jwst("jw12345", _skills_dir=skills)  # type: ignore[arg-type]
+        assert result.provenance.n_cadences == 3
+
+    def test_provenance_product_type_in_flux_column(
+        self, tmp_path: pytest.TempPathFactory
+    ) -> None:
+        skills = self._skills_dir(tmp_path, _FAKE_JWST_MODULE)
+        result = _fetch_jwst("jw12345", _skills_dir=skills)  # type: ignore[arg-type]
+        assert result.provenance.flux_column == "x1dints"
+
+    def test_cadence_computed_from_timestamps(
+        self, tmp_path: pytest.TempPathFactory
+    ) -> None:
+        skills = self._skills_dir(tmp_path, _FAKE_JWST_MODULE)
+        result = _fetch_jwst("jw12345", _skills_dir=skills)  # type: ignore[arg-type]
+        # time_btjd=[0.0, 0.5, 1.0] → dt=0.5d → 0.5*86400=43200s
+        assert result.provenance.cadence_seconds == pytest.approx(43200.0)
+
+    def test_baseline_computed_from_timestamps(
+        self, tmp_path: pytest.TempPathFactory
+    ) -> None:
+        skills = self._skills_dir(tmp_path, _FAKE_JWST_MODULE)
+        result = _fetch_jwst("jw12345", _skills_dir=skills)  # type: ignore[arg-type]
+        # time_btjd=[0.0, 0.5, 1.0] → baseline = 1.0 - 0.0 = 1.0d
+        assert result.provenance.time_baseline_days == pytest.approx(1.0)
+
+    def test_no_data_raises_value_error(self, tmp_path: pytest.TempPathFactory) -> None:
+        skills = self._skills_dir(tmp_path, _FAKE_JWST_NO_DATA)
+        with pytest.raises(ValueError, match="No JWST data"):
+            _fetch_jwst("jw99999", _skills_dir=skills)  # type: ignore[arg-type]
+
+    def test_missing_skill_file_raises_import_error(
+        self, tmp_path: pytest.TempPathFactory
+    ) -> None:
+        with pytest.raises(ImportError):
+            _fetch_jwst("jw12345", _skills_dir=tmp_path)  # type: ignore[arg-type]
+
+    def test_fetch_lightcurve_dispatches_to_jwst(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: pytest.TempPathFactory
+    ) -> None:
+        """fetch_lightcurve(mission='JWST') must not touch lightkurve."""
+        skills = tmp_path / "fetch_jwst_lc.py"
+        skills.write_text(_FAKE_JWST_MODULE)
+        import exo_toolkit.fetch as fetch_mod
+        monkeypatch.setattr(fetch_mod, "_SKILLS_DIR", tmp_path)
+        result = fetch_lightcurve("jw12345", "JWST")
+        assert result.provenance.mission == "JWST"

@@ -17,7 +17,9 @@ fetch_lightcurve(target_id, mission, *, exptime, pipeline, sectors,
 from __future__ import annotations
 
 import datetime
+import importlib.util
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -57,25 +59,28 @@ class FetchResult:
 # Internal constants
 # ---------------------------------------------------------------------------
 
-_DEFAULT_AUTHOR: dict[Mission, str] = {
+_DEFAULT_AUTHOR: dict[str, str] = {
     "TESS": "SPOC",
     "Kepler": "Kepler",
     "K2": "K2",
 }
 
 # lightkurve.search_lightcurve uses different parameter names per mission
-_SECTOR_KWARG: dict[Mission, str] = {
+_SECTOR_KWARG: dict[str, str] = {
     "TESS": "sector",
     "Kepler": "quarter",
     "K2": "campaign",
 }
 
 # Key in lc.meta that holds the sector / quarter / campaign number
-_SECTOR_META_KEY: dict[Mission, str] = {
+_SECTOR_META_KEY: dict[str, str] = {
     "TESS": "SECTOR",
     "Kepler": "QUARTER",
     "K2": "CAMPAIGN",
 }
+
+# Path to the Skills directory (resolved once at import time)
+_SKILLS_DIR: Path = Path(__file__).resolve().parent.parent.parent / "Skills"
 
 # Fallback cadence in seconds when lc.meta["EXPTIME"] is absent
 _EXPTIME_FALLBACK: dict[str, float] = {
@@ -103,25 +108,30 @@ def fetch_lightcurve(
 
     Args:
         target_id: Target identifier — "TIC 123456789" for TESS,
-            "KIC 123456789" for Kepler, "EPIC 123456789" for K2.
-        mission: "TESS", "Kepler", or "K2".
+            "KIC 123456789" for Kepler, "EPIC 123456789" for K2,
+            or a JWST obsid (e.g. "jw01743001001_04101_00001_nrca1") for JWST.
+        mission: "TESS", "Kepler", "K2", or "JWST".
         exptime: Exposure-time hint passed to lightkurve: "long" (20-min
             TESS / 30-min Kepler), "short" (2-min TESS), or "fast"
-            (20-sec TESS).
+            (20-sec TESS).  Ignored for JWST.
         pipeline: Override the default pipeline author — e.g. "QLP"
-            instead of the default "SPOC" for TESS.
+            instead of the default "SPOC" for TESS.  Ignored for JWST.
         sectors: Restrict download to specific TESS sectors, Kepler
             quarters, or K2 campaigns.  None means all available.
+            Ignored for JWST.
         prefer_pdcsap: Request PDCSAP (systematics-corrected) flux.
-            Set False to use SAP flux instead.
+            Set False to use SAP flux instead.  Ignored for JWST.
 
     Returns:
         FetchResult containing the stitched LightCurve and provenance.
 
     Raises:
-        ImportError: lightkurve is not installed.
+        ImportError: lightkurve is not installed (non-JWST missions).
         ValueError: No light curves found for the target / parameters.
     """
+    if mission == "JWST":
+        return _fetch_jwst(target_id)
+
     try:
         import lightkurve as lk  # noqa: PLC0415
     except ImportError as exc:
@@ -234,7 +244,59 @@ def compute_provenance_score(provenance: FetchProvenance) -> float:
 # ---------------------------------------------------------------------------
 
 
-def _extract_sectors(collection: Any, mission: Mission) -> tuple[int, ...]:
+def _fetch_jwst(obsid: str, *, _skills_dir: Path | None = None) -> FetchResult:
+    """Fetch a JWST light curve via Skills/fetch_jwst_lc.py.
+
+    Args:
+        obsid: JWST observation ID (e.g. "jw01743001001_04101_00001_nrca1").
+        _skills_dir: Override Skills directory path (for tests only).
+
+    Returns:
+        FetchResult with a lightkurve-compatible LightCurve object.
+
+    Raises:
+        ImportError: fetch_jwst_lc.py cannot be loaded from the Skills directory.
+        ValueError: No JWST data found for the given obsid.
+    """
+    skills_dir = _skills_dir or _SKILLS_DIR
+    jwst_path = skills_dir / "fetch_jwst_lc.py"
+    if not jwst_path.exists():
+        raise ImportError(f"Cannot find fetch_jwst_lc.py at {jwst_path}")
+    spec = importlib.util.spec_from_file_location("fetch_jwst_lc", jwst_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load fetch_jwst_lc.py from {jwst_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    result = module.fetch_jwst_lc(obsid)
+    if result is None:
+        raise ValueError(f"No JWST data found for obsid {obsid!r}")
+
+    lc = module.to_lightkurve(result)
+
+    time_arr: list[float] = result.time_btjd
+    cadence_seconds = (
+        float((time_arr[-1] - time_arr[0]) / (len(time_arr) - 1)) * 86400.0
+        if len(time_arr) >= 2
+        else 60.0
+    )
+    baseline_days = float(time_arr[-1] - time_arr[0]) if len(time_arr) >= 2 else 0.0
+
+    provenance = FetchProvenance(
+        target_id=obsid,
+        mission="JWST",
+        sectors_or_quarters=(),
+        cadence_seconds=max(cadence_seconds, 1.0),
+        pipeline="JWST",
+        flux_column=result.product_type,
+        n_cadences=result.n_integrations,
+        time_baseline_days=baseline_days,
+        fetched_at=datetime.datetime.now(datetime.UTC).isoformat(),
+    )
+    return FetchResult(light_curve=lc, provenance=provenance)
+
+
+def _extract_sectors(collection: Any, mission: str) -> tuple[int, ...]:
     """Collect unique, sorted sector/quarter/campaign numbers from a collection."""
     key = _SECTOR_META_KEY[mission]
     seen: list[int] = []

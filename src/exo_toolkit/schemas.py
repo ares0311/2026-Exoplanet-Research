@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 Score = Annotated[float, Field(ge=0.0, le=1.0)]
 OptScore = Annotated[float | None, Field(ge=0.0, le=1.0)]
 
-Mission = Literal["TESS", "Kepler", "K2"]
+Mission = Literal["TESS", "Kepler", "K2", "JWST"]
 
 SubmissionPathway = Literal[
     "known_object_annotation",

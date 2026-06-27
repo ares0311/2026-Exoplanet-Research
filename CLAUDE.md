@@ -1237,6 +1237,7 @@ fix the durable resume ledger before asking the human to run it again.
 - `Skills/fetch_jwst_targets.py` (A1) — **MERGED** (PR #133)
 - `Skills/fetch_jwst_lc.py` (A2) — **MERGED** (PR #133)
 - K2 TAP ORA-00904 fix (`Skills/fetch_tess_k2_overlap_snippets.py`) — **MERGED** (PR #134, 2026-06-27)
+- `exo <obsid> --mission JWST` CLI wiring (A3) — **MERGED** (PR #141, 2026-06-27): `Mission` literal extended; `fetch_lightcurve` dispatches to `_fetch_jwst`; 13 new tests
 - Option B1–B4 (TESS target restructuring) — **MERGED** (PR #139, 2026-06-27): CTOI exclusion, confirmed-host exclusion, tmag 12–14.5 default, period_max 500d
 - Option B5 — **[HUMAN]** Run first 200-target discovery scan (see Immediate Next Actions below)
 
@@ -1252,8 +1253,8 @@ fix the durable resume ledger before asking the human to run it again.
      --log logs/discovery_run_001.json
    .venv/bin/python Skills/rank_candidates.py logs/discovery_run_001.json --top 20
    ```
-2. **[AGENT]** A3: Wire JWST `--mission JWST` into the `exo` CLI via `src/exo_toolkit/fetch.py` extension (after B5 discovery scan completes or in parallel).
-3. **[AGENT]** CNN C20 training (only after step 1 above produces candidates): merge K2 overlap into C20 corpus, build `data/tess_c20_cnn_splits/`, train with `configs/cnn_tess_c18.json` (`freeze_conv_epochs=10`).
+2. **[AGENT]** CNN C20 training (only after step 1 above produces candidates): merge K2 overlap into C20 corpus, build `data/tess_c20_cnn_splits/`, train with `configs/cnn_tess_c18.json` (`freeze_conv_epochs=10`).
+3. ~~A3 JWST CLI wiring~~ — **COMPLETE** (PR #141).
 
 #### CNN candidate history (what has been tried — do not repeat)
 
