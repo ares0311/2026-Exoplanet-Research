@@ -2,7 +2,7 @@
 
 **Purpose**: Prevent doom loops. Every agent and every session must read this before doing anything.
 
-**Last updated**: 2026-06-26 (sequencing: Option A JWST integration → Option B TESS novelty restructure)
+**Last updated**: 2026-06-27 (sequencing: Option A JWST integration → Option B TESS novelty restructure)
 
 ---
 
@@ -116,7 +116,7 @@ The `pathway.py` thresholds are set conservatively. They are correct. Do not cha
 
 ---
 
-## JWST: Option A — In Progress
+## JWST: Option A — MERGED (PR #133)
 
 **Authorized 2026-06-26. Build A before B.**
 
@@ -143,7 +143,7 @@ JWST does not run autonomous surveys the way TESS does. Its time-series observat
 | A2 | Download JWST calibrated integration products (`_calints.fits`); extract flux vs. time | `Skills/fetch_jwst_lc.py` |
 | A3 | Convert JWST data to pipeline LightCurve format; wire into `exo` CLI with `--mission JWST` | `src/exo_toolkit/fetch.py` extension |
 
-**Status**: A1 built (see below). A2 in progress. A3 after A2 validates.
+**Status**: A1 MERGED (PR #133). A2 MERGED (PR #133); K2 TAP ORA-00904 fix in PR #134. A3 after PR #134 merges and A2 validates against live JWST targets.
 
 ### Option A constraints
 
@@ -170,7 +170,7 @@ Current gap: `star_scanner.py` excludes TOI list but NOT CTOI (community TOI) or
 | B4 | Extend default `period_max` in BLS search to 500 d | `src/exo_toolkit/search.py` |
 | B5 | Run first 200-target discovery scan and document results | [HUMAN] |
 
-**Status**: Not started. Begins after A2 is committed.
+**Status**: Not started. Begins after PR #134 merges to main.
 
 ---
 
