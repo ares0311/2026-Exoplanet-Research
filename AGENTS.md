@@ -74,14 +74,15 @@ When the user must take an action to unblock a gap:
 
 **Research brief wired (2026-06-27):** `docs/exoplanet_detection_research_brief.md` is now required reading. Key takeaways: TESS > Kepler/K2 > JWST in discovery priority order; CNN architecture baseline is Shallue & Vanderburg (2018); PLATO launches end-2026 (pipeline should handle long-baseline photometry); GP for correlated noise; citizen submissions require full transit + false-positive diagnostic table.
 
-**Active work: Option A JWST integration + Option B TESS target restructuring.**
+**Active work: Option A JWST integration (A3 pending) + Option B5 [HUMAN] discovery scan.**
 
 | Item | State |
 |---|---|
 | Option A1 — `Skills/fetch_jwst_targets.py` | **MERGED** (PR #133) |
 | Option A2 — `Skills/fetch_jwst_lc.py` | **MERGED** (PR #133) |
 | K2 TAP ORA-00904 fix | **MERGED** (PR #134, 2026-06-27) |
-| Option B1–B5 — TESS target restructuring | **NOT STARTED** — begins after discovery scan |
+| Option B1–B4 — TESS target restructuring | **MERGED** (PR #139, 2026-06-27) |
+| Option B5 — first 200-target discovery scan | **[HUMAN]** — ready to run (see First action below) |
 | K2 overlap corpus (`data/tess_k2_overlap_snippets.jsonl`) | **COMPLETE** — 2,086 snippets (2026-06-27) |
 
 **The only active CNN gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80).**
@@ -122,12 +123,12 @@ When the user must take an action to unblock a gap:
 
 ### First action for the incoming agent
 
-**K2 corpus is complete.** The first real discovery scan has not yet been run. This is the highest-priority action before any CNN work.
+**Option B1–B4 is merged (PR #139).** The scanner now excludes TOI + CTOI + confirmed hosts automatically and defaults to Tmag 12–14.5. The first real discovery scan has not yet been run. This is the highest-priority action before any CNN work.
 
 ```bash
 git pull origin main
 caffeinate -dims .venv/bin/python Skills/star_scanner.py \
-  --max-stars 200 --tmag-min 12.0 --tmag-max 14.5 \
+  --max-stars 200 \
   --log logs/discovery_run_001.json
 .venv/bin/python Skills/rank_candidates.py logs/discovery_run_001.json --top 20
 ```
