@@ -203,7 +203,7 @@ def run_pipeline(
 
     Args:
         target_id: Target identifier, e.g. ``"TIC 150428135"``.
-        mission: ``"TESS"``, ``"Kepler"``, or ``"K2"``.
+        mission: ``"TESS"``, ``"Kepler"``, ``"K2"``, or ``"JWST"``.
         min_snr: Minimum BLS SNR threshold for candidate signals.
         max_peaks: Maximum number of signals to return from the BLS search.
         scorer: Scoring model — ``"bayesian"`` (default), ``"xgboost"``, or
@@ -428,7 +428,7 @@ def _print_results(rows: list[dict[str, Any]], target_id: str) -> None:
 @app.command()
 def scan(
     target_id: str = typer.Argument(..., help='Target identifier, e.g. "TIC 150428135"'),
-    mission: str = typer.Option("TESS", help="Mission: TESS, Kepler, or K2"),
+    mission: str = typer.Option("TESS", help="Mission: TESS, Kepler, K2, or JWST"),
     min_snr: float = typer.Option(5.0, "--min-snr", help="Minimum BLS SNR threshold"),
     max_peaks: int = typer.Option(5, "--max-peaks", help="Maximum signals to search for"),
     scorer: str = typer.Option(
@@ -463,7 +463,7 @@ def scan(
 
     Runs the full pipeline: fetch → clean → search → vet → score → classify.
     """
-    valid_missions = ("TESS", "Kepler", "K2")
+    valid_missions = ("TESS", "Kepler", "K2", "JWST")
     if mission not in valid_missions:
         typer.echo(f"Invalid mission '{mission}'. Choose from: {valid_missions}", err=True)
         raise typer.Exit(code=1)

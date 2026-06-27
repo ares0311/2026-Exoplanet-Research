@@ -317,6 +317,11 @@ class TestScanCommand:
             result = runner.invoke(app, ["TIC 0", "--mission", "HST"])
         assert result.exit_code != 0
 
+    def test_jwst_mission_is_accepted(self) -> None:
+        with self._patch_pipeline([]):
+            result = runner.invoke(app, ["jw01743001001", "--mission", "JWST"])
+        assert result.exit_code == 0
+
     def test_pipeline_exception_exits_2(self) -> None:
         with patch("exo_toolkit.cli.run_pipeline", side_effect=RuntimeError("fail")):
             result = runner.invoke(app, ["TIC 0"])
