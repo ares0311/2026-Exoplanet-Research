@@ -39,7 +39,7 @@ def search_lightcurve(
     mission: Mission,
     *,
     period_min: float = 0.5,
-    period_max: float | None = None,
+    period_max: float | None = 500.0,
     duration_min_hours: float = 0.5,
     duration_max_hours: float = 12.0,
     n_durations: int = 20,
@@ -55,8 +55,10 @@ def search_lightcurve(
         target_id: Identifier string for the target (e.g. "TIC 123456789").
         mission: "TESS", "Kepler", or "K2".
         period_min: Minimum trial period in days.
-        period_max: Maximum trial period in days.  When None, defaults to
-            half the light curve baseline (requires at least 2 transits).
+        period_max: Maximum trial period in days.  Default 500 d for
+            long-period planet sensitivity; automatically capped to half the
+            light curve baseline by astropy BLS autoperiod (``minimum_n_transit=2``).
+            Pass None to use the baseline/2 heuristic explicitly.
         duration_min_hours: Shortest transit duration to search (hours).
         duration_max_hours: Longest transit duration to search (hours).
         n_durations: Number of duration steps in the BLS grid.

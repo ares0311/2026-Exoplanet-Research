@@ -46,6 +46,8 @@ _EXOFOP_URL = (
     "https://exofop.ipac.caltech.edu/tess/download_toi.php?sort=toi&output=csv"
 )
 
+_SKILLS_DIR = Path(__file__).resolve().parent
+
 # ---------------------------------------------------------------------------
 # Priority scoring
 # ---------------------------------------------------------------------------
@@ -215,7 +217,7 @@ class ScanLog:
 
 
 # ---------------------------------------------------------------------------
-# TOI exclusion list
+# Exclusion lists: TOI, CTOI, confirmed planets
 # ---------------------------------------------------------------------------
 
 
@@ -236,6 +238,48 @@ def _load_toi_tic_ids() -> set[int]:
     return {int(v) for v in df[tic_col].dropna()}
 
 
+def _load_ctoi_tic_ids() -> set[int]:
+    """Download the ExoFOP CTOI table and return the set of TIC IDs it contains.
+
+    Uses ``Skills/fetch_exofop_ctoi.py`` with its injectable fetch function.
+    Returns an empty set on any failure so the scan can continue.
+    """
+    import importlib.util
+
+    ctoi_path = _SKILLS_DIR / "fetch_exofop_ctoi.py"
+    spec = importlib.util.spec_from_file_location("fetch_exofop_ctoi", ctoi_path)
+    if spec is None or spec.loader is None:
+        return set()
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)  # type: ignore[attr-defined]
+
+    try:
+        result = module.fetch_ctoi_table()
+        return {int(r["tic_id"]) for r in result.rows if r.get("tic_id")}
+    except Exception:  # noqa: BLE001
+        return set()
+
+
+def _load_confirmed_host_tic_ids() -> frozenset[int]:
+    """Return TIC IDs of confirmed transiting planet hosts from NASA Exoplanet Archive.
+
+    Uses ``Skills/fetch_confirmed_hosts.py``.  Returns an empty frozenset on failure.
+    """
+    import importlib.util
+
+    host_path = _SKILLS_DIR / "fetch_confirmed_hosts.py"
+    spec = importlib.util.spec_from_file_location("fetch_confirmed_hosts", host_path)
+    if spec is None or spec.loader is None:
+        return frozenset()
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)  # type: ignore[attr-defined]
+
+    try:
+        return module.fetch_confirmed_host_tic_ids()
+    except Exception:  # noqa: BLE001
+        return frozenset()
+
+
 # ---------------------------------------------------------------------------
 # Target selection
 # ---------------------------------------------------------------------------
@@ -243,7 +287,7 @@ def _load_toi_tic_ids() -> set[int]:
 
 def select_targets(
     n: int = 100,
-    tmag_range: tuple[float, float] = (10.0, 14.0),
+    tmag_range: tuple[float, float] = (12.0, 14.5),
     exclude_tic_ids: set[int] | None = None,
 ) -> list[dict[str, Any]]:
     """Query the TIC catalog and return up to *n* stars ranked by priority.
@@ -398,7 +442,7 @@ def run_background_scan(
     log_path: Path,
     *,
     n_targets: int = 500,
-    tmag_range: tuple[float, float] = (10.0, 14.0),
+    tmag_range: tuple[float, float] = (12.0, 14.5),
     mission: str = "TESS",
     min_snr: float = 5.0,
     max_peaks: int = 5,
@@ -407,14 +451,17 @@ def run_background_scan(
 ) -> None:
     """Fetch a ranked target list and scan each star in priority order.
 
-    Already-scanned stars (from *log_path*) and TOI stars are excluded before
-    scanning begins.  The log is updated after every star so progress is never
-    lost on interruption.
+    Already-scanned stars (from *log_path*), TOI stars, community TOI (CTOI)
+    stars, and confirmed transiting planet hosts from the NASA Exoplanet Archive
+    are excluded before scanning begins.  All exclusion lists fail open — if a
+    list cannot be fetched the scan continues without that exclusion.  The log
+    is updated after every star so progress is never lost on interruption.
 
     Args:
         log_path: Path to the persistent JSON scan log.
         n_targets: Maximum stars to scan in this run.
         tmag_range: ``(min_tmag, max_tmag)`` for the TIC catalog query.
+            Default ``(12.0, 14.5)`` targets the faint-star novelty frontier.
         mission: ``"TESS"``, ``"Kepler"``, or ``"K2"``.
         min_snr: Minimum BLS SNR threshold.
         max_peaks: Maximum signals per star.
@@ -430,11 +477,26 @@ def run_background_scan(
         print(f"Warning: could not load TOI list ({exc}); skipping TOI exclusion")
         toi_ids = set()
 
+    print("Loading CTOI exclusion list …")
+    try:
+        ctoi_ids = _load_ctoi_tic_ids()
+    except Exception as exc:  # noqa: BLE001
+        print(f"Warning: could not load CTOI list ({exc}); skipping CTOI exclusion")
+        ctoi_ids = set()
+
+    print("Loading confirmed transiting planet hosts …")
+    try:
+        confirmed_ids = _load_confirmed_host_tic_ids()
+    except Exception as exc:  # noqa: BLE001
+        print(f"Warning: could not load confirmed hosts ({exc}); skipping")
+        confirmed_ids = frozenset()
+
     already_scanned = log.scanned_ids()
-    exclude = toi_ids | already_scanned
+    exclude = toi_ids | ctoi_ids | confirmed_ids | already_scanned
     print(
-        f"Excluding {len(toi_ids):,} TOI stars and "
-        f"{len(already_scanned):,} already-scanned stars"
+        f"Excluding {len(toi_ids):,} TOI  |  {len(ctoi_ids):,} CTOI  |  "
+        f"{len(confirmed_ids):,} confirmed hosts  |  "
+        f"{len(already_scanned):,} already-scanned"
     )
 
     print(
@@ -515,10 +577,10 @@ def _parse_args() -> argparse.Namespace:
         "--max-stars", type=int, default=500,
         help="Maximum stars to scan in background mode (default: 500)",
     )
-    p.add_argument("--tmag-min", type=float, default=10.0,
-                   help="Minimum TESS magnitude (default: 10.0)")
-    p.add_argument("--tmag-max", type=float, default=14.0,
-                   help="Maximum TESS magnitude (default: 14.0)")
+    p.add_argument("--tmag-min", type=float, default=12.0,
+                   help="Minimum TESS magnitude (default: 12.0)")
+    p.add_argument("--tmag-max", type=float, default=14.5,
+                   help="Maximum TESS magnitude (default: 14.5)")
     p.add_argument("--mission", default="TESS", choices=["TESS", "Kepler", "K2"])
     p.add_argument("--min-snr", type=float, default=5.0,
                    help="Minimum BLS SNR threshold (default: 5.0)")
