@@ -259,9 +259,9 @@ caffeinate -dims .venv/bin/python Skills/star_scanner.py \
   --max-stars 200 \
   --tmag-min 12.0 \
   --tmag-max 14.5 \
-  --log-path logs/discovery_run_001.json
-python Skills/rank_candidates.py logs/discovery_run_001.json --top 20
-python Skills/alert_filter.py logs/discovery_run_001.json \
+  --log logs/discovery_run_001.json
+.venv/bin/python Skills/rank_candidates.py logs/discovery_run_001.json --top 20
+.venv/bin/python Skills/alert_filter.py logs/discovery_run_001.json \
   --fpp-max 0.15 \
   --output logs/discovery_filtered_001.json
 ```

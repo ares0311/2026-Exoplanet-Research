@@ -1247,7 +1247,7 @@ fix the durable resume ledger before asking the human to run it again.
    git pull origin main
    caffeinate -dims .venv/bin/python Skills/star_scanner.py \
      --max-stars 200 --tmag-min 12.0 --tmag-max 14.5 \
-     --log-path logs/discovery_run_001.json
+     --log logs/discovery_run_001.json
    .venv/bin/python Skills/rank_candidates.py logs/discovery_run_001.json --top 20
    ```
 2. **[AGENT]** Build Option B1–B5 (TESS target restructuring: CTOI exclusion, confirmed-planet cross-check, Tmag defaults, period_max extension). Can begin immediately — no blockers.

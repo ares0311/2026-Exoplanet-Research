@@ -9,6 +9,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from Skills.rank_candidates import (  # noqa: E402
+    _scan_log_to_rows,
     compute_rank_score,
     load_candidates,
     rank_candidates,
@@ -131,3 +132,123 @@ class TestRankCandidates:
     def test_rank_score_key_added(self) -> None:
         ranked = rank_candidates([_row()])
         assert "rank_score" in ranked[0]
+
+
+# ---------------------------------------------------------------------------
+# ScanLog format support
+# ---------------------------------------------------------------------------
+
+def _scan_log(entries: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "last_updated": "2026-06-27T12:00:00Z",
+        "entries": {
+            str(e["tic_id"]): e for e in entries
+        },
+    }
+
+
+def _scan_entry(
+    tic_id: int = 11111,
+    status: str = "candidate_found",
+    best_fpp: float | None = 0.08,
+    best_pathway: str | None = "planet_hunters_discussion",
+    best_period_days: float | None = 5.0,
+) -> dict[str, Any]:
+    return {
+        "tic_id": tic_id,
+        "scanned_at": "2026-06-27T12:00:00Z",
+        "status": status,
+        "n_signals": 1,
+        "best_period_days": best_period_days,
+        "best_fpp": best_fpp,
+        "best_pathway": best_pathway,
+        "priority_score": 0.7,
+        "error_message": None,
+    }
+
+
+class TestScanLogToRows:
+    def test_candidate_found_entry_included(self) -> None:
+        log = _scan_log([_scan_entry(tic_id=100, status="candidate_found")])
+        rows = _scan_log_to_rows(log)
+        assert len(rows) == 1
+        assert rows[0]["tic_id"] == 100
+
+    def test_non_candidate_entries_excluded(self) -> None:
+        log = _scan_log([
+            _scan_entry(tic_id=1, status="candidate_found"),
+            _scan_entry(tic_id=2, status="scanned_clear"),
+            _scan_entry(tic_id=3, status="no_data"),
+            _scan_entry(tic_id=4, status="error"),
+        ])
+        rows = _scan_log_to_rows(log)
+        assert len(rows) == 1
+        assert rows[0]["tic_id"] == 1
+
+    def test_fpp_mapped_to_scores(self) -> None:
+        log = _scan_log([_scan_entry(best_fpp=0.07)])
+        rows = _scan_log_to_rows(log)
+        assert rows[0]["scores"]["false_positive_probability"] == 0.07
+
+    def test_pathway_mapped(self) -> None:
+        log = _scan_log([_scan_entry(best_pathway="tfop_ready")])
+        rows = _scan_log_to_rows(log)
+        assert rows[0]["pathway"] == "tfop_ready"
+
+    def test_period_days_mapped(self) -> None:
+        log = _scan_log([_scan_entry(best_period_days=12.3)])
+        rows = _scan_log_to_rows(log)
+        assert rows[0]["period_days"] == 12.3
+
+    def test_target_id_and_candidate_id_set(self) -> None:
+        log = _scan_log([_scan_entry(tic_id=99999)])
+        rows = _scan_log_to_rows(log)
+        assert "99999" in rows[0]["target_id"]
+        assert "99999" in rows[0]["candidate_id"]
+
+    def test_none_fpp_defaults_to_one(self) -> None:
+        log = _scan_log([_scan_entry(best_fpp=None)])
+        rows = _scan_log_to_rows(log)
+        assert rows[0]["scores"]["false_positive_probability"] == 1.0
+
+    def test_empty_entries(self) -> None:
+        log: dict[str, Any] = {"last_updated": "2026-06-27T12:00:00Z", "entries": {}}
+        rows = _scan_log_to_rows(log)
+        assert rows == []
+
+
+class TestLoadCandidatesScanLog:
+    def test_scan_log_file_detected(self, tmp_path: Path) -> None:
+        f = tmp_path / "scan.json"
+        log = _scan_log([_scan_entry(tic_id=555)])
+        f.write_text(json.dumps(log))
+        rows = load_candidates([f])
+        assert len(rows) == 1
+        assert rows[0]["tic_id"] == 555
+
+    def test_non_candidates_filtered(self, tmp_path: Path) -> None:
+        f = tmp_path / "scan.json"
+        log = _scan_log([
+            _scan_entry(tic_id=1, status="candidate_found"),
+            _scan_entry(tic_id=2, status="scanned_clear"),
+        ])
+        f.write_text(json.dumps(log))
+        rows = load_candidates([f])
+        assert len(rows) == 1
+
+    def test_source_file_key_added_for_scan_log(self, tmp_path: Path) -> None:
+        f = tmp_path / "scan.json"
+        f.write_text(json.dumps(_scan_log([_scan_entry()])))
+        rows = load_candidates([f])
+        assert rows[0]["_source_file"] == str(f)
+
+    def test_scan_log_ranks_correctly(self, tmp_path: Path) -> None:
+        f = tmp_path / "scan.json"
+        log = _scan_log([
+            _scan_entry(tic_id=1, best_fpp=0.05, best_pathway="tfop_ready"),
+            _scan_entry(tic_id=2, best_fpp=0.30, best_pathway="planet_hunters_discussion"),
+        ])
+        f.write_text(json.dumps(log))
+        rows = load_candidates([f])
+        ranked = rank_candidates(rows)
+        assert ranked[0]["tic_id"] == 1

@@ -128,7 +128,7 @@ When the user must take an action to unblock a gap:
 git pull origin main
 caffeinate -dims .venv/bin/python Skills/star_scanner.py \
   --max-stars 200 --tmag-min 12.0 --tmag-max 14.5 \
-  --log-path logs/discovery_run_001.json
+  --log logs/discovery_run_001.json
 .venv/bin/python Skills/rank_candidates.py logs/discovery_run_001.json --top 20
 ```
 

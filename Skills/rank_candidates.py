@@ -1,7 +1,8 @@
 """Rank and compare exoplanet candidate outputs from the exo CLI.
 
 Reads one or more JSON files produced by ``exo <TIC-ID> --output results.json``
-and prints a ranked table sorted by a composite score.
+or a ScanLog produced by ``star_scanner.py --log <path>`` and prints a ranked
+table sorted by a composite score.
 
 Composite ranking score
 -----------------------
@@ -46,19 +47,51 @@ _PATHWAY_BONUS: dict[str, float] = {
 # ---------------------------------------------------------------------------
 
 
+def _scan_log_to_rows(data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Convert a star_scanner ScanLog dict to rank_candidates row format.
+
+    Only entries with status ``candidate_found`` are returned.
+    """
+    rows: list[dict[str, Any]] = []
+    for entry in data.get("entries", {}).values():
+        if entry.get("status") != "candidate_found":
+            continue
+        fpp = entry.get("best_fpp")
+        rows.append({
+            "tic_id": entry.get("tic_id"),
+            "target_id": f"TIC {entry.get('tic_id', '?')}",
+            "candidate_id": f"TIC {entry.get('tic_id', '?')}",
+            "period_days": entry.get("best_period_days") or 0.0,
+            "pathway": entry.get("best_pathway") or "",
+            "provenance_score": 0.0,
+            "snr": 0.0,
+            "scores": {
+                "false_positive_probability": fpp if fpp is not None else 1.0,
+                "detection_confidence": 0.0,
+                "novelty_score": 0.0,
+            },
+        })
+    return rows
+
+
 def load_candidates(paths: list[Path]) -> list[dict[str, Any]]:
     """Load candidate rows from JSON output files.
 
-    Each file may contain a single dict or a list of dicts (as produced by
-    ``exo --output``).  Returns a flat list of all rows with a ``_source_file``
-    key added for traceability.
+    Accepts ``exo --output`` / ``batch_scan`` format (list of dicts or single
+    dict) and ``star_scanner`` ScanLog format (dict with ``entries`` +
+    ``last_updated`` keys).  Only ``candidate_found`` entries are returned
+    from ScanLog files.  Returns a flat list with ``_source_file`` added.
     """
     rows: list[dict[str, Any]] = []
     for path in paths:
         data = json.loads(path.read_text())
-        if isinstance(data, dict):
-            data = [data]
-        for row in data:
+        if isinstance(data, dict) and "entries" in data and "last_updated" in data:
+            converted: list[dict[str, Any]] = _scan_log_to_rows(data)
+        elif isinstance(data, dict):
+            converted = [data]
+        else:
+            converted = list(data)
+        for row in converted:
             row = dict(row)
             row.setdefault("_source_file", str(path))
             rows.append(row)
