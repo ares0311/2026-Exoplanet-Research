@@ -74,7 +74,7 @@ When the user must take an action to unblock a gap:
 
 **Research brief wired (2026-06-27):** `docs/exoplanet_detection_research_brief.md` is now required reading. Key takeaways: TESS > Kepler/K2 > JWST in discovery priority order; CNN architecture baseline is Shallue & Vanderburg (2018); PLATO launches end-2026 (pipeline should handle long-baseline photometry); GP for correlated noise; citizen submissions require full transit + false-positive diagnostic table.
 
-**Active work: Option A JWST integration (A3 pending) + Option B5 [HUMAN] discovery scan.**
+**Active work: Option B5 [HUMAN] discovery scan.** JWST integration A1-A3, K2 TAP fixes, and TESS target restructuring B1-B4 are merged.
 
 | Item | State |
 |---|---|
@@ -86,7 +86,7 @@ When the user must take an action to unblock a gap:
 | Option B5 — first 200-target discovery scan | **[HUMAN]** — ready to run (see First action below) |
 | K2 overlap corpus (`data/tess_k2_overlap_snippets.jsonl`) | **COMPLETE** — 2,086 snippets (2026-06-27) |
 
-**The only active CNN gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80).**
+**The only active CNN gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80), but CNN work is paused until the first real discovery scan is complete and reviewed.**
 
 ### What was done in the previous sessions (2026-06-21 – 2026-06-26)
 
@@ -132,9 +132,12 @@ caffeinate -dims .venv/bin/python Skills/star_scanner.py \
   --max-stars 200 \
   --log logs/discovery_run_001.json
 .venv/bin/python Skills/rank_candidates.py logs/discovery_run_001.json --top 20
+.venv/bin/python Skills/alert_filter.py logs/discovery_run_001.json \
+  --fpp-max 0.15 \
+  --output logs/discovery_filtered_001.json
 ```
 
-Do NOT proceed with CNN C20 training until the above scan is complete and has been reviewed for candidates. If zero candidates emerge after scanning ≥1,000 targets, that finding itself dictates the next priority.
+If `alert_filter.py` exits with `No candidates matched the filters.`, that is an acceptable null triage result for the first 200-target batch; keep the full `logs/discovery_run_001.json` for review. Do NOT proceed with CNN C20 training until the above scan is complete and has been reviewed for candidates. If zero candidates emerge after scanning ≥1,000 targets, that finding itself dictates the next priority.
 
 ### CNN production runbook
 

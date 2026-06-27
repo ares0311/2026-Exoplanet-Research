@@ -2,7 +2,7 @@
 
 **Purpose**: Prevent doom loops. Every agent and every session must read this before doing anything.
 
-**Last updated**: 2026-06-27 (sequencing: Option A JWST integration → Option B TESS novelty restructure)
+**Last updated**: 2026-06-27 (Option A JWST integration and Option B TESS novelty restructure merged; Option B5 discovery scan pending)
 
 ---
 
@@ -65,7 +65,7 @@ These are ranked by novelty (most underexplored first):
 - ExoFOP CTOI list (already flagged by community)
 - NASA Exoplanet Archive confirmed planets table
 
-`Skills/toi_checker.py` and `Skills/star_scanner.py` already implement TOI exclusion. Missing: CTOI and confirmed-planet cross-check. Add these before running large discovery batches.
+`Skills/toi_checker.py` and `Skills/star_scanner.py` implement TOI, CTOI, and confirmed-host exclusion. Keep these exclusions enabled before running discovery batches.
 
 ---
 
@@ -143,7 +143,7 @@ JWST does not run autonomous surveys the way TESS does. Its time-series observat
 | A2 | Download JWST calibrated integration products (`_calints.fits`); extract flux vs. time | `Skills/fetch_jwst_lc.py` |
 | A3 | Convert JWST data to pipeline LightCurve format; wire into `exo` CLI with `--mission JWST` | `src/exo_toolkit/fetch.py` extension |
 
-**Status**: A1 MERGED (PR #133). A2 MERGED (PR #133). K2 TAP ORA-00904 fix MERGED (PR #134). A3 after A2 validates against live JWST targets.
+**Status**: A1 MERGED (PR #133). A2 MERGED (PR #133). K2 TAP ORA-00904 fix MERGED (PR #134). A3 MERGED (PR #141): `exo --mission JWST` is wired through the CLI.
 
 ### Option A constraints
 
@@ -154,23 +154,23 @@ JWST does not run autonomous surveys the way TESS does. Its time-series observat
 
 ---
 
-## TESS Target Selection: Option B — Next After A
+## TESS Target Selection: Option B — B1-B4 Merged, B5 Pending
 
-**Build after A1+A2 are committed.**
+**Use for the first real discovery scan.**
 
-Current gap: `star_scanner.py` excludes TOI list but NOT CTOI (community TOI) or confirmed exoplanet hosts from the NASA Exoplanet Archive. This means candidates already flagged by the community get re-scanned.
+Current gate: `star_scanner.py` excludes TOI, CTOI, and confirmed exoplanet hosts from the NASA Exoplanet Archive, and defaults to the Tmag 12.0-14.5 novelty frontier. The remaining step is to run and review a real scan.
 
 ### Option B build plan
 
 | Step | What to build | File |
 |------|--------------|------|
-| B1 | Add CTOI exclusion to `star_scanner.py::run_background_scan()` using `Skills/fetch_exofop_ctoi.py` | `Skills/star_scanner.py` |
-| B2 | Add confirmed-planet cross-check using NASA Exoplanet Archive TAP (`ps` table, `pl_tranflag=1`) | new `Skills/fetch_confirmed_hosts.py` |
-| B3 | Default `tmag_range` in `star_scanner.py` to `(12.0, 14.5)` to target faint-star novelty frontier | `Skills/star_scanner.py` |
-| B4 | Extend default `period_max` in BLS search to 500 d | `src/exo_toolkit/search.py` |
+| B1 | Add CTOI exclusion to `star_scanner.py::run_background_scan()` using `Skills/fetch_exofop_ctoi.py` | MERGED (PR #139) |
+| B2 | Add confirmed-planet cross-check using NASA Exoplanet Archive TAP (`ps` table, `pl_tranflag=1`) | MERGED (PR #139) |
+| B3 | Default `tmag_range` in `star_scanner.py` to `(12.0, 14.5)` to target faint-star novelty frontier | MERGED (PR #139) |
+| B4 | Extend default `period_max` in BLS search to 500 d | MERGED (PR #139) |
 | B5 | Run first 200-target discovery scan and document results | [HUMAN] |
 
-**Status**: Not started. Begins after PR #134 merges to main.
+**Status**: B1-B4 merged to `main`. B5 is the highest-priority active production gate.
 
 ---
 
@@ -238,18 +238,7 @@ The XGBoost model (`models/xgboost_koi.json`) is trained and available now.
 
 ---
 
-## The Immediate Next Action (As of 2026-06-26)
-
-**K2 corpus fetch** (to enable C20 CNN training — secondary to discovery):
-
-```bash
-git pull origin main
-caffeinate -dims .venv/bin/python Skills/fetch_tess_k2_overlap_snippets.py \
-  --output data/tess_k2_overlap_snippets.jsonl \
-  --workers 4 \
-  --request-delay 0.25
-wc -l data/tess_k2_overlap_snippets.jsonl
-```
+## The Immediate Next Action (As of 2026-06-27)
 
 **First discovery run** (higher priority than CNN training):
 
@@ -267,6 +256,12 @@ caffeinate -dims .venv/bin/python Skills/star_scanner.py \
 ```
 
 This will take approximately 2–4 hours on a Mac M4 Max (200 targets × ~1 min each). Use `caffeinate -dims`.
+
+If `alert_filter.py` reports `No candidates matched the filters.`, keep the full
+`logs/discovery_run_001.json`; a null 200-target batch is still useful evidence.
+Do not build the C20 CNN corpus or train C20 until this discovery run has been
+reviewed. If zero candidates emerge after at least 1,000 TIC targets, the null
+result dictates the next production priority.
 
 ---
 

@@ -1,8 +1,8 @@
 # PROJECT STATUS
 
 ## Status: Active Development
-## Phase: T1-1 CNN Gate — K2 corpus fetch in progress, C20 training queued
-## Last Updated: 2026-06-22
+## Phase: Live Discovery Gate — first 200-target scan pending
+## Last Updated: 2026-06-27
 
 ---
 
@@ -15,8 +15,10 @@ The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit w
 - Optional XGBoost and stacking scorer modes (Tier 1 model trained: Kepler KOI AUC=0.992)
 - SQLite-backed background automation with top-level logs
 - 415 standalone `Skills/` utility scripts
-- 109 top-level test files, 2,222 default tests passing
+- 113 top-level test files, 2,328 default tests passing
 - 27 package Python modules under `src/exo_toolkit/`
+- JWST time-series ingestion wired into the CLI with `--mission JWST`
+- Novel TESS target scanning that excludes TOI, CTOI, and confirmed-host catalogs
 
 Local validation note: validated on Python 3.14.3 in `.venv` with `xgboost` dependency restored and macOS OpenMP runtime (`libomp`) installed. System Python is never used.
 
@@ -28,7 +30,7 @@ Local validation note: validated on Python 3.14.3 in `.venv` with `xgboost` depe
 |------|-----------|--------|
 | Scoring engine | `schemas.py`, `features.py`, `hypotheses.py`, `priors.py`, `scoring.py`, `pathway.py` | Complete |
 | Data pipeline | `fetch.py`, `clean.py`, `search.py`, `vet.py`, `calibration.py` | Complete |
-| Transit scan CLI | `cli.py` — `exo <TIC-ID>` with `--scorer`, `--model-path`, `--output` | Complete |
+| Transit scan CLI | `cli.py` — `exo <TIC-ID>` with `--scorer`, `--model-path`, `--output`; JWST via `--mission JWST` | Complete |
 | Background automation CLI | `cli.py` — `background-run-once`, summaries, integrity, validation | Complete |
 | Background automation module | `background/` — config, fixtures, priority, runner, storage, reports | Complete |
 | SQLite runtime state | `logs/background_search.sqlite3` schema v2 | Complete |
@@ -37,9 +39,9 @@ Local validation note: validated on Python 3.14.3 in `.venv` with `xgboost` depe
 | Scheduler docs | `docs/SCHEDULER.md` — cron, launchd, systemd | Complete |
 | ML Tier 1 | `ml/xgboost_scorer.py` + `models/xgboost_koi.json` | Complete — trained on 7,586 Kepler KOIs (AUC=0.992) |
 | ML Tier 3 | `ml/stacking_scorer.py` | Complete, includes optional 3-tier XGBoost/CNN/Bayesian blend |
-| ML Tier 2 scaffolding | `ml/cnn_scorer.py`, `Skills/train_cnn.py`, CNN data utilities | Complete, production use gated on labeled TESS corpus |
+| ML Tier 2 scaffolding | `ml/cnn_scorer.py`, `Skills/train_cnn.py`, CNN data utilities | Complete, no production checkpoint; paused until discovery scan evidence exists |
 | Training/evaluation Skills | Kepler, TESS, combined training, CNN data assembly/validation/training support, XGBoost training, scorer evaluation | Complete |
-| Discovery workflow Skills | star scanner, batch scan, alert filter, ranking, watchlist, exports, reports | Complete |
+| Discovery workflow Skills | star scanner, batch scan, alert filter, ranking, watchlist, exports, reports | Complete; first real scan pending |
 | Milestones 13-39 Skills | 354 additional analysis, vetting, observability, ML, physics, reporting, scheduling, and follow-up utilities | Complete |
 | Milestone 19a Skill | `multi_sector_phase_compare.py` — offline per-sector phase-fold comparison | Complete |
 | Milestone 19b Skill | `candidate_dashboard_export.py` — static conservative candidate dashboard with optional plot artifacts | Complete |
@@ -89,7 +91,30 @@ without relying on chat context or local terminal output.
 
 ---
 
-## Blocked
+## Active Production Blocker
+
+**T1-0 — first real discovery scan evidence**
+
+- The project mission has been realigned to discovering previously unknown transit candidates before doing more CNN work.
+- Option A JWST integration is merged: A1/A2 via PR #133 and A3 CLI wiring via PR #141.
+- Option B TESS novelty targeting is merged via PR #139: `star_scanner.py` excludes TOI, CTOI, and confirmed-host catalogs, and defaults to Tmag 12.0-14.5.
+- K2 overlap corpus collection is complete locally with 2,086 snippets; do not re-fetch it.
+- The next production action is human-run because it requires live services and a long-running Mac-local scan:
+
+```bash
+git pull origin main
+caffeinate -dims .venv/bin/python Skills/star_scanner.py \
+  --max-stars 200 \
+  --log logs/discovery_run_001.json
+.venv/bin/python Skills/rank_candidates.py logs/discovery_run_001.json --top 20
+.venv/bin/python Skills/alert_filter.py logs/discovery_run_001.json \
+  --fpp-max 0.15 \
+  --output logs/discovery_filtered_001.json
+```
+
+If `alert_filter.py` finds no rows, keep `logs/discovery_run_001.json`; a null first batch still informs the next target-selection cycle.
+
+## Paused
 
 **Production ML Tier 2 — checkpoint generalization**
 
@@ -129,20 +154,16 @@ without relying on chat context or local terminal output.
   instead of hiding the stale provider behind a generic invalid/empty result.
 - Architecture details: `docs/CNN_SPEC.md`.
 - Human local runbook: `docs/CNN_PRODUCTION_RUNBOOK.md`.
-- Next outside blocker: choose the next materially different T1-1 strategy.
+- Next outside blocker: wait for first discovery-scan evidence. Do not build C20 or train another CNN until the scan is complete and reviewed.
 
 ---
 
 ## Next Actions
 
-1. Update `docs/LOCAL_ARTIFACT_LEDGER.md` and `artifacts/manifests/local_artifacts.json` after each local artifact state change so GitHub records the current corpus/split/checkpoint status.
-2. Do not promote `checkpoints/cnn_tess_finetuned/best.pt`; it failed the
-   documented production gate.
-3. Do not run the Path A v3 MAST fetch from the 56-target inventory as a
-   production-closing attempt.
-4. Start the next T1-1 planning cycle around a materially different strategy:
-   a larger documented label source other than the stale ExoMAST TCE endpoint,
-   a label-quality improvement path, or a changed transfer/CNN approach.
+1. Run the first 200-target discovery scan on the user's Mac using the command in `docs/DISCOVERY_RUNBOOK.md`.
+2. Review `logs/discovery_run_001.json`, ranked candidates, and `logs/discovery_filtered_001.json` if present.
+3. Update `docs/LOCAL_ARTIFACT_LEDGER.md` and `artifacts/manifests/local_artifacts.json` with the scan result so GitHub-only agents can continue without chat context.
+4. Do not run C20 CNN corpus assembly or training until the first discovery scan is complete and reviewed.
 5. Promote nothing unless a future evaluator run reports `Flag: PASS`, raw test
    AUC is at least 0.85, calibrated test F1 is at least 0.80, calibrated
    Brier/ECE are no worse than raw, and the human explicitly approves
@@ -154,7 +175,7 @@ handoff.
 
 ## Latest Local Validation
 
-Validated on 2026-06-18:
+Validated on 2026-06-27:
 
 ```bash
 .venv/bin/ruff check .
@@ -162,7 +183,7 @@ Validated on 2026-06-18:
 .venv/bin/python -m pytest
 ```
 
-Result: ruff passed, mypy passed, pytest passed with 2,222 passed, 2 deselected, and 2 Lightkurve package warnings.
+Result: ruff passed, mypy passed, pytest passed with 2,328 passed, 2 deselected, and 3 package warnings.
 
 ---
 

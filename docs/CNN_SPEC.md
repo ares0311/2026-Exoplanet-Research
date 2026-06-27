@@ -1,6 +1,6 @@
 # ML Tier-2 — 1D CNN Architecture Specification
 
-**Status: FIRST CHECKPOINT REJECTED — retraining required before production promotion**
+**Status: NO PRODUCTION CHECKPOINT — CNN work paused until the first real discovery scan is complete and reviewed**
 
 The production corpus gate opened on 2026-06-06. The authorized local corpus
 contains 2,623 usable TESS snippets after 13 recorded fetch/extraction errors.
@@ -11,13 +11,13 @@ train/validation/test partition.
 Track local Tier-2 readiness with the offline reporter:
 
 ```bash
-python Skills/tier2_progress_reporter.py \
+.venv/bin/python Skills/tier2_progress_reporter.py \
   --labels data/exofop_ctoi_labels.json \
   --output reports/tier2_status.md \
   --json-output reports/tier2_status.json
 ```
 
-Check the live production-data gate with `python Skills/count_tess_labels.py`
+Check the live production-data gate with `.venv/bin/python Skills/count_tess_labels.py`
 only when live network access is intentionally approved. It queries ExoFOP,
 uses a bounded request timeout, writes a top-level SQLite audit log at
 `logs/tess_label_check.sqlite3`, and must not run in default validation.

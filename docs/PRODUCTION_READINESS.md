@@ -1,9 +1,9 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-06-26 (K2 TAP query encoding fixed — PR #132; version bumped to 0.2.0; C20 training awaits K2 corpus fetch)
+Last reviewed: 2026-06-27 (JWST A3 merged — PR #141; TESS novelty restructure B1-B4 merged — PR #139; K2 corpus complete; first real discovery scan B5 pending)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 2,222 default tests passing, 2 integration_live deselected
+Test baseline: 2,328 default tests passing, 2 integration_live deselected
 
 ---
 
@@ -23,12 +23,22 @@ must not be copied into `models/`, registered, or used for production scoring.
 
 ---
 
-## Tier 1 Gaps (Blocking Production CNN Use)
+## Tier 1 Gaps (Blocking Live Discovery Production)
+
+### T1-0: First Real Discovery Scan Evidence
+
+- **What is missing**: A completed, reviewed discovery scan over novel TESS targets that are not already TOIs, CTOIs, or confirmed exoplanet hosts
+- **Gate status**: **OPEN / HUMAN-RUN BLOCKED** — Option B1-B4 are merged and `Skills/star_scanner.py` is ready; the first 200-target scan must be run on the user's Mac because it uses live MAST/ExoFOP/NASA services and may take hours
+- **Why this is highest priority**: `docs/DISCOVERY_RUNBOOK.md` realigned production toward discovering previously unknown transit candidates. CNN work improves false-positive rejection, but it does not matter until the project has real candidates or a documented null discovery result.
+- **Required first batch**: Run `Skills/star_scanner.py --max-stars 200 --log logs/discovery_run_001.json`, then rank and filter candidates with `Skills/rank_candidates.py` and `Skills/alert_filter.py`
+- **Success evidence**: `logs/discovery_run_001.json` exists locally, top-ranked candidates or a null result are reviewed, and `docs/LOCAL_ARTIFACT_LEDGER.md` / `artifacts/manifests/local_artifacts.json` are updated with the batch result
+- **Next escalation rule**: Do not resume CNN C20 training until at least the first real scan is complete and reviewed. If zero candidates emerge after at least 1,000 TIC targets, that null result becomes the next production-planning input.
 
 ### T1-1: Production Tier 2 CNN Checkpoint
 
 - **What is missing**: A CNN checkpoint that passes held-out performance and calibration gates
 - **Gate status**: **OPEN** — Kepler pretraining, TESS split generation, and two Kepler->TESS fine-tunes are locally complete; both fine-tuned checkpoints failed held-out production gates and must not be promoted
+- **Current priority**: **PAUSED** until T1-0 is complete and reviewed
 - **Code status**: Training and state-dict inference paths are operational; the package scorer reconstructs the trained architecture and fails closed when loading fails
 - **Prior local corpus status**: **VALID as of 2026-06-12** — 2,037 snippets (1,012 positive CP+KP, 1,025 negative FP+FA, ratio 0.99); zero-epoch corpus retired and rebuilt from scratch with valid BJD epochs; label bug fixed (KP→1); MAST throttling fix applied (`bbb0877`)
 - **Local corpus status**: **KEPLER LOCAL VALIDATED** — TESS v2 complete at 2,619 snippets; Kepler finite rebuild has 6,837 parseable snippets with zero non-finite flux rows, zero duplicate resume keys, labels negative=4,280 and positive=2,557; `data/kepler_cnn_splits` validator PASS with train/val/test = 4,741 / 1,060 / 1,036
@@ -76,7 +86,7 @@ must not be copied into `models/`, registered, or used for production scoring.
   - **freeze_conv strategy exhausted.** Do not retry without a materially different corpus or training schedule.
 - **Strategic decision (2026-06-22)**: Human chose Option C — more data. All training-side approaches exhausted on 4,892 examples. Next authorized corpus: K2 EPIC overlap (K2 KOI confirmed planets/FPs with TESS re-observations folded at K2 ephemerides). See runbook Step 7g.
 - **ECE-skip gate fix (2026-06-22)**: `evaluate_cnn_checkpoint.py` now skips temperature scaling when raw test ECE < 0.05. Root cause of C11–C19 calibration doom loop confirmed: val is overconfident due to early-stopping selection bias; T > 1 applied to already-calibrated test structurally worsened ECE. With the fix, C20 gate is: raw AUC ≥ 0.85 AND raw F1 ≥ 0.80 (when ECE < 0.05, cal==raw). `Skills/fetch_tess_k2_overlap_snippets.py` and `configs/cnn_tess_c20.json` committed.
-- **Current data gate**: TESS combined splits VALIDATED; Kepler splits VALIDATED; C13–C19 all rejected; no CNN checkpoint approved for promotion. K2 overlap corpus fetch is the next authorized data-collection step. `Skills/fetch_tess_k2_overlap_snippets.py` is ready to run.
+- **Current data gate**: TESS combined splits VALIDATED; Kepler splits VALIDATED; C13–C19 all rejected; no CNN checkpoint approved for promotion. K2 overlap corpus is complete at 2,086 snippets. C20 corpus assembly is blocked until T1-0 discovery-scan evidence exists.
 - **Current authorized runbook**: `docs/CNN_PRODUCTION_RUNBOOK.md`
 - **Current promotion gate**: raw held-out test AUC ≥ 0.85; calibrated held-out test F1 ≥ 0.80; temperature scaling calibration must not worsen held-out test Brier score or ECE
 - **Calibration note**: Temperature scaling (T fitted via NLL on val split) replaced Platt scaling on 2026-06-21. Platt A≈1.7–1.8 consistently worsened calibration because raw predictions were already well-calibrated (ECE 0.02–0.06). Temperature scaling is the identity at T=1 and will not artificially sharpen probabilities.
@@ -136,7 +146,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
 | 82 production-critical Skills/ | ✅ |
-| 2,222 default tests, ruff clean, mypy clean | ✅ |
+| 2,328 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -145,11 +155,11 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 
 Run these before any live deployment or public announcement:
 
-- [ ] `PYTHONPATH=src python -m pytest` — all default tests pass, 0 failures
-- [ ] `ruff check .` — no lint errors
-- [ ] `python -m mypy src` — no type errors
+- [ ] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures
+- [ ] `.venv/bin/ruff check .` — no lint errors
+- [ ] `.venv/bin/python -m mypy src` — no type errors
 - [ ] `exo background-run-once --dry-run` — no config errors
-- [ ] `python Skills/tier2_progress_reporter.py` — confirm CNN gate status documented
+- [ ] `.venv/bin/python Skills/tier2_progress_reporter.py` — confirm CNN gate status documented
 - [ ] Verify `configs/background_search_v0.json` fingerprint matches expected value
 - [ ] Verify `models/xgboost_koi.json` and `models/xgboost_koi_meta.json` exist for XGBoost scorer
 - [ ] Run `exo <known-confirmed-TOI-TIC-ID> --scorer bayesian` — verify FPP < 0.5
@@ -175,7 +185,8 @@ These are enforced in code and must never be bypassed:
 
 | Blocker | What Is Needed | Who |
 |---|---|---|
-| Next CNN production plan | Path A inventory was too small; choose the next materially different T1-1 strategy before any long data fetch or training run | Agent + human approval |
+| First real discovery scan | Run the 200-target `star_scanner.py` batch on the user's Mac and paste back the rank/filter summary | Human |
+| Next CNN production plan | Wait for T1-0 scan evidence; only then decide whether C20 corpus assembly/training is still production-relevant | Agent + human approval |
 | CNN production promotion | Validate, calibrate, register, and commit only a future checkpoint that passes held-out gates | Agent + human approval |
 | Stacking weight calibration | Tune blend weights on held-out calibration set | Agent after T1-1 resolved |
 
@@ -185,7 +196,7 @@ These are enforced in code and must never be bypassed:
 
 Any plan proposed in a session must:
 
-1. Name the highest-priority unresolved Tier 1 gap (currently **T1-1: Production Tier 2 CNN Checkpoint**)
+1. Name the highest-priority unresolved Tier 1 gap (currently **T1-0: First Real Discovery Scan Evidence**)
 2. Show how each proposed step closes or directly unblocks that gap — or explicitly justify why it is Tier 2 work
 3. Include outside blockers as explicit named steps with responsible party
 4. Never propose log modules, schemas, or scaffolding unless they directly unblock a named gap

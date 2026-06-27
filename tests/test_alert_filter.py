@@ -120,3 +120,72 @@ class TestApplyFilters:
         apply_filters(f, output_path=out)
         assert out.exists()
         assert json.loads(out.read_text()) == [_row()]
+
+    def test_filters_star_scanner_scan_log(self, tmp_path: Path) -> None:
+        f = tmp_path / "discovery_run.json"
+        f.write_text(
+            json.dumps(
+                {
+                    "started_at": "2026-06-27T10:00:00Z",
+                    "entries": {
+                        "1001": {
+                            "tic_id": 1001,
+                            "status": "candidate_found",
+                            "n_signals": 1,
+                            "best_fpp": 0.10,
+                            "best_pathway": "planet_hunters_discussion",
+                            "best_period_days": 12.34,
+                            "priority_score": 0.77,
+                            "scanned_at": "2026-06-27T10:01:00Z",
+                        },
+                        "1002": {
+                            "tic_id": 1002,
+                            "status": "candidate_found",
+                            "n_signals": 1,
+                            "best_fpp": 0.40,
+                            "best_pathway": "github_only_reproducibility",
+                            "best_period_days": 3.21,
+                        },
+                        "1003": {
+                            "tic_id": 1003,
+                            "status": "scanned_clear",
+                            "n_signals": 0,
+                        },
+                    },
+                }
+            )
+        )
+
+        result = apply_filters(f, fpp_max=0.15)
+
+        assert len(result) == 1
+        assert result[0]["tic_id"] == 1001
+        assert result[0]["false_positive_probability"] == pytest.approx(0.10)
+        assert result[0]["period_days"] == pytest.approx(12.34)
+
+    def test_writes_filtered_star_scanner_scan_log(self, tmp_path: Path) -> None:
+        f = tmp_path / "discovery_run.json"
+        out = tmp_path / "filtered.json"
+        f.write_text(
+            json.dumps(
+                {
+                    "entries": {
+                        "1001": {
+                            "tic_id": 1001,
+                            "status": "candidate_found",
+                            "n_signals": 2,
+                            "best_fpp": 0.08,
+                            "best_pathway": "tfop_ready",
+                            "best_period_days": 4.56,
+                        }
+                    }
+                }
+            )
+        )
+
+        apply_filters(f, output_path=out, fpp_max=0.15, pathway="tfop_ready")
+
+        written = json.loads(out.read_text())
+        assert len(written) == 1
+        assert written[0]["candidate_id"] == "TIC 1001"
+        assert written[0]["scores"]["false_positive_probability"] == pytest.approx(0.08)
