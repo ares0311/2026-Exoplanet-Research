@@ -1236,20 +1236,13 @@ fix the durable resume ledger before asking the human to run it again.
 **JWST Option A status (as of 2026-06-27):**
 - `Skills/fetch_jwst_targets.py` (A1) — **MERGED** (PR #133)
 - `Skills/fetch_jwst_lc.py` (A2) — **MERGED** (PR #133)
-- K2 TAP ORA-00904 fix (`Skills/fetch_tess_k2_overlap_snippets.py`) — **PR #134** (CI pending)
-- Option B (TESS target restructuring: B1–B5) — **NOT STARTED**; start after PR #134 merges
+- K2 TAP ORA-00904 fix (`Skills/fetch_tess_k2_overlap_snippets.py`) — **MERGED** (PR #134, 2026-06-27)
+- Option B (TESS target restructuring: B1–B5) — **NOT STARTED**; first priority after discovery scan
+
+**K2 corpus fetch status (as of 2026-06-27):** **COMPLETE** — 2,086 snippets written to `data/tess_k2_overlap_snippets.jsonl`; wrote=2086, skipped=174, terminal_failures=135, elapsed=2531s (42m11s). No further fetch action needed.
 
 **Immediate next actions (in priority order):**
-1. **[HUMAN]** Merge PR #134 once CI passes — no code changes needed, just approve.
-2. **[HUMAN]** Run the K2 corpus fetch (after PR #134 merges and `git pull origin main`):
-   ```bash
-   git pull origin main
-   caffeinate -dims .venv/bin/python Skills/fetch_tess_k2_overlap_snippets.py \
-     --output data/tess_k2_overlap_snippets.jsonl \
-     --workers 4 --request-delay 0.25
-   wc -l data/tess_k2_overlap_snippets.jsonl
-   ```
-3. **[HUMAN]** Run the first real discovery scan (higher priority than any CNN work):
+1. **[HUMAN]** Run the first real discovery scan — highest priority item before any CNN work:
    ```bash
    git pull origin main
    caffeinate -dims .venv/bin/python Skills/star_scanner.py \
@@ -1257,8 +1250,8 @@ fix the durable resume ledger before asking the human to run it again.
      --log-path logs/discovery_run_001.json
    .venv/bin/python Skills/rank_candidates.py logs/discovery_run_001.json --top 20
    ```
-4. **[AGENT]** After both [HUMAN] tasks above complete: build Option B1–B5 (TESS target restructuring).
-5. **[AGENT]** CNN C20 training (only after step 3 above produces candidates): expand corpus with K2 overlap snippets, build `data/tess_c20_cnn_splits/`, train with `configs/cnn_tess_c18.json` (`freeze_conv_epochs=10`).
+2. **[AGENT]** Build Option B1–B5 (TESS target restructuring: CTOI exclusion, confirmed-planet cross-check, Tmag defaults, period_max extension). Can begin immediately — no blockers.
+3. **[AGENT]** CNN C20 training (only after step 1 above produces candidates): merge K2 overlap into C20 corpus, build `data/tess_c20_cnn_splits/`, train with `configs/cnn_tess_c18.json` (`freeze_conv_epochs=10`).
 
 #### CNN candidate history (what has been tried — do not repeat)
 
@@ -1292,8 +1285,8 @@ fix the durable resume ledger before asking the human to run it again.
 - **Kepler pretrain**: `checkpoints/cnn_kepler_pretrain/best.pt` — SHA `c782d7af...`; val AUC 0.9186; **retain**
 - **TESS combined**: `data/tess_combined_snippets.jsonl` — 7,483 rows (TESS v2 + Kepler-TESS overlap)
 - **TESS combined splits**: `data/tess_combined_cnn_splits/` — LOCAL VALIDATED; train 4,892 / val 1,049 / test 1,033
-- **K2 overlap**: `data/tess_k2_overlap_snippets.jsonl` — **NOT YET FETCHED**; fetcher built (PR #134); expected 500–1,500 new snippets
-- **C20 splits**: `data/tess_c20_cnn_splits/` — **NOT YET BUILT**; depends on K2 overlap fetch
+- **K2 overlap**: `data/tess_k2_overlap_snippets.jsonl` — **COMPLETE** — 2,086 snippets (2026-06-27; wrote=2086, skipped=174, terminal_failures=135, elapsed=2531s)
+- **C20 splits**: `data/tess_c20_cnn_splits/` — **NOT YET BUILT**; build only after discovery scan produces candidates
 
 #### CNN production runbook
 

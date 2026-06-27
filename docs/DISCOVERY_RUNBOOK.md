@@ -58,7 +58,7 @@ These are ranked by novelty (most underexplored first):
 | 2 | **Recent sectors (64–68)** | SPOC output available but citizen-science attention has moved on | `select_targets()` with recent sector filter |
 | 3 | **Long-period candidates (P > 200 d)** | Most BLS searches cap at 200 d; requires multi-sector light curves | Extend `period_max` in search.py BLS call |
 | 4 | **20-second cadence targets** | Expensive to process; barely touched by any survey | MAST query with `exptime=20` |
-| 5 | **JWST targets** | Lightkurve does not support JWST natively; requires custom photometry | Out-of-scope for this pipeline currently |
+| 5 | **JWST targets** | Lightkurve does not support JWST natively; requires custom photometry | **IN SCOPE** — use `Skills/fetch_jwst_targets.py` to list programs and `Skills/fetch_jwst_lc.py` to extract flux (MERGED PR #133); A3 CLI wiring pending |
 
 **Novelty criterion**: A target is "novel" if its TIC ID does NOT appear in:
 - ExoFOP TOI list (already flagged by TESS pipeline)
@@ -143,7 +143,7 @@ JWST does not run autonomous surveys the way TESS does. Its time-series observat
 | A2 | Download JWST calibrated integration products (`_calints.fits`); extract flux vs. time | `Skills/fetch_jwst_lc.py` |
 | A3 | Convert JWST data to pipeline LightCurve format; wire into `exo` CLI with `--mission JWST` | `src/exo_toolkit/fetch.py` extension |
 
-**Status**: A1 MERGED (PR #133). A2 MERGED (PR #133); K2 TAP ORA-00904 fix in PR #134. A3 after PR #134 merges and A2 validates against live JWST targets.
+**Status**: A1 MERGED (PR #133). A2 MERGED (PR #133). K2 TAP ORA-00904 fix MERGED (PR #134). A3 after A2 validates against live JWST targets.
 
 ### Option A constraints
 
