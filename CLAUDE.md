@@ -1237,20 +1237,22 @@ fix the durable resume ledger before asking the human to run it again.
 - `Skills/fetch_jwst_targets.py` (A1) — **MERGED** (PR #133)
 - `Skills/fetch_jwst_lc.py` (A2) — **MERGED** (PR #133)
 - K2 TAP ORA-00904 fix (`Skills/fetch_tess_k2_overlap_snippets.py`) — **MERGED** (PR #134, 2026-06-27)
-- Option B (TESS target restructuring: B1–B5) — **NOT STARTED**; first priority after discovery scan
+- Option B1–B4 (TESS target restructuring) — **MERGED** (PR #139, 2026-06-27): CTOI exclusion, confirmed-host exclusion, tmag 12–14.5 default, period_max 500d
+- Option B5 — **[HUMAN]** Run first 200-target discovery scan (see Immediate Next Actions below)
 
 **K2 corpus fetch status (as of 2026-06-27):** **COMPLETE** — 2,086 snippets written to `data/tess_k2_overlap_snippets.jsonl`; wrote=2086, skipped=174, terminal_failures=135, elapsed=2531s (42m11s). No further fetch action needed.
 
 **Immediate next actions (in priority order):**
-1. **[HUMAN]** Run the first real discovery scan — highest priority item before any CNN work:
+1. **[HUMAN]** Run the first real discovery scan — highest priority item before any CNN work.
+   Option B1–B4 is now merged: the scanner automatically excludes TOI + CTOI + confirmed hosts and defaults to Tmag 12–14.5:
    ```bash
    git pull origin main
    caffeinate -dims .venv/bin/python Skills/star_scanner.py \
-     --max-stars 200 --tmag-min 12.0 --tmag-max 14.5 \
+     --max-stars 200 \
      --log logs/discovery_run_001.json
    .venv/bin/python Skills/rank_candidates.py logs/discovery_run_001.json --top 20
    ```
-2. **[AGENT]** Build Option B1–B5 (TESS target restructuring: CTOI exclusion, confirmed-planet cross-check, Tmag defaults, period_max extension). Can begin immediately — no blockers.
+2. **[AGENT]** A3: Wire JWST `--mission JWST` into the `exo` CLI via `src/exo_toolkit/fetch.py` extension (after B5 discovery scan completes or in parallel).
 3. **[AGENT]** CNN C20 training (only after step 1 above produces candidates): merge K2 overlap into C20 corpus, build `data/tess_c20_cnn_splits/`, train with `configs/cnn_tess_c18.json` (`freeze_conv_epochs=10`).
 
 #### CNN candidate history (what has been tried — do not repeat)
