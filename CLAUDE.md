@@ -13,6 +13,7 @@ Every session must begin by reading:
 1. `AGENTS.md`
 2. `docs/PRODUCTION_READINESS.md`
 3. `docs/DISCOVERY_RUNBOOK.md`
+4. `docs/exoplanet_detection_research_brief.md` (skim the satellite table and AI methods section)
 
 Before proposing or executing any task you must:
 1. Name the highest-priority unresolved Tier 1 gap from `docs/PRODUCTION_READINESS.md`.
@@ -1342,6 +1343,45 @@ Bayesian scoring as the default fallback:
 
 - **TESS**: MAST via Lightkurve (`mission="TESS"`, PDCSAP flux preferred)
 - **Kepler/K2**: MAST via Lightkurve (`mission="Kepler"` / `"K2"`)
+- **JWST**: MAST via `astroquery.mast` directly — Lightkurve does NOT support JWST. Use `_calints.fits` (Stage 2) or `_x1dints.fits` (Stage 3 NIRISS SOSS). See `Skills/fetch_jwst_lc.py`.
 - **Catalogs**: NASA Exoplanet Archive, TOI list, KOI list, CTOI via astroquery
 
 Focus on lightly-worked targets: later TESS sectors, fainter stars (Tmag 10–14), less-crowded fields.
+
+---
+
+## Research Context (`docs/exoplanet_detection_research_brief.md`)
+
+Full brief: `docs/exoplanet_detection_research_brief.md`. Key facts for coding agents:
+
+### Satellite Priority Order (for discovery work)
+1. **TESS** — best current public discovery engine; huge archive, ongoing sectors, TOIs, FFIs
+2. **Kepler/K2** — highest-value historical benchmark; Kepler = cleaner long-baseline; K2 = noisier systematics
+3. **JWST** — atmospheric characterization, not bulk detection; public data via MAST after proprietary period
+4. **PLATO** — launching end-2026; bright-star terrestrial planets + asteroseismic ages (prepare pipeline)
+5. **Roman** — future; microlensing census and coronagraph technology demo
+
+### AI Methods Relevant to This Project
+- **1D CNN on phase-folded light curves** — Shallue & Vanderburg (2018) baseline; local+global view architecture
+- **Transformer for full light curves** — attention can model long light curves without pre-selecting transit windows
+- **Semi-supervised / anomaly detection** — useful when labels are incomplete; helps discover unusual systems
+- **GP for stellar variability** — models correlated noise; prevents biased transit depth/timing estimates
+- **Bayesian atmospheric retrieval** — JWST spectra require TauREx/petitRADTRANS-style retrieval; ML retrieval (neural posterior estimation) is the frontier
+
+### Citizen Science Quality Bar (before escalating any candidate)
+- Signal repeats at consistent period
+- Full transit with pre/post baseline; partial events are lower value
+- Survives multiple detrending approaches
+- No centroid shift, no eclipsing binary contaminant in aperture, no secondary eclipse
+- Odd/even depth consistent
+- Use BJD_TDB time standard; document it
+
+### Minimum Submission Evidence
+TIC ID + coordinates, light curve (BJD + normalized flux + errors), transit model parameters, false-positive diagnostic table, catalog cross-check (TOI/CTOI/Gaia/confirmed hosts), reproducible notebook or script.
+
+### Pipeline Stack Guidance (from brief)
+Use `lightkurve`, `astroquery`, `wotan` (detrending), `transitleastsquares`, `exoplanet`, `celerite`, `pymc` where appropriate. JWST: use `astroquery.mast` directly. Atmospheric: `petitRADTRANS` or `TauREx` for forward models.
+
+### Upcoming Assets to Prepare For
+- **PLATO** (end-2026): long-baseline photometry, asteroseismic stellar ages — pipeline should handle multi-year continuous light curves
+- **Roman** (mid-2020s): microlensing fields, coronagraph tech demo — different data format from transit surveys
