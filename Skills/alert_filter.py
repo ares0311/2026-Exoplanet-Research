@@ -94,8 +94,7 @@ def apply_filters(
     Returns:
         Filtered list of rows.
     """
-    data = json.loads(Path(path).read_text())
-    rows = data if isinstance(data, list) else [data]
+    rows = _load_rows(path)
     filtered = filter_candidates(
         rows,
         fpp_max=fpp_max,
@@ -112,6 +111,55 @@ def apply_filters(
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+
+def _load_rows(path: Path | str) -> list[dict[str, Any]]:
+    """Load candidate rows from list, single-result, or star_scanner log JSON."""
+    data = json.loads(Path(path).read_text())
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict) and isinstance(data.get("entries"), dict):
+        return _scan_log_to_rows(data)
+    if isinstance(data, dict):
+        return [data]
+    return []
+
+
+def _scan_log_to_rows(log: dict[str, Any]) -> list[dict[str, Any]]:
+    """Convert ``Skills/star_scanner.py --log`` output into filterable rows."""
+    rows: list[dict[str, Any]] = []
+    entries = log.get("entries", {})
+    if not isinstance(entries, dict):
+        return rows
+
+    for key, entry in entries.items():
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("status") != "candidate_found":
+            continue
+
+        tic_id = entry.get("tic_id")
+        target_id = f"TIC {tic_id}" if tic_id is not None else str(key)
+        best_fpp = entry.get("best_fpp")
+        rows.append(
+            {
+                "candidate_id": target_id,
+                "target_id": target_id,
+                "tic_id": tic_id,
+                "status": entry.get("status"),
+                "n_signals": entry.get("n_signals", 0),
+                "period_days": entry.get("best_period_days"),
+                "best_period_days": entry.get("best_period_days"),
+                "pathway": entry.get("best_pathway"),
+                "best_pathway": entry.get("best_pathway"),
+                "false_positive_probability": best_fpp,
+                "best_fpp": best_fpp,
+                "priority_score": entry.get("priority_score"),
+                "scanned_at": entry.get("scanned_at"),
+                "scores": {"false_positive_probability": best_fpp},
+            }
+        )
+    return rows
 
 
 def _fpp(row: dict[str, Any]) -> float | None:

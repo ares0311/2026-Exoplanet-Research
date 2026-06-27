@@ -72,7 +72,8 @@ def test_local_artifact_manifest_matches_human_ledger() -> None:
 
     assert manifest["policy"]["git_add_dot_must_be_safe"] is True
     assert manifest["policy"]["github_visible_ledger_required"] is True
-    assert manifest["production_gap"] == "T1-1: Production Tier 2 CNN Checkpoint"
+    assert manifest["production_gap"].startswith("T1-0: First Real Discovery Scan Evidence")
+    assert "T1-1: Production Tier 2 CNN Checkpoint paused" in manifest["production_gap"]
 
     artifact_paths = {artifact["path"] for artifact in manifest["artifacts"]}
     required_paths = {
@@ -82,6 +83,8 @@ def test_local_artifact_manifest_matches_human_ledger() -> None:
         "data/tess_cnn_splits/",
         "checkpoints/cnn_kepler_pretrain/",
         "checkpoints/cnn_tess_finetuned/",
+        "logs/discovery_run_001.json",
+        "logs/discovery_filtered_001.json",
         "models/cnn*/",
         "logs/*.sqlite*",
         "reports/",

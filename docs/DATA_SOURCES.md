@@ -62,7 +62,7 @@ Columns fetched: `TOI`, `TIC ID`, `TFOPWG Disposition`, `Period (days)`,
 
 Labels used: `CP` → 1, `FP` / `EB` → 0.  `PC` excluded.
 
-Gate check: `python Skills/count_tess_labels.py` monitors CP count for CNN Tier-2.
+Gate check: `.venv/bin/python Skills/count_tess_labels.py` monitors CP count for CNN Tier-2.
 
 ---
 

@@ -479,7 +479,7 @@ python Skills/injection_recovery.py \
 Offline status artifacts:
 
 ```bash
-python Skills/tier2_progress_reporter.py \
+.venv/bin/python Skills/tier2_progress_reporter.py \
   --labels data/exofop_ctoi_labels.json \
   --output reports/tier2_status.md \
   --json-output reports/tier2_status.json

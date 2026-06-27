@@ -158,7 +158,7 @@ The detection of transiting exoplanets from space-based photometry has undergone
 
 A persistent challenge across both missions is the high false-positive rate among photometric transit candidates. Background eclipsing binaries, on-target eclipsing binaries diluted by the target's flux, stellar variability masquerading as periodic dimming, and instrumental systematics collectively account for the majority of transit-like signals detected by automated pipelines (Fressin et al.; Morton). Rigorous vetting — combining photometric diagnostics, centroid analysis, catalog matching, and probabilistic modeling — is therefore a prerequisite for responsible candidate reporting. The Kepler mission's Robovetter system (Coughlin et al.; Thompson et al.) demonstrated that automated multi-criterion vetting can achieve high completeness and reliability when trained on a large labeled corpus; the same principles apply to TESS data, with appropriate corrections for differences in cadence, pixel scale, and systematic noise.
 
-Deep-learning approaches have extended the automated vetting paradigm further. Shallue and Vanderburg showed that a convolutional neural network trained on Kepler TCEs can match or exceed human performance on the classification of folded light curves, recovering an eighth planet in the Kepler-90 system. However, such models are mission-specific and require thousands of labeled examples before they generalize reliably (Shallue and Vanderburg). This repository now includes CNN training, checkpoint, calibration, inference, CLI, and stacking scaffolding, but production CNN use remains gated until 5,000 or more TESS confirmed-planet labels and a calibrated checkpoint are available. The Bayesian log-score model and XGBoost tabular classifier remain the production-ready fallbacks in the interim.
+Deep-learning approaches have extended the automated vetting paradigm further. Shallue and Vanderburg showed that a convolutional neural network trained on Kepler TCEs can match or exceed human performance on the classification of folded light curves, recovering an eighth planet in the Kepler-90 system. However, such models are mission-specific and require thousands of labeled examples before they generalize reliably (Shallue and Vanderburg). This repository now includes CNN training, checkpoint, calibration, inference, CLI, and stacking scaffolding, but no CNN checkpoint is production-approved. The production workflow is currently discovery-first: run and review real novel-target scans before resuming CNN C20 training. The Bayesian log-score model and XGBoost tabular classifier remain the production-ready fallbacks in the interim.
 
 Citizen-science initiatives such as Planet Hunters have demonstrated that human inspection of phase-folded light curves can recover candidates missed by automated pipelines, particularly single-transit events and long-period systems (Fischer et al.). However, the volume of data produced by TESS renders manual inspection alone insufficient. A computational toolkit that automates the vetting and scoring workflow, while remaining interpretable and reproducible, occupies a productive niche between fully automated survey pipelines and ad hoc visual inspection.
 
@@ -222,11 +222,11 @@ The `--scorer` flag selects among five backends:
 | Full ensemble | `--scorer full-ensemble --model-path model.json --cnn-checkpoint best.pt` | Experimental XGBoost + CNN + Bayesian blend |
 
 The CNN implementation scaffolding is present, but production CNN training/use
-is gated on 5,000+ TESS confirmed-planet labels and calibration review. Write
+is paused until the first real discovery scan is complete and reviewed. Write
 offline readiness artifacts:
 
 ```bash
-python Skills/tier2_progress_reporter.py \
+.venv/bin/python Skills/tier2_progress_reporter.py \
   --labels data/exofop_ctoi_labels.json \
   --output reports/tier2_status.md \
   --json-output reports/tier2_status.json
@@ -236,7 +236,7 @@ Check the live ExoFOP label count only when network access is intentionally
 approved:
 
 ```bash
-python Skills/count_tess_labels.py
+.venv/bin/python Skills/count_tess_labels.py
 ```
 
 ---
@@ -896,7 +896,8 @@ validated counts and active blockers.
 | ✅ | **Milestone 29 — Pipeline operations** | Pipeline health/freshness/drift/throughput monitors, candidate cross-reference, follow-up checklist generation, target selection optimization, prioritization reports, and batch archiving. | `Skills/pipeline_health_monitor.py`, `Skills/model_drift_detector.py`, `Skills/batch_result_archiver.py` |
 | ✅ | **Milestone 30 — Session planning and local model training** | Signal quality grading, session summaries, provenance logs, labeling export, config validation, confidence tracking, metadata stores, ephemeris updates, multi-target scheduling, archive support, and trained Kepler XGBoost model artifacts. | `models/xgboost_koi.json`, `models/xgboost_koi.xgb.json`, `Skills/session_summary_generator.py`, `Skills/candidate_archive.py` |
 | ✅ | **Milestones 34-39 — Physics, vetting, and planning utilities** | ML evaluation, photometry quality, transit vetting, noise budget, orbit simulation, stellar physics, TTV, occurrence-rate, contamination, RV, and observing-planning utilities. | Recent Milestone 34-39 commits; `Skills/`; `tests/` |
-| 🟡 | **Production CNN checkpoint** | The first seed-42 candidate was rejected, and audit then found every source snippet used `epoch_bjd=0.0`. Rebuild and audit the epoch-corrected local corpus, create a fresh grouped promotion split, then retrain and promote only a passing candidate. | Root cause, rejection metrics, and handoff: `docs/CNN_SPEC.md`; authoritative blocker: `docs/PRODUCTION_READINESS.md` |
+| 🟡 | **First real discovery scan** | Run the 200-target TESS novelty scan, rank/filter the results, and record candidate or null evidence before any more CNN work. | `docs/DISCOVERY_RUNBOOK.md`, `docs/PRODUCTION_READINESS.md`, `docs/LOCAL_ARTIFACT_LEDGER.md` |
+| 🟡 | **Production CNN checkpoint** | C1-C19 were rejected; Kepler and K2 overlap corpora are available locally, but C20 is paused until discovery-scan evidence shows CNN triage is still the right next production lever. | Root cause, rejection metrics, and handoff: `docs/CNN_SPEC.md`; authoritative blocker: `docs/PRODUCTION_READINESS.md` |
 | 🟡 | **TESS-specific calibration set** | Validation-only Platt fitting was exercised, but it worsened held-out Brier score and ECE; retain the fixed validation/test protocol while improving the model. | `Skills/cnn_calibrator.py`, `Skills/model_ensemble_evaluator.py`, `docs/CNN_SPEC.md` |
 | 🟡 | **Regime-specific priors** | Extend mission-level priors into period-, radius-, stellar-type-, and completeness-dependent profiles after calibration evidence exists. | Future update to `configs/scoring_priors_v0.json` and `docs/SCORING_MODEL.md` |
 | 🟡 | **Live target operations** | Use TOI checks, batch scans, ranking, watchlists, dashboards, and browser/API review surfaces for systematic follow-up while preserving human approval gates. | `Skills/toi_checker.py`, `Skills/batch_scan.py`, `Skills/watchlist.py`, `Skills/candidate_api.py` |
@@ -969,7 +970,7 @@ If the XGBoost curve deviates significantly from the diagonal, recalibrate the m
 Offline readiness report:
 
 ```bash
-python Skills/tier2_progress_reporter.py \
+.venv/bin/python Skills/tier2_progress_reporter.py \
   --labels data/exofop_ctoi_labels.json \
   --output reports/tier2_status.md \
   --json-output reports/tier2_status.json
@@ -978,7 +979,7 @@ python Skills/tier2_progress_reporter.py \
 Live ExoFOP count, when network access is intentionally approved:
 
 ```bash
-python Skills/count_tess_labels.py
+.venv/bin/python Skills/count_tess_labels.py
 ```
 
 Each live check writes a top-level SQLite audit log by default:
