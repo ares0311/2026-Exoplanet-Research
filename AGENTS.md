@@ -72,7 +72,7 @@ When the user must take an action to unblock a gap:
 
 **Mission realignment (2026-06-26):** The primary goal is **discovering previously unknown exoplanet transit candidates** by searching data feeds not yet analyzed by existing pipelines. CNN training (T1-1) is secondary to running actual discovery scans. Do not propose further CNN work until at least one real discovery scan is complete and documented. See `docs/DISCOVERY_RUNBOOK.md` for the full discovery workflow.
 
-**Research brief wired (2026-06-27):** `docs/exoplanet_detection_research_brief.md` is now required reading. Key takeaways: TESS > Kepler/K2 > JWST in discovery priority order; CNN architecture baseline is Shallue & Vanderburg (2018); PLATO launches end-2026 (pipeline should handle long-baseline photometry); GP for correlated noise; citizen submissions require full transit + false-positive diagnostic table. Two additional briefs are PENDING — the user will push `docs/alien_technosignatures_research_brief.md` and `docs/fermi_paradox_technosignatures_brief.md`; add them to required reading when they appear in the repo.
+**Research brief wired (2026-06-27):** `docs/exoplanet_detection_research_brief.md` is now required reading. Key takeaways: TESS > Kepler/K2 > JWST in discovery priority order; CNN architecture baseline is Shallue & Vanderburg (2018); PLATO launches end-2026 (pipeline should handle long-baseline photometry); GP for correlated noise; citizen submissions require full transit + false-positive diagnostic table.
 
 **Active work: Option A JWST integration + Option B TESS target restructuring.**
 
