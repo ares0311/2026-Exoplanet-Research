@@ -12,6 +12,7 @@ Every session must begin by reading:
 1. `AGENTS.md` (this file)
 2. `docs/PRODUCTION_READINESS.md`
 3. `docs/DISCOVERY_RUNBOOK.md`
+4. `docs/exoplanet_detection_research_brief.md` (skim satellite table + AI methods)
 
 Before proposing or executing any task you must:
 1. Name the highest-priority unresolved Tier 1 gap from `docs/PRODUCTION_READINESS.md`.
@@ -67,9 +68,11 @@ When the user must take an action to unblock a gap:
 
 ---
 
-## HANDOFF STATE — 2026-06-26 (READ THIS FIRST)
+## HANDOFF STATE — 2026-06-27 (READ THIS FIRST)
 
 **Mission realignment (2026-06-26):** The primary goal is **discovering previously unknown exoplanet transit candidates** by searching data feeds not yet analyzed by existing pipelines. CNN training (T1-1) is secondary to running actual discovery scans. Do not propose further CNN work until at least one real discovery scan is complete and documented. See `docs/DISCOVERY_RUNBOOK.md` for the full discovery workflow.
+
+**Research brief wired (2026-06-27):** `docs/exoplanet_detection_research_brief.md` is now required reading. Key takeaways: TESS > Kepler/K2 > JWST in discovery priority order; CNN architecture baseline is Shallue & Vanderburg (2018); PLATO launches end-2026 (pipeline should handle long-baseline photometry); GP for correlated noise; citizen submissions require full transit + false-positive diagnostic table.
 
 **Active work: Option A JWST integration + Option B TESS target restructuring.**
 

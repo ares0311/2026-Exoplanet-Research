@@ -13,6 +13,7 @@ Every session must begin by reading:
 1. `AGENTS.md`
 2. `docs/PRODUCTION_READINESS.md`
 3. `docs/DISCOVERY_RUNBOOK.md`
+4. `docs/exoplanet_detection_research_brief.md` (skim the satellite table and AI methods section)
 
 Before proposing or executing any task you must:
 1. Name the highest-priority unresolved Tier 1 gap from `docs/PRODUCTION_READINESS.md`.
@@ -570,7 +571,7 @@ Complete user reference for all 24 Skills scripts (updated Milestone 12).
 - **Conservative priors**: built-in defaults remain planet_candidate = 0.10, EB/BEB/stellar/instrumental = 0.20 each, known_object = 0.10
 - **Mission prior profiles**: `configs/scoring_priors_v0.json` defines opt-in conservative TESS/Kepler/K2 profiles loaded by `priors.py`
 - **ML Tier 1 (XGBoost) is built** — `ml/xgboost_scorer.py` ships as an optional alternative scorer; Bayesian log-score model remains the default fallback when labels are unavailable
-- **ML Tier 2 scaffolding is built** — `ml/cnn_scorer.py`, `Skills/train_cnn.py`, checkpoint/calibration utilities, and CLI wiring exist; CNN label gate is OPEN (2,668 labels); TESS light curve download COMPLETE (2,636 targets → `data/tess_snippets.jsonl`); training pipeline ready to execute
+- **ML Tier 2 scaffolding is built** — `ml/cnn_scorer.py`, `Skills/train_cnn.py`, checkpoint/calibration utilities, and CLI wiring exist; CNN label gate is OPEN (2,668 labels); TESS light curve download COMPLETE (2,619 snippets → `data/tess_snippets_v2.jsonl`); training pipeline ready to execute
 - **ML Tier 3 (stacking) is built** — `ml/stacking_scorer.py` blends XGBoost + CNN + Bayesian P(planet) when models are supplied; falls back conservatively when optional models are unavailable
 - **CLI scorer options**: `exo <TIC-ID> --scorer [bayesian|xgboost|ensemble|cnn|full-ensemble] --model-path <path> --cnn-checkpoint <path>`
 - **Never output "confirmed planet"** — use "candidate signal" or "follow-up target"
@@ -1228,11 +1229,38 @@ terminal failures. Console progress is not resume state. If rerunning a
 downloader reprocesses completed or terminally failed work by default, stop and
 fix the durable resume ledger before asking the human to run it again.
 
-### Next Step — HANDOFF 2026-06-22
+### Next Step — HANDOFF 2026-06-27
 
-**Status: C13–C19 all rejected. Best candidate is C18 (test AUC 0.8439, raw ECE 0.0301). freeze_conv strategy exhausted. Human chose Option C (more data). Next authorized data step: K2 EPIC overlap corpus. Next training candidate: C20 using `configs/cnn_tess_c18.json` on expanded splits.**
+**Mission realignment (2026-06-26):** Primary goal is **discovering previously unknown exoplanet transit candidates**. CNN training (T1-1) is explicitly secondary. Do NOT propose further CNN work until at least one real discovery scan over ≥1,000 TIC targets is complete and documented. See `docs/DISCOVERY_RUNBOOK.md`.
 
-#### Candidate history summary (what has been tried, do not repeat)
+**JWST Option A status (as of 2026-06-27):**
+- `Skills/fetch_jwst_targets.py` (A1) — **MERGED** (PR #133)
+- `Skills/fetch_jwst_lc.py` (A2) — **MERGED** (PR #133)
+- K2 TAP ORA-00904 fix (`Skills/fetch_tess_k2_overlap_snippets.py`) — **PR #134** (CI pending)
+- Option B (TESS target restructuring: B1–B5) — **NOT STARTED**; start after PR #134 merges
+
+**Immediate next actions (in priority order):**
+1. **[HUMAN]** Merge PR #134 once CI passes — no code changes needed, just approve.
+2. **[HUMAN]** Run the K2 corpus fetch (after PR #134 merges and `git pull origin main`):
+   ```bash
+   git pull origin main
+   caffeinate -dims .venv/bin/python Skills/fetch_tess_k2_overlap_snippets.py \
+     --output data/tess_k2_overlap_snippets.jsonl \
+     --workers 4 --request-delay 0.25
+   wc -l data/tess_k2_overlap_snippets.jsonl
+   ```
+3. **[HUMAN]** Run the first real discovery scan (higher priority than any CNN work):
+   ```bash
+   git pull origin main
+   caffeinate -dims .venv/bin/python Skills/star_scanner.py \
+     --max-stars 200 --tmag-min 12.0 --tmag-max 14.5 \
+     --log-path logs/discovery_run_001.json
+   .venv/bin/python Skills/rank_candidates.py logs/discovery_run_001.json --top 20
+   ```
+4. **[AGENT]** After both [HUMAN] tasks above complete: build Option B1–B5 (TESS target restructuring).
+5. **[AGENT]** CNN C20 training (only after step 3 above produces candidates): expand corpus with K2 overlap snippets, build `data/tess_c20_cnn_splits/`, train with `configs/cnn_tess_c18.json` (`freeze_conv_epochs=10`).
+
+#### CNN candidate history (what has been tried — do not repeat)
 
 | Candidate | Training examples | Strategy | Test AUC | Outcome |
 |---|---|---|---|---|
@@ -1249,29 +1277,23 @@ fix the durable resume ledger before asking the human to run it again.
 
 **Do not repeat any of these strategies with the existing corpus.**
 
-#### What the incoming agent must do
-
-1. **[AGENT]** Write `Skills/fetch_tess_k2_overlap_snippets.py` — analogous to `Skills/fetch_tess_kepler_overlap_snippets.py` but targeting the NASA Exoplanet Archive K2 KOI cumulative table (TAP endpoint). Downloads TESS photometry for K2 EPIC host stars, phase-folds at K2 ephemerides (BKJD epoch + 2454833.0 → BJD), bins to 201 bins. Same JSONL schema, same bounded thread pool pattern, same failures sidecar. Script must avoid `SearchResult.download_all()` (unsafe with threads — see existing fetcher for the correct pattern).
-2. **[AGENT]** Commit the new fetcher to `claude/review-markdown-docs-SwVnR`, push, PR, merge.
-3. **[HUMAN]** Run the K2 overlap fetch after pulling main (see runbook Step 7g for exact command).
-
 #### Critical constraints for the next agent
 
-- Calibration method is **temperature scaling** (not Platt). The evaluator was updated in PR #125. Do not reference "Platt" in new commands.
+- Calibration method is **temperature scaling** (not Platt). The evaluator was updated in PR #125.
 - Best checkpoint `checkpoints/cnn_tess_c18/best.pt` (SHA `d33c15f4...`) — retain as reference; do not promote without human approval.
-- C20 training config: use `configs/cnn_tess_c18.json` (`freeze_conv_epochs=10`) — this was better than C19's 20 frozen epochs.
-- C20 split dir: `data/tess_c20_cnn_splits` (new dir; C20 must be trained on the expanded corpus including K2 overlap data).
+- C20 training config: use `configs/cnn_tess_c18.json` (`freeze_conv_epochs=10`).
+- C20 split dir: `data/tess_c20_cnn_splits` (new dir; C20 must train on expanded corpus including K2 overlap data).
 - Gate: raw held-out AUC ≥ 0.85, calibrated F1 ≥ 0.80, temperature scaling must not worsen Brier/ECE.
 
 #### Corpus status
 
-- **TESS v2**: `data/tess_snippets_v2.jsonl` — 2,619 snippets (COMPLETE)
+- **TESS v2**: `data/tess_snippets_v2.jsonl` — 2,619 snippets (COMPLETE, LOCAL ONLY)
 - **Kepler**: `data/kepler_snippets.jsonl` — LOCAL VALIDATED; 6,837 finite snippets
 - **Kepler pretrain**: `checkpoints/cnn_kepler_pretrain/best.pt` — SHA `c782d7af...`; val AUC 0.9186; **retain**
 - **TESS combined**: `data/tess_combined_snippets.jsonl` — 7,483 rows (TESS v2 + Kepler-TESS overlap)
 - **TESS combined splits**: `data/tess_combined_cnn_splits/` — LOCAL VALIDATED; train 4,892 / val 1,049 / test 1,033
-- **K2 overlap**: `data/tess_k2_overlap_snippets.jsonl` — **NOT YET BUILT**; expected 500–1,500 new snippets
-- **C20 splits**: `data/tess_c20_cnn_splits/` — **NOT YET BUILT**; will merge tess_combined + K2 overlap
+- **K2 overlap**: `data/tess_k2_overlap_snippets.jsonl` — **NOT YET FETCHED**; fetcher built (PR #134); expected 500–1,500 new snippets
+- **C20 splits**: `data/tess_c20_cnn_splits/` — **NOT YET BUILT**; depends on K2 overlap fetch
 
 #### CNN production runbook
 
@@ -1297,7 +1319,7 @@ Bayesian scoring as the default fallback:
 **Tier 3 — Stacking meta-learner** ✅ DONE
 - Simple weighted blend over outputs of XGBoost + CNN + existing Bayesian log-score model
 - Production weights still require a separate held-out calibration set (~500+ examples)
-- Final probabilities pass through existing `calibration.py` (Platt / isotonic)
+- Final probabilities pass through existing `calibration.py` (temperature scaling / isotonic)
 
 **Architecture fit**
 - XGBoost and CNN sit alongside `scoring.py`; stacking layer blends their posteriors
@@ -1321,6 +1343,45 @@ Bayesian scoring as the default fallback:
 
 - **TESS**: MAST via Lightkurve (`mission="TESS"`, PDCSAP flux preferred)
 - **Kepler/K2**: MAST via Lightkurve (`mission="Kepler"` / `"K2"`)
+- **JWST**: MAST via `astroquery.mast` directly — Lightkurve does NOT support JWST. Use `_calints.fits` (Stage 2) or `_x1dints.fits` (Stage 3 NIRISS SOSS). See `Skills/fetch_jwst_lc.py`.
 - **Catalogs**: NASA Exoplanet Archive, TOI list, KOI list, CTOI via astroquery
 
 Focus on lightly-worked targets: later TESS sectors, fainter stars (Tmag 10–14), less-crowded fields.
+
+---
+
+## Research Context (`docs/exoplanet_detection_research_brief.md`)
+
+Full brief: `docs/exoplanet_detection_research_brief.md`. Key facts for coding agents:
+
+### Satellite Priority Order (for discovery work)
+1. **TESS** — best current public discovery engine; huge archive, ongoing sectors, TOIs, FFIs
+2. **Kepler/K2** — highest-value historical benchmark; Kepler = cleaner long-baseline; K2 = noisier systematics
+3. **JWST** — atmospheric characterization, not bulk detection; public data via MAST after proprietary period
+4. **PLATO** — launching end-2026; bright-star terrestrial planets + asteroseismic ages (prepare pipeline)
+5. **Roman** — future; microlensing census and coronagraph technology demo
+
+### AI Methods Relevant to This Project
+- **1D CNN on phase-folded light curves** — Shallue & Vanderburg (2018) baseline; local+global view architecture
+- **Transformer for full light curves** — attention can model long light curves without pre-selecting transit windows
+- **Semi-supervised / anomaly detection** — useful when labels are incomplete; helps discover unusual systems
+- **GP for stellar variability** — models correlated noise; prevents biased transit depth/timing estimates
+- **Bayesian atmospheric retrieval** — JWST spectra require TauREx/petitRADTRANS-style retrieval; ML retrieval (neural posterior estimation) is the frontier
+
+### Citizen Science Quality Bar (before escalating any candidate)
+- Signal repeats at consistent period
+- Full transit with pre/post baseline; partial events are lower value
+- Survives multiple detrending approaches
+- No centroid shift, no eclipsing binary contaminant in aperture, no secondary eclipse
+- Odd/even depth consistent
+- Use BJD_TDB time standard; document it
+
+### Minimum Submission Evidence
+TIC ID + coordinates, light curve (BJD + normalized flux + errors), transit model parameters, false-positive diagnostic table, catalog cross-check (TOI/CTOI/Gaia/confirmed hosts), reproducible notebook or script.
+
+### Pipeline Stack Guidance (from brief)
+Use `lightkurve`, `astroquery`, `wotan` (detrending), `transitleastsquares`, `exoplanet`, `celerite`, `pymc` where appropriate. JWST: use `astroquery.mast` directly. Atmospheric: `petitRADTRANS` or `TauREx` for forward models.
+
+### Upcoming Assets to Prepare For
+- **PLATO** (end-2026): long-baseline photometry, asteroseismic stellar ages — pipeline should handle multi-year continuous light curves
+- **Roman** (mid-2020s): microlensing fields, coronagraph tech demo — different data format from transit surveys
