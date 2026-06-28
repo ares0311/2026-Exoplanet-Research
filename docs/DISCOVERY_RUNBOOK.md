@@ -2,7 +2,7 @@
 
 **Purpose**: Prevent doom loops. Every agent and every session must read this before doing anything.
 
-**Last updated**: 2026-06-27 (Option A JWST integration and Option B TESS novelty restructure merged; Option B5 discovery scan pending)
+**Last updated**: 2026-06-28 (Option A JWST integration and Option B TESS novelty restructure merged; PR #143 live scanner fix merged; worker/ETA first-scan recipe hardening in progress; Option B5 discovery scan pending)
 
 ---
 
@@ -226,7 +226,7 @@ The pipeline can do these things today without new code:
 |------------|---------|
 | Scan a single star | `exo <TIC-ID> --output out.json` |
 | Scan a list of stars | `python Skills/batch_scan.py targets.txt --output results.json --resume` |
-| Select novel TIC targets | `python Skills/star_scanner.py --max-stars 500 --tmag-min 12 --tmag-max 15` |
+| Select novel TIC targets | `.venv/bin/python Skills/star_scanner.py --max-stars 500 --tmag-min 12 --tmag-max 15` |
 | Rank candidates by quality | `python Skills/rank_candidates.py results.json --top 20` |
 | Check if target is already TOI | `python Skills/toi_checker.py <TIC-ID>` |
 | Filter by FPP/pathway | `python Skills/alert_filter.py results.json --fpp-max 0.15` |
@@ -249,6 +249,8 @@ caffeinate -dims .venv/bin/python Skills/star_scanner.py \
   --max-stars 200 \
   --tmag-min 12.0 \
   --tmag-max 14.5 \
+  --workers 4 \
+  --request-delay 0.5 \
   --log logs/discovery_run_001.json
 .venv/bin/python Skills/rank_candidates.py logs/discovery_run_001.json --top 20
 .venv/bin/python Skills/alert_filter.py logs/discovery_run_001.json \
