@@ -83,6 +83,7 @@ When the user must take an action to unblock a gap:
 | K2 TAP ORA-00904 fix | **MERGED** (PR #134, 2026-06-27) |
 | Option A3 — `--mission JWST` wired into `exo` CLI | **MERGED** (PR #141, 2026-06-27) |
 | Option B1–B4 — TESS target restructuring | **MERGED** (PR #139, 2026-06-27) |
+| Live scanner startup/target-selection hardening | **MERGED** (PR #143, 2026-06-28) |
 | Option B5 — first 200-target discovery scan | **[HUMAN]** — ready to run (see First action below) |
 | K2 overlap corpus (`data/tess_k2_overlap_snippets.jsonl`) | **COMPLETE** — 2,086 snippets (2026-06-27) |
 
@@ -126,8 +127,11 @@ When the user must take an action to unblock a gap:
 
 **Option B1–B4 is merged (PR #139).** The scanner now excludes TOI + CTOI + confirmed hosts automatically and defaults to Tmag 12–14.5. The first real discovery scan has not yet been run. This is the highest-priority action before any CNN work.
 
+**PR #143 is merged (2026-06-28).** A live one-target smoke on `main` verified that the ExoFOP SSL loader, Python 3.14 helper imports, bounded TIC target selection, and no-light-curve `no_data` classification all work. Do not re-debug the old pasted failures from before PR #143.
+
 ```bash
-git pull origin main
+git switch main
+git pull --ff-only origin main
 caffeinate -dims .venv/bin/python Skills/star_scanner.py \
   --max-stars 200 \
   --log logs/discovery_run_001.json
@@ -334,10 +338,10 @@ Any Python command expected to run longer than ~60 seconds **must** be prefixed 
 
 ```bash
 # Standard form for any long download or training run:
-caffeinate -i python Skills/<script>.py [args]
+caffeinate -i .venv/bin/python Skills/<script>.py [args]
 
 # To keep running with lid closed, use -dims instead:
-caffeinate -dims python Skills/<script>.py [args]
+caffeinate -dims .venv/bin/python Skills/<script>.py [args]
 ```
 
 This applies to: light curve downloads, CNN training, batch scans, injection-recovery runs, and any other script that makes repeated network calls or runs for more than a minute. Never give a bare `python ...` recipe for these — always prepend `caffeinate -i`.
@@ -389,22 +393,24 @@ The user's local Mac and GitHub `main` are the joint source of truth. The agent'
 
 1. **All code changes must reach `main` before the user runs anything.** The full cycle is mandatory: feature branch → commit → push → PR → CI green → merge to main → PR closed. Never leave a PR open at the end of a session.
 2. **Never tell the user to run a script that has not yet been merged to main.** If a script is still on a feature branch, merge it first.
-3. **Every recipe given to the user must begin with `git pull origin main`** so their local is guaranteed current before any command executes.
+3. **Every recipe given to the user must begin by switching to `main` and fast-forwarding from `origin/main`** so their local is guaranteed current before any command executes and feature branches cannot receive divergent pulls.
 4. **PRs must be merged, not just approved.** After CI passes, promote from draft, squash-merge, and confirm the PR is closed before the session ends.
-5. **After every merge**, remind the user to run `git pull origin main` on their Mac if they have a terminal open.
+5. **After every merge**, remind the user to run `git switch main` and `git pull --ff-only origin main` on their Mac if they have a terminal open.
 
 ### Standard recipe header (copy-paste this before every user command)
 
 ```bash
 # Always sync first
-git pull origin main
+git switch main
+git pull --ff-only origin main
 ```
 
 For long-running commands, the full header is:
 
 ```bash
-git pull origin main
-caffeinate -i python Skills/<script>.py [args]
+git switch main
+git pull --ff-only origin main
+caffeinate -i .venv/bin/python Skills/<script>.py [args]
 ```
 
 ### What Not To Do
@@ -412,7 +418,7 @@ caffeinate -i python Skills/<script>.py [args]
 - Do not tell the user to run `python Skills/foo.py` before `foo.py` is on `main`.
 - Do not leave PRs in draft or open state at end of a session.
 - Do not commit directly to `main` — always use a feature branch and PR.
-- Do not assume the user's local is current — always prepend `git pull origin main`.
+- Do not assume the user's local is current — always prepend the branch-safe `git switch main` + `git pull --ff-only origin main` sync block.
 
 ## Python Environment Policy
 
