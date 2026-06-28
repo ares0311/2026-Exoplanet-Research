@@ -31,8 +31,11 @@ Usage
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import sys
+import time
+import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -47,6 +50,37 @@ _EXOFOP_URL = (
 )
 
 _SKILLS_DIR = Path(__file__).resolve().parent
+
+_DEFAULT_SEARCH_CENTERS: tuple[tuple[float, float], ...] = tuple(
+    (float(ra), float(dec))
+    for dec in (-60, -30, 0, 30, 60)
+    for ra in range(0, 360, 30)
+)
+
+
+def _url_text(url: str, *, timeout: int = 60) -> str:
+    """Fetch URL text using certifi when available."""
+    import ssl
+
+    try:
+        import certifi
+
+        ctx: ssl.SSLContext | None = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        ctx = None
+
+    with urllib.request.urlopen(url, timeout=timeout, context=ctx) as resp:  # noqa: S310
+        return resp.read().decode("utf-8", errors="replace")
+
+
+def _row_get(row: Any, key: str) -> Any:
+    """Return a value from dict-like or astropy table rows."""
+    if isinstance(row, dict):
+        return row.get(key)
+    try:
+        return row[key]
+    except (KeyError, TypeError, ValueError):
+        return None
 
 # ---------------------------------------------------------------------------
 # Priority scoring
@@ -225,7 +259,7 @@ def _load_toi_tic_ids() -> set[int]:
     """Download the TESS TOI table and return the set of TIC IDs it contains."""
     import pandas as pd
 
-    df = pd.read_csv(_EXOFOP_URL, comment="#")
+    df = pd.read_csv(io.StringIO(_url_text(_EXOFOP_URL)), comment="#")
     tic_col = next(
         (c for c in df.columns if "tic" in c.lower() and "id" in c.lower()),
         None,
@@ -251,6 +285,7 @@ def _load_ctoi_tic_ids() -> set[int]:
     if spec is None or spec.loader is None:
         return set()
     module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)  # type: ignore[attr-defined]
 
     try:
@@ -272,6 +307,7 @@ def _load_confirmed_host_tic_ids() -> frozenset[int]:
     if spec is None or spec.loader is None:
         return frozenset()
     module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)  # type: ignore[attr-defined]
 
     try:
@@ -289,68 +325,117 @@ def select_targets(
     n: int = 100,
     tmag_range: tuple[float, float] = (12.0, 14.5),
     exclude_tic_ids: set[int] | None = None,
+    *,
+    query_radius_deg: float = 0.5,
+    max_tiles: int = 60,
+    retry_attempts: int = 2,
+    retry_delay: float = 2.0,
 ) -> list[dict[str, Any]]:
     """Query the TIC catalog and return up to *n* stars ranked by priority.
 
     Stars in *exclude_tic_ids* (e.g. known TOIs or already-scanned stars) are
-    removed before ranking.
+    removed before ranking.  The query is intentionally tiled by sky position:
+    all-sky TIC magnitude queries are too large for MAST and can be closed by
+    the remote service before a response is returned.
 
     Args:
         n: Maximum number of targets to return.
         tmag_range: ``(min_tmag, max_tmag)`` magnitude range for the query.
         exclude_tic_ids: TIC IDs to omit from the results.
+        query_radius_deg: Cone-search radius for each TIC tile.
+        max_tiles: Maximum number of sky tiles to query.
+        retry_attempts: Attempts per tile before skipping it.
+        retry_delay: Seconds to wait between retry attempts.
 
     Returns:
         List of dicts, sorted by ``"priority"`` descending, each with keys:
         ``tic_id``, ``tmag``, ``teff``, ``contratio``, ``priority``.
     """
+    from astropy import units as u
+    from astropy.coordinates import SkyCoord
     from astroquery.mast import Catalogs
 
     exclude = exclude_tic_ids or set()
-
-    result = Catalogs.query_criteria(
-        catalog="TIC",
-        Tmag=list(tmag_range),
-        objType="STAR",
-    )
+    min_tmag, max_tmag = tmag_range
+    target_pool_size = max(n * 3, n)
 
     targets: list[dict[str, Any]] = []
-    for row in result:
-        try:
-            tic_id = int(row["ID"])
-        except (ValueError, KeyError, TypeError):
-            continue
-        if tic_id in exclude:
+    seen: set[int] = set()
+    tile_errors: list[str] = []
+
+    for tile_idx, (ra_deg, dec_deg) in enumerate(_DEFAULT_SEARCH_CENTERS[:max_tiles], 1):
+        coord = SkyCoord(ra=ra_deg * u.deg, dec=dec_deg * u.deg, frame="icrs")
+        result: Any | None = None
+        for attempt in range(1, retry_attempts + 1):
+            try:
+                result = Catalogs.query_region(
+                    coord,
+                    radius=query_radius_deg * u.deg,
+                    catalog="TIC",
+                )
+                break
+            except Exception as exc:  # noqa: BLE001
+                msg = (
+                    f"tile {tile_idx} ra={ra_deg:.1f} dec={dec_deg:.1f} "
+                    f"attempt {attempt}/{retry_attempts}: {exc}"
+                )
+                tile_errors.append(msg)
+                if attempt < retry_attempts:
+                    time.sleep(retry_delay)
+
+        if result is None:
             continue
 
-        try:
-            tmag = float(row["Tmag"])
-        except (ValueError, TypeError):
-            continue
-        if tmag != tmag:  # NaN guard
-            continue
+        for row in result:
+            obj_type = _row_get(row, "objType")
+            if obj_type is not None and str(obj_type).strip().upper() != "STAR":
+                continue
+            try:
+                tic_id = int(_row_get(row, "ID"))
+            except (ValueError, TypeError):
+                continue
+            if tic_id in exclude or tic_id in seen:
+                continue
 
-        try:
-            teff: float | None = float(row["Teff"]) if row.get("Teff") is not None else None
-        except (ValueError, TypeError):
-            teff = None
+            try:
+                tmag = float(_row_get(row, "Tmag"))
+            except (ValueError, TypeError):
+                continue
+            if tmag != tmag or not (min_tmag <= tmag <= max_tmag):  # NaN guard
+                continue
 
-        try:
-            contratio: float | None = (
-                float(row["contratio"]) if row.get("contratio") is not None else None
+            try:
+                raw_teff = _row_get(row, "Teff")
+                teff: float | None = float(raw_teff) if raw_teff is not None else None
+            except (ValueError, TypeError):
+                teff = None
+
+            try:
+                raw_contratio = _row_get(row, "contratio")
+                contratio: float | None = (
+                    float(raw_contratio) if raw_contratio is not None else None
+                )
+            except (ValueError, TypeError):
+                contratio = None
+
+            pri = priority_score(tmag, teff=teff, contratio=contratio)
+            seen.add(tic_id)
+            targets.append(
+                {
+                    "tic_id": tic_id,
+                    "tmag": tmag,
+                    "teff": teff,
+                    "contratio": contratio,
+                    "priority": pri,
+                }
             )
-        except (ValueError, TypeError):
-            contratio = None
+        if len(targets) >= target_pool_size:
+            break
 
-        pri = priority_score(tmag, teff=teff, contratio=contratio)
-        targets.append(
-            {
-                "tic_id": tic_id,
-                "tmag": tmag,
-                "teff": teff,
-                "contratio": contratio,
-                "priority": pri,
-            }
+    if not targets and tile_errors:
+        sample = "; ".join(tile_errors[-3:])
+        raise RuntimeError(
+            f"TIC target selection failed across {len(tile_errors)} attempts: {sample}"
         )
 
     targets.sort(key=lambda t: t["priority"], reverse=True)
@@ -412,10 +497,11 @@ def scan_star(
             model_path=model_path,
         )
     except Exception as exc:  # noqa: BLE001
-        result["status"] = "error"
-        result["error_message"] = str(exc)
+        message = str(exc)
+        result["status"] = "no_data" if _is_no_data_error(message) else "error"
+        result["error_message"] = message
         if log is not None:
-            log.record(tic_id, "error", result)
+            log.record(tic_id, result["status"], result)
         return result
 
     if not rows:
@@ -433,6 +519,19 @@ def scan_star(
     return result
 
 
+def _is_no_data_error(message: str) -> bool:
+    """Return True when a pipeline exception means the target has no usable data."""
+    normalized = message.lower()
+    no_data_markers = (
+        "no tess light curves found",
+        "no kepler light curves found",
+        "no k2 light curves found",
+        "no light curves found",
+        "no data found",
+    )
+    return any(marker in normalized for marker in no_data_markers)
+
+
 # ---------------------------------------------------------------------------
 # Background scan loop
 # ---------------------------------------------------------------------------
@@ -448,6 +547,8 @@ def run_background_scan(
     max_peaks: int = 5,
     scorer: str = "bayesian",
     model_path: Path | None = None,
+    query_radius_deg: float = 0.5,
+    max_target_query_tiles: int = 60,
 ) -> None:
     """Fetch a ranked target list and scan each star in priority order.
 
@@ -467,28 +568,30 @@ def run_background_scan(
         max_peaks: Maximum signals per star.
         scorer: Scoring model.
         model_path: XGBoost model path (for xgboost/ensemble scorer).
+        query_radius_deg: Cone-search radius for each bounded TIC target tile.
+        max_target_query_tiles: Maximum number of TIC sky tiles to query.
     """
     log = ScanLog(log_path)
 
-    print("Loading TESS TOI exclusion list …")
+    print("Loading TESS TOI exclusion list …", flush=True)
     try:
         toi_ids = _load_toi_tic_ids()
     except Exception as exc:  # noqa: BLE001
-        print(f"Warning: could not load TOI list ({exc}); skipping TOI exclusion")
+        print(f"Warning: could not load TOI list ({exc}); skipping TOI exclusion", flush=True)
         toi_ids = set()
 
-    print("Loading CTOI exclusion list …")
+    print("Loading CTOI exclusion list …", flush=True)
     try:
         ctoi_ids = _load_ctoi_tic_ids()
     except Exception as exc:  # noqa: BLE001
-        print(f"Warning: could not load CTOI list ({exc}); skipping CTOI exclusion")
+        print(f"Warning: could not load CTOI list ({exc}); skipping CTOI exclusion", flush=True)
         ctoi_ids = set()
 
-    print("Loading confirmed transiting planet hosts …")
+    print("Loading confirmed transiting planet hosts …", flush=True)
     try:
         confirmed_ids = _load_confirmed_host_tic_ids()
     except Exception as exc:  # noqa: BLE001
-        print(f"Warning: could not load confirmed hosts ({exc}); skipping")
+        print(f"Warning: could not load confirmed hosts ({exc}); skipping", flush=True)
         confirmed_ids = frozenset()
 
     already_scanned = log.scanned_ids()
@@ -496,15 +599,36 @@ def run_background_scan(
     print(
         f"Excluding {len(toi_ids):,} TOI  |  {len(ctoi_ids):,} CTOI  |  "
         f"{len(confirmed_ids):,} confirmed hosts  |  "
-        f"{len(already_scanned):,} already-scanned"
+        f"{len(already_scanned):,} already-scanned",
+        flush=True,
     )
 
     print(
         f"Querying TIC for up to {n_targets} targets "
-        f"(Tmag {tmag_range[0]:.1f}–{tmag_range[1]:.1f}) …"
+        f"(Tmag {tmag_range[0]:.1f}–{tmag_range[1]:.1f}; "
+        f"radius={query_radius_deg:.2f} deg; tiles≤{max_target_query_tiles}) …",
+        flush=True,
     )
-    targets = select_targets(n=n_targets, tmag_range=tmag_range, exclude_tic_ids=exclude)
-    print(f"Selected {len(targets)} candidate targets\n")
+    try:
+        targets = select_targets(
+            n=n_targets,
+            tmag_range=tmag_range,
+            exclude_tic_ids=exclude,
+            query_radius_deg=query_radius_deg,
+            max_tiles=max_target_query_tiles,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"Target selection failed: {exc}", file=sys.stderr, flush=True)
+        raise
+    print(f"Selected {len(targets)} candidate targets\n", flush=True)
+
+    if not targets:
+        print(
+            "No candidate targets selected. Try increasing --max-target-query-tiles "
+            "or --query-radius-deg after checking live-service status.",
+            flush=True,
+        )
+        return
 
     try:
         for idx, target in enumerate(targets, 1):
@@ -530,23 +654,26 @@ def run_background_scan(
             if status == "candidate_found":
                 print(
                     f"CANDIDATE  P={result['best_period_days']:.2f} d  "
-                    f"FPP={result['best_fpp']:.3f}  [{result['best_pathway']}]"
+                    f"FPP={result['best_fpp']:.3f}  [{result['best_pathway']}]",
+                    flush=True,
                 )
             elif status == "scanned_clear":
-                print("clear")
+                print("clear", flush=True)
             elif status == "no_data":
-                print("no data")
+                print("no data", flush=True)
             else:
-                print(f"error: {result['error_message']}")
+                print(f"error: {result['error_message']}", flush=True)
     except KeyboardInterrupt:
-        print("\nScan interrupted.")
+        print("\nScan interrupted.", flush=True)
 
     summary = log.summary()
     print(
         f"\nDone — {summary['total']:,} total  "
         f"| {summary['candidate_found']:,} candidates  "
         f"| {summary['scanned_clear']:,} clear  "
-        f"| {summary['error']:,} errors"
+        f"| {summary['no_data']:,} no-data  "
+        f"| {summary['error']:,} errors",
+        flush=True,
     )
 
 
@@ -586,6 +713,10 @@ def _parse_args() -> argparse.Namespace:
                    help="Minimum BLS SNR threshold (default: 5.0)")
     p.add_argument("--max-peaks", type=int, default=5,
                    help="Maximum signals per star (default: 5)")
+    p.add_argument("--query-radius-deg", type=float, default=0.5,
+                   help="TIC cone-search radius per target-selection tile (default: 0.5)")
+    p.add_argument("--max-target-query-tiles", type=int, default=60,
+                   help="Maximum TIC sky tiles to query for target selection (default: 60)")
     p.add_argument(
         "--scorer", default="bayesian", choices=["bayesian", "xgboost", "ensemble"],
     )
@@ -648,4 +779,6 @@ if __name__ == "__main__":
         max_peaks=args.max_peaks,
         scorer=args.scorer,
         model_path=_model_path,
+        query_radius_deg=args.query_radius_deg,
+        max_target_query_tiles=args.max_target_query_tiles,
     )
