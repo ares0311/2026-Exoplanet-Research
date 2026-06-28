@@ -84,7 +84,7 @@ When the user must take an action to unblock a gap:
 | Option A3 — `--mission JWST` wired into `exo` CLI | **MERGED** (PR #141, 2026-06-27) |
 | Option B1–B4 — TESS target restructuring | **MERGED** (PR #139, 2026-06-27) |
 | Live scanner startup/target-selection hardening | **MERGED** (PR #143, 2026-06-28) |
-| Option B5 — first 200-target discovery scan | **[HUMAN]** — ready to run (see First action below) |
+| Option B5 — first 200-target discovery scan | **[HUMAN]** — rerun required with QLP after SPOC-only no-data batch (see First action below) |
 | K2 overlap corpus (`data/tess_k2_overlap_snippets.jsonl`) | **COMPLETE** — 2,086 snippets (2026-06-27) |
 
 **The only active CNN gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80), but CNN work is paused until the first real discovery scan is complete and reviewed.**
@@ -125,7 +125,7 @@ When the user must take an action to unblock a gap:
 
 ### First action for the incoming agent
 
-**Option B1–B4 is merged (PR #139).** The scanner now excludes TOI + CTOI + confirmed hosts automatically and defaults to Tmag 12–14.5. The first real discovery scan has not yet been run. This is the highest-priority action before any CNN work.
+**Option B1–B4 is merged (PR #139).** The scanner now excludes TOI + CTOI + confirmed hosts automatically and defaults to Tmag 12–14.5. A first 200-target attempt (`logs/discovery_run_001.json`) completed on 2026-06-28 but does **not** close T1-0: it used the old SPOC-only fetch path and produced 198 no-data rows plus 2 transient remote-disconnect errors, with 0 clear scans and 0 candidates. Root cause: target selection queried TIC stars without requiring light-curve availability, while the pipeline fetched only `author='SPOC', exptime='long'`. The next run must use QLP and a fresh log.
 
 **PR #143 is merged (2026-06-28).** A live one-target smoke on `main` verified that the ExoFOP SSL loader, Python 3.14 helper imports, bounded TIC target selection, and no-light-curve `no_data` classification all work. Do not re-debug the old pasted failures from before PR #143.
 
@@ -134,16 +134,18 @@ git switch main
 git pull --ff-only origin main
 caffeinate -dims .venv/bin/python Skills/star_scanner.py \
   --max-stars 200 \
+  --pipeline QLP \
+  --exptime long \
   --workers 4 \
   --request-delay 0.5 \
-  --log logs/discovery_run_001.json
-.venv/bin/python Skills/rank_candidates.py logs/discovery_run_001.json --top 20
-.venv/bin/python Skills/alert_filter.py logs/discovery_run_001.json \
+  --log logs/discovery_run_002_qlp.json
+.venv/bin/python Skills/rank_candidates.py logs/discovery_run_002_qlp.json --top 20
+.venv/bin/python Skills/alert_filter.py logs/discovery_run_002_qlp.json \
   --fpp-max 0.15 \
-  --output logs/discovery_filtered_001.json
+  --output logs/discovery_filtered_002_qlp.json
 ```
 
-If `alert_filter.py` exits with `No candidates matched the filters.`, that is an acceptable null triage result for the first 200-target batch; keep the full `logs/discovery_run_001.json` for review. Do NOT proceed with CNN C20 training until the above scan is complete and has been reviewed for candidates. If zero candidates emerge after scanning ≥1,000 targets, that finding itself dictates the next priority.
+If `alert_filter.py` exits with `No candidates matched the filters.`, that is an acceptable null triage result only if the QLP log contains real clear scans or candidates rather than another mostly no-data batch; keep the full `logs/discovery_run_002_qlp.json` for review. Do NOT proceed with CNN C20 training until the above scan is complete and has been reviewed for candidates. If zero candidates emerge after scanning ≥1,000 targets, that finding itself dictates the next priority.
 
 ### CNN production runbook
 

@@ -155,6 +155,33 @@ class TestRunPipeline:
             )
         assert result == []
 
+    def test_fetch_options_forwarded(self) -> None:
+        lc = _mock_lc()
+        captured: dict[str, Any] = {}
+
+        def _fetch(target_id: str, mission: str, **kwargs: Any) -> Any:
+            captured["target_id"] = target_id
+            captured["mission"] = mission
+            captured.update(kwargs)
+            return _make_fetch_result(lc, pipeline="QLP")
+
+        with patch("exo_toolkit.cli.search_lightcurve", return_value=[]):
+            run_pipeline(
+                "TIC 0",
+                "TESS",
+                pipeline="QLP",
+                exptime="long",
+                fetch_fn=_fetch,
+                clean_fn=self._patched_clean(lc),
+            )
+
+        assert captured == {
+            "target_id": "TIC 0",
+            "mission": "TESS",
+            "pipeline": "QLP",
+            "exptime": "long",
+        }
+
     def test_one_row_per_signal(self) -> None:
         lc = _mock_lc()
         signals = [_make_signal(3.0), _make_signal(7.0)]

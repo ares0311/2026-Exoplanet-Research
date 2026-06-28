@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "last_updated": "2026-06-27",
+  "last_updated": "2026-06-28",
   "production_gap": "T1-0: First Real Discovery Scan Evidence; T1-1: Production Tier 2 CNN Checkpoint paused",
   "policy": {
     "standard_operator_cadence": "git add .",
@@ -730,35 +730,79 @@
     {
       "path": "logs/discovery_run_001.json",
       "kind": "discovery_scan_log",
-      "status": "pending_human_run",
+      "status": "complete_non_closing_spoc_no_data",
       "git_policy": "ignored",
       "last_known": {
-        "scan": "B5 first real discovery scan",
+        "scan": "B5 first real discovery scan attempt",
         "max_stars": 200,
         "selection": "novel TESS targets after TOI/CTOI/confirmed-host exclusion",
         "command": "caffeinate -dims .venv/bin/python Skills/star_scanner.py --max-stars 200 --log logs/discovery_run_001.json",
+        "pipeline": "SPOC",
+        "exptime": "long",
+        "total": 200,
+        "candidate_found": 0,
+        "scanned_clear": 0,
+        "no_data": 198,
+        "errors": 2,
+        "error_tic_ids": [350861149, 149970879],
+        "sha256": "e5ebe5ee0995e13d88ca6f118f192d1ae5cb89a4ab04da90731864fe697e7201",
+        "root_cause": "run_pipeline could not override fetch_lightcurve, so background discovery used the SPOC long-cadence default after TIC-only target selection; almost all selected targets had no SPOC light curve",
         "review_commands": [
           ".venv/bin/python Skills/rank_candidates.py logs/discovery_run_001.json --top 20",
           ".venv/bin/python Skills/alert_filter.py logs/discovery_run_001.json --fpp-max 0.15 --output logs/discovery_filtered_001.json"
         ],
-        "verified_on": "2026-06-27"
+        "verified_on": "2026-06-28"
       },
-      "validation_gate": "This scan must complete and be reviewed before C20 CNN corpus assembly or training resumes.",
-      "next_action": "[HUMAN] run the B5 discovery scan on the Mac and paste back the rank/filter summary."
+      "validation_gate": "Does not close T1-0 because there were zero clear scans and zero candidates.",
+      "next_action": "Retain locally for forensic provenance; run logs/discovery_run_002_qlp.json with --pipeline QLP."
     },
     {
       "path": "logs/discovery_filtered_001.json",
       "kind": "discovery_triage_output",
-      "status": "pending_scan_result",
+      "status": "complete_empty_non_closing",
       "git_policy": "ignored",
       "last_known": {
         "source": "logs/discovery_run_001.json",
         "filter": "false_positive_probability <= 0.15",
-        "empty_result_policy": "If alert_filter exits with no matches, retain the full scan log as the review artifact.",
-        "verified_on": "2026-06-27"
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "verified_on": "2026-06-28"
       },
       "validation_gate": "Use only as triage output; candidate escalation still requires human review and false-positive diagnostics.",
-      "next_action": "Review together with the full discovery scan log after B5 completes."
+      "next_action": "Retain locally only; next actionable triage output is logs/discovery_filtered_002_qlp.json."
+    },
+    {
+      "path": "logs/discovery_run_002_qlp.json",
+      "kind": "discovery_scan_log",
+      "status": "pending_human_run",
+      "git_policy": "ignored",
+      "last_known": {
+        "scan": "B5 first QLP discovery scan",
+        "max_stars": 200,
+        "selection": "novel TESS targets after TOI/CTOI/confirmed-host exclusion",
+        "command": "caffeinate -dims .venv/bin/python Skills/star_scanner.py --max-stars 200 --pipeline QLP --exptime long --workers 4 --request-delay 0.5 --log logs/discovery_run_002_qlp.json",
+        "review_commands": [
+          ".venv/bin/python Skills/rank_candidates.py logs/discovery_run_002_qlp.json --top 20",
+          ".venv/bin/python Skills/alert_filter.py logs/discovery_run_002_qlp.json --fpp-max 0.15 --output logs/discovery_filtered_002_qlp.json"
+        ],
+        "verified_on": "2026-06-28"
+      },
+      "validation_gate": "This scan must complete and show real clear scans or candidates before C20 CNN corpus assembly or training resumes.",
+      "next_action": "[HUMAN] run the QLP B5 discovery scan on the Mac and paste back the rank/filter summary."
+    },
+    {
+      "path": "logs/discovery_filtered_002_qlp.json",
+      "kind": "discovery_triage_output",
+      "status": "pending_scan_result",
+      "git_policy": "ignored",
+      "last_known": {
+        "source": "logs/discovery_run_002_qlp.json",
+        "filter": "false_positive_probability <= 0.15",
+        "empty_result_policy": "Empty is acceptable only after a QLP scan with real clear scans or candidates, not another mostly no-data batch.",
+        "verified_on": "2026-06-28"
+      },
+      "validation_gate": "Use only as triage output; candidate escalation still requires human review and false-positive diagnostics.",
+      "next_action": "Review together with the QLP discovery scan log after B5 completes."
     },
     {
       "path": "models/cnn*/",

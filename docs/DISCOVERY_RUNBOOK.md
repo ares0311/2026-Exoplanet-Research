@@ -2,7 +2,7 @@
 
 **Purpose**: Prevent doom loops. Every agent and every session must read this before doing anything.
 
-**Last updated**: 2026-06-28 (Option A JWST integration and Option B TESS novelty restructure merged; PR #143 live scanner fix merged; worker/ETA first-scan recipe hardening in progress; Option B5 discovery scan pending)
+**Last updated**: 2026-06-28 (Option A JWST integration and Option B TESS novelty restructure merged; PR #143 live scanner fix merged; PR #145 worker/ETA fix merged; SPOC-only B5 attempt completed but did not close T1-0; QLP rerun pending)
 
 ---
 
@@ -158,7 +158,7 @@ JWST does not run autonomous surveys the way TESS does. Its time-series observat
 
 **Use for the first real discovery scan.**
 
-Current gate: `star_scanner.py` excludes TOI, CTOI, and confirmed exoplanet hosts from the NASA Exoplanet Archive, and defaults to the Tmag 12.0-14.5 novelty frontier. The remaining step is to run and review a real scan.
+Current gate: `star_scanner.py` excludes TOI, CTOI, and confirmed exoplanet hosts from the NASA Exoplanet Archive, and defaults to the Tmag 12.0-14.5 novelty frontier. The first SPOC-only run completed but did not close the gate because nearly every selected TIC had no SPOC long-cadence light curve. Use QLP for the next scan.
 
 ### Option B build plan
 
@@ -168,7 +168,7 @@ Current gate: `star_scanner.py` excludes TOI, CTOI, and confirmed exoplanet host
 | B2 | Add confirmed-planet cross-check using NASA Exoplanet Archive TAP (`ps` table, `pl_tranflag=1`) | MERGED (PR #139) |
 | B3 | Default `tmag_range` in `star_scanner.py` to `(12.0, 14.5)` to target faint-star novelty frontier | MERGED (PR #139) |
 | B4 | Extend default `period_max` in BLS search to 500 d | MERGED (PR #139) |
-| B5 | Run first 200-target discovery scan and document results | [HUMAN] |
+| B5 | Run first 200-target QLP discovery scan and document results | [HUMAN] |
 
 **Status**: B1-B4 merged to `main`. B5 is the highest-priority active production gate.
 
@@ -240,7 +240,7 @@ The XGBoost model (`models/xgboost_koi.json`) is trained and available now.
 
 ## The Immediate Next Action (As of 2026-06-27)
 
-**First discovery run** (higher priority than CNN training):
+**First QLP discovery run** (higher priority than CNN training):
 
 ```bash
 git switch main
@@ -249,19 +249,23 @@ caffeinate -dims .venv/bin/python Skills/star_scanner.py \
   --max-stars 200 \
   --tmag-min 12.0 \
   --tmag-max 14.5 \
+  --pipeline QLP \
+  --exptime long \
   --workers 4 \
   --request-delay 0.5 \
-  --log logs/discovery_run_001.json
-.venv/bin/python Skills/rank_candidates.py logs/discovery_run_001.json --top 20
-.venv/bin/python Skills/alert_filter.py logs/discovery_run_001.json \
+  --log logs/discovery_run_002_qlp.json
+.venv/bin/python Skills/rank_candidates.py logs/discovery_run_002_qlp.json --top 20
+.venv/bin/python Skills/alert_filter.py logs/discovery_run_002_qlp.json \
   --fpp-max 0.15 \
-  --output logs/discovery_filtered_001.json
+  --output logs/discovery_filtered_002_qlp.json
 ```
 
-This will take approximately 2–4 hours on a Mac M4 Max (200 targets × ~1 min each). Use `caffeinate -dims`.
+This will take approximately 2–4 hours on a Mac M4 Max. Use `caffeinate -dims`.
 
 If `alert_filter.py` reports `No candidates matched the filters.`, keep the full
-`logs/discovery_run_001.json`; a null 200-target batch is still useful evidence.
+`logs/discovery_run_002_qlp.json`; a null 200-target batch is useful evidence only
+if the log shows real scanned-clear targets or candidates, not another mostly
+no-data batch.
 Do not build the C20 CNN corpus or train C20 until this discovery run has been
 reviewed. If zero candidates emerge after at least 1,000 TIC targets, the null
 result dictates the next production priority.

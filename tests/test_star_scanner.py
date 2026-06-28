@@ -403,9 +403,45 @@ class TestRunBackgroundScan:
 
         out = capsys.readouterr().out
         assert "workers=2" in out
+        assert "pipeline=QLP" in out
+        assert "exptime=long" in out
         assert "request_delay=0.00s" in out
         assert "elapsed=" in out
         assert "ETA=" in out
+
+    def test_background_scan_passes_fetch_options_to_pipeline(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        log_path = tmp_path / "log.json"
+        captured: list[dict[str, Any]] = []
+
+        def fake_pipeline(*args: object, **kwargs: object) -> list[object]:
+            captured.append(dict(kwargs))
+            return []
+
+        with (
+            patch("Skills.star_scanner._load_toi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_ctoi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_confirmed_host_tic_ids", return_value=frozenset()),
+            patch("Skills.star_scanner.select_targets", return_value=self._targets()),
+            patch("Skills.star_scanner.run_pipeline", side_effect=fake_pipeline),
+        ):
+            run_background_scan(
+                log_path,
+                n_targets=10,
+                pipeline="QLP",
+                exptime="long",
+                workers=2,
+                request_delay=0.0,
+            )
+
+        assert captured
+        assert all(row["pipeline"] == "QLP" for row in captured)
+        assert all(row["exptime"] == "long" for row in captured)
+        for entry in ScanLog(log_path)._data["entries"].values():
+            assert entry["pipeline"] == "QLP"
+            assert entry["exptime"] == "long"
 
     def test_skips_already_scanned_via_exclude(self, tmp_path: Path) -> None:
         log_path = tmp_path / "log.json"

@@ -1,6 +1,6 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-06-28 (JWST A3 merged — PR #141; TESS novelty restructure B1-B4 merged — PR #139; live scanner startup/target-selection fix merged — PR #143; first real discovery scan B5 pending)
+Last reviewed: 2026-06-28 (JWST A3 merged — PR #141; TESS novelty restructure B1-B4 merged — PR #139; live scanner startup/target-selection fix merged — PR #143; PR #145 worker/ETA fix merged; first SPOC-only B5 attempt completed but did not close T1-0)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
 Test baseline: 2,328 default tests passing, 2 integration_live deselected
@@ -27,11 +27,12 @@ must not be copied into `models/`, registered, or used for production scoring.
 
 ### T1-0: First Real Discovery Scan Evidence
 
-- **What is missing**: A completed, reviewed discovery scan over novel TESS targets that are not already TOIs, CTOIs, or confirmed exoplanet hosts
-- **Gate status**: **OPEN / HUMAN-RUN BLOCKED** — Option B1-B4 are merged and `Skills/star_scanner.py` is ready; PR #143 fixed the live ExoFOP SSL loader, Python 3.14 dynamic-import loader, unbounded all-sky TIC query, and no-light-curve error classification failures; the first 200-target scan must be run on the user's Mac because it uses live MAST/ExoFOP/NASA services and may take hours
+- **What is missing**: A completed, reviewed discovery scan over novel TESS targets with actual downloadable light curves, excluding TOIs, CTOIs, and confirmed exoplanet hosts
+- **Gate status**: **OPEN / HUMAN-RUN BLOCKED** — Option B1-B4 are merged; PR #143 fixed startup/target-selection failures; PR #145 added bounded workers and ETA output. `logs/discovery_run_001.json` completed locally on 2026-06-28 but does **not** close this gate because it used the old SPOC-only fetch path and produced 198 no-data rows plus 2 transient remote-disconnect errors, with 0 clear scans and 0 candidates.
 - **Why this is highest priority**: `docs/DISCOVERY_RUNBOOK.md` realigned production toward discovering previously unknown transit candidates. CNN work improves false-positive rejection, but it does not matter until the project has real candidates or a documented null discovery result.
-- **Required first batch**: Run `Skills/star_scanner.py --max-stars 200 --workers 4 --request-delay 0.5 --log logs/discovery_run_001.json`, then rank and filter candidates with `Skills/rank_candidates.py` and `Skills/alert_filter.py`
-- **Success evidence**: `logs/discovery_run_001.json` exists locally, top-ranked candidates or a null result are reviewed, and `docs/LOCAL_ARTIFACT_LEDGER.md` / `artifacts/manifests/local_artifacts.json` are updated with the batch result
+- **Root cause of run 001**: `select_targets()` selected TIC catalog stars without requiring light-curve availability, while `run_pipeline()` could not override `fetch_lightcurve()` and therefore fetched only `author='SPOC', exptime='long'`.
+- **Required next batch**: Run `Skills/star_scanner.py --max-stars 200 --pipeline QLP --exptime long --workers 4 --request-delay 0.5 --log logs/discovery_run_002_qlp.json`, then rank and filter candidates with `Skills/rank_candidates.py` and `Skills/alert_filter.py`
+- **Success evidence**: `logs/discovery_run_002_qlp.json` exists locally, includes clear scans or candidates instead of mostly no-data rows, top-ranked candidates or a meaningful null result are reviewed, and `docs/LOCAL_ARTIFACT_LEDGER.md` / `artifacts/manifests/local_artifacts.json` are updated with the batch result
 - **Next escalation rule**: Do not resume CNN C20 training until at least the first real scan is complete and reviewed. If zero candidates emerge after at least 1,000 TIC targets, that null result becomes the next production-planning input.
 
 ### T1-1: Production Tier 2 CNN Checkpoint
