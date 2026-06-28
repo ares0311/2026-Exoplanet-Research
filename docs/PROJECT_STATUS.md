@@ -1,7 +1,7 @@
 # PROJECT STATUS
 
 ## Status: Active Development
-## Phase: Live Discovery Gate — first 200-target scan pending
+## Phase: Live Discovery Gate — first QLP 200-target scan pending
 ## Last Updated: 2026-06-28
 
 ---
@@ -100,23 +100,26 @@ without relying on chat context or local terminal output.
 - Option B TESS novelty targeting is merged via PR #139: `star_scanner.py` excludes TOI, CTOI, and confirmed-host catalogs, and defaults to Tmag 12.0-14.5.
 - Live scanner startup/target-selection hardening is merged via PR #143: ExoFOP SSL loading, Python 3.14 helper imports, bounded TIC target selection, and `no_data` classification are fixed; a one-target live smoke on `main` selected TIC 425884922 and completed with `1 no-data | 0 errors`.
 - K2 overlap corpus collection is complete locally with 2,086 snippets; do not re-fetch it.
-- The next production action is human-run because it requires live services and a long-running Mac-local scan:
+- A SPOC-only 200-target attempt completed on 2026-06-28 as `logs/discovery_run_001.json`, but it did not close T1-0: 198 targets had no SPOC long-cadence light curve, 2 hit transient remote disconnects, and there were 0 clear scans / 0 candidates.
+- The next production action is human-run because it requires live services and a long-running Mac-local scan. Use QLP and a fresh log so the result is not polluted by the SPOC-only no-data batch:
 
 ```bash
 git switch main
 git pull --ff-only origin main
 caffeinate -dims .venv/bin/python Skills/star_scanner.py \
   --max-stars 200 \
+  --pipeline QLP \
+  --exptime long \
   --workers 4 \
   --request-delay 0.5 \
-  --log logs/discovery_run_001.json
-.venv/bin/python Skills/rank_candidates.py logs/discovery_run_001.json --top 20
-.venv/bin/python Skills/alert_filter.py logs/discovery_run_001.json \
+  --log logs/discovery_run_002_qlp.json
+.venv/bin/python Skills/rank_candidates.py logs/discovery_run_002_qlp.json --top 20
+.venv/bin/python Skills/alert_filter.py logs/discovery_run_002_qlp.json \
   --fpp-max 0.15 \
-  --output logs/discovery_filtered_001.json
+  --output logs/discovery_filtered_002_qlp.json
 ```
 
-If `alert_filter.py` finds no rows, keep `logs/discovery_run_001.json`; a null first batch still informs the next target-selection cycle.
+If `alert_filter.py` finds no rows, keep `logs/discovery_run_002_qlp.json`; a null batch only informs the next target-selection cycle if it contains real scanned-clear targets or candidates, not mostly no-data rows.
 
 ## Paused
 
@@ -164,8 +167,8 @@ If `alert_filter.py` finds no rows, keep `logs/discovery_run_001.json`; a null f
 
 ## Next Actions
 
-1. Run the first 200-target discovery scan on the user's Mac using the command in `docs/DISCOVERY_RUNBOOK.md`.
-2. Review `logs/discovery_run_001.json`, ranked candidates, and `logs/discovery_filtered_001.json` if present.
+1. Run the first QLP 200-target discovery scan on the user's Mac using the command in `docs/DISCOVERY_RUNBOOK.md`.
+2. Review `logs/discovery_run_002_qlp.json`, ranked candidates, and `logs/discovery_filtered_002_qlp.json` if present.
 3. Update `docs/LOCAL_ARTIFACT_LEDGER.md` and `artifacts/manifests/local_artifacts.json` with the scan result so GitHub-only agents can continue without chat context.
 4. Do not run C20 CNN corpus assembly or training until the first discovery scan is complete and reviewed.
 5. Promote nothing unless a future evaluator run reports `Flag: PASS`, raw test

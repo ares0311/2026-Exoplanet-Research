@@ -241,6 +241,8 @@ class ScanLog:
               "best_fpp": float | null,
               "best_pathway": str | null,
               "priority_score": float | null,
+              "pipeline": str | null,
+              "exptime": str | null,
               "error_message": str | null
             }
           }
@@ -276,6 +278,8 @@ class ScanLog:
             "best_fpp": result.get("best_fpp"),
             "best_pathway": result.get("best_pathway"),
             "priority_score": result.get("priority_score"),
+            "pipeline": result.get("pipeline"),
+            "exptime": result.get("exptime"),
             "error_message": result.get("error_message"),
         }
         self._data["entries"][str(tic_id)] = entry
@@ -512,6 +516,8 @@ def scan_star(
     max_peaks: int = 5,
     scorer: str = "bayesian",
     model_path: Path | None = None,
+    pipeline: str | None = None,
+    exptime: str | None = None,
     priority: float | None = None,
 ) -> dict[str, Any]:
     """Run the full pipeline on one star and optionally persist the result.
@@ -524,6 +530,8 @@ def scan_star(
         max_peaks: Maximum signals to search for per star.
         scorer: ``"bayesian"``, ``"xgboost"``, or ``"ensemble"``.
         model_path: XGBoost model JSON (required for xgboost/ensemble).
+        pipeline: Optional MAST pipeline/author override.
+        exptime: Optional MAST exposure hint.
         priority: Pre-computed priority score to store in the log entry.
 
     Returns:
@@ -540,6 +548,8 @@ def scan_star(
         "best_fpp": None,
         "best_pathway": None,
         "priority_score": priority,
+        "pipeline": pipeline,
+        "exptime": exptime,
         "error_message": None,
     }
 
@@ -551,6 +561,8 @@ def scan_star(
             max_peaks=max_peaks,
             scorer=scorer,
             model_path=model_path,
+            pipeline=pipeline,
+            exptime=exptime,
         )
     except Exception as exc:  # noqa: BLE001
         message = str(exc)
@@ -603,6 +615,8 @@ def run_background_scan(
     max_peaks: int = 5,
     scorer: str = "bayesian",
     model_path: Path | None = None,
+    pipeline: str = "QLP",
+    exptime: str = "long",
     query_radius_deg: float = 0.5,
     max_target_query_tiles: int = 60,
     workers: int = 4,
@@ -626,6 +640,9 @@ def run_background_scan(
         max_peaks: Maximum signals per star.
         scorer: Scoring model.
         model_path: XGBoost model path (for xgboost/ensemble scorer).
+        pipeline: MAST pipeline/author to fetch. Default QLP favors FFI-based
+            discovery coverage over SPOC target-limited light curves.
+        exptime: MAST exposure hint.
         query_radius_deg: Cone-search radius for each bounded TIC target tile.
         max_target_query_tiles: Maximum number of TIC sky tiles to query.
         workers: Maximum concurrent target scans. Default 4 keeps live MAST
@@ -684,6 +701,7 @@ def run_background_scan(
     worker_count = max(1, min(workers, len(targets)))
     print(
         f"Selected {len(targets)} candidate targets  "
+        f"| pipeline={pipeline}  exptime={exptime}  "
         f"| workers={worker_count}  request_delay={request_delay:.2f}s\n",
         flush=True,
     )
@@ -711,6 +729,8 @@ def run_background_scan(
             max_peaks=max_peaks,
             scorer=scorer,
             model_path=model_path,
+            pipeline=pipeline,
+            exptime=exptime,
             priority=target["priority"],
         )
         return target, result
@@ -784,6 +804,10 @@ def _parse_args() -> argparse.Namespace:
                    help="Minimum BLS SNR threshold (default: 5.0)")
     p.add_argument("--max-peaks", type=int, default=5,
                    help="Maximum signals per star (default: 5)")
+    p.add_argument("--pipeline", default="QLP", choices=["SPOC", "QLP", "TGLC"],
+                   help="MAST pipeline/author for TESS light curves (default: QLP)")
+    p.add_argument("--exptime", default="long", choices=["long", "short", "fast"],
+                   help="MAST exposure hint for TESS light curves (default: long)")
     p.add_argument("--query-radius-deg", type=float, default=0.5,
                    help="TIC cone-search radius per target-selection tile (default: 0.5)")
     p.add_argument("--max-target-query-tiles", type=int, default=60,
@@ -830,6 +854,8 @@ if __name__ == "__main__":
             max_peaks=args.max_peaks,
             scorer=args.scorer,
             model_path=_model_path,
+            pipeline=args.pipeline,
+            exptime=args.exptime,
         )
         if _result["status"] == "candidate_found":
             print(
@@ -854,6 +880,8 @@ if __name__ == "__main__":
         max_peaks=args.max_peaks,
         scorer=args.scorer,
         model_path=_model_path,
+        pipeline=args.pipeline,
+        exptime=args.exptime,
         query_radius_deg=args.query_radius_deg,
         max_target_query_tiles=args.max_target_query_tiles,
         workers=args.workers,

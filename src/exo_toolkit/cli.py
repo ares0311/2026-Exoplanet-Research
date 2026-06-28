@@ -190,6 +190,8 @@ def run_pipeline(
     target_id: str,
     mission: Mission,
     *,
+    exptime: str | None = None,
+    pipeline: str | None = None,
     min_snr: float = 5.0,
     max_peaks: int = 5,
     scorer: str = "bayesian",
@@ -204,6 +206,8 @@ def run_pipeline(
     Args:
         target_id: Target identifier, e.g. ``"TIC 150428135"``.
         mission: ``"TESS"``, ``"Kepler"``, ``"K2"``, or ``"JWST"``.
+        exptime: Optional exposure-time hint passed to ``fetch_lightcurve``.
+        pipeline: Optional pipeline/author override passed to ``fetch_lightcurve``.
         min_snr: Minimum BLS SNR threshold for candidate signals.
         max_peaks: Maximum number of signals to return from the BLS search.
         scorer: Scoring model — ``"bayesian"`` (default), ``"xgboost"``, or
@@ -255,7 +259,12 @@ def run_pipeline(
     if calibration_path is not None:
         calibration_result = load_calibration(calibration_path)
 
-    fetch_result = _fetch(target_id, mission)
+    fetch_kwargs: dict[str, Any] = {}
+    if exptime is not None:
+        fetch_kwargs["exptime"] = exptime
+    if pipeline is not None:
+        fetch_kwargs["pipeline"] = pipeline
+    fetch_result = _fetch(target_id, mission, **fetch_kwargs)
     clean_result = _clean(fetch_result.light_curve)
     provenance_score = compute_provenance_score(fetch_result.provenance)
 
@@ -429,6 +438,16 @@ def _print_results(rows: list[dict[str, Any]], target_id: str) -> None:
 def scan(
     target_id: str = typer.Argument(..., help='Target identifier, e.g. "TIC 150428135"'),
     mission: str = typer.Option("TESS", help="Mission: TESS, Kepler, K2, or JWST"),
+    exptime: str | None = typer.Option(
+        None,
+        "--exptime",
+        help="Exposure hint for MAST fetches: long, short, or fast",
+    ),
+    pipeline: str | None = typer.Option(
+        None,
+        "--pipeline",
+        help="Pipeline/author override for MAST fetches, e.g. SPOC, QLP, or TGLC",
+    ),
     min_snr: float = typer.Option(5.0, "--min-snr", help="Minimum BLS SNR threshold"),
     max_peaks: int = typer.Option(5, "--max-peaks", help="Maximum signals to search for"),
     scorer: str = typer.Option(
@@ -503,6 +522,8 @@ def scan(
         rows = run_pipeline(
             target_id,
             mission,  # type: ignore[arg-type]
+            exptime=exptime,
+            pipeline=pipeline,
             min_snr=min_snr,
             max_peaks=max_peaks,
             scorer=scorer,
