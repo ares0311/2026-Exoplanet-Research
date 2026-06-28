@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import dataclasses
 import sys
+from pathlib import Path
 from unittest.mock import MagicMock, call
 
 import pydantic
@@ -26,6 +27,7 @@ from exo_toolkit.fetch import (
     FetchResult,
     _extract_sectors,
     _fetch_jwst,
+    _remove_corrupt_lightkurve_cache_file,
     compute_provenance_score,
     fetch_lightcurve,
 )
@@ -370,6 +372,59 @@ class TestFetchLightcurve:
         fetch_lightcurve("TIC 999", "TESS", prefer_pdcsap=False)
         search = mock_lk.search_lightcurve.return_value
         assert search.download_all.call_args == call(flux_column="sap_flux")
+
+    def test_corrupt_lightkurve_cache_file_is_removed_and_retried(
+        self, mock_lk: MagicMock, tmp_path: Path
+    ) -> None:
+        corrupt = (
+            tmp_path
+            / ".lightkurve"
+            / "cache"
+            / "mastDownload"
+            / "HLSP"
+            / "hlsp_qlp_tess_ffi_s0001-0000000425884922_tess_v01_llc"
+            / "hlsp_qlp_tess_ffi_s0001-0000000425884922_tess_v01_llc.fits"
+        )
+        corrupt.parent.mkdir(parents=True)
+        corrupt.write_text("truncated", encoding="utf-8")
+        lc = _make_lc_mock(procver="QLP")
+        collection = _make_collection_mock([lc])
+        search = _make_search_mock(collection)
+        search.download_all.side_effect = [
+            RuntimeError(
+                "Error in reading Data product "
+                f"{corrupt} "
+                "of type QLP .\nThis file may be corrupt due to an "
+                "interrupted download. Please remove it from your disk and try again."
+            ),
+            collection,
+        ]
+        mock_lk.search_lightcurve.return_value = search
+
+        result = fetch_lightcurve("TIC 425884922", "TESS", pipeline="QLP")
+
+        assert result.light_curve is collection.stitch.return_value
+        assert not corrupt.exists()
+        assert search.download_all.call_args_list == [
+            call(flux_column="pdcsap_flux"),
+            call(flux_column="pdcsap_flux"),
+        ]
+
+    def test_corrupt_cache_repair_ignores_non_lightkurve_paths(
+        self, tmp_path: Path
+    ) -> None:
+        ordinary = tmp_path / "science.fits"
+        ordinary.write_text("not a fits file", encoding="utf-8")
+        exc = RuntimeError(
+            "Error in reading Data product "
+            f"{ordinary} "
+            "of type QLP . This file may be corrupt due to an interrupted download."
+        )
+
+        removed = _remove_corrupt_lightkurve_cache_file(exc)
+
+        assert removed is None
+        assert ordinary.exists()
 
     def test_flux_column_recorded_in_provenance(self, mock_lk: MagicMock) -> None:
         lc = _make_lc_mock()
