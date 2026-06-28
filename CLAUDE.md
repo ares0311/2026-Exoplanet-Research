@@ -82,25 +82,27 @@ The user's local Mac and GitHub `main` are the joint source of truth. Keep them 
 **Agent rules (non-negotiable):**
 1. Every code change must complete the full cycle: feature branch → commit → push → PR → CI green → merge to main → PR closed. Never leave a PR open at end of session.
 2. Never tell the user to run a script that has not yet been merged to `main`.
-3. Every recipe given to the user must begin with `git pull origin main`.
-4. After every merge to `main`, remind the user: `git pull origin main`.
+3. Every recipe given to the user must begin by switching to `main` and fast-forwarding from `origin/main`.
+4. After every merge to `main`, remind the user: `git switch main` then `git pull --ff-only origin main`.
 
 **Standard recipe header — prepend to EVERY user command:**
 ```bash
-git pull origin main
+git switch main
+git pull --ff-only origin main
 ```
 
 **For long-running commands:**
 ```bash
-git pull origin main
-caffeinate -i python Skills/<script>.py [args]
+git switch main
+git pull --ff-only origin main
+caffeinate -i .venv/bin/python Skills/<script>.py [args]
 ```
 
 ### macOS Long-Running Process Policy — ALWAYS USE caffeinate
 Any recipe for a Python command that runs longer than ~60 seconds **must** use `caffeinate -i`:
 ```bash
-caffeinate -i python Skills/<script>.py [args]   # standard
-caffeinate -dims python Skills/<script>.py [args] # lid-close safe
+caffeinate -i .venv/bin/python Skills/<script>.py [args]   # standard
+caffeinate -dims .venv/bin/python Skills/<script>.py [args] # lid-close safe
 ```
 This applies to: light curve downloads, CNN training, batch scans, injection-recovery, and any repeated-network or long-compute script. **Never give a bare `python ...` recipe for these.**
 
@@ -1243,11 +1245,14 @@ fix the durable resume ledger before asking the human to run it again.
 
 **K2 corpus fetch status (as of 2026-06-27):** **COMPLETE** — 2,086 snippets written to `data/tess_k2_overlap_snippets.jsonl`; wrote=2086, skipped=174, terminal_failures=135, elapsed=2531s (42m11s). No further fetch action needed.
 
+**Live scanner fix (PR #143, 2026-06-28):** **MERGED** — live one-target smoke on `main` verified that ExoFOP SSL loading, Python 3.14 helper imports, bounded TIC target selection, and no-light-curve `no_data` classification work. Do not re-debug the pre-PR #143 pasted failures.
+
 **Immediate next actions (in priority order):**
 1. **[HUMAN]** Run the first real discovery scan — highest priority item before any CNN work.
    Option B1–B4 is now merged: the scanner automatically excludes TOI + CTOI + confirmed hosts and defaults to Tmag 12–14.5:
    ```bash
-   git pull origin main
+   git switch main
+   git pull --ff-only origin main
    caffeinate -dims .venv/bin/python Skills/star_scanner.py \
      --max-stars 200 \
      --log logs/discovery_run_001.json

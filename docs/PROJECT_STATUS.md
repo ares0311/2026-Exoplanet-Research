@@ -2,7 +2,7 @@
 
 ## Status: Active Development
 ## Phase: Live Discovery Gate — first 200-target scan pending
-## Last Updated: 2026-06-27
+## Last Updated: 2026-06-28
 
 ---
 
@@ -98,11 +98,13 @@ without relying on chat context or local terminal output.
 - The project mission has been realigned to discovering previously unknown transit candidates before doing more CNN work.
 - Option A JWST integration is merged: A1/A2 via PR #133 and A3 CLI wiring via PR #141.
 - Option B TESS novelty targeting is merged via PR #139: `star_scanner.py` excludes TOI, CTOI, and confirmed-host catalogs, and defaults to Tmag 12.0-14.5.
+- Live scanner startup/target-selection hardening is merged via PR #143: ExoFOP SSL loading, Python 3.14 helper imports, bounded TIC target selection, and `no_data` classification are fixed; a one-target live smoke on `main` selected TIC 425884922 and completed with `1 no-data | 0 errors`.
 - K2 overlap corpus collection is complete locally with 2,086 snippets; do not re-fetch it.
 - The next production action is human-run because it requires live services and a long-running Mac-local scan:
 
 ```bash
-git pull origin main
+git switch main
+git pull --ff-only origin main
 caffeinate -dims .venv/bin/python Skills/star_scanner.py \
   --max-stars 200 \
   --log logs/discovery_run_001.json

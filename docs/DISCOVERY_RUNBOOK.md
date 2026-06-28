@@ -190,8 +190,8 @@ CNN training consumed 6 weeks (C1–C19). The CNN improves FP rejection. FP reje
 ### Rule 4: Do not ask the user questions you can look up
 If the question is "what FPP threshold does academia use?", look it up. If the question is "which TESS sectors are least searched?", look it up. Only escalate to the user when the decision requires their personal judgment (budget, risk tolerance, which expert to contact).
 
-### Rule 5: Every session starts with `git pull origin main`
-Every recipe given to the user must begin with `git pull origin main`. Never give a command from a branch that has not been merged to main.
+### Rule 5: Every session starts from synced `main`
+Every recipe given to the user must begin by switching to `main` and fast-forwarding from `origin/main`. Never pull `origin/main` into a feature branch and never give a command from a branch that has not been merged to main.
 
 ### Rule 6: Training data cleanup
 Rejected CNN training artifacts consume disk space and create confusion. After any training attempt is formally rejected (not just failed — formally documented as REJECTED in AGENTS.md):
@@ -243,7 +243,8 @@ The XGBoost model (`models/xgboost_koi.json`) is trained and available now.
 **First discovery run** (higher priority than CNN training):
 
 ```bash
-git pull origin main
+git switch main
+git pull --ff-only origin main
 caffeinate -dims .venv/bin/python Skills/star_scanner.py \
   --max-stars 200 \
   --tmag-min 12.0 \
