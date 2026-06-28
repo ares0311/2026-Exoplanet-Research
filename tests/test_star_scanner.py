@@ -223,21 +223,21 @@ class TestSelectTargets:
 
     @patch("astroquery.mast.Catalogs")
     def test_returns_list_of_dicts(self, mock_catalogs: MagicMock) -> None:
-        mock_catalogs.query_criteria.return_value = self._catalog_rows()
+        mock_catalogs.query_region.return_value = self._catalog_rows()
         results = select_targets(n=10)
         assert isinstance(results, list)
         assert all("tic_id" in r and "priority" in r for r in results)
 
     @patch("astroquery.mast.Catalogs")
     def test_sorted_by_priority_descending(self, mock_catalogs: MagicMock) -> None:
-        mock_catalogs.query_criteria.return_value = self._catalog_rows()
+        mock_catalogs.query_region.return_value = self._catalog_rows()
         results = select_targets(n=10)
         priorities = [r["priority"] for r in results]
         assert priorities == sorted(priorities, reverse=True)
 
     @patch("astroquery.mast.Catalogs")
     def test_excludes_specified_ids(self, mock_catalogs: MagicMock) -> None:
-        mock_catalogs.query_criteria.return_value = self._catalog_rows()
+        mock_catalogs.query_region.return_value = self._catalog_rows()
         results = select_targets(n=10, exclude_tic_ids={100, 200})
         tic_ids = {r["tic_id"] for r in results}
         assert 100 not in tic_ids
@@ -245,17 +245,33 @@ class TestSelectTargets:
 
     @patch("astroquery.mast.Catalogs")
     def test_respects_n_limit(self, mock_catalogs: MagicMock) -> None:
-        mock_catalogs.query_criteria.return_value = self._catalog_rows()
+        mock_catalogs.query_region.return_value = self._catalog_rows()
         results = select_targets(n=2)
         assert len(results) <= 2
 
     @patch("astroquery.mast.Catalogs")
     def test_handles_missing_teff_gracefully(self, mock_catalogs: MagicMock) -> None:
         rows = [{"ID": 500, "Tmag": 12.0, "Teff": None, "contratio": None}]
-        mock_catalogs.query_criteria.return_value = rows
+        mock_catalogs.query_region.return_value = rows
         results = select_targets(n=5)
         assert len(results) == 1
         assert results[0]["teff"] is None
+
+    @patch("astroquery.mast.Catalogs")
+    def test_uses_bounded_region_queries_not_all_sky_criteria(
+        self,
+        mock_catalogs: MagicMock,
+    ) -> None:
+        mock_catalogs.query_region.return_value = self._catalog_rows()
+        select_targets(n=2)
+        assert mock_catalogs.query_region.called
+        assert not mock_catalogs.query_criteria.called
+
+    @patch("astroquery.mast.Catalogs")
+    def test_raises_when_all_tic_tiles_fail(self, mock_catalogs: MagicMock) -> None:
+        mock_catalogs.query_region.side_effect = RuntimeError("remote closed")
+        with pytest.raises(RuntimeError, match="TIC target selection failed"):
+            select_targets(n=2, max_tiles=1, retry_attempts=1)
 
 
 # ---------------------------------------------------------------------------
@@ -281,10 +297,19 @@ class TestScanStar:
 
     def test_error_status_on_pipeline_exception(self) -> None:
         with patch("Skills.star_scanner.run_pipeline") as mock_pipe:
-            mock_pipe.side_effect = RuntimeError("no data found")
+            mock_pipe.side_effect = RuntimeError("unexpected parser failure")
             result = scan_star(88888)
         assert result["status"] == "error"
-        assert "no data found" in result["error_message"]
+        assert "unexpected parser failure" in result["error_message"]
+
+    def test_no_lightcurve_exception_is_no_data(self) -> None:
+        with patch("Skills.star_scanner.run_pipeline") as mock_pipe:
+            mock_pipe.side_effect = RuntimeError(
+                "No TESS light curves found for 'TIC 425884922'"
+            )
+            result = scan_star(425884922)
+        assert result["status"] == "no_data"
+        assert "No TESS light curves found" in result["error_message"]
 
     def test_records_to_log_when_provided(self, tmp_path: Path) -> None:
         log = ScanLog(tmp_path / "log.json")
@@ -324,6 +349,14 @@ class TestScanStar:
         assert log.is_scanned(555)
         assert log.summary()["error"] == 1
 
+    def test_no_data_is_logged_when_log_provided(self, tmp_path: Path) -> None:
+        log = ScanLog(tmp_path / "log.json")
+        with patch("Skills.star_scanner.run_pipeline") as mock_pipe:
+            mock_pipe.side_effect = ValueError("No TESS light curves found")
+            scan_star(556, log=log)
+        assert log.is_scanned(556)
+        assert log.summary()["no_data"] == 1
+
 
 # ---------------------------------------------------------------------------
 # TestRunBackgroundScan
@@ -343,6 +376,8 @@ class TestRunBackgroundScan:
         log_path = tmp_path / "log.json"
         with (
             patch("Skills.star_scanner._load_toi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_ctoi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_confirmed_host_tic_ids", return_value=frozenset()),
             patch("Skills.star_scanner.select_targets", return_value=self._targets()),
             patch("Skills.star_scanner.run_pipeline", return_value=[]),
         ):
@@ -358,12 +393,19 @@ class TestRunBackgroundScan:
 
         captured_exclude: list[set[int]] = []
 
-        def fake_select(n: int, tmag_range: tuple, exclude_tic_ids: set | None = None) -> list:
+        def fake_select(
+            n: int,
+            tmag_range: tuple,
+            exclude_tic_ids: set | None = None,
+            **_: object,
+        ) -> list:
             captured_exclude.append(exclude_tic_ids or set())
             return [self._targets()[1]]  # only 1002
 
         with (
             patch("Skills.star_scanner._load_toi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_ctoi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_confirmed_host_tic_ids", return_value=frozenset()),
             patch("Skills.star_scanner.select_targets", side_effect=fake_select),
             patch("Skills.star_scanner.run_pipeline", return_value=[]),
         ):
@@ -384,6 +426,8 @@ class TestRunBackgroundScan:
 
         with (
             patch("Skills.star_scanner._load_toi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_ctoi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_confirmed_host_tic_ids", return_value=frozenset()),
             patch("Skills.star_scanner.select_targets", return_value=self._targets()),
             patch("Skills.star_scanner.run_pipeline", side_effect=fake_pipeline),
         ):
@@ -393,12 +437,19 @@ class TestRunBackgroundScan:
         log_path = tmp_path / "log.json"
         captured: list[set[int]] = []
 
-        def fake_select(n: int, tmag_range: tuple, exclude_tic_ids: set | None = None) -> list:
+        def fake_select(
+            n: int,
+            tmag_range: tuple,
+            exclude_tic_ids: set | None = None,
+            **_: object,
+        ) -> list:
             captured.append(exclude_tic_ids or set())
             return []
 
         with (
             patch("Skills.star_scanner._load_toi_tic_ids", return_value={1001, 9999}),
+            patch("Skills.star_scanner._load_ctoi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_confirmed_host_tic_ids", return_value=frozenset()),
             patch("Skills.star_scanner.select_targets", side_effect=fake_select),
         ):
             run_background_scan(log_path, n_targets=10)
