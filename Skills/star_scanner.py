@@ -15,16 +15,16 @@ records which TIC IDs have been processed.
 Usage
 -----
     # Single target
-    python Skills/star_scanner.py --target 150428135
+    .venv/bin/python Skills/star_scanner.py --target 150428135
 
     # Background scan (auto-resumes via log)
-    python Skills/star_scanner.py --log data/scan_log.json --max-stars 1000
+    .venv/bin/python Skills/star_scanner.py --log data/scan_log.json --max-stars 1000
 
     # Show scan log summary without scanning
-    python Skills/star_scanner.py --summary --log data/scan_log.json
+    .venv/bin/python Skills/star_scanner.py --summary --log data/scan_log.json
 
     # Narrow magnitude window; use ML scorer
-    python Skills/star_scanner.py --log data/scan_log.json \\
+    .venv/bin/python Skills/star_scanner.py --log data/scan_log.json \\
         --tmag-min 11 --tmag-max 13 \\
         --scorer xgboost --model-path data/model.json
 """
@@ -34,8 +34,10 @@ import argparse
 import io
 import json
 import sys
+import threading
 import time
 import urllib.request
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -56,6 +58,26 @@ _DEFAULT_SEARCH_CENTERS: tuple[tuple[float, float], ...] = tuple(
     for dec in (-60, -30, 0, 30, 60)
     for ra in range(0, 360, 30)
 )
+
+
+class _StartRateLimiter:
+    """Space worker starts so live-service requests do not burst at once."""
+
+    def __init__(self, delay_seconds: float) -> None:
+        self._delay_seconds = max(0.0, delay_seconds)
+        self._lock = threading.Lock()
+        self._next_start = 0.0
+
+    def wait(self) -> None:
+        """Wait until the next start slot is available."""
+        if self._delay_seconds <= 0.0:
+            return
+        with self._lock:
+            now = time.monotonic()
+            wait_seconds = max(0.0, self._next_start - now)
+            self._next_start = max(now, self._next_start) + self._delay_seconds
+        if wait_seconds > 0.0:
+            time.sleep(wait_seconds)
 
 
 def _url_text(url: str, *, timeout: int = 60) -> str:
@@ -81,6 +103,40 @@ def _row_get(row: Any, key: str) -> Any:
         return row[key]
     except (KeyError, TypeError, ValueError):
         return None
+
+
+def _format_eta(seconds: float) -> str:
+    """Format an ETA duration for console progress."""
+    if seconds == float("inf"):
+        return "unknown"
+    if seconds > 90:
+        minutes = int(seconds // 60)
+        remainder = int(seconds % 60)
+        return f"{minutes}m{remainder:02d}s"
+    return f"{seconds:.0f}s"
+
+
+def _status_text(result: dict[str, Any]) -> str:
+    """Return a compact console status for a scan result."""
+    status = result["status"]
+    if status == "candidate_found":
+        return (
+            f"CANDIDATE P={result['best_period_days']:.2f} d "
+            f"FPP={result['best_fpp']:.3f} [{result['best_pathway']}]"
+        )
+    if status == "scanned_clear":
+        return "clear"
+    if status == "no_data":
+        return "no data"
+    return f"error: {result['error_message']}"
+
+
+def _progress_suffix(done: int, total: int, start_time: float) -> str:
+    """Return elapsed/ETA suffix for per-target progress output."""
+    elapsed = time.monotonic() - start_time
+    rate = done / elapsed if elapsed > 0.0 else 0.0
+    remaining = (total - done) / rate if rate > 0.0 else float("inf")
+    return f"elapsed={elapsed:.0f}s ETA={_format_eta(remaining)}"
 
 # ---------------------------------------------------------------------------
 # Priority scoring
@@ -549,6 +605,8 @@ def run_background_scan(
     model_path: Path | None = None,
     query_radius_deg: float = 0.5,
     max_target_query_tiles: int = 60,
+    workers: int = 4,
+    request_delay: float = 0.5,
 ) -> None:
     """Fetch a ranked target list and scan each star in priority order.
 
@@ -570,6 +628,9 @@ def run_background_scan(
         model_path: XGBoost model path (for xgboost/ensemble scorer).
         query_radius_deg: Cone-search radius for each bounded TIC target tile.
         max_target_query_tiles: Maximum number of TIC sky tiles to query.
+        workers: Maximum concurrent target scans. Default 4 keeps live MAST
+            use polite on the configured M4 Max while avoiding a serial run.
+        request_delay: Minimum seconds between worker scan starts.
     """
     log = ScanLog(log_path)
 
@@ -620,7 +681,12 @@ def run_background_scan(
     except Exception as exc:  # noqa: BLE001
         print(f"Target selection failed: {exc}", file=sys.stderr, flush=True)
         raise
-    print(f"Selected {len(targets)} candidate targets\n", flush=True)
+    worker_count = max(1, min(workers, len(targets)))
+    print(
+        f"Selected {len(targets)} candidate targets  "
+        f"| workers={worker_count}  request_delay={request_delay:.2f}s\n",
+        flush=True,
+    )
 
     if not targets:
         print(
@@ -630,41 +696,46 @@ def run_background_scan(
         )
         return
 
+    start_time = time.monotonic()
+    n_done = 0
+    limiter = _StartRateLimiter(request_delay)
+
+    def scan_target(target: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+        limiter.wait()
+        tic_id = target["tic_id"]
+        result = scan_star(
+            tic_id,
+            mission=mission,
+            log=None,
+            min_snr=min_snr,
+            max_peaks=max_peaks,
+            scorer=scorer,
+            model_path=model_path,
+            priority=target["priority"],
+        )
+        return target, result
+
+    executor = ThreadPoolExecutor(max_workers=worker_count)
+    futures: list[Future[tuple[dict[str, Any], dict[str, Any]]]] = []
     try:
-        for idx, target in enumerate(targets, 1):
+        futures = [executor.submit(scan_target, target) for target in targets]
+        for future in as_completed(futures):
+            target, result = future.result()
             tic_id = target["tic_id"]
-            pri = target["priority"]
+            log.record(tic_id, result["status"], result)
+            n_done += 1
             print(
-                f"[{idx}/{len(targets)}] TIC {tic_id}  "
-                f"Tmag={target['tmag']:.1f}  priority={pri:.3f} …",
-                end=" ",
+                f"[{n_done}/{len(targets)}] TIC {tic_id}  "
+                f"Tmag={target['tmag']:.1f}  priority={target['priority']:.3f}  "
+                f"{_status_text(result)}  {_progress_suffix(n_done, len(targets), start_time)}",
                 flush=True,
             )
-            result = scan_star(
-                tic_id,
-                mission=mission,
-                log=log,
-                min_snr=min_snr,
-                max_peaks=max_peaks,
-                scorer=scorer,
-                model_path=model_path,
-                priority=pri,
-            )
-            status = result["status"]
-            if status == "candidate_found":
-                print(
-                    f"CANDIDATE  P={result['best_period_days']:.2f} d  "
-                    f"FPP={result['best_fpp']:.3f}  [{result['best_pathway']}]",
-                    flush=True,
-                )
-            elif status == "scanned_clear":
-                print("clear", flush=True)
-            elif status == "no_data":
-                print("no data", flush=True)
-            else:
-                print(f"error: {result['error_message']}", flush=True)
     except KeyboardInterrupt:
+        for future in futures:
+            future.cancel()
         print("\nScan interrupted.", flush=True)
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
 
     summary = log.summary()
     print(
@@ -717,6 +788,10 @@ def _parse_args() -> argparse.Namespace:
                    help="TIC cone-search radius per target-selection tile (default: 0.5)")
     p.add_argument("--max-target-query-tiles", type=int, default=60,
                    help="Maximum TIC sky tiles to query for target selection (default: 60)")
+    p.add_argument("--workers", type=int, default=4,
+                   help="Concurrent target scans for live discovery (default: 4)")
+    p.add_argument("--request-delay", type=float, default=0.5,
+                   help="Minimum seconds between worker scan starts (default: 0.5)")
     p.add_argument(
         "--scorer", default="bayesian", choices=["bayesian", "xgboost", "ensemble"],
     )
@@ -781,4 +856,6 @@ if __name__ == "__main__":
         model_path=_model_path,
         query_radius_deg=args.query_radius_deg,
         max_target_query_tiles=args.max_target_query_tiles,
+        workers=args.workers,
+        request_delay=args.request_delay,
     )

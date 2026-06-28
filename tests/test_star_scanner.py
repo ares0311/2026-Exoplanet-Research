@@ -386,6 +386,27 @@ class TestRunBackgroundScan:
         assert log.is_scanned(1001)
         assert log.is_scanned(1002)
 
+    def test_background_scan_prints_workers_elapsed_and_eta(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        log_path = tmp_path / "log.json"
+        with (
+            patch("Skills.star_scanner._load_toi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_ctoi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_confirmed_host_tic_ids", return_value=frozenset()),
+            patch("Skills.star_scanner.select_targets", return_value=self._targets()),
+            patch("Skills.star_scanner.run_pipeline", return_value=[]),
+        ):
+            run_background_scan(log_path, n_targets=10, workers=2, request_delay=0.0)
+
+        out = capsys.readouterr().out
+        assert "workers=2" in out
+        assert "request_delay=0.00s" in out
+        assert "elapsed=" in out
+        assert "ETA=" in out
+
     def test_skips_already_scanned_via_exclude(self, tmp_path: Path) -> None:
         log_path = tmp_path / "log.json"
         log = ScanLog(log_path)

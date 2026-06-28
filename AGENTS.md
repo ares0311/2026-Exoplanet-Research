@@ -134,6 +134,8 @@ git switch main
 git pull --ff-only origin main
 caffeinate -dims .venv/bin/python Skills/star_scanner.py \
   --max-stars 200 \
+  --workers 4 \
+  --request-delay 0.5 \
   --log logs/discovery_run_001.json
 .venv/bin/python Skills/rank_candidates.py logs/discovery_run_001.json --top 20
 .venv/bin/python Skills/alert_filter.py logs/discovery_run_001.json \
