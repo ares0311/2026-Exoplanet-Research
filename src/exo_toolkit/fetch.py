@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import datetime
 import importlib.util
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -159,7 +160,7 @@ def fetch_lightcurve(
             f"(author={author!r}, exptime={exptime!r})"
         )
 
-    collection = search.download_all(flux_column=flux_column)
+    collection = _download_all_with_cache_repair(search, flux_column=flux_column)
     lc = collection.stitch()
 
     cadence_raw = lc.meta.get("EXPTIME", 0.0)
@@ -294,6 +295,55 @@ def _fetch_jwst(obsid: str, *, _skills_dir: Path | None = None) -> FetchResult:
         fetched_at=datetime.datetime.now(datetime.UTC).isoformat(),
     )
     return FetchResult(light_curve=lc, provenance=provenance)
+
+
+def _download_all_with_cache_repair(search: Any, *, flux_column: str) -> Any:
+    """Download a Lightkurve search result, repairing corrupt cache files.
+
+    Interrupted live downloads can leave truncated FITS files in Lightkurve's
+    MAST cache. Lightkurve reports those files explicitly and asks the operator
+    to remove them. Do that bounded, targeted repair automatically so resumed
+    production scans do not turn stale cache corruption into repeated target
+    failures.
+    """
+    max_cache_repairs = 4
+    for attempt in range(max_cache_repairs + 1):
+        try:
+            return search.download_all(flux_column=flux_column)
+        except Exception as exc:
+            repaired = _remove_corrupt_lightkurve_cache_file(exc)
+            if repaired is not None and attempt < max_cache_repairs:
+                continue
+            raise
+
+    raise RuntimeError("Lightkurve cache repair retry loop exhausted")
+
+
+def _remove_corrupt_lightkurve_cache_file(exc: Exception) -> Path | None:
+    """Remove one corrupt Lightkurve MAST cache FITS named by *exc*."""
+    text = str(exc)
+    if "This file may be corrupt due to an interrupted download" not in text:
+        return None
+    for raw_path in _extract_fits_paths(text):
+        candidate = Path(raw_path)
+        if (
+            candidate.suffix == ".fits"
+            and ".lightkurve" in candidate.parts
+            and "mastDownload" in candidate.parts
+        ):
+            try:
+                candidate.unlink()
+            except FileNotFoundError:
+                return candidate
+            if not candidate.exists():
+                return candidate
+    return None
+
+
+def _extract_fits_paths(text: str) -> list[str]:
+    """Return absolute FITS paths embedded in a Lightkurve error string."""
+    paths = re.findall(r"(/[^\n]+?\.fits)", text)
+    return [path.strip() for path in paths]
 
 
 def _extract_sectors(collection: Any, mission: str) -> tuple[int, ...]:

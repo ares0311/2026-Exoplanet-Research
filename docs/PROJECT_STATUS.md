@@ -101,7 +101,8 @@ without relying on chat context or local terminal output.
 - Live scanner startup/target-selection hardening is merged via PR #143: ExoFOP SSL loading, Python 3.14 helper imports, bounded TIC target selection, and `no_data` classification are fixed; a one-target live smoke on `main` selected TIC 425884922 and completed with `1 no-data | 0 errors`.
 - K2 overlap corpus collection is complete locally with 2,086 snippets; do not re-fetch it.
 - A SPOC-only 200-target attempt completed on 2026-06-28 as `logs/discovery_run_001.json`, but it did not close T1-0: 198 targets had no SPOC long-cadence light curve, 2 hit transient remote disconnects, and there were 0 clear scans / 0 candidates.
-- The next production action is human-run because it requires live services and a long-running Mac-local scan. Use QLP and a fresh log so the result is not polluted by the SPOC-only no-data batch:
+- A QLP attempt started on 2026-06-28 as `logs/discovery_run_002_qlp.json`, but it did not close T1-0: it recorded 3 corrupt local Lightkurve cache errors, 0 clear scans, and 0 candidates. Root cause: interrupted prior QLP downloads left corrupt FITS files under `~/.lightkurve/cache/mastDownload/HLSP/...`, and the shared fetch path did not delete the named corrupt file and retry.
+- The next production action is human-run because it requires live services and a long-running Mac-local scan. Use QLP and a fresh log after the cache-repair fix is merged so the result is not polluted by the SPOC-only no-data batch or the failed QLP resume state:
 
 ```bash
 git switch main
@@ -112,14 +113,14 @@ caffeinate -dims .venv/bin/python Skills/star_scanner.py \
   --exptime long \
   --workers 4 \
   --request-delay 0.5 \
-  --log logs/discovery_run_002_qlp.json
-.venv/bin/python Skills/rank_candidates.py logs/discovery_run_002_qlp.json --top 20
-.venv/bin/python Skills/alert_filter.py logs/discovery_run_002_qlp.json \
+  --log logs/discovery_run_003_qlp_cache_repair.json
+.venv/bin/python Skills/rank_candidates.py logs/discovery_run_003_qlp_cache_repair.json --top 20
+.venv/bin/python Skills/alert_filter.py logs/discovery_run_003_qlp_cache_repair.json \
   --fpp-max 0.15 \
-  --output logs/discovery_filtered_002_qlp.json
+  --output logs/discovery_filtered_003_qlp_cache_repair.json
 ```
 
-If `alert_filter.py` finds no rows, keep `logs/discovery_run_002_qlp.json`; a null batch only informs the next target-selection cycle if it contains real scanned-clear targets or candidates, not mostly no-data rows.
+If `alert_filter.py` finds no rows, keep `logs/discovery_run_003_qlp_cache_repair.json`; a null batch only informs the next target-selection cycle if it contains real scanned-clear targets or candidates, not mostly no-data/cache-error rows.
 
 ## Paused
 
@@ -167,8 +168,8 @@ If `alert_filter.py` finds no rows, keep `logs/discovery_run_002_qlp.json`; a nu
 
 ## Next Actions
 
-1. Run the first QLP 200-target discovery scan on the user's Mac using the command in `docs/DISCOVERY_RUNBOOK.md`.
-2. Review `logs/discovery_run_002_qlp.json`, ranked candidates, and `logs/discovery_filtered_002_qlp.json` if present.
+1. Run the first QLP 200-target discovery scan after cache repair on the user's Mac using the command in `docs/DISCOVERY_RUNBOOK.md`.
+2. Review `logs/discovery_run_003_qlp_cache_repair.json`, ranked candidates, and `logs/discovery_filtered_003_qlp_cache_repair.json` if present.
 3. Update `docs/LOCAL_ARTIFACT_LEDGER.md` and `artifacts/manifests/local_artifacts.json` with the scan result so GitHub-only agents can continue without chat context.
 4. Do not run C20 CNN corpus assembly or training until the first discovery scan is complete and reviewed.
 5. Promote nothing unless a future evaluator run reports `Flag: PASS`, raw test
