@@ -109,6 +109,18 @@ def _wire(mock_lk: MagicMock, lc: MagicMock, n_results: int = 1) -> MagicMock:
     return coll
 
 
+def _missing_flux_column_error(flux_column: str) -> RuntimeError:
+    """Build the misleading Lightkurve wrapper error for a missing FITS column."""
+    try:
+        raise RuntimeError(
+            "Error in reading Data product /tmp/example.fits of type QLP .\n"
+            "This file may be corrupt due to an interrupted download. "
+            "Please remove it from your disk and try again."
+        ) from KeyError(flux_column)
+    except RuntimeError as exc:
+        return exc
+
+
 # ---------------------------------------------------------------------------
 # FetchProvenance
 # ---------------------------------------------------------------------------
@@ -399,6 +411,70 @@ class TestFetchLightcurve:
             flux_column="sap_flux",
         )
 
+    def test_qlp_prefer_pdcsap_uses_kspsap_not_pdcsap(
+        self, mock_lk: MagicMock
+    ) -> None:
+        lc = _make_lc_mock(procver="QLP")
+        _wire(mock_lk, lc)
+
+        result = fetch_lightcurve("TIC 999", "TESS", pipeline="QLP")
+
+        search = mock_lk.search_lightcurve.return_value
+        assert result.provenance.flux_column == "kspsap_flux"
+        assert search.download_all.call_count == 0
+        assert search._download_one.call_args == call(
+            table=slice(0, 1, None),
+            quality_bitmask="default",
+            download_dir=None,
+            cutout_size=None,
+            flux_column="kspsap_flux",
+        )
+
+    def test_qlp_missing_kspsap_falls_back_without_cache_delete(
+        self, mock_lk: MagicMock, tmp_path: Path
+    ) -> None:
+        cached = (
+            tmp_path
+            / ".lightkurve"
+            / "cache"
+            / "mastDownload"
+            / "HLSP"
+            / "hlsp_qlp_tess_ffi_s0056-0000000425884922_tess_v01_llc"
+            / "hlsp_qlp_tess_ffi_s0056-0000000425884922_tess_v01_llc.fits"
+        )
+        cached.parent.mkdir(parents=True)
+        cached.write_text("valid fits placeholder", encoding="utf-8")
+        lc = _make_lc_mock(procver="QLP", sector_val=56)
+        collection = _make_collection_mock([lc])
+        search = _make_search_mock(collection)
+        search._download_one.side_effect = [
+            _missing_flux_column_error("kspsap_flux"),
+            lc,
+        ]
+        mock_lk.search_lightcurve.return_value = search
+        mock_lk.LightCurveCollection.return_value = collection
+
+        result = fetch_lightcurve("TIC 425884922", "TESS", pipeline="QLP")
+
+        assert result.provenance.flux_column == "det_flux"
+        assert cached.exists()
+        assert search._download_one.call_args_list == [
+            call(
+                table=slice(0, 1, None),
+                quality_bitmask="default",
+                download_dir=None,
+                cutout_size=None,
+                flux_column="kspsap_flux",
+            ),
+            call(
+                table=slice(0, 1, None),
+                quality_bitmask="default",
+                download_dir=None,
+                cutout_size=None,
+                flux_column="det_flux",
+            ),
+        ]
+
     def test_corrupt_lightkurve_cache_file_is_removed_and_retried(
         self, mock_lk: MagicMock, tmp_path: Path
     ) -> None:
@@ -439,14 +515,14 @@ class TestFetchLightcurve:
                 quality_bitmask="default",
                 download_dir=None,
                 cutout_size=None,
-                flux_column="pdcsap_flux",
+                flux_column="kspsap_flux",
             ),
             call(
                 table=slice(0, 1, None),
                 quality_bitmask="default",
                 download_dir=None,
                 cutout_size=None,
-                flux_column="pdcsap_flux",
+                flux_column="kspsap_flux",
             ),
         ]
 

@@ -1241,14 +1241,14 @@ fix the durable resume ledger before asking the human to run it again.
 - K2 TAP ORA-00904 fix (`Skills/fetch_tess_k2_overlap_snippets.py`) — **MERGED** (PR #134, 2026-06-27)
 - `exo <obsid> --mission JWST` CLI wiring (A3) — **MERGED** (PR #141, 2026-06-27): `Mission` literal extended; `fetch_lightcurve` dispatches to `_fetch_jwst`; 13 new tests
 - Option B1–B4 (TESS target restructuring) — **MERGED** (PR #139, 2026-06-27): CTOI exclusion, confirmed-host exclusion, tmag 12–14.5 default, period_max 500d
-- Option B5 — **[HUMAN]** Run first 200-target QLP discovery scan after stdout-safe fetch fix (see Immediate Next Actions below). The 2026-06-28 SPOC-only attempt (`logs/discovery_run_001.json`) completed but did not close T1-0: 198 no-data rows, 2 transient remote-disconnect errors, 0 clear scans, 0 candidates. The first QLP attempt (`logs/discovery_run_002_qlp.json`) also did not close T1-0: 3 corrupt local Lightkurve cache errors, 0 clear scans, 0 candidates. The cache-repair QLP attempt (`logs/discovery_run_003_qlp_cache_repair.json`) also did not close T1-0: 1 error, 0 clear scans, 0 candidates, then `ValueError: I/O operation on closed file` from Lightkurve's process-global stdout mutation under threaded downloads.
+- Option B5 — **[HUMAN]** Run first 200-target QLP discovery scan after QLP flux-column fix (see Immediate Next Actions below). The 2026-06-28 SPOC-only attempt (`logs/discovery_run_001.json`) completed but did not close T1-0: 198 no-data rows, 2 transient remote-disconnect errors, 0 clear scans, 0 candidates. The first QLP attempt (`logs/discovery_run_002_qlp.json`) also did not close T1-0: 3 corrupt local Lightkurve cache errors, 0 clear scans, 0 candidates. The cache-repair QLP attempt (`logs/discovery_run_003_qlp_cache_repair.json`) also did not close T1-0: 1 error, 0 clear scans, 0 candidates, then `ValueError: I/O operation on closed file` from Lightkurve's process-global stdout mutation under threaded downloads. The stdout-safe QLP attempt (`logs/discovery_run_004_qlp_stdout_safe.json`) also did not close T1-0: 200 total entries, 0 candidates, 0 clear scans, 1 no-data row, 199 errors caused by requesting SPOC-style `pdcsap_flux` from valid QLP products that do not provide `PDCSAP_FLUX`.
 
 **K2 corpus fetch status (as of 2026-06-27):** **COMPLETE** — 2,086 snippets written to `data/tess_k2_overlap_snippets.jsonl`; wrote=2086, skipped=174, terminal_failures=135, elapsed=2531s (42m11s). No further fetch action needed.
 
 **Live scanner fix (PR #143, 2026-06-28):** **MERGED** — live one-target smoke on `main` verified that ExoFOP SSL loading, Python 3.14 helper imports, bounded TIC target selection, and no-light-curve `no_data` classification work. Do not re-debug the pre-PR #143 pasted failures.
 
 **Immediate next actions (in priority order):**
-1. **[HUMAN]** Run the first real QLP discovery scan after stdout-safe fetch fix — highest priority item before any CNN work.
+1. **[HUMAN]** Run the first real QLP discovery scan after QLP flux-column fix — highest priority item before any CNN work.
    Option B1–B4 is now merged: the scanner automatically excludes TOI + CTOI + confirmed hosts and defaults to Tmag 12–14.5:
    ```bash
    git switch main
@@ -1259,11 +1259,11 @@ fix the durable resume ledger before asking the human to run it again.
      --exptime long \
      --workers 4 \
      --request-delay 0.5 \
-     --log logs/discovery_run_004_qlp_stdout_safe.json
-   .venv/bin/python Skills/rank_candidates.py logs/discovery_run_004_qlp_stdout_safe.json --top 20
-   .venv/bin/python Skills/alert_filter.py logs/discovery_run_004_qlp_stdout_safe.json \
+     --log logs/discovery_run_005_qlp_flux_safe.json
+   .venv/bin/python Skills/rank_candidates.py logs/discovery_run_005_qlp_flux_safe.json --top 20
+   .venv/bin/python Skills/alert_filter.py logs/discovery_run_005_qlp_flux_safe.json \
      --fpp-max 0.15 \
-     --output logs/discovery_filtered_004_qlp_stdout_safe.json
+     --output logs/discovery_filtered_005_qlp_flux_safe.json
    ```
 2. **[AGENT]** CNN C20 training (only after step 1 above produces candidates): merge K2 overlap into C20 corpus, build `data/tess_c20_cnn_splits/`, train with `configs/cnn_tess_c18.json` (`freeze_conv_epochs=10`).
 3. ~~A3 JWST CLI wiring~~ — **COMPLETE** (PR #141).

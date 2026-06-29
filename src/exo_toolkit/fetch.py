@@ -142,7 +142,7 @@ def fetch_lightcurve(
         ) from exc
 
     author = pipeline or _DEFAULT_AUTHOR[mission]
-    flux_column = "pdcsap_flux" if prefer_pdcsap else "sap_flux"
+    flux_columns = _flux_column_candidates(author, prefer_pdcsap=prefer_pdcsap)
     sector_kwarg = _SECTOR_KWARG[mission]
     sector_value: list[int] | None = list(sectors) if sectors is not None else None
 
@@ -160,7 +160,10 @@ def fetch_lightcurve(
             f"(author={author!r}, exptime={exptime!r})"
         )
 
-    collection = _download_collection_with_cache_repair(search, flux_column=flux_column)
+    collection, flux_columns_used = _download_collection_with_cache_repair(
+        search,
+        flux_columns=flux_columns,
+    )
     lc = collection.stitch()
 
     cadence_raw = lc.meta.get("EXPTIME", 0.0)
@@ -182,7 +185,7 @@ def fetch_lightcurve(
         sectors_or_quarters=_extract_sectors(collection, mission),
         cadence_seconds=cadence_seconds,
         pipeline=actual_pipeline,
-        flux_column=flux_column,
+        flux_column="+".join(flux_columns_used),
         n_cadences=len(lc.time),
         time_baseline_days=time_baseline_days,
         fetched_at=datetime.datetime.now(datetime.UTC).isoformat(),
@@ -297,7 +300,22 @@ def _fetch_jwst(obsid: str, *, _skills_dir: Path | None = None) -> FetchResult:
     return FetchResult(light_curve=lc, provenance=provenance)
 
 
-def _download_collection_with_cache_repair(search: Any, *, flux_column: str) -> Any:
+def _flux_column_candidates(author: str, *, prefer_pdcsap: bool) -> tuple[str, ...]:
+    """Return flux-column candidates for a Lightkurve author/pipeline."""
+    if author.upper() == "QLP":
+        if not prefer_pdcsap:
+            return ("sap_flux",)
+        # QLP does not provide PDCSAP_FLUX.  Older products use KSPSAP_* for
+        # corrected flux; newer products use DET_* and sometimes SYS_RM_FLUX.
+        return ("kspsap_flux", "det_flux", "sys_rm_flux", "sap_flux")
+    return ("pdcsap_flux",) if prefer_pdcsap else ("sap_flux",)
+
+
+def _download_collection_with_cache_repair(
+    search: Any,
+    *,
+    flux_columns: tuple[str, ...],
+) -> tuple[Any, tuple[str, ...]]:
     """Download a Lightkurve search result without mutating global stdout.
 
     ``SearchResult.download()`` and ``download_all()`` are decorated with
@@ -316,43 +334,61 @@ def _download_collection_with_cache_repair(search: Any, *, flux_column: str) -> 
         ) from exc
 
     light_curves: list[Any] = []
+    flux_columns_used: list[str] = []
     for idx in range(len(search.table)):
-        light_curves.append(
-            _download_one_with_cache_repair(
-                search,
-                table=search.table[idx : idx + 1],
-                flux_column=flux_column,
-            )
+        light_curve, flux_column = _download_one_with_cache_repair(
+            search,
+            table=search.table[idx : idx + 1],
+            flux_columns=flux_columns,
         )
+        light_curves.append(light_curve)
+        if flux_column not in flux_columns_used:
+            flux_columns_used.append(flux_column)
     if not light_curves:
         raise ValueError("No downloadable light curves returned by Lightkurve")
-    return lk.LightCurveCollection(light_curves)
+    return lk.LightCurveCollection(light_curves), tuple(flux_columns_used)
 
 
 def _download_one_with_cache_repair(
     search: Any,
     *,
     table: Any,
-    flux_column: str,
-) -> Any:
+    flux_columns: tuple[str, ...],
+) -> tuple[Any, str]:
     """Download one Lightkurve product, repairing one corrupt cache file at a time."""
     max_cache_repairs = 4
-    for attempt in range(max_cache_repairs + 1):
-        try:
-            return search._download_one(  # noqa: SLF001
-                table=table,
-                quality_bitmask="default",
-                download_dir=None,
-                cutout_size=None,
-                flux_column=flux_column,
-            )
-        except Exception as exc:
-            repaired = _remove_corrupt_lightkurve_cache_file(exc)
-            if repaired is not None and attempt < max_cache_repairs:
-                continue
-            raise
+    last_missing_flux_error: Exception | None = None
+    for flux_column in flux_columns:
+        for attempt in range(max_cache_repairs + 1):
+            try:
+                return (
+                    search._download_one(  # noqa: SLF001
+                        table=table,
+                        quality_bitmask="default",
+                        download_dir=None,
+                        cutout_size=None,
+                        flux_column=flux_column,
+                    ),
+                    flux_column,
+                )
+            except Exception as exc:
+                if _is_missing_flux_column_error(exc, flux_column):
+                    last_missing_flux_error = exc
+                    break
+                repaired = _remove_corrupt_lightkurve_cache_file(exc)
+                if repaired is not None and attempt < max_cache_repairs:
+                    continue
+                raise
 
+    if last_missing_flux_error is not None:
+        raise last_missing_flux_error
     raise RuntimeError("Lightkurve cache repair retry loop exhausted")
+
+
+def _is_missing_flux_column_error(exc: Exception, flux_column: str) -> bool:
+    """Return True when Lightkurve wrapped a missing FITS flux column."""
+    cause = exc.__cause__
+    return isinstance(cause, KeyError) and str(cause).strip("'\"") == flux_column
 
 
 def _remove_corrupt_lightkurve_cache_file(exc: Exception) -> Path | None:

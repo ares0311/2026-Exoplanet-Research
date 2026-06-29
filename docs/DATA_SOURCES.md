@@ -16,8 +16,10 @@ access methods, rate limits, and the scripts that fetch from them.
 | Rate limit | ~1,000 requests/day unauthenticated; use `~/.mast_api_token` for higher limits |
 | Script | `fetch.py` (`fetch_lightcurve(tic_id, mission)`) |
 
-**Preferred flux type**: `PDCSAP_FLUX` (systematics-corrected).  Fall back to
-`SAP_FLUX` only when PDCSAP is unavailable.
+**Preferred flux type**: Use pipeline-native corrected flux. SPOC/Kepler/K2
+prefer `PDCSAP_FLUX` when present and fall back to `SAP_FLUX`. QLP products do
+not provide `PDCSAP_FLUX`; use `KSPSAP_FLUX`, `DET_FLUX`, or `SYS_RM_FLUX`
+before falling back to `SAP_FLUX`.
 
 **Missions supported**: `"TESS"`, `"Kepler"`, `"K2"`.
 
