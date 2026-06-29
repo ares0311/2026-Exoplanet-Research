@@ -260,6 +260,11 @@ caffeinate -dims .venv/bin/python Skills/star_scanner.py \
   --output logs/discovery_filtered_006_qlp_progress_safe.json
 ```
 
+Run the rank/filter commands only after the scanner exits normally and prints
+its completion summary. If the scanner is stopped or suspended with Ctrl-C or
+Ctrl-Z, rerun the scanner from `main` before triage; terminal scrollback is not
+a durable completed scan log.
+
 This will take approximately 2–4 hours on a Mac M4 Max. Use `caffeinate -dims`.
 
 If `alert_filter.py` reports `No candidates matched the filters.`, keep the full

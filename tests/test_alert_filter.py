@@ -9,7 +9,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from Skills.alert_filter import apply_filters, filter_candidates  # noqa: E402
+from Skills.alert_filter import _cli, apply_filters, filter_candidates  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -189,3 +189,18 @@ class TestApplyFilters:
         assert len(written) == 1
         assert written[0]["candidate_id"] == "TIC 1001"
         assert written[0]["scores"]["false_positive_probability"] == pytest.approx(0.08)
+
+
+class TestAlertFilterCli:
+    def test_missing_file_returns_operator_message(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        code = _cli([str(tmp_path / "missing_scan.json"), "--fpp-max", "0.15"])
+
+        captured = capsys.readouterr()
+        assert code == 2
+        assert "does not exist" in captured.err
+        assert "let Skills/star_scanner.py finish successfully" in captured.err
+        assert "Traceback" not in captured.err

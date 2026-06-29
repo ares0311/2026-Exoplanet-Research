@@ -107,6 +107,7 @@ When the user must take an action to unblock a gap:
 - **Project version bumped to 0.2.1** — patch release for the production-blocking QLP scanner stdout-race fix; this is a package version change only, not a `.venv` rename.
 - **Project version bumped to 0.2.2** — patch release for the production-blocking QLP flux-column fix; QLP products do not provide `PDCSAP_FLUX`, so the fetcher now uses QLP-native corrected flux columns before falling back to SAP.
 - **Project version bumped to 0.2.3** — patch release for the production-blocking QLP scanner observability fix; scan logs are created immediately, active targets are checkpointed separately from completed entries, and Astroquery MAST download banners are disabled under the Lightkurve per-product path.
+- **Project version bumped to 0.2.4** — patch release for discovery triage guardrails; `rank_candidates.py` and `alert_filter.py` now fail closed with operator guidance instead of raw tracebacks when a live scan log is missing or incomplete.
 
 ### Where things stand
 
@@ -155,6 +156,11 @@ caffeinate -dims .venv/bin/python Skills/star_scanner.py \
   --fpp-max 0.15 \
   --output logs/discovery_filtered_006_qlp_progress_safe.json
 ```
+
+Do not run the ranking or filtering commands until the scanner exits normally
+after printing its completion summary. If the scanner is stopped or suspended
+with Ctrl-C/Ctrl-Z, rerun the scanner on `main` before triage; partial console
+output is not a completed scan log.
 
 If `alert_filter.py` exits with `No candidates matched the filters.`, that is an acceptable null triage result only if the QLP log contains real clear scans or candidates rather than another mostly no-data/error batch; keep the full `logs/discovery_run_006_qlp_progress_safe.json` for review. Do NOT proceed with CNN C20 training until the above scan is complete and has been reviewed for candidates. If zero candidates emerge after scanning ≥1,000 targets, that finding itself dictates the next priority.
 

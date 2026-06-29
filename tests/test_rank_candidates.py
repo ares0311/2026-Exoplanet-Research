@@ -6,9 +6,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from Skills.rank_candidates import (  # noqa: E402
+    _cli,
     _scan_log_to_rows,
     compute_rank_score,
     load_candidates,
@@ -252,3 +255,18 @@ class TestLoadCandidatesScanLog:
         rows = load_candidates([f])
         ranked = rank_candidates(rows)
         assert ranked[0]["tic_id"] == 1
+
+
+class TestRankCandidatesCli:
+    def test_missing_file_returns_operator_message(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        code = _cli([str(tmp_path / "missing_scan.json")])
+
+        captured = capsys.readouterr()
+        assert code == 2
+        assert "does not exist" in captured.err
+        assert "let Skills/star_scanner.py finish successfully" in captured.err
+        assert "Traceback" not in captured.err
