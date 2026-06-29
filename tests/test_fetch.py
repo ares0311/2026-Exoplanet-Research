@@ -13,6 +13,7 @@ from __future__ import annotations
 import dataclasses
 import sys
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, call
 
 import pydantic
@@ -25,6 +26,7 @@ from exo_toolkit.fetch import (
     _PIPELINE_QUALITY_DEFAULT,
     FetchProvenance,
     FetchResult,
+    _download_one_quietly,
     _extract_sectors,
     _fetch_jwst,
     _remove_corrupt_lightkurve_cache_file,
@@ -119,6 +121,49 @@ def _missing_flux_column_error(flux_column: str) -> RuntimeError:
         ) from KeyError(flux_column)
     except RuntimeError as exc:
         return exc
+
+
+def test_download_one_quietly_forces_astroquery_verbose_false(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: QLP scanner output must not be flooded by MAST download chatter."""
+    calls: list[dict[str, Any]] = []
+
+    class FakeObservations:
+        @staticmethod
+        def download_products(products: Any, *args: Any, **kwargs: Any) -> list[dict[str, str]]:
+            calls.append(dict(kwargs))
+            return [{"Status": "COMPLETE", "Local Path": "/tmp/example.fits"}]
+
+    fake_mast = MagicMock()
+    fake_mast.Observations = FakeObservations
+    fake_astroquery = MagicMock()
+    fake_astroquery.mast = fake_mast
+    monkeypatch.setitem(sys.modules, "astroquery", fake_astroquery)
+    monkeypatch.setitem(sys.modules, "astroquery.mast", fake_mast)
+
+    search = MagicMock()
+    expected = object()
+
+    def fake_download_one(**_: Any) -> object:
+        from astroquery.mast import Observations
+
+        Observations.download_products(["product"], mrp_only=False)
+        return expected
+
+    search._download_one.side_effect = fake_download_one
+
+    result = _download_one_quietly(
+        search,
+        table=slice(0, 1, None),
+        quality_bitmask="default",
+        download_dir=None,
+        cutout_size=None,
+        flux_column="kspsap_flux",
+    )
+
+    assert result is expected
+    assert calls == [{"mrp_only": False, "verbose": False}]
 
 
 # ---------------------------------------------------------------------------

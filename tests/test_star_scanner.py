@@ -139,6 +139,15 @@ class TestScanLog:
         log = ScanLog(tmp_path / "log.json")
         assert log.summary()["total"] == 0
 
+    def test_new_log_is_created_immediately(self, tmp_path: Path) -> None:
+        path = tmp_path / "log.json"
+        ScanLog(path)
+        assert path.exists()
+        with path.open() as fh:
+            data = json.load(fh)
+        assert data["entries"] == {}
+        assert data["active"] == {}
+
     def test_is_scanned_false_before_record(self, tmp_path: Path) -> None:
         log = ScanLog(tmp_path / "log.json")
         assert not log.is_scanned(12345)
@@ -147,6 +156,26 @@ class TestScanLog:
         log = ScanLog(tmp_path / "log.json")
         log.record(12345, "scanned_clear", {"n_signals": 0})
         assert log.is_scanned(12345)
+
+    def test_mark_started_does_not_make_target_scanned(self, tmp_path: Path) -> None:
+        log = ScanLog(tmp_path / "log.json")
+        target = {"tic_id": 12345, "priority": 0.75}
+
+        log.mark_started(12345, target, pipeline="QLP", exptime="long")
+
+        assert not log.is_scanned(12345)
+        assert log.scanned_ids() == set()
+        assert log.summary()["active"] == 1
+
+    def test_record_clears_active_target(self, tmp_path: Path) -> None:
+        log = ScanLog(tmp_path / "log.json")
+        target = {"tic_id": 12345, "priority": 0.75}
+
+        log.mark_started(12345, target, pipeline="QLP", exptime="long")
+        log.record(12345, "scanned_clear", {"n_signals": 0})
+
+        assert log.is_scanned(12345)
+        assert log.summary()["active"] == 0
 
     def test_scanned_ids_returns_all_recorded(self, tmp_path: Path) -> None:
         log = ScanLog(tmp_path / "log.json")
@@ -406,6 +435,8 @@ class TestRunBackgroundScan:
         assert "pipeline=QLP" in out
         assert "exptime=long" in out
         assert "request_delay=0.00s" in out
+        assert "[start] TIC" in out
+        assert "active=" in out
         assert "elapsed=" in out
         assert "ETA=" in out
 

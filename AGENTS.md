@@ -106,6 +106,7 @@ When the user must take an action to unblock a gap:
 - **Project version bumped to 0.2.0** — `pyproject.toml` updated; "citizen-science" keyword removed; status updated to "4 - Beta".
 - **Project version bumped to 0.2.1** — patch release for the production-blocking QLP scanner stdout-race fix; this is a package version change only, not a `.venv` rename.
 - **Project version bumped to 0.2.2** — patch release for the production-blocking QLP flux-column fix; QLP products do not provide `PDCSAP_FLUX`, so the fetcher now uses QLP-native corrected flux columns before falling back to SAP.
+- **Project version bumped to 0.2.3** — patch release for the production-blocking QLP scanner observability fix; scan logs are created immediately, active targets are checkpointed separately from completed entries, and Astroquery MAST download banners are disabled under the Lightkurve per-product path.
 
 ### Where things stand
 
@@ -135,6 +136,8 @@ A third QLP attempt (`logs/discovery_run_003_qlp_cache_repair.json`) started on 
 
 A fourth QLP attempt (`logs/discovery_run_004_qlp_stdout_safe.json`) completed on 2026-06-28 but also does **not** close T1-0: it recorded 200 total entries, 0 candidates, 0 clear scans, 1 no-data row, and 199 errors. Root cause: the shared fetcher still requested SPOC-style `pdcsap_flux` from QLP HLSP products. The downloaded FITS files were valid; QLP products contain columns such as `SAP_FLUX`, `KSPSAP_FLUX`, `DET_FLUX`, and `SYS_RM_FLUX`, but not `PDCSAP_FLUX`. Lightkurve wrapped the missing-column `KeyError('pdcsap_flux')` in the misleading "may be corrupt due to an interrupted download" message.
 
+A fifth QLP attempt (`logs/discovery_run_005_qlp_flux_safe.json`) started after the flux-column fix but also does **not** close T1-0. The pasted console showed many Astroquery/MAST `Downloading URL ... [Done]` lines and numerical warnings but no per-target scanner progress, and no durable scan log existed before the first completed target. Root cause: `ScanLog` flushed only after `record()`, `run_background_scan()` printed only after a future completed, and Lightkurve's lower-level `_download_one()` still called `Observations.download_products()` with Astroquery's default `verbose=True`.
+
 **PR #143 is merged (2026-06-28).** A live one-target smoke on `main` verified that the ExoFOP SSL loader, Python 3.14 helper imports, bounded TIC target selection, and no-light-curve `no_data` classification all work. Do not re-debug the old pasted failures from before PR #143.
 
 ```bash
@@ -146,14 +149,14 @@ caffeinate -dims .venv/bin/python Skills/star_scanner.py \
   --exptime long \
   --workers 4 \
   --request-delay 0.5 \
-  --log logs/discovery_run_005_qlp_flux_safe.json
-.venv/bin/python Skills/rank_candidates.py logs/discovery_run_005_qlp_flux_safe.json --top 20
-.venv/bin/python Skills/alert_filter.py logs/discovery_run_005_qlp_flux_safe.json \
+  --log logs/discovery_run_006_qlp_progress_safe.json
+.venv/bin/python Skills/rank_candidates.py logs/discovery_run_006_qlp_progress_safe.json --top 20
+.venv/bin/python Skills/alert_filter.py logs/discovery_run_006_qlp_progress_safe.json \
   --fpp-max 0.15 \
-  --output logs/discovery_filtered_005_qlp_flux_safe.json
+  --output logs/discovery_filtered_006_qlp_progress_safe.json
 ```
 
-If `alert_filter.py` exits with `No candidates matched the filters.`, that is an acceptable null triage result only if the QLP log contains real clear scans or candidates rather than another mostly no-data/error batch; keep the full `logs/discovery_run_005_qlp_flux_safe.json` for review. Do NOT proceed with CNN C20 training until the above scan is complete and has been reviewed for candidates. If zero candidates emerge after scanning ≥1,000 targets, that finding itself dictates the next priority.
+If `alert_filter.py` exits with `No candidates matched the filters.`, that is an acceptable null triage result only if the QLP log contains real clear scans or candidates rather than another mostly no-data/error batch; keep the full `logs/discovery_run_006_qlp_progress_safe.json` for review. Do NOT proceed with CNN C20 training until the above scan is complete and has been reviewed for candidates. If zero candidates emerge after scanning ≥1,000 targets, that finding itself dictates the next priority.
 
 ### CNN production runbook
 

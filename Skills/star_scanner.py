@@ -231,6 +231,15 @@ class ScanLog:
 
         {
           "last_updated": "<ISO-8601 UTC>",
+          "active": {
+            "<tic_id>": {
+              "tic_id": int,
+              "started_at": "<ISO-8601 UTC>",
+              "priority_score": float | null,
+              "pipeline": str | null,
+              "exptime": str | null
+            }
+          },
           "entries": {
             "<tic_id>": {
               "tic_id": int,
@@ -254,37 +263,66 @@ class ScanLog:
 
     def __init__(self, path: Path) -> None:
         self._path = path
+        self._lock = threading.RLock()
         self._data: dict[str, Any] = {"last_updated": "", "entries": {}}
         if path.exists():
             with path.open() as fh:
                 self._data = json.load(fh)
+        self._data.setdefault("entries", {})
+        self._data["active"] = {}
+        self._data["last_updated"] = datetime.now(UTC).isoformat()
+        self._flush()
 
     def is_scanned(self, tic_id: int) -> bool:
         """Return True if *tic_id* has an entry in the log."""
-        return str(tic_id) in self._data["entries"]
+        with self._lock:
+            return str(tic_id) in self._data["entries"]
 
     def scanned_ids(self) -> set[int]:
         """Return the set of all TIC IDs recorded in the log."""
-        return {int(k) for k in self._data["entries"]}
+        with self._lock:
+            return {int(k) for k in self._data["entries"]}
+
+    def mark_started(
+        self,
+        tic_id: int,
+        target: dict[str, Any],
+        *,
+        pipeline: str,
+        exptime: str,
+    ) -> None:
+        """Record that a worker has started *tic_id* without making it a resume skip."""
+        with self._lock:
+            self._data.setdefault("active", {})[str(tic_id)] = {
+                "tic_id": tic_id,
+                "started_at": datetime.now(UTC).isoformat(),
+                "priority_score": target.get("priority"),
+                "pipeline": pipeline,
+                "exptime": exptime,
+            }
+            self._data["last_updated"] = datetime.now(UTC).isoformat()
+            self._flush()
 
     def record(self, tic_id: int, status: str, result: dict[str, Any]) -> None:
         """Add or overwrite the log entry for *tic_id*."""
-        entry: dict[str, Any] = {
-            "tic_id": tic_id,
-            "scanned_at": datetime.now(UTC).isoformat(),
-            "status": status,
-            "n_signals": result.get("n_signals", 0),
-            "best_period_days": result.get("best_period_days"),
-            "best_fpp": result.get("best_fpp"),
-            "best_pathway": result.get("best_pathway"),
-            "priority_score": result.get("priority_score"),
-            "pipeline": result.get("pipeline"),
-            "exptime": result.get("exptime"),
-            "error_message": result.get("error_message"),
-        }
-        self._data["entries"][str(tic_id)] = entry
-        self._data["last_updated"] = datetime.now(UTC).isoformat()
-        self._flush()
+        with self._lock:
+            entry: dict[str, Any] = {
+                "tic_id": tic_id,
+                "scanned_at": datetime.now(UTC).isoformat(),
+                "status": status,
+                "n_signals": result.get("n_signals", 0),
+                "best_period_days": result.get("best_period_days"),
+                "best_fpp": result.get("best_fpp"),
+                "best_pathway": result.get("best_pathway"),
+                "priority_score": result.get("priority_score"),
+                "pipeline": result.get("pipeline"),
+                "exptime": result.get("exptime"),
+                "error_message": result.get("error_message"),
+            }
+            self._data["entries"][str(tic_id)] = entry
+            self._data.setdefault("active", {}).pop(str(tic_id), None)
+            self._data["last_updated"] = datetime.now(UTC).isoformat()
+            self._flush()
 
     def summary(self) -> dict[str, int]:
         """Return a dict of status → count plus a ``"total"`` key."""
@@ -293,21 +331,25 @@ class ScanLog:
             "scanned_clear": 0,
             "no_data": 0,
             "error": 0,
+            "active": 0,
             "total": 0,
         }
-        for entry in self._data["entries"].values():
-            status = entry.get("status", "error")
-            if status in counts:
-                counts[status] += 1
-            counts["total"] += 1
+        with self._lock:
+            counts["active"] = len(self._data.get("active", {}))
+            for entry in self._data["entries"].values():
+                status = entry.get("status", "error")
+                if status in counts:
+                    counts[status] += 1
+                counts["total"] += 1
         return counts
 
     def _flush(self) -> None:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self._path.with_suffix(".tmp")
-        with tmp.open("w") as fh:
-            json.dump(self._data, fh, indent=2)
-        tmp.replace(self._path)
+        with self._lock:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self._path.with_suffix(".tmp")
+            with tmp.open("w") as fh:
+                json.dump(self._data, fh, indent=2)
+            tmp.replace(self._path)
 
 
 # ---------------------------------------------------------------------------
@@ -717,10 +759,20 @@ def run_background_scan(
     start_time = time.monotonic()
     n_done = 0
     limiter = _StartRateLimiter(request_delay)
+    print_lock = threading.Lock()
 
     def scan_target(target: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
         limiter.wait()
         tic_id = target["tic_id"]
+        log.mark_started(tic_id, target, pipeline=pipeline, exptime=exptime)
+        with print_lock:
+            print(
+                f"[start] TIC {tic_id}  Tmag={target['tmag']:.1f}  "
+                f"priority={target['priority']:.3f}  pipeline={pipeline}  "
+                f"exptime={exptime}  active={log.summary()['active']}  "
+                f"{_progress_suffix(n_done, len(targets), start_time)}",
+                flush=True,
+            )
         result = scan_star(
             tic_id,
             mission=mission,
@@ -744,18 +796,20 @@ def run_background_scan(
             tic_id = target["tic_id"]
             log.record(tic_id, result["status"], result)
             n_done += 1
-            print(
-                f"[{n_done}/{len(targets)}] TIC {tic_id}  "
-                f"Tmag={target['tmag']:.1f}  priority={target['priority']:.3f}  "
-                f"{_status_text(result)}  {_progress_suffix(n_done, len(targets), start_time)}",
-                flush=True,
-            )
+            with print_lock:
+                print(
+                    f"[{n_done}/{len(targets)}] TIC {tic_id}  "
+                    f"Tmag={target['tmag']:.1f}  priority={target['priority']:.3f}  "
+                    f"{_status_text(result)}  active={log.summary()['active']}  "
+                    f"{_progress_suffix(n_done, len(targets), start_time)}",
+                    flush=True,
+                )
     except KeyboardInterrupt:
         for future in futures:
             future.cancel()
         print("\nScan interrupted.", flush=True)
     finally:
-        executor.shutdown(wait=False, cancel_futures=True)
+        executor.shutdown(wait=True, cancel_futures=True)
 
     summary = log.summary()
     print(
@@ -763,7 +817,8 @@ def run_background_scan(
         f"| {summary['candidate_found']:,} candidates  "
         f"| {summary['scanned_clear']:,} clear  "
         f"| {summary['no_data']:,} no-data  "
-        f"| {summary['error']:,} errors",
+        f"| {summary['error']:,} errors  "
+        f"| {summary['active']:,} active",
         flush=True,
     )
 
