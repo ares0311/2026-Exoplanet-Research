@@ -2,7 +2,7 @@
 
 **Purpose**: Prevent doom loops. Every agent and every session must read this before doing anything.
 
-**Last updated**: 2026-06-28 (Option A JWST integration and Option B TESS novelty restructure merged; PR #143 live scanner fix merged; PR #145 worker/ETA fix merged; SPOC-only B5 attempt and QLP corrupt-cache attempt completed but did not close T1-0; cache-repair QLP rerun pending)
+**Last updated**: 2026-06-28 (Option A JWST integration and Option B TESS novelty restructure merged; PR #143 live scanner fix merged; PR #145 worker/ETA fix merged; SPOC-only B5 attempt, QLP corrupt-cache attempt, and QLP stdout-race attempt completed but did not close T1-0; stdout-safe QLP rerun pending)
 
 ---
 
@@ -158,7 +158,7 @@ JWST does not run autonomous surveys the way TESS does. Its time-series observat
 
 **Use for the first real discovery scan.**
 
-Current gate: `star_scanner.py` excludes TOI, CTOI, and confirmed exoplanet hosts from the NASA Exoplanet Archive, and defaults to the Tmag 12.0-14.5 novelty frontier. The first SPOC-only run completed but did not close the gate because nearly every selected TIC had no SPOC long-cadence light curve. The first QLP rerun also did not close the gate because three stale local Lightkurve cache FITS files were corrupt from interrupted downloads and the shared fetch path did not repair them before retrying. Use QLP with a fresh log after the cache-repair fix is merged for the next scan.
+Current gate: `star_scanner.py` excludes TOI, CTOI, and confirmed exoplanet hosts from the NASA Exoplanet Archive, and defaults to the Tmag 12.0-14.5 novelty frontier. The first SPOC-only run completed but did not close the gate because nearly every selected TIC had no SPOC long-cadence light curve. The first QLP rerun also did not close the gate because three stale local Lightkurve cache FITS files were corrupt from interrupted downloads and the shared fetch path did not repair them before retrying. The next QLP attempt repaired cache files but still crashed because Lightkurve public download methods mutate process-global stdout under worker-thread concurrency. Use QLP with a fresh log after the stdout-safe fetch fix is merged for the next scan.
 
 ### Option B build plan
 
@@ -240,7 +240,7 @@ The XGBoost model (`models/xgboost_koi.json`) is trained and available now.
 
 ## The Immediate Next Action (As of 2026-06-27)
 
-**First QLP discovery run after cache repair** (higher priority than CNN training):
+**First QLP discovery run after stdout-safe fetch fix** (higher priority than CNN training):
 
 ```bash
 git switch main
@@ -253,17 +253,17 @@ caffeinate -dims .venv/bin/python Skills/star_scanner.py \
   --exptime long \
   --workers 4 \
   --request-delay 0.5 \
-  --log logs/discovery_run_003_qlp_cache_repair.json
-.venv/bin/python Skills/rank_candidates.py logs/discovery_run_003_qlp_cache_repair.json --top 20
-.venv/bin/python Skills/alert_filter.py logs/discovery_run_003_qlp_cache_repair.json \
+  --log logs/discovery_run_004_qlp_stdout_safe.json
+.venv/bin/python Skills/rank_candidates.py logs/discovery_run_004_qlp_stdout_safe.json --top 20
+.venv/bin/python Skills/alert_filter.py logs/discovery_run_004_qlp_stdout_safe.json \
   --fpp-max 0.15 \
-  --output logs/discovery_filtered_003_qlp_cache_repair.json
+  --output logs/discovery_filtered_004_qlp_stdout_safe.json
 ```
 
 This will take approximately 2–4 hours on a Mac M4 Max. Use `caffeinate -dims`.
 
 If `alert_filter.py` reports `No candidates matched the filters.`, keep the full
-`logs/discovery_run_003_qlp_cache_repair.json`; a null 200-target batch is useful evidence only
+`logs/discovery_run_004_qlp_stdout_safe.json`; a null 200-target batch is useful evidence only
 if the log shows real scanned-clear targets or candidates, not another mostly
 no-data batch.
 Do not build the C20 CNN corpus or train C20 until this discovery run has been

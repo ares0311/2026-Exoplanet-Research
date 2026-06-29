@@ -754,7 +754,7 @@
         "verified_on": "2026-06-28"
       },
       "validation_gate": "Does not close T1-0 because there were zero clear scans and zero candidates.",
-      "next_action": "Retain locally for forensic provenance; run logs/discovery_run_003_qlp_cache_repair.json with --pipeline QLP after cache-repair fix is merged."
+      "next_action": "Retain locally for forensic provenance; run logs/discovery_run_004_qlp_stdout_safe.json with --pipeline QLP after stdout-safe fetch fix is merged."
     },
     {
       "path": "logs/discovery_filtered_001.json",
@@ -769,7 +769,7 @@
         "verified_on": "2026-06-28"
       },
       "validation_gate": "Use only as triage output; candidate escalation still requires human review and false-positive diagnostics.",
-      "next_action": "Retain locally only; next actionable triage output is logs/discovery_filtered_003_qlp_cache_repair.json."
+      "next_action": "Retain locally only; next actionable triage output is logs/discovery_filtered_004_qlp_stdout_safe.json."
     },
     {
       "path": "logs/discovery_run_002_qlp.json",
@@ -807,40 +807,78 @@
         "verified_on": "2026-06-28"
       },
       "validation_gate": "Use only as triage output; candidate escalation still requires human review and false-positive diagnostics.",
-      "next_action": "Retain locally only; next actionable triage output is logs/discovery_filtered_003_qlp_cache_repair.json."
+      "next_action": "Retain locally only; next actionable triage output is logs/discovery_filtered_004_qlp_stdout_safe.json."
     },
     {
       "path": "logs/discovery_run_003_qlp_cache_repair.json",
       "kind": "discovery_scan_log",
-      "status": "pending_human_run_after_cache_repair",
+      "status": "complete_non_closing_stdout_race",
       "git_policy": "ignored",
       "last_known": {
-        "scan": "B5 first QLP discovery scan after Lightkurve cache repair",
+        "scan": "B5 first QLP discovery scan after Lightkurve cache repair attempt",
         "max_stars": 200,
         "selection": "novel TESS targets after TOI/CTOI/confirmed-host exclusion",
         "command": "caffeinate -dims .venv/bin/python Skills/star_scanner.py --max-stars 200 --pipeline QLP --exptime long --workers 4 --request-delay 0.5 --log logs/discovery_run_003_qlp_cache_repair.json",
-        "review_commands": [
-          ".venv/bin/python Skills/rank_candidates.py logs/discovery_run_003_qlp_cache_repair.json --top 20",
-          ".venv/bin/python Skills/alert_filter.py logs/discovery_run_003_qlp_cache_repair.json --fpp-max 0.15 --output logs/discovery_filtered_003_qlp_cache_repair.json"
-        ],
+        "total_entries": 1,
+        "errors": 1,
+        "scanned_clear": 0,
+        "candidates": 0,
+        "no_data": 0,
+        "sha256": "beacda216534ca583b76002ff7ed7916b249de5f7dc712cd13a1863bb856e8cc",
+        "root_cause": "Lightkurve SearchResult.download and download_all are decorated with suppress_stdout, which mutates process-global sys.stdout; this is unsafe while star_scanner worker threads download light curves and the main thread prints progress",
         "verified_on": "2026-06-28"
       },
-      "validation_gate": "This scan must complete and show real clear scans or candidates before C20 CNN corpus assembly or training resumes.",
-      "next_action": "[HUMAN] after cache-repair fix is merged, run the QLP B5 discovery scan on the Mac and paste back the rank/filter summary."
+      "validation_gate": "Does not close T1-0 because there were zero clear scans and zero candidates, and the process crashed before completing the batch.",
+      "next_action": "Retain locally for forensic provenance; do not reuse as production evidence because scanner resume will skip the recorded error entry."
     },
     {
       "path": "logs/discovery_filtered_003_qlp_cache_repair.json",
       "kind": "discovery_triage_output",
-      "status": "pending_scan_result",
+      "status": "complete_empty_non_closing",
       "git_policy": "ignored",
       "last_known": {
         "source": "logs/discovery_run_003_qlp_cache_repair.json",
         "filter": "false_positive_probability <= 0.15",
-        "empty_result_policy": "Empty is acceptable only after a QLP scan with real clear scans or candidates, not another mostly no-data/cache-error batch.",
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "empty_result_policy": "Empty is non-closing because the source scan had zero clear scans, zero candidates, and crashed before completing.",
         "verified_on": "2026-06-28"
       },
       "validation_gate": "Use only as triage output; candidate escalation still requires human review and false-positive diagnostics.",
-      "next_action": "Review together with the cache-repair QLP discovery scan log after B5 completes."
+      "next_action": "Retain locally only; next actionable triage output is logs/discovery_filtered_004_qlp_stdout_safe.json."
+    },
+    {
+      "path": "logs/discovery_run_004_qlp_stdout_safe.json",
+      "kind": "discovery_scan_log",
+      "status": "pending_human_run_after_stdout_safe_fetch",
+      "git_policy": "ignored",
+      "last_known": {
+        "scan": "B5 first QLP discovery scan after stdout-safe Lightkurve fetch",
+        "max_stars": 200,
+        "selection": "novel TESS targets after TOI/CTOI/confirmed-host exclusion",
+        "command": "caffeinate -dims .venv/bin/python Skills/star_scanner.py --max-stars 200 --pipeline QLP --exptime long --workers 4 --request-delay 0.5 --log logs/discovery_run_004_qlp_stdout_safe.json",
+        "review_commands": [
+          ".venv/bin/python Skills/rank_candidates.py logs/discovery_run_004_qlp_stdout_safe.json --top 20",
+          ".venv/bin/python Skills/alert_filter.py logs/discovery_run_004_qlp_stdout_safe.json --fpp-max 0.15 --output logs/discovery_filtered_004_qlp_stdout_safe.json"
+        ],
+        "verified_on": "2026-06-28"
+      },
+      "validation_gate": "This scan must complete and show real clear scans or candidates before C20 CNN corpus assembly or training resumes.",
+      "next_action": "[HUMAN] after stdout-safe fetch fix is merged, run the QLP B5 discovery scan on the Mac and paste back the rank/filter summary."
+    },
+    {
+      "path": "logs/discovery_filtered_004_qlp_stdout_safe.json",
+      "kind": "discovery_triage_output",
+      "status": "pending_scan_result",
+      "git_policy": "ignored",
+      "last_known": {
+        "source": "logs/discovery_run_004_qlp_stdout_safe.json",
+        "filter": "false_positive_probability <= 0.15",
+        "empty_result_policy": "Empty is acceptable only after a QLP scan with real clear scans or candidates, not another mostly no-data/cache-error/stdout-crash batch.",
+        "verified_on": "2026-06-28"
+      },
+      "validation_gate": "Use only as triage output; candidate escalation still requires human review and false-positive diagnostics.",
+      "next_action": "Review together with the stdout-safe QLP discovery scan log after B5 completes."
     },
     {
       "path": "models/cnn*/",

@@ -1,8 +1,8 @@
 """Light curve fetching from MAST via Lightkurve.
 
-Wraps Lightkurve's search → download_all → stitch pattern into a single
-call that returns a FetchResult containing a stitched LightCurve and full
-provenance metadata.
+Wraps Lightkurve's search → per-product download → stitch pattern into a
+single call that returns a FetchResult containing a stitched LightCurve and
+full provenance metadata.
 
 Lightkurve is imported lazily inside fetch_lightcurve() so this module
 loads without error even when lightkurve is not installed.  A clear
@@ -160,7 +160,7 @@ def fetch_lightcurve(
             f"(author={author!r}, exptime={exptime!r})"
         )
 
-    collection = _download_all_with_cache_repair(search, flux_column=flux_column)
+    collection = _download_collection_with_cache_repair(search, flux_column=flux_column)
     lc = collection.stitch()
 
     cadence_raw = lc.meta.get("EXPTIME", 0.0)
@@ -297,19 +297,55 @@ def _fetch_jwst(obsid: str, *, _skills_dir: Path | None = None) -> FetchResult:
     return FetchResult(light_curve=lc, provenance=provenance)
 
 
-def _download_all_with_cache_repair(search: Any, *, flux_column: str) -> Any:
-    """Download a Lightkurve search result, repairing corrupt cache files.
+def _download_collection_with_cache_repair(search: Any, *, flux_column: str) -> Any:
+    """Download a Lightkurve search result without mutating global stdout.
 
-    Interrupted live downloads can leave truncated FITS files in Lightkurve's
-    MAST cache. Lightkurve reports those files explicitly and asks the operator
-    to remove them. Do that bounded, targeted repair automatically so resumed
-    production scans do not turn stale cache corruption into repeated target
-    failures.
+    ``SearchResult.download()`` and ``download_all()`` are decorated with
+    Lightkurve's ``suppress_stdout`` helper, which assigns ``sys.stdout``
+    process-wide. That is unsafe while the discovery scanner runs multiple
+    worker threads and the main thread prints progress. Use the lower-level
+    per-product downloader instead, and still repair corrupt cached FITS files
+    when Lightkurve reports an interrupted download.
     """
+    try:
+        import lightkurve as lk  # noqa: PLC0415
+    except ImportError as exc:
+        raise ImportError(
+            "lightkurve is required for fetch operations. "
+            "Install it with: pip install lightkurve"
+        ) from exc
+
+    light_curves: list[Any] = []
+    for idx in range(len(search.table)):
+        light_curves.append(
+            _download_one_with_cache_repair(
+                search,
+                table=search.table[idx : idx + 1],
+                flux_column=flux_column,
+            )
+        )
+    if not light_curves:
+        raise ValueError("No downloadable light curves returned by Lightkurve")
+    return lk.LightCurveCollection(light_curves)
+
+
+def _download_one_with_cache_repair(
+    search: Any,
+    *,
+    table: Any,
+    flux_column: str,
+) -> Any:
+    """Download one Lightkurve product, repairing one corrupt cache file at a time."""
     max_cache_repairs = 4
     for attempt in range(max_cache_repairs + 1):
         try:
-            return search.download_all(flux_column=flux_column)
+            return search._download_one(  # noqa: SLF001
+                table=table,
+                quality_bitmask="default",
+                download_dir=None,
+                cutout_size=None,
+                flux_column=flux_column,
+            )
         except Exception as exc:
             repaired = _remove_corrupt_lightkurve_cache_file(exc)
             if repaired is not None and attempt < max_cache_repairs:
