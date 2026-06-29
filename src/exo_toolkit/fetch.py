@@ -17,8 +17,10 @@ fetch_lightcurve(target_id, mission, *, exptime, pipeline, sectors,
 from __future__ import annotations
 
 import datetime
+import importlib
 import importlib.util
 import re
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -89,6 +91,8 @@ _EXPTIME_FALLBACK: dict[str, float] = {
     "short": 120.0,
     "fast": 20.0,
 }
+
+_DOWNLOAD_PRODUCTS_LOCK = threading.Lock()
 
 
 # ---------------------------------------------------------------------------
@@ -362,7 +366,8 @@ def _download_one_with_cache_repair(
         for attempt in range(max_cache_repairs + 1):
             try:
                 return (
-                    search._download_one(  # noqa: SLF001
+                    _download_one_quietly(
+                        search,
                         table=table,
                         quality_bitmask="default",
                         download_dir=None,
@@ -383,6 +388,31 @@ def _download_one_with_cache_repair(
     if last_missing_flux_error is not None:
         raise last_missing_flux_error
     raise RuntimeError("Lightkurve cache repair retry loop exhausted")
+
+
+def _download_one_quietly(search: Any, **kwargs: Any) -> Any:
+    """Call Lightkurve's per-product downloader with Astroquery verbosity disabled.
+
+    Lightkurve's lower-level ``_download_one`` avoids its ``suppress_stdout``
+    decorator, but it still calls ``Observations.download_products`` with
+    Astroquery's default ``verbose=True``.  Force ``verbose=False`` while the
+    third-party call is active so worker-thread scans keep operator progress
+    readable without redirecting process-global stdout.
+    """
+    mast_module: Any = importlib.import_module("astroquery.mast")
+    observations: Any = mast_module.Observations
+    original = observations.download_products
+
+    def quiet_download_products(products: Any, *args: Any, **inner_kwargs: Any) -> Any:
+        inner_kwargs["verbose"] = False
+        return original(products, *args, **inner_kwargs)
+
+    with _DOWNLOAD_PRODUCTS_LOCK:
+        observations.download_products = quiet_download_products
+        try:
+            return search._download_one(**kwargs)  # noqa: SLF001
+        finally:
+            observations.download_products = original
 
 
 def _is_missing_flux_column_error(exc: Exception, flux_column: str) -> bool:

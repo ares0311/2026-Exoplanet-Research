@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "exo-toolkit"
-version = "0.2.2"
+version = "0.2.3"
 description = "TESS/Kepler exoplanet candidate detection, vetting, scoring, and submission-pathway toolkit"
 readme = "README.md"
 requires-python = ">=3.11"

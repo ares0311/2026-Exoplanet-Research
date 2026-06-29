@@ -1248,7 +1248,7 @@ fix the durable resume ledger before asking the human to run it again.
 **Live scanner fix (PR #143, 2026-06-28):** **MERGED** — live one-target smoke on `main` verified that ExoFOP SSL loading, Python 3.14 helper imports, bounded TIC target selection, and no-light-curve `no_data` classification work. Do not re-debug the pre-PR #143 pasted failures.
 
 **Immediate next actions (in priority order):**
-1. **[HUMAN]** Run the first real QLP discovery scan after QLP flux-column fix — highest priority item before any CNN work.
+1. **[HUMAN]** Run the first real QLP discovery scan after scanner progress/quiet-download fix — highest priority item before any CNN work.
    Option B1–B4 is now merged: the scanner automatically excludes TOI + CTOI + confirmed hosts and defaults to Tmag 12–14.5:
    ```bash
    git switch main
@@ -1259,11 +1259,11 @@ fix the durable resume ledger before asking the human to run it again.
      --exptime long \
      --workers 4 \
      --request-delay 0.5 \
-     --log logs/discovery_run_005_qlp_flux_safe.json
-   .venv/bin/python Skills/rank_candidates.py logs/discovery_run_005_qlp_flux_safe.json --top 20
-   .venv/bin/python Skills/alert_filter.py logs/discovery_run_005_qlp_flux_safe.json \
+     --log logs/discovery_run_006_qlp_progress_safe.json
+   .venv/bin/python Skills/rank_candidates.py logs/discovery_run_006_qlp_progress_safe.json --top 20
+   .venv/bin/python Skills/alert_filter.py logs/discovery_run_006_qlp_progress_safe.json \
      --fpp-max 0.15 \
-     --output logs/discovery_filtered_005_qlp_flux_safe.json
+     --output logs/discovery_filtered_006_qlp_progress_safe.json
    ```
 2. **[AGENT]** CNN C20 training (only after step 1 above produces candidates): merge K2 overlap into C20 corpus, build `data/tess_c20_cnn_splits/`, train with `configs/cnn_tess_c18.json` (`freeze_conv_epochs=10`).
 3. ~~A3 JWST CLI wiring~~ — **COMPLETE** (PR #141).
