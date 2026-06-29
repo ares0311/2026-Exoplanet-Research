@@ -905,13 +905,13 @@
     {
       "path": "logs/discovery_run_006_qlp_progress_safe.json",
       "kind": "discovery_scan_log",
-      "status": "pending_human_run_after_progress_safe_fix",
+      "status": "pending_human_run_after_progress_safe_and_bounded_bls_fix",
       "git_policy": "ignored",
       "last_known": {
-        "scan": "B5 first QLP discovery scan after scanner progress/quiet-download fix",
+        "scan": "B5 first QLP discovery scan after scanner progress/quiet-download and bounded-BLS fixes",
         "max_stars": 200,
         "selection": "novel TESS targets after TOI/CTOI/confirmed-host exclusion",
-        "command": "caffeinate -dims .venv/bin/python Skills/star_scanner.py --max-stars 200 --pipeline QLP --exptime long --workers 4 --request-delay 0.5 --log logs/discovery_run_006_qlp_progress_safe.json",
+        "command": "caffeinate -dims .venv/bin/python Skills/star_scanner.py --max-stars 200 --pipeline QLP --exptime long --max-period-grid-points 20000 --workers 4 --request-delay 0.5 --log logs/discovery_run_006_qlp_progress_safe.json",
         "review_commands": [
           ".venv/bin/python Skills/rank_candidates.py logs/discovery_run_006_qlp_progress_safe.json --top 20",
           ".venv/bin/python Skills/alert_filter.py logs/discovery_run_006_qlp_progress_safe.json --fpp-max 0.15 --output logs/discovery_filtered_006_qlp_progress_safe.json"

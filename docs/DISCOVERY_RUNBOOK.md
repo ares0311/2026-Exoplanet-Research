@@ -251,6 +251,7 @@ caffeinate -dims .venv/bin/python Skills/star_scanner.py \
   --tmag-max 14.5 \
   --pipeline QLP \
   --exptime long \
+  --max-period-grid-points 20000 \
   --workers 4 \
   --request-delay 0.5 \
   --log logs/discovery_run_006_qlp_progress_safe.json

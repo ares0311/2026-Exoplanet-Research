@@ -45,6 +45,7 @@ def search_lightcurve(
     n_durations: int = 20,
     min_snr: float = 5.0,
     max_peaks: int = 5,
+    max_period_grid_points: int | None = 20_000,
 ) -> list[CandidateSignal]:
     """Search a cleaned light curve for periodic transit signals via BLS.
 
@@ -66,6 +67,10 @@ def search_lightcurve(
             Peaks below this threshold terminate the search.
         max_peaks: Maximum number of signals to extract (iterative masking
             stops after this many peaks regardless of SNR).
+        max_period_grid_points: Maximum BLS trial periods. The default bounded
+            grid keeps live scans from generating hundreds of millions of trial
+            periods for long-baseline TESS/QLP light curves. Pass None to use
+            Astropy's full ``autoperiod`` grid.
 
     Returns:
         List of CandidateSignal objects ordered by descending BLS power.
@@ -104,11 +109,12 @@ def search_lightcurve(
         e = flux_err[include]
 
         bls = BoxLeastSquares(t * u.day, f, dy=e)
-        period_grid = bls.autoperiod(
-            duration_grid * u.day,
-            minimum_period=period_min * u.day,
-            maximum_period=resolved_period_max * u.day,
-            minimum_n_transit=2,
+        period_grid = _make_period_grid(
+            bls,
+            duration_grid,
+            period_min=period_min,
+            period_max=resolved_period_max,
+            max_period_grid_points=max_period_grid_points,
         )
 
         if len(period_grid) == 0:
@@ -174,6 +180,31 @@ def _extract_flux_err(lc: Any, flux: np.ndarray) -> np.ndarray:
     mad = float(np.median(np.abs(flux - np.median(flux))))
     sigma = 1.4826 * mad if mad > 0.0 else 1e-4
     return np.full_like(flux, sigma)
+
+
+def _make_period_grid(
+    bls: BoxLeastSquares,
+    duration_grid: np.ndarray,
+    *,
+    period_min: float,
+    period_max: float,
+    max_period_grid_points: int | None,
+) -> Any:
+    """Return a BLS period grid, bounded by default for live scanner safety."""
+    if max_period_grid_points is None:
+        return bls.autoperiod(
+            duration_grid * u.day,
+            minimum_period=period_min * u.day,
+            maximum_period=period_max * u.day,
+            minimum_n_transit=2,
+        )
+
+    n_points = max(2, int(max_period_grid_points))
+    freq_min = 1.0 / period_max
+    freq_max = 1.0 / period_min
+    frequencies = np.linspace(freq_min, freq_max, n_points)
+    periods = np.sort(1.0 / frequencies)
+    return periods * u.day
 
 
 def _count_transits(
