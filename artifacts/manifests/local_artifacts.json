@@ -900,7 +900,7 @@
         "verified_on": "2026-06-29"
       },
       "validation_gate": "Does not close T1-0 because the operator could not verify live progress and no durable log existed before the first completed target.",
-      "next_action": "Retain only as forensic terminal evidence; stop any still-running run005 process and rerun fresh as logs/discovery_run_006_qlp_progress_safe.json after the scanner progress/quiet-download fix is merged."
+      "next_action": "Retain only as forensic terminal evidence; stop any still-running run005 process and rerun fresh as logs/discovery_run_006_qlp_progress_safe.json from current main."
     },
     {
       "path": "logs/discovery_run_006_qlp_progress_safe.json",
@@ -919,7 +919,7 @@
         "verified_on": "2026-06-29"
       },
       "validation_gate": "This scan must complete and show real clear scans or candidates before C20 CNN corpus assembly or training resumes.",
-      "next_action": "[HUMAN] after the progress-safe fix is merged, run the QLP B5 discovery scan on the Mac and paste back the rank/filter summary."
+      "next_action": "[HUMAN] run the QLP B5 discovery scan on the Mac from current main; run rank/filter only after the scanner exits normally, then paste back the summary."
     },
     {
       "path": "logs/discovery_filtered_006_qlp_progress_safe.json",

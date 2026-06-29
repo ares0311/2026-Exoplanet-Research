@@ -105,7 +105,8 @@ without relying on chat context or local terminal output.
 - A cache-repair QLP attempt started on 2026-06-28 as `logs/discovery_run_003_qlp_cache_repair.json`, but it did not close T1-0: it recorded 1 error, 0 clear scans, and 0 candidates before crashing with `ValueError: I/O operation on closed file`. Root cause: Lightkurve public download methods use `suppress_stdout`, which mutates process-global `sys.stdout`; that is unsafe under worker-thread downloads while the main thread prints progress.
 - A stdout-safe QLP attempt completed on 2026-06-28 as `logs/discovery_run_004_qlp_stdout_safe.json`, but it did not close T1-0: it recorded 200 total entries, 0 candidates, 0 clear scans, 1 no-data row, and 199 errors. Root cause: the shared fetch path requested SPOC-style `pdcsap_flux`; valid QLP HLSP products provide `KSPSAP_FLUX`, `DET_FLUX`, `SYS_RM_FLUX`, or `SAP_FLUX`, not `PDCSAP_FLUX`.
 - A flux-safe QLP attempt started as `logs/discovery_run_005_qlp_flux_safe.json`, but it did not close T1-0: the pasted console showed third-party MAST download chatter and warnings but no per-target scanner progress, and no durable log existed before the first completed target.
-- The next production action is human-run because it requires live services and a long-running Mac-local scan. Use QLP and a fresh log after the scanner progress/quiet-download fix is merged so the result is not polluted by prior failed resume state:
+- PR #150 is merged on `main`: scanner logs are created immediately, active targets are checkpointed separately, per-target startup/progress is printed, and third-party MAST download banners are suppressed.
+- The next production action is human-run because it requires live services and a long-running Mac-local scan. Use QLP and a fresh `run006` log so the result is not polluted by prior failed resume state:
 
 ```bash
 git switch main
@@ -122,6 +123,9 @@ caffeinate -dims .venv/bin/python Skills/star_scanner.py \
   --fpp-max 0.15 \
   --output logs/discovery_filtered_006_qlp_progress_safe.json
 ```
+
+Run rank/filter only after the scanner exits normally. If the scan is stopped
+or suspended, rerun the scanner from `main` before triage.
 
 If `alert_filter.py` finds no rows, keep `logs/discovery_run_006_qlp_progress_safe.json`; a null batch only informs the next target-selection cycle if it contains real scanned-clear targets or candidates, not mostly no-data/error rows.
 

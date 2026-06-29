@@ -42,6 +42,22 @@ _PATHWAY_BONUS: dict[str, float] = {
 }
 
 
+def _operator_file_error(path: Path, error: Exception) -> str:
+    """Return a traceback-free CLI message for missing or unreadable inputs."""
+    if isinstance(error, FileNotFoundError):
+        detail = "does not exist"
+    elif isinstance(error, json.JSONDecodeError):
+        detail = "is not valid complete JSON"
+    else:
+        detail = f"could not be read ({error})"
+    return (
+        f"Input file {detail}: {path}\n"
+        "If this is a live discovery scan log, let Skills/star_scanner.py finish "
+        "successfully before running rank_candidates.py. If the scan was stopped "
+        "or suspended, rerun the scanner from main and then rank the completed log."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -216,7 +232,13 @@ def _cli(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    rows = load_candidates(args.files)
+    try:
+        rows = load_candidates(args.files)
+    except (FileNotFoundError, json.JSONDecodeError, OSError) as exc:
+        filename = getattr(exc, "filename", None)
+        path = Path(filename) if filename else args.files[0]
+        print(_operator_file_error(path, exc), file=sys.stderr)
+        return 2
     if not rows:
         print("No candidates found.", file=sys.stderr)
         return 1
