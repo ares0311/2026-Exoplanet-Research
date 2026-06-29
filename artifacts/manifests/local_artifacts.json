@@ -754,7 +754,7 @@
         "verified_on": "2026-06-28"
       },
       "validation_gate": "Does not close T1-0 because there were zero clear scans and zero candidates.",
-      "next_action": "Retain locally for forensic provenance; run logs/discovery_run_004_qlp_stdout_safe.json with --pipeline QLP after stdout-safe fetch fix is merged."
+      "next_action": "Retain locally for forensic provenance; run logs/discovery_run_005_qlp_flux_safe.json with --pipeline QLP after the QLP flux-column fix is merged."
     },
     {
       "path": "logs/discovery_filtered_001.json",
@@ -769,7 +769,7 @@
         "verified_on": "2026-06-28"
       },
       "validation_gate": "Use only as triage output; candidate escalation still requires human review and false-positive diagnostics.",
-      "next_action": "Retain locally only; next actionable triage output is logs/discovery_filtered_004_qlp_stdout_safe.json."
+      "next_action": "Retain locally only; next actionable triage output is logs/discovery_filtered_005_qlp_flux_safe.json."
     },
     {
       "path": "logs/discovery_run_002_qlp.json",
@@ -807,7 +807,7 @@
         "verified_on": "2026-06-28"
       },
       "validation_gate": "Use only as triage output; candidate escalation still requires human review and false-positive diagnostics.",
-      "next_action": "Retain locally only; next actionable triage output is logs/discovery_filtered_004_qlp_stdout_safe.json."
+      "next_action": "Retain locally only; next actionable triage output is logs/discovery_filtered_005_qlp_flux_safe.json."
     },
     {
       "path": "logs/discovery_run_003_qlp_cache_repair.json",
@@ -845,40 +845,78 @@
         "verified_on": "2026-06-28"
       },
       "validation_gate": "Use only as triage output; candidate escalation still requires human review and false-positive diagnostics.",
-      "next_action": "Retain locally only; next actionable triage output is logs/discovery_filtered_004_qlp_stdout_safe.json."
+      "next_action": "Retain locally only; next actionable triage output is logs/discovery_filtered_005_qlp_flux_safe.json."
     },
     {
       "path": "logs/discovery_run_004_qlp_stdout_safe.json",
       "kind": "discovery_scan_log",
-      "status": "pending_human_run_after_stdout_safe_fetch",
+      "status": "complete_non_closing_wrong_flux_column",
       "git_policy": "ignored",
       "last_known": {
         "scan": "B5 first QLP discovery scan after stdout-safe Lightkurve fetch",
         "max_stars": 200,
         "selection": "novel TESS targets after TOI/CTOI/confirmed-host exclusion",
         "command": "caffeinate -dims .venv/bin/python Skills/star_scanner.py --max-stars 200 --pipeline QLP --exptime long --workers 4 --request-delay 0.5 --log logs/discovery_run_004_qlp_stdout_safe.json",
-        "review_commands": [
-          ".venv/bin/python Skills/rank_candidates.py logs/discovery_run_004_qlp_stdout_safe.json --top 20",
-          ".venv/bin/python Skills/alert_filter.py logs/discovery_run_004_qlp_stdout_safe.json --fpp-max 0.15 --output logs/discovery_filtered_004_qlp_stdout_safe.json"
-        ],
+        "total_entries": 200,
+        "errors": 199,
+        "scanned_clear": 0,
+        "candidates": 0,
+        "no_data": 1,
+        "root_cause": "The shared fetch path requested SPOC-style pdcsap_flux; valid QLP HLSP products provide KSPSAP_FLUX, DET_FLUX, SYS_RM_FLUX, or SAP_FLUX, not PDCSAP_FLUX. Lightkurve wrapped the missing-column KeyError as a misleading corrupt-download message.",
+        "fix_evidence": "A live smoke after the fix read TIC 425884922 with flux_column=kspsap_flux+det_flux, sectors 1/2/28/68/95/96, n_cadences=38084, and baseline_days=2608.12.",
         "verified_on": "2026-06-28"
       },
-      "validation_gate": "This scan must complete and show real clear scans or candidates before C20 CNN corpus assembly or training resumes.",
-      "next_action": "[HUMAN] after stdout-safe fetch fix is merged, run the QLP B5 discovery scan on the Mac and paste back the rank/filter summary."
+      "validation_gate": "Does not close T1-0 because there were zero clear scans and zero candidates.",
+      "next_action": "Retain locally for forensic provenance; do not reuse as production evidence because scanner resume will skip the recorded error entries."
     },
     {
       "path": "logs/discovery_filtered_004_qlp_stdout_safe.json",
       "kind": "discovery_triage_output",
-      "status": "pending_scan_result",
+      "status": "complete_empty_non_closing",
       "git_policy": "ignored",
       "last_known": {
         "source": "logs/discovery_run_004_qlp_stdout_safe.json",
         "filter": "false_positive_probability <= 0.15",
-        "empty_result_policy": "Empty is acceptable only after a QLP scan with real clear scans or candidates, not another mostly no-data/cache-error/stdout-crash batch.",
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "empty_result_policy": "Empty is non-closing because the source scan had zero clear scans and zero candidates.",
         "verified_on": "2026-06-28"
       },
       "validation_gate": "Use only as triage output; candidate escalation still requires human review and false-positive diagnostics.",
-      "next_action": "Review together with the stdout-safe QLP discovery scan log after B5 completes."
+      "next_action": "Retain locally only; next actionable triage output is logs/discovery_filtered_005_qlp_flux_safe.json."
+    },
+    {
+      "path": "logs/discovery_run_005_qlp_flux_safe.json",
+      "kind": "discovery_scan_log",
+      "status": "pending_human_run_after_qlp_flux_fix",
+      "git_policy": "ignored",
+      "last_known": {
+        "scan": "B5 first QLP discovery scan after QLP flux-column fix",
+        "max_stars": 200,
+        "selection": "novel TESS targets after TOI/CTOI/confirmed-host exclusion",
+        "command": "caffeinate -dims .venv/bin/python Skills/star_scanner.py --max-stars 200 --pipeline QLP --exptime long --workers 4 --request-delay 0.5 --log logs/discovery_run_005_qlp_flux_safe.json",
+        "review_commands": [
+          ".venv/bin/python Skills/rank_candidates.py logs/discovery_run_005_qlp_flux_safe.json --top 20",
+          ".venv/bin/python Skills/alert_filter.py logs/discovery_run_005_qlp_flux_safe.json --fpp-max 0.15 --output logs/discovery_filtered_005_qlp_flux_safe.json"
+        ],
+        "verified_on": "2026-06-28"
+      },
+      "validation_gate": "This scan must complete and show real clear scans or candidates before C20 CNN corpus assembly or training resumes.",
+      "next_action": "[HUMAN] after the QLP flux-column fix is merged, run the QLP B5 discovery scan on the Mac and paste back the rank/filter summary."
+    },
+    {
+      "path": "logs/discovery_filtered_005_qlp_flux_safe.json",
+      "kind": "discovery_triage_output",
+      "status": "pending_scan_result",
+      "git_policy": "ignored",
+      "last_known": {
+        "source": "logs/discovery_run_005_qlp_flux_safe.json",
+        "filter": "false_positive_probability <= 0.15",
+        "empty_result_policy": "Empty is acceptable only after a QLP scan with real clear scans or candidates, not another mostly no-data/error batch.",
+        "verified_on": "2026-06-28"
+      },
+      "validation_gate": "Use only as triage output; candidate escalation still requires human review and false-positive diagnostics.",
+      "next_action": "Review together with the flux-safe QLP discovery scan log after B5 completes."
     },
     {
       "path": "models/cnn*/",
