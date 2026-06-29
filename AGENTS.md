@@ -108,6 +108,7 @@ When the user must take an action to unblock a gap:
 - **Project version bumped to 0.2.2** — patch release for the production-blocking QLP flux-column fix; QLP products do not provide `PDCSAP_FLUX`, so the fetcher now uses QLP-native corrected flux columns before falling back to SAP.
 - **Project version bumped to 0.2.3** — patch release for the production-blocking QLP scanner observability fix; scan logs are created immediately, active targets are checkpointed separately from completed entries, and Astroquery MAST download banners are disabled under the Lightkurve per-product path.
 - **Project version bumped to 0.2.4** — patch release for discovery triage guardrails; `rank_candidates.py` and `alert_filter.py` now fail closed with operator guidance instead of raw tracebacks when a live scan log is missing or incomplete.
+- **Project version bumped to 0.2.5** — patch release for bounded live discovery search; BLS period grids are capped by default so long-baseline QLP light curves do not generate hundreds of millions of trial periods, and the pipeline now passes `vet_signal(light_curve, signal)` in the documented order.
 
 ### Where things stand
 
@@ -148,6 +149,7 @@ caffeinate -dims .venv/bin/python Skills/star_scanner.py \
   --max-stars 200 \
   --pipeline QLP \
   --exptime long \
+  --max-period-grid-points 20000 \
   --workers 4 \
   --request-delay 0.5 \
   --log logs/discovery_run_006_qlp_progress_safe.json

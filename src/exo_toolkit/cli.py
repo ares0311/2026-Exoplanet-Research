@@ -194,6 +194,7 @@ def run_pipeline(
     pipeline: str | None = None,
     min_snr: float = 5.0,
     max_peaks: int = 5,
+    max_period_grid_points: int | None = 20_000,
     scorer: str = "bayesian",
     model_path: Path | None = None,
     cnn_checkpoint_path: Path | None = None,
@@ -210,6 +211,8 @@ def run_pipeline(
         pipeline: Optional pipeline/author override passed to ``fetch_lightcurve``.
         min_snr: Minimum BLS SNR threshold for candidate signals.
         max_peaks: Maximum number of signals to return from the BLS search.
+        max_period_grid_points: Maximum BLS trial periods per peak. The default
+            keeps live discovery scans bounded on long-baseline QLP light curves.
         scorer: Scoring model — ``"bayesian"`` (default), ``"xgboost"``, or
             ``"ensemble"`` (average of Bayesian + XGBoost).
         model_path: Path to a saved ``XGBoostScorer`` metadata JSON file.
@@ -274,6 +277,7 @@ def run_pipeline(
         mission=mission,
         min_snr=min_snr,
         max_peaks=max_peaks,
+        max_period_grid_points=max_period_grid_points,
     )
 
     if not signals:
@@ -281,7 +285,7 @@ def run_pipeline(
 
     rows: list[dict[str, Any]] = []
     for signal in signals:
-        vet_result = vet_signal(signal, clean_result.light_curve)
+        vet_result = vet_signal(clean_result.light_curve, signal)
         posterior, scores = score_candidate(signal, vet_result.features)
         pathway = classify_submission_pathway(
             signal, vet_result.features, posterior, scores,
@@ -450,6 +454,11 @@ def scan(
     ),
     min_snr: float = typer.Option(5.0, "--min-snr", help="Minimum BLS SNR threshold"),
     max_peaks: int = typer.Option(5, "--max-peaks", help="Maximum signals to search for"),
+    max_period_grid_points: int = typer.Option(
+        20_000,
+        "--max-period-grid-points",
+        help="Maximum BLS trial periods per peak; keep bounded for live scans",
+    ),
     scorer: str = typer.Option(
         "bayesian",
         "--scorer",
@@ -526,6 +535,7 @@ def scan(
             pipeline=pipeline,
             min_snr=min_snr,
             max_peaks=max_peaks,
+            max_period_grid_points=max_period_grid_points,
             scorer=scorer,
             model_path=model_path,
             cnn_checkpoint_path=cnn_checkpoint_path,

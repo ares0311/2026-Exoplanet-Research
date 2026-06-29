@@ -211,6 +211,36 @@ class TestRunPipeline:
 
         assert len(result) == 2
 
+    def test_vet_signal_receives_light_curve_then_signal(self) -> None:
+        lc = _mock_lc()
+        signal = _make_signal()
+        captured: dict[str, Any] = {}
+
+        def _vet(light_curve: Any, candidate_signal: Any) -> Any:
+            captured["light_curve"] = light_curve
+            captured["signal"] = candidate_signal
+            return MagicMock(features=CandidateFeatures())
+
+        with (
+            patch("exo_toolkit.cli.search_lightcurve", return_value=[signal]),
+            patch("exo_toolkit.cli.vet_signal", side_effect=_vet),
+            patch(
+                "exo_toolkit.cli.score_candidate",
+                return_value=(_uniform_posterior(), _make_scores()),
+            ),
+            patch(
+                "exo_toolkit.cli.classify_submission_pathway",
+                return_value="planet_hunters_discussion",
+            ),
+        ):
+            run_pipeline(
+                "TIC 0", "TESS",
+                fetch_fn=self._patched_fetch(lc),
+                clean_fn=self._patched_clean(lc),
+            )
+
+        assert captured == {"light_curve": lc, "signal": signal}
+
     def test_row_contains_required_keys(self) -> None:
         lc = _mock_lc()
         signal = _make_signal()

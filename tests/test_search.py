@@ -18,6 +18,7 @@ from exo_toolkit.search import (
     _count_transits,
     _extract_flux_err,
     _make_candidate_id,
+    _make_period_grid,
     search_lightcurve,
 )
 
@@ -79,6 +80,48 @@ def _flat_lc(
     lc.flux.value = flux
     lc.flux_err.value = flux_err
     return lc
+
+
+class _FakeBls:
+    def autoperiod(self, *_args: object, **_kwargs: object) -> object:
+        return "auto-grid"
+
+
+class TestMakePeriodGrid:
+    def test_bounded_grid_respects_cap(self) -> None:
+        grid = _make_period_grid(
+            _FakeBls(),  # type: ignore[arg-type]
+            np.array([0.1]),
+            period_min=0.5,
+            period_max=30.0,
+            max_period_grid_points=123,
+        )
+
+        assert len(grid) == 123
+
+    def test_bounded_grid_covers_period_range(self) -> None:
+        grid = _make_period_grid(
+            _FakeBls(),  # type: ignore[arg-type]
+            np.array([0.1]),
+            period_min=0.5,
+            period_max=30.0,
+            max_period_grid_points=123,
+        )
+        values = grid.to_value("day")
+
+        assert values[0] == pytest.approx(0.5)
+        assert values[-1] == pytest.approx(30.0)
+
+    def test_none_uses_astropy_autoperiod(self) -> None:
+        grid = _make_period_grid(
+            _FakeBls(),  # type: ignore[arg-type]
+            np.array([0.1]),
+            period_min=0.5,
+            period_max=30.0,
+            max_period_grid_points=None,
+        )
+
+        assert grid == "auto-grid"
 
 
 # ---------------------------------------------------------------------------

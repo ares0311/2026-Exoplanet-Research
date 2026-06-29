@@ -556,6 +556,7 @@ def scan_star(
     log: ScanLog | None = None,
     min_snr: float = 5.0,
     max_peaks: int = 5,
+    max_period_grid_points: int | None = 20_000,
     scorer: str = "bayesian",
     model_path: Path | None = None,
     pipeline: str | None = None,
@@ -570,6 +571,7 @@ def scan_star(
         log: Optional :class:`ScanLog`; when provided the result is recorded.
         min_snr: Minimum BLS SNR threshold.
         max_peaks: Maximum signals to search for per star.
+        max_period_grid_points: Maximum BLS trial periods per peak.
         scorer: ``"bayesian"``, ``"xgboost"``, or ``"ensemble"``.
         model_path: XGBoost model JSON (required for xgboost/ensemble).
         pipeline: Optional MAST pipeline/author override.
@@ -601,6 +603,7 @@ def scan_star(
             mission,  # type: ignore[arg-type]
             min_snr=min_snr,
             max_peaks=max_peaks,
+            max_period_grid_points=max_period_grid_points,
             scorer=scorer,
             model_path=model_path,
             pipeline=pipeline,
@@ -655,6 +658,7 @@ def run_background_scan(
     mission: str = "TESS",
     min_snr: float = 5.0,
     max_peaks: int = 5,
+    max_period_grid_points: int | None = 20_000,
     scorer: str = "bayesian",
     model_path: Path | None = None,
     pipeline: str = "QLP",
@@ -680,6 +684,8 @@ def run_background_scan(
         mission: ``"TESS"``, ``"Kepler"``, or ``"K2"``.
         min_snr: Minimum BLS SNR threshold.
         max_peaks: Maximum signals per star.
+        max_period_grid_points: Maximum BLS trial periods per peak. Default
+            20,000 keeps long-baseline QLP scans bounded.
         scorer: Scoring model.
         model_path: XGBoost model path (for xgboost/ensemble scorer).
         pipeline: MAST pipeline/author to fetch. Default QLP favors FFI-based
@@ -744,6 +750,7 @@ def run_background_scan(
     print(
         f"Selected {len(targets)} candidate targets  "
         f"| pipeline={pipeline}  exptime={exptime}  "
+        f"| max_peaks={max_peaks}  period_grid≤{max_period_grid_points or 'auto'}  "
         f"| workers={worker_count}  request_delay={request_delay:.2f}s\n",
         flush=True,
     )
@@ -779,6 +786,7 @@ def run_background_scan(
             log=None,
             min_snr=min_snr,
             max_peaks=max_peaks,
+            max_period_grid_points=max_period_grid_points,
             scorer=scorer,
             model_path=model_path,
             pipeline=pipeline,
@@ -859,6 +867,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Minimum BLS SNR threshold (default: 5.0)")
     p.add_argument("--max-peaks", type=int, default=5,
                    help="Maximum signals per star (default: 5)")
+    p.add_argument("--max-period-grid-points", type=int, default=20_000,
+                   help="Maximum BLS trial periods per peak (default: 20000)")
     p.add_argument("--pipeline", default="QLP", choices=["SPOC", "QLP", "TGLC"],
                    help="MAST pipeline/author for TESS light curves (default: QLP)")
     p.add_argument("--exptime", default="long", choices=["long", "short", "fast"],
@@ -907,6 +917,7 @@ if __name__ == "__main__":
             log=_log,
             min_snr=args.min_snr,
             max_peaks=args.max_peaks,
+            max_period_grid_points=args.max_period_grid_points,
             scorer=args.scorer,
             model_path=_model_path,
             pipeline=args.pipeline,
@@ -933,6 +944,7 @@ if __name__ == "__main__":
         mission=args.mission,
         min_snr=args.min_snr,
         max_peaks=args.max_peaks,
+        max_period_grid_points=args.max_period_grid_points,
         scorer=args.scorer,
         model_path=_model_path,
         pipeline=args.pipeline,

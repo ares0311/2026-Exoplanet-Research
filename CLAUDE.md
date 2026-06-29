@@ -480,8 +480,8 @@ New `RawDiagnostics` fields: `oot_scatter_sigma`, `sector_depths`, `sector_depth
 
 ## CLI Version Flag and Meta Output (Milestone 12f)
 
-- `exo --version` / `exo -V` — prints the installed `exo-toolkit` package version (currently `0.2.4`)
-- `__version__ = "0.2.4"` in `src/exo_toolkit/__init__.py` is the importlib.metadata fallback for direct source-tree execution
+- `exo --version` / `exo -V` — prints the installed `exo-toolkit` package version (currently `0.2.5`)
+- `__version__ = "0.2.5"` in `src/exo_toolkit/__init__.py` is the importlib.metadata fallback for direct source-tree execution
 - Each output row gains a `"meta"` dict: `toolkit_version`, `run_at`, `scorer`, `git_commit`, `features_available`
 - `_git_commit_short()` reads `git rev-parse --short HEAD`; returns `None` on failure
 
