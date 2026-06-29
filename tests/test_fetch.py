@@ -77,6 +77,7 @@ def _make_collection_mock(
     stitched: MagicMock | None = None,
 ) -> MagicMock:
     coll = MagicMock()
+    coll.light_curves = lc_mocks
     coll.__iter__ = MagicMock(return_value=iter(lc_mocks))
     coll.stitch = MagicMock(return_value=stitched if stitched is not None else lc_mocks[0])
     return coll
@@ -85,7 +86,17 @@ def _make_collection_mock(
 def _make_search_mock(collection: MagicMock, n_results: int = 1) -> MagicMock:
     search = MagicMock()
     search.__len__ = MagicMock(return_value=n_results)
-    search.download_all = MagicMock(return_value=collection)
+    table = MagicMock()
+    table.__len__ = MagicMock(return_value=n_results)
+    table.__getitem__ = MagicMock(side_effect=lambda key: key)
+    search.table = table
+    search.download_all = MagicMock(
+        side_effect=AssertionError("download_all mutates process-global stdout")
+    )
+    search.download = MagicMock(
+        side_effect=AssertionError("download mutates process-global stdout")
+    )
+    search._download_one = MagicMock(side_effect=collection.light_curves)
     return search
 
 
@@ -94,6 +105,7 @@ def _wire(mock_lk: MagicMock, lc: MagicMock, n_results: int = 1) -> MagicMock:
     coll = _make_collection_mock([lc])
     search = _make_search_mock(coll, n_results)
     mock_lk.search_lightcurve.return_value = search
+    mock_lk.LightCurveCollection.return_value = coll
     return coll
 
 
@@ -364,14 +376,28 @@ class TestFetchLightcurve:
         _wire(mock_lk, lc)
         fetch_lightcurve("TIC 999", "TESS", prefer_pdcsap=True)
         search = mock_lk.search_lightcurve.return_value
-        assert search.download_all.call_args == call(flux_column="pdcsap_flux")
+        assert search.download_all.call_count == 0
+        assert search._download_one.call_args == call(
+            table=slice(0, 1, None),
+            quality_bitmask="default",
+            download_dir=None,
+            cutout_size=None,
+            flux_column="pdcsap_flux",
+        )
 
     def test_prefer_pdcsap_false_uses_sap(self, mock_lk: MagicMock) -> None:
         lc = _make_lc_mock()
         _wire(mock_lk, lc)
         fetch_lightcurve("TIC 999", "TESS", prefer_pdcsap=False)
         search = mock_lk.search_lightcurve.return_value
-        assert search.download_all.call_args == call(flux_column="sap_flux")
+        assert search.download_all.call_count == 0
+        assert search._download_one.call_args == call(
+            table=slice(0, 1, None),
+            quality_bitmask="default",
+            download_dir=None,
+            cutout_size=None,
+            flux_column="sap_flux",
+        )
 
     def test_corrupt_lightkurve_cache_file_is_removed_and_retried(
         self, mock_lk: MagicMock, tmp_path: Path
@@ -390,24 +416,38 @@ class TestFetchLightcurve:
         lc = _make_lc_mock(procver="QLP")
         collection = _make_collection_mock([lc])
         search = _make_search_mock(collection)
-        search.download_all.side_effect = [
+        search._download_one.side_effect = [
             RuntimeError(
                 "Error in reading Data product "
                 f"{corrupt} "
                 "of type QLP .\nThis file may be corrupt due to an "
                 "interrupted download. Please remove it from your disk and try again."
             ),
-            collection,
+            lc,
         ]
         mock_lk.search_lightcurve.return_value = search
+        mock_lk.LightCurveCollection.return_value = collection
 
         result = fetch_lightcurve("TIC 425884922", "TESS", pipeline="QLP")
 
         assert result.light_curve is collection.stitch.return_value
         assert not corrupt.exists()
-        assert search.download_all.call_args_list == [
-            call(flux_column="pdcsap_flux"),
-            call(flux_column="pdcsap_flux"),
+        assert search.download_all.call_count == 0
+        assert search._download_one.call_args_list == [
+            call(
+                table=slice(0, 1, None),
+                quality_bitmask="default",
+                download_dir=None,
+                cutout_size=None,
+                flux_column="pdcsap_flux",
+            ),
+            call(
+                table=slice(0, 1, None),
+                quality_bitmask="default",
+                download_dir=None,
+                cutout_size=None,
+                flux_column="pdcsap_flux",
+            ),
         ]
 
     def test_corrupt_cache_repair_ignores_non_lightkurve_paths(
@@ -492,6 +532,7 @@ class TestFetchLightcurve:
         coll = _make_collection_mock([lc1, lc2], stitched=stitched)
         search = _make_search_mock(coll, n_results=2)
         mock_lk.search_lightcurve.return_value = search
+        mock_lk.LightCurveCollection.return_value = coll
         result = fetch_lightcurve("TIC 999", "TESS")
         assert result.provenance.sectors_or_quarters == (1, 2)
 

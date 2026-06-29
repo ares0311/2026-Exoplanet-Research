@@ -84,7 +84,7 @@ When the user must take an action to unblock a gap:
 | Option A3 — `--mission JWST` wired into `exo` CLI | **MERGED** (PR #141, 2026-06-27) |
 | Option B1–B4 — TESS target restructuring | **MERGED** (PR #139, 2026-06-27) |
 | Live scanner startup/target-selection hardening | **MERGED** (PR #143, 2026-06-28) |
-| Option B5 — first 200-target discovery scan | **[HUMAN]** — rerun required with QLP after local Lightkurve cache repair (see First action below) |
+| Option B5 — first 200-target discovery scan | **[HUMAN]** — rerun required with QLP after local Lightkurve stdout-race fix (see First action below) |
 | K2 overlap corpus (`data/tess_k2_overlap_snippets.jsonl`) | **COMPLETE** — 2,086 snippets (2026-06-27) |
 
 **The only active CNN gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80), but CNN work is paused until the first real discovery scan is complete and reviewed.**
@@ -104,6 +104,7 @@ When the user must take an action to unblock a gap:
 - **K2 TAP `epic_id` column bug (2026-06-26, on-branch fix)** — third HTTP 400: `ORA-00904: 'EPIC_ID': invalid identifier`. Root cause: `epic_id` appears in `tap_schema.columns` as an ADQL view alias but the underlying Oracle column is `k2c_objid`. **NEVER use `epic_id` in a k2pandc query.** Fixed by adding `k2c_objid` as the primary candidate (before `epic_id`) in `_K2_COL_CANDIDATES`, with `epic_candname` as fallback (parsed from "EPIC 211311380.01" → 211311380). Also switched from `format=json` to `format=csv` + `urlencode` (spaces as `+`, which NASA TAP prefers). Schema discovery now logs ALL available columns to stderr for future debugging.
 - **C20 config committed (2026-06-22)** — `configs/cnn_tess_c20.json` (identical to C18, freeze_conv_epochs=10, checkpoint_dir=checkpoints/cnn_tess_c20).
 - **Project version bumped to 0.2.0** — `pyproject.toml` updated; "citizen-science" keyword removed; status updated to "4 - Beta".
+- **Project version bumped to 0.2.1** — patch release for the production-blocking QLP scanner fetch fix; this is a package version change only, not a `.venv` rename.
 
 ### Where things stand
 
@@ -129,6 +130,8 @@ When the user must take an action to unblock a gap:
 
 A second QLP attempt (`logs/discovery_run_002_qlp.json`) started on 2026-06-28 but also does **not** close T1-0: it recorded 3 errors, 0 clear scans, and 0 candidates. Root cause: interrupted prior QLP downloads left corrupt FITS files in the local Lightkurve MAST cache (`~/.lightkurve/cache/mastDownload/HLSP/...`), and the shared fetch path treated Lightkurve's "This file may be corrupt due to an interrupted download" error as a terminal scan error instead of deleting the named cache file and retrying. The next run must use a fresh log after the cache-repair fetch fix is merged.
 
+A third QLP attempt (`logs/discovery_run_003_qlp_cache_repair.json`) started on 2026-06-28 but also does **not** close T1-0: it recorded 1 error, 0 clear scans, and 0 candidates, then crashed with `ValueError: I/O operation on closed file` while printing progress. Root cause: Lightkurve's public `SearchResult.download()` and `download_all()` are decorated with `suppress_stdout`, which mutates process-global `sys.stdout`; that is unsafe while `star_scanner.py` runs worker-thread downloads and prints progress on the main thread. The next run must use a fresh log after the shared fetch path avoids those decorated methods.
+
 **PR #143 is merged (2026-06-28).** A live one-target smoke on `main` verified that the ExoFOP SSL loader, Python 3.14 helper imports, bounded TIC target selection, and no-light-curve `no_data` classification all work. Do not re-debug the old pasted failures from before PR #143.
 
 ```bash
@@ -140,14 +143,14 @@ caffeinate -dims .venv/bin/python Skills/star_scanner.py \
   --exptime long \
   --workers 4 \
   --request-delay 0.5 \
-  --log logs/discovery_run_003_qlp_cache_repair.json
-.venv/bin/python Skills/rank_candidates.py logs/discovery_run_003_qlp_cache_repair.json --top 20
-.venv/bin/python Skills/alert_filter.py logs/discovery_run_003_qlp_cache_repair.json \
+  --log logs/discovery_run_004_qlp_stdout_safe.json
+.venv/bin/python Skills/rank_candidates.py logs/discovery_run_004_qlp_stdout_safe.json --top 20
+.venv/bin/python Skills/alert_filter.py logs/discovery_run_004_qlp_stdout_safe.json \
   --fpp-max 0.15 \
-  --output logs/discovery_filtered_003_qlp_cache_repair.json
+  --output logs/discovery_filtered_004_qlp_stdout_safe.json
 ```
 
-If `alert_filter.py` exits with `No candidates matched the filters.`, that is an acceptable null triage result only if the QLP log contains real clear scans or candidates rather than another mostly no-data batch; keep the full `logs/discovery_run_003_qlp_cache_repair.json` for review. Do NOT proceed with CNN C20 training until the above scan is complete and has been reviewed for candidates. If zero candidates emerge after scanning ≥1,000 targets, that finding itself dictates the next priority.
+If `alert_filter.py` exits with `No candidates matched the filters.`, that is an acceptable null triage result only if the QLP log contains real clear scans or candidates rather than another mostly no-data batch; keep the full `logs/discovery_run_004_qlp_stdout_safe.json` for review. Do NOT proceed with CNN C20 training until the above scan is complete and has been reviewed for candidates. If zero candidates emerge after scanning ≥1,000 targets, that finding itself dictates the next priority.
 
 ### CNN production runbook
 
