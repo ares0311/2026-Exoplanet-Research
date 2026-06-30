@@ -318,6 +318,7 @@ def run_pipeline(
                 "instrumental_artifact": posterior.instrumental_artifact,
                 "known_object": posterior.known_object,
             },
+            "features": vet_result.features.model_dump(mode="json"),
             "scores": {
                 "false_positive_probability": scores.false_positive_probability,
                 "detection_confidence": scores.detection_confidence,

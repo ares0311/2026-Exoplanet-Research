@@ -367,6 +367,17 @@ class TestFetchLightcurve:
         result = fetch_lightcurve("TIC 999", "TESS")
         assert result.light_curve is coll.stitch.return_value
 
+    def test_stitch_does_not_apply_lightkurve_default_normalizer(
+        self, mock_lk: MagicMock
+    ) -> None:
+        """Regression: QLP products must be clipped before normalization."""
+        lc = _make_lc_mock(procver="QLP")
+        coll = _wire(mock_lk, lc)
+
+        fetch_lightcurve("TIC 999", "TESS", pipeline="QLP")
+
+        coll.stitch.assert_called_once_with(corrector_func=None)
+
     def test_provenance_target_id(self, mock_lk: MagicMock) -> None:
         lc = _make_lc_mock()
         _wire(mock_lk, lc)

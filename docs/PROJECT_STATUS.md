@@ -1,7 +1,7 @@
 # PROJECT STATUS
 
 ## Status: Active Development
-## Phase: Live Discovery Gate — run006 QLP candidate review
+## Phase: Live Discovery Gate — run008 targeted QLP false-positive review
 ## Last Updated: 2026-06-30
 
 ---
@@ -111,11 +111,21 @@ without relying on chat context or local terminal output.
 and 0 active targets. The filtered output contains two rows: TIC 201252011
 (period 227.39056281978395 d, FPP 0.1160636155807766) and TIC 257712351
 (period 142.95415231096942 d, FPP 0.12672985673564718).
+- Version 0.2.8 fixes two production-review blockers found during targeted
+follow-up: Lightkurve stitch no longer normalizes QLP products before project
+sigma-clipping, and `exo --output` now serializes computed vetting features for
+`Skills/false_positive_vetter.py`.
+- Run008 targeted follow-up reproduced both filtered candidates under the fixed
+path: `logs/discovery_run_008_targeted_qlp_stitch_safe.json` has 2
+`candidate_found` entries and active `{}`. SHA-256:
+`8626587c4fe59565132e078273763c7beac4a0a88597615f71e147a5134d1b0a`.
+Filtered output SHA-256:
+`574a4cf188faa9e273128496fcd23b27cb8369a3e9d2ad2c1b5bbaedd9effed4`.
 
-The next action is review, not rerun: inspect the two filtered candidates and
-the high candidate rate / period-boundary behavior before any external action.
-Version 0.2.6 rejects invalid BLS peaks and period-grid boundary peaks before
-they become candidate signals, so future evidence runs must use 0.2.6 or newer.
+The next action is false-positive review, not rerun: inspect the two targeted
+candidates and the missing diagnostics before any external action. Both best
+signals still fail `limb_darkening_plausibility_score=0.0`, and many
+centroid/contamination/odd-even/multi-sector diagnostics remain unavailable.
 
 ## Paused
 
@@ -163,10 +173,10 @@ they become candidate signals, so future evidence runs must use 0.2.6 or newer.
 
 ## Next Actions
 
-1. Review `logs/discovery_run_006_qlp_progress_safe.json`, ranked candidates, and `logs/discovery_filtered_006_qlp_progress_safe.json` as pre-0.2.6 evidence.
-2. Run targeted 0.2.6+ QLP follow-up scans for TIC 201252011 and TIC 257712351 with `Skills/star_scanner.py --target`, `--pipeline QLP`, `--exptime long`, `--max-period-grid-points 20000`, and a fresh log path.
-3. Generate candidate plots/report cards or equivalent diagnostic packets for TIC 201252011 and TIC 257712351 if they remain plausible after targeted follow-up.
-4. Investigate why run006 flagged 192/200 targets as candidates and why many detections hit the 0.5 d / 500 d period boundaries.
+1. Review `logs/discovery_run_008_targeted_qlp_stitch_safe.json`, ranked candidates, and `logs/discovery_filtered_008_targeted_qlp_stitch_safe.json` as the current targeted evidence.
+2. Use the regenerated `exo --output` rows and false-positive vetting reports for TIC 201252011 and TIC 257712351; both best signals remain review-blocked by missing diagnostics and failed limb-darkening plausibility.
+3. Add or run candidate-specific centroid, contamination, odd/even, and multi-sector diagnostics before any external action.
+4. Investigate why run006 flagged 192/200 targets as candidates and why many detections hit the 0.5 d / 500 d period boundaries before another blind scan.
 5. Do not run C20 CNN corpus assembly or training until the first discovery scan is reviewed.
 6. Promote nothing unless a future evaluator run reports `Flag: PASS`, raw test
    AUC is at least 0.85, calibrated test F1 is at least 0.80, calibrated

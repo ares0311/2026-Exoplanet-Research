@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "last_updated": "2026-06-29",
+  "last_updated": "2026-06-30",
   "production_gap": "T1-0: First Real Discovery Scan Evidence; T1-1: Production Tier 2 CNN Checkpoint paused",
   "policy": {
     "standard_operator_cadence": "git add .",
@@ -912,7 +912,7 @@
     {
       "path": "logs/discovery_run_006_qlp_progress_safe.json",
       "kind": "discovery_scan_log",
-      "status": "complete_review_needed",
+      "status": "complete_superseded_for_targeted_review",
       "git_policy": "ignored",
       "last_known": {
         "scan": "B5 first QLP discovery scan after scanner progress/quiet-download and bounded-BLS fixes",
@@ -934,16 +934,16 @@
         "period_boundary_candidates": 81,
         "sha256": "8ed084e39fcf1b1f7f0405208a413d4651641aba195305f3ca3b2b8bc3615dc8",
         "verified_on": "2026-06-29",
-        "scanner_version_note": "Run006 predates the durable review-metrics fix and the 0.2.6 BLS guard that rejects invalid and period-boundary peaks.",
-        "targeted_followup_command_shape": "caffeinate -i .venv/bin/python Skills/star_scanner.py --target <TIC_ID> --pipeline QLP --exptime long --max-period-grid-points 20000 --log logs/discovery_run_007_targeted_qlp_v026.json"
+        "scanner_version_note": "Run006 predates the version 0.2.8 stitch-normalization and feature-output fixes.",
+        "targeted_followup_result": "Run008 reproduced both filtered candidates under the fixed path."
       },
       "validation_gate": "Useful first QLP evidence, but not submission-ready: high candidate rate, 81 period-boundary detections, and one negative-duration error require 0.2.6+ follow-up review.",
-      "next_action": "Review the two filtered candidates as pre-0.2.6 evidence, then run targeted 0.2.6+ follow-up scans for TIC 201252011 and TIC 257712351 with Skills/star_scanner.py --target, QLP, long exptime, max-period-grid-points 20000, and a fresh log path."
+      "next_action": "Use as historical batch evidence only; current candidate-review evidence is run008."
     },
     {
       "path": "logs/discovery_filtered_006_qlp_progress_safe.json",
       "kind": "discovery_triage_output",
-      "status": "complete_review_needed",
+      "status": "complete_superseded_for_targeted_review",
       "git_policy": "ignored",
       "last_known": {
         "source": "logs/discovery_run_006_qlp_progress_safe.json",
@@ -966,8 +966,124 @@
         ],
         "verified_on": "2026-06-29"
       },
-      "validation_gate": "Use only as triage output; candidate escalation still requires human review and false-positive diagnostics.",
-      "next_action": "Review alongside the full run006 log as pre-0.2.6 evidence; no external contact or CNN work until false-positive diagnostics are documented."
+      "validation_gate": "Use only as historical triage output; candidate escalation still requires human review and false-positive diagnostics.",
+      "next_action": "Use as historical triage output only; current candidate-review evidence is run008."
+    },
+    {
+      "path": "logs/discovery_run_008_targeted_qlp_stitch_safe.json",
+      "kind": "discovery_scan_log",
+      "status": "complete_review_needed",
+      "git_policy": "ignored",
+      "last_known": {
+        "scan": "Targeted QLP follow-up after stitch-normalization fix",
+        "target_tic_ids": [201252011, 257712351],
+        "command_shape": "MPLCONFIGDIR=/tmp/exo-mpl-targeted caffeinate -i .venv/bin/python Skills/star_scanner.py --target <TIC_ID> --pipeline QLP --exptime long --max-period-grid-points 20000 --log logs/discovery_run_008_targeted_qlp_stitch_safe.json",
+        "completed": true,
+        "entries": 2,
+        "candidate_found": 2,
+        "active": 0,
+        "sha256": "8626587c4fe59565132e078273763c7beac4a0a88597615f71e147a5134d1b0a",
+        "verified_on": "2026-06-30",
+        "normalization_warning_removed": true,
+        "candidates": [
+          {
+            "tic_id": 201252011,
+            "period_days": 227.39056281978395,
+            "false_positive_probability": 0.11606180728511539,
+            "pathway": "planet_hunters_discussion"
+          },
+          {
+            "tic_id": 257712351,
+            "period_days": 142.95415231096942,
+            "false_positive_probability": 0.12672948535351847,
+            "pathway": "planet_hunters_discussion"
+          }
+        ]
+      },
+      "validation_gate": "Targeted candidates reproduced, but evidence is not submission-ready because false-positive diagnostics remain incomplete.",
+      "next_action": "Review false-positive diagnostics for both candidates; no external submission/contact and no CNN C20 work until missing diagnostics are addressed."
+    },
+    {
+      "path": "logs/discovery_filtered_008_targeted_qlp_stitch_safe.json",
+      "kind": "discovery_triage_output",
+      "status": "complete_review_needed",
+      "git_policy": "ignored",
+      "last_known": {
+        "source": "logs/discovery_run_008_targeted_qlp_stitch_safe.json",
+        "filter": "false_positive_probability <= 0.15",
+        "rows": 2,
+        "sha256": "574a4cf188faa9e273128496fcd23b27cb8369a3e9d2ad2c1b5bbaedd9effed4",
+        "verified_on": "2026-06-30",
+        "candidates": [
+          {
+            "tic_id": 201252011,
+            "period_days": 227.39056281978395,
+            "false_positive_probability": 0.11606180728511539,
+            "pathway": "planet_hunters_discussion"
+          },
+          {
+            "tic_id": 257712351,
+            "period_days": 142.95415231096942,
+            "false_positive_probability": 0.12672948535351847,
+            "pathway": "planet_hunters_discussion"
+          }
+        ]
+      },
+      "validation_gate": "Use only as targeted triage output; candidate escalation still requires human review and false-positive diagnostics.",
+      "next_action": "Review alongside regenerated exo --output rows and vetting reports; not submission-ready."
+    },
+    {
+      "path": "logs/candidate_201252011_qlp_v027.json",
+      "kind": "candidate_review_output",
+      "status": "complete_review_needed",
+      "git_policy": "ignored",
+      "last_known": {
+        "source": "exo --output for TIC 201252011 after feature serialization fix",
+        "sha256": "3ae7243524029df57ada6f421a7e329edeff5df9083309409dde2e0cdd7c89fc",
+        "verified_on": "2026-06-30",
+        "best_signal": "TIC_201252011_s04",
+        "period_days": 227.39056281978395,
+        "false_positive_probability": 0.11606180728511539,
+        "detection_confidence": 0.9226429746790031,
+        "features_non_null": 15,
+        "features_missing": 28,
+        "false_positive_vetter": {
+          "fail": 1,
+          "warn": 0,
+          "pass": 12,
+          "missing": 19,
+          "failed_diagnostic": "limb_darkening_plausibility_score=0.0"
+        }
+      },
+      "validation_gate": "Not submission-ready: many diagnostics are missing and limb-darkening plausibility fails.",
+      "next_action": "Add/run missing false-positive diagnostics, especially odd-even, secondary eclipse, centroid/contamination, and multi-sector checks."
+    },
+    {
+      "path": "logs/candidate_257712351_qlp_v027.json",
+      "kind": "candidate_review_output",
+      "status": "complete_review_needed",
+      "git_policy": "ignored",
+      "last_known": {
+        "source": "exo --output for TIC 257712351 after feature serialization fix",
+        "sha256": "af44d57fda05a33a6041c3c72fc501e68d845bbb5775c59af41ca95f4bdab648",
+        "verified_on": "2026-06-30",
+        "best_signal": "TIC_257712351_s02",
+        "period_days": 142.95415231096942,
+        "false_positive_probability": 0.12672948535351847,
+        "detection_confidence": 0.9212986039363349,
+        "features_non_null": 16,
+        "features_missing": 27,
+        "secondary_signal_note": "TIC_257712351_s03 has P=0.5304170113665563 d, FPP=0.7575883898962267, pathway=github_only_reproducibility.",
+        "false_positive_vetter": {
+          "fail": 1,
+          "warn": 0,
+          "pass": 13,
+          "missing": 18,
+          "failed_diagnostic": "limb_darkening_plausibility_score=0.0"
+        }
+      },
+      "validation_gate": "Not submission-ready: many diagnostics are missing and limb-darkening plausibility fails.",
+      "next_action": "Add/run missing false-positive diagnostics, especially odd-even, centroid/contamination, and multi-sector checks; do not escalate the 0.5304 d secondary signal."
     },
     {
       "path": "models/cnn*/",
