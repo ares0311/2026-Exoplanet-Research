@@ -1241,34 +1241,16 @@ fix the durable resume ledger before asking the human to run it again.
 - K2 TAP ORA-00904 fix (`Skills/fetch_tess_k2_overlap_snippets.py`) — **MERGED** (PR #134, 2026-06-27)
 - `exo <obsid> --mission JWST` CLI wiring (A3) — **MERGED** (PR #141, 2026-06-27): `Mission` literal extended; `fetch_lightcurve` dispatches to `_fetch_jwst`; 13 new tests
 - Option B1–B4 (TESS target restructuring) — **MERGED** (PR #139, 2026-06-27): CTOI exclusion, confirmed-host exclusion, tmag 12–14.5 default, period_max 500d
-- Option B5 — **[HUMAN]** Run first 200-target QLP discovery scan after the scanner progress/quiet-download fix (see Immediate Next Actions below). The 2026-06-28 SPOC-only attempt (`logs/discovery_run_001.json`) completed but did not close T1-0: 198 no-data rows, 2 transient remote-disconnect errors, 0 clear scans, 0 candidates. The first QLP attempt (`logs/discovery_run_002_qlp.json`) also did not close T1-0: 3 corrupt local Lightkurve cache errors, 0 clear scans, 0 candidates. The cache-repair QLP attempt (`logs/discovery_run_003_qlp_cache_repair.json`) also did not close T1-0: 1 error, 0 clear scans, 0 candidates, then `ValueError: I/O operation on closed file` from Lightkurve's process-global stdout mutation under threaded downloads. The stdout-safe QLP attempt (`logs/discovery_run_004_qlp_stdout_safe.json`) also did not close T1-0: 200 total entries, 0 candidates, 0 clear scans, 1 no-data row, 199 errors caused by requesting SPOC-style `pdcsap_flux` from valid QLP products that do not provide `PDCSAP_FLUX`. The flux-safe QLP attempt (`logs/discovery_run_005_qlp_flux_safe.json`) also did not close T1-0: no durable scan log existed before first completion and operator-visible progress was hidden by third-party download chatter. PR #150 is merged; use fresh `run006`.
+- Option B5 — **REVIEW NEEDED**. Run006 completed locally on 2026-06-29 after scanner progress/quiet-download and bounded-BLS fixes. `logs/discovery_run_006_qlp_progress_safe.json`: 200 entries, 192 `candidate_found`, 6 `scanned_clear`, 1 `no_data`, 1 `error`, active=0, runtime 46m35s, SHA-256 `8ed084e39fcf1b1f7f0405208a413d4651641aba195305f3ca3b2b8bc3615dc8`. `logs/discovery_filtered_006_qlp_progress_safe.json`: 2 candidates, SHA-256 `17630739c28bed296910512b86c63c77d952708cf84ab2fe6d8f55ae120a5fc9`. Next agent should review TIC 201252011 and TIC 257712351 and investigate the high candidate rate / period-boundary behavior before any external action or CNN work.
 
 **K2 corpus fetch status (as of 2026-06-27):** **COMPLETE** — 2,086 snippets written to `data/tess_k2_overlap_snippets.jsonl`; wrote=2086, skipped=174, terminal_failures=135, elapsed=2531s (42m11s). No further fetch action needed.
 
 **Live scanner fix (PR #143, 2026-06-28):** **MERGED** — live one-target smoke on `main` verified that ExoFOP SSL loading, Python 3.14 helper imports, bounded TIC target selection, and no-light-curve `no_data` classification work. Do not re-debug the pre-PR #143 pasted failures.
 
 **Immediate next actions (in priority order):**
-1. **[HUMAN]** Run the first real QLP discovery scan after scanner progress/quiet-download fix — highest priority item before any CNN work.
-   Option B1–B4 is now merged: the scanner automatically excludes TOI + CTOI + confirmed hosts and defaults to Tmag 12–14.5:
-   ```bash
-   git switch main
-   git pull --ff-only origin main
-   caffeinate -dims .venv/bin/python Skills/star_scanner.py \
-     --max-stars 200 \
-     --pipeline QLP \
-     --exptime long \
-     --workers 4 \
-     --request-delay 0.5 \
-     --log logs/discovery_run_006_qlp_progress_safe.json
-   .venv/bin/python Skills/rank_candidates.py logs/discovery_run_006_qlp_progress_safe.json --top 20
-   .venv/bin/python Skills/alert_filter.py logs/discovery_run_006_qlp_progress_safe.json \
-     --fpp-max 0.15 \
-     --output logs/discovery_filtered_006_qlp_progress_safe.json
-   ```
-   Run rank/filter only after the scanner exits normally. If the scan is stopped
-   or suspended, rerun the scanner from `main` before triage.
-2. **[AGENT]** CNN C20 training (only after step 1 above produces candidates): merge K2 overlap into C20 corpus, build `data/tess_c20_cnn_splits/`, train with `configs/cnn_tess_c18.json` (`freeze_conv_epochs=10`).
-3. ~~A3 JWST CLI wiring~~ — **COMPLETE** (PR #141).
+1. **[AGENT]** Review run006 output before any more data collection or CNN work. Start with the two filtered candidates: TIC 201252011 (period 227.39056281978395 d, FPP 0.1160636155807766) and TIC 257712351 (period 142.95415231096942 d, FPP 0.12672985673564718).
+2. **[AGENT]** Investigate run006 numerical quality: 192/200 targets were flagged as candidates and 81 detections hit the 0.5 d or 500 d period boundaries. Treat this as a search/model-quality review blocker, not as submission-ready discovery evidence.
+3. **[PAUSED]** CNN C20 training remains paused until run006 is reviewed and false-positive diagnostics are documented.
 
 #### CNN candidate history (what has been tried — do not repeat)
 

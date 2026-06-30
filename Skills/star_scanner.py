@@ -18,13 +18,13 @@ Usage
     .venv/bin/python Skills/star_scanner.py --target 150428135
 
     # Background scan (auto-resumes via log)
-    .venv/bin/python Skills/star_scanner.py --log data/scan_log.json --max-stars 1000
+    .venv/bin/python Skills/star_scanner.py --log logs/scan_log.json --max-stars 1000
 
     # Show scan log summary without scanning
-    .venv/bin/python Skills/star_scanner.py --summary --log data/scan_log.json
+    .venv/bin/python Skills/star_scanner.py --summary --log logs/scan_log.json
 
     # Narrow magnitude window; use ML scorer
-    .venv/bin/python Skills/star_scanner.py --log data/scan_log.json \\
+    .venv/bin/python Skills/star_scanner.py --log logs/scan_log.json \\
         --tmag-min 11 --tmag-max 13 \\
         --scorer xgboost --model-path data/model.json
 """
@@ -851,8 +851,8 @@ def _parse_args() -> argparse.Namespace:
         help="Print scan log summary and exit (no scanning)",
     )
     p.add_argument(
-        "--log", default="data/scan_log.json",
-        help="Path to scan log JSON (default: data/scan_log.json)",
+        "--log", default="logs/scan_log.json",
+        help="Path to scan log JSON (default: logs/scan_log.json)",
     )
     p.add_argument(
         "--max-stars", type=int, default=500,

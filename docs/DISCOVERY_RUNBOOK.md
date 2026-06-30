@@ -2,7 +2,7 @@
 
 **Purpose**: Prevent doom loops. Every agent and every session must read this before doing anything.
 
-**Last updated**: 2026-06-29 (Option A JWST integration and Option B TESS novelty restructure merged; PR #143 live scanner fix merged; PR #145 worker/ETA fix merged; SPOC-only B5 attempt, QLP corrupt-cache attempt, QLP stdout-race attempt, QLP wrong-flux-column attempt, and QLP no-progress/no-durable-log attempt did not close T1-0; QLP progress-safe rerun pending)
+**Last updated**: 2026-06-29 (Option A JWST integration and Option B TESS novelty restructure merged; PR #143 live scanner fix merged; PR #145 worker/ETA fix merged; SPOC-only B5 attempt, QLP corrupt-cache attempt, QLP stdout-race attempt, QLP wrong-flux-column attempt, and QLP no-progress/no-durable-log attempt did not close T1-0; run006 completed and now requires candidate/numerical-quality review)
 
 ---
 
@@ -238,43 +238,29 @@ The XGBoost model (`models/xgboost_koi.json`) is trained and available now.
 
 ---
 
-## The Immediate Next Action (As of 2026-06-27)
+## The Immediate Next Action (As of 2026-06-29)
 
-**First QLP discovery run after scanner progress/quiet-download fix** (higher priority than CNN training):
+**Review run006 candidate evidence** (higher priority than CNN training):
 
-```bash
-git switch main
-git pull --ff-only origin main
-caffeinate -dims .venv/bin/python Skills/star_scanner.py \
-  --max-stars 200 \
-  --tmag-min 12.0 \
-  --tmag-max 14.5 \
-  --pipeline QLP \
-  --exptime long \
-  --max-period-grid-points 20000 \
-  --workers 4 \
-  --request-delay 0.5 \
-  --log logs/discovery_run_006_qlp_progress_safe.json
-.venv/bin/python Skills/rank_candidates.py logs/discovery_run_006_qlp_progress_safe.json --top 20
-.venv/bin/python Skills/alert_filter.py logs/discovery_run_006_qlp_progress_safe.json \
-  --fpp-max 0.15 \
-  --output logs/discovery_filtered_006_qlp_progress_safe.json
-```
+The first real QLP discovery scan completed locally as
+`logs/discovery_run_006_qlp_progress_safe.json`. It produced 200 entries:
+192 `candidate_found`, 6 `scanned_clear`, 1 `no_data`, 1 `error`, and
+0 active targets. Filtering with `--fpp-max 0.15` produced
+`logs/discovery_filtered_006_qlp_progress_safe.json` with two rows:
 
-Run the rank/filter commands only after the scanner exits normally and prints
-its completion summary. If the scanner is stopped or suspended with Ctrl-C or
-Ctrl-Z, rerun the scanner from `main` before triage; terminal scrollback is not
-a durable completed scan log.
+| TIC | Period (d) | FPP | Pathway |
+|---|---:|---:|---|
+| TIC 201252011 | 227.39056281978395 | 0.1160636155807766 | `planet_hunters_discussion` |
+| TIC 257712351 | 142.95415231096942 | 0.12672985673564718 | `planet_hunters_discussion` |
 
-This will take approximately 2–4 hours on a Mac M4 Max. Use `caffeinate -dims`.
+Before any external action, review the filtered candidates and the full scan
+log. The run is useful evidence, but not submission-ready: 192/200 targets were
+flagged as candidates and 81 detections landed at the 0.5 d or 500 d period
+boundaries, so the next work is candidate/numerical-quality review and
+false-positive diagnostics.
 
-If `alert_filter.py` reports `No candidates matched the filters.`, keep the full
-`logs/discovery_run_006_qlp_progress_safe.json`; a null 200-target batch is useful evidence only
-if the log shows real scanned-clear targets or candidates, not another mostly
-no-data/error batch.
 Do not build the C20 CNN corpus or train C20 until this discovery run has been
-reviewed. If zero candidates emerge after at least 1,000 TIC targets, the null
-result dictates the next production priority.
+reviewed. Do not submit or contact externally without explicit human approval.
 
 ---
 
