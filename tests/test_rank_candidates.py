@@ -165,6 +165,14 @@ def _scan_entry(
         "best_period_days": best_period_days,
         "best_fpp": best_fpp,
         "best_pathway": best_pathway,
+        "best_snr": 11.0,
+        "best_detection_confidence": 0.75,
+        "best_novelty_score": 0.65,
+        "best_depth_ppm": 1200.0,
+        "best_duration_hours": 2.5,
+        "best_transit_count": 4,
+        "provenance_score": 0.85,
+        "signals": [{"candidate_id": f"TIC_{tic_id}_s01"}],
         "priority_score": 0.7,
         "error_message": None,
     }
@@ -202,6 +210,18 @@ class TestScanLogToRows:
         log = _scan_log([_scan_entry(best_period_days=12.3)])
         rows = _scan_log_to_rows(log)
         assert rows[0]["period_days"] == 12.3
+
+    def test_review_metrics_mapped(self) -> None:
+        log = _scan_log([_scan_entry(tic_id=123)])
+        rows = _scan_log_to_rows(log)
+        assert rows[0]["snr"] == pytest.approx(11.0)
+        assert rows[0]["provenance_score"] == pytest.approx(0.85)
+        assert rows[0]["depth_ppm"] == pytest.approx(1200.0)
+        assert rows[0]["duration_hours"] == pytest.approx(2.5)
+        assert rows[0]["transit_count"] == 4
+        assert rows[0]["scores"]["detection_confidence"] == pytest.approx(0.75)
+        assert rows[0]["scores"]["novelty_score"] == pytest.approx(0.65)
+        assert rows[0]["signals"] == [{"candidate_id": "TIC_123_s01"}]
 
     def test_target_id_and_candidate_id_set(self) -> None:
         log = _scan_log([_scan_entry(tic_id=99999)])

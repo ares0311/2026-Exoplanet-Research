@@ -249,6 +249,14 @@ class ScanLog:
               "best_period_days": float | null,
               "best_fpp": float | null,
               "best_pathway": str | null,
+              "best_snr": float | null,
+              "best_detection_confidence": float | null,
+              "best_novelty_score": float | null,
+              "best_depth_ppm": float | null,
+              "best_duration_hours": float | null,
+              "best_transit_count": int | null,
+              "provenance_score": float | null,
+              "signals": list[dict],
               "priority_score": float | null,
               "pipeline": str | null,
               "exptime": str | null,
@@ -314,6 +322,14 @@ class ScanLog:
                 "best_period_days": result.get("best_period_days"),
                 "best_fpp": result.get("best_fpp"),
                 "best_pathway": result.get("best_pathway"),
+                "best_snr": result.get("best_snr"),
+                "best_detection_confidence": result.get("best_detection_confidence"),
+                "best_novelty_score": result.get("best_novelty_score"),
+                "best_depth_ppm": result.get("best_depth_ppm"),
+                "best_duration_hours": result.get("best_duration_hours"),
+                "best_transit_count": result.get("best_transit_count"),
+                "provenance_score": result.get("provenance_score"),
+                "signals": result.get("signals", []),
                 "priority_score": result.get("priority_score"),
                 "pipeline": result.get("pipeline"),
                 "exptime": result.get("exptime"),
@@ -591,6 +607,14 @@ def scan_star(
         "best_period_days": None,
         "best_fpp": None,
         "best_pathway": None,
+        "best_snr": None,
+        "best_detection_confidence": None,
+        "best_novelty_score": None,
+        "best_depth_ppm": None,
+        "best_duration_hours": None,
+        "best_transit_count": None,
+        "provenance_score": None,
+        "signals": [],
         "priority_score": priority,
         "pipeline": pipeline,
         "exptime": exptime,
@@ -623,13 +647,40 @@ def scan_star(
         result["status"] = "candidate_found"
         result["n_signals"] = len(rows)
         best = min(rows, key=lambda r: r["scores"]["false_positive_probability"])
+        result["signals"] = [_summarize_signal_row(row) for row in rows]
         result["best_period_days"] = best["period_days"]
         result["best_fpp"] = best["scores"]["false_positive_probability"]
         result["best_pathway"] = best["pathway"]
+        result["best_snr"] = best.get("snr")
+        result["best_detection_confidence"] = best.get("scores", {}).get("detection_confidence")
+        result["best_novelty_score"] = best.get("scores", {}).get("novelty_score")
+        result["best_depth_ppm"] = best.get("depth_ppm")
+        result["best_duration_hours"] = best.get("duration_hours")
+        result["best_transit_count"] = best.get("transit_count")
+        result["provenance_score"] = best.get("provenance_score")
 
     if log is not None:
         log.record(tic_id, result["status"], result)
     return result
+
+
+def _summarize_signal_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Return the durable, review-relevant subset of a pipeline output row."""
+    scores = row.get("scores", {})
+    return {
+        "candidate_id": row.get("candidate_id"),
+        "period_days": row.get("period_days"),
+        "epoch_bjd": row.get("epoch_bjd"),
+        "duration_hours": row.get("duration_hours"),
+        "depth_ppm": row.get("depth_ppm"),
+        "transit_count": row.get("transit_count"),
+        "snr": row.get("snr"),
+        "false_positive_probability": scores.get("false_positive_probability"),
+        "detection_confidence": scores.get("detection_confidence"),
+        "novelty_score": scores.get("novelty_score"),
+        "provenance_score": row.get("provenance_score"),
+        "pathway": row.get("pathway"),
+    }
 
 
 def _is_no_data_error(message: str) -> bool:

@@ -74,7 +74,7 @@ When the user must take an action to unblock a gap:
 
 **Research brief wired (2026-06-27):** `docs/exoplanet_detection_research_brief.md` is now required reading. Key takeaways: TESS > Kepler/K2 > JWST in discovery priority order; CNN architecture baseline is Shallue & Vanderburg (2018); PLATO launches end-2026 (pipeline should handle long-baseline photometry); GP for correlated noise; citizen submissions require full transit + false-positive diagnostic table.
 
-**Active work: Option B5 [HUMAN] discovery scan.** JWST integration A1-A3, K2 TAP fixes, and TESS target restructuring B1-B4 are merged.
+**Active work: Option B5 run006 review.** JWST integration A1-A3, K2 TAP fixes, and TESS target restructuring B1-B4 are merged. The first QLP scan completed locally and is blocked on candidate/numerical-quality review.
 
 | Item | State |
 |---|---|

@@ -51,6 +51,7 @@ def _make_pipeline_row(
         "transit_count": 4,
         "snr": 15.0,
         "scorer": "bayesian",
+        "provenance_score": 0.82,
         "posterior": {"planet_candidate": 1.0 - fpp, "eclipsing_binary": 0.0,
                       "background_eclipsing_binary": 0.0, "stellar_variability": 0.0,
                       "instrumental_artifact": 0.0, "known_object": 0.0},
@@ -223,6 +224,14 @@ class TestScanLog:
             "best_period_days": 37.4,
             "best_fpp": 0.08,
             "best_pathway": "tfop_ready",
+            "best_snr": 12.5,
+            "best_detection_confidence": 0.8,
+            "best_novelty_score": 0.7,
+            "best_depth_ppm": 900.0,
+            "best_duration_hours": 2.5,
+            "best_transit_count": 3,
+            "provenance_score": 0.6,
+            "signals": [{"candidate_id": "TIC_555_s01"}],
             "priority_score": 0.9,
         })
         with (tmp_path / "log.json").open() as fh:
@@ -231,6 +240,14 @@ class TestScanLog:
         assert entry["n_signals"] == 2
         assert entry["best_period_days"] == pytest.approx(37.4)
         assert entry["best_pathway"] == "tfop_ready"
+        assert entry["best_snr"] == pytest.approx(12.5)
+        assert entry["best_detection_confidence"] == pytest.approx(0.8)
+        assert entry["best_novelty_score"] == pytest.approx(0.7)
+        assert entry["best_depth_ppm"] == pytest.approx(900.0)
+        assert entry["best_duration_hours"] == pytest.approx(2.5)
+        assert entry["best_transit_count"] == 3
+        assert entry["provenance_score"] == pytest.approx(0.6)
+        assert entry["signals"] == [{"candidate_id": "TIC_555_s01"}]
 
 
 # ---------------------------------------------------------------------------
@@ -316,6 +333,14 @@ class TestScanStar:
         assert result["status"] == "candidate_found"
         assert result["n_signals"] == 1
         assert result["best_fpp"] == pytest.approx(0.10)
+        assert result["best_snr"] == pytest.approx(15.0)
+        assert result["best_detection_confidence"] == pytest.approx(0.9)
+        assert result["best_novelty_score"] == pytest.approx(0.95)
+        assert result["best_depth_ppm"] == pytest.approx(1000.0)
+        assert result["best_duration_hours"] == pytest.approx(2.0)
+        assert result["best_transit_count"] == 4
+        assert result["provenance_score"] == pytest.approx(0.82)
+        assert result["signals"][0]["snr"] == pytest.approx(15.0)
 
     def test_scanned_clear_when_no_signals(self, tmp_path: Path) -> None:
         with patch("Skills.star_scanner.run_pipeline") as mock_pipe:

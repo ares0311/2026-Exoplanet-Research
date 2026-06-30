@@ -135,6 +135,14 @@ class TestApplyFilters:
                             "best_fpp": 0.10,
                             "best_pathway": "planet_hunters_discussion",
                             "best_period_days": 12.34,
+                            "best_snr": 9.5,
+                            "best_detection_confidence": 0.72,
+                            "best_novelty_score": 0.61,
+                            "best_depth_ppm": 800.0,
+                            "best_duration_hours": 1.9,
+                            "best_transit_count": 5,
+                            "provenance_score": 0.88,
+                            "signals": [{"candidate_id": "TIC_1001_s01"}],
                             "priority_score": 0.77,
                             "scanned_at": "2026-06-27T10:01:00Z",
                         },
@@ -162,6 +170,10 @@ class TestApplyFilters:
         assert result[0]["tic_id"] == 1001
         assert result[0]["false_positive_probability"] == pytest.approx(0.10)
         assert result[0]["period_days"] == pytest.approx(12.34)
+        assert result[0]["snr"] == pytest.approx(9.5)
+        assert result[0]["provenance_score"] == pytest.approx(0.88)
+        assert result[0]["scores"]["detection_confidence"] == pytest.approx(0.72)
+        assert result[0]["signals"] == [{"candidate_id": "TIC_1001_s01"}]
 
     def test_writes_filtered_star_scanner_scan_log(self, tmp_path: Path) -> None:
         f = tmp_path / "discovery_run.json"

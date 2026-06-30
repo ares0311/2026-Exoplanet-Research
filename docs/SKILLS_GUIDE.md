@@ -9,261 +9,16 @@ Run any script with `--help` to see its full CLI options.
 
 ## Current inventory
 
-The repository currently has 415 standalone Skills. The quick reference below
-highlights many established workflow entry points, but it is not exhaustive.
-For the exact current script surface, run `find Skills -maxdepth 1 -name '*.py'`.
+The repository currently has 98 Python Skill files. The exact script surface
+changes over time; do not copy a stale pasted inventory. Use this command for
+the authoritative local list:
 
-```text
-active_learning_scorer.py
-airmass_calculator.py
-alert_filter.py
-alert_webhook.py
-aperture_optimization_scorer.py
-archive_lookup.py
-astroimagej_region_writer.py
-atmospheric_scale_height_calculator.py
-autocorrelation_period_finder.py
-background_source_probability.py
-barycentric_time_corrector.py
-batch_email_formatter.py
-batch_scan.py
-binned_lc_exporter.py
-bootstrap_uncertainty.py
-build_cnn_training_data.py
-build_combined_training_data.py
-build_tess_training_data.py
-build_training_data.py
-bulk_priority_update.py
-cadence_irregularity_scorer.py
-calibration_curve_reporter.py
-candidate_annotation_exporter.py
-candidate_api.py
-candidate_browser_ui.py
-candidate_changelog_tracker.py
-candidate_csv_importer.py
-candidate_dashboard_export.py
-candidate_database.py
-candidate_deduplicator.py
-candidate_evidence_aggregator.py
-candidate_flag_summary.py
-candidate_followup_prioritizer.py
-candidate_html_export.py
-candidate_merger.py
-candidate_notes.py
-candidate_report_card.py
-candidate_score_explainer.py
-candidate_similarity_scorer.py
-candidate_submission_formatter.py
-candidate_summary_card.py
-candidate_timeline.py
-catalog_crossmatch.py
-centroid_analyzer.py
-centroid_offset_mapper.py
-chi_square_period_checker.py
-cnn_calibrator.py
-cnn_checkpoint_manager.py
-cnn_feature_augmenter.py
-cnn_inference_batcher.py
-cnn_model_config.py
-cnn_split_validator.py
-cnn_training_config.py
-compare_candidates.py
-config_diff_tool.py
-config_manager.py
-confusion_matrix_reporter.py
-contact_time_calculator.py
-correlated_noise_estimator.py
-count_tess_labels.py
-crowding_metric_calculator.py
-data_gap_interpolator.py
-data_quality_checker.py
-depth_period_correlation_scorer.py
-depth_snr_per_sector.py
-detection_efficiency_map.py
-detrending_comparator.py
-dilution_factor_calculator.py
-disposition_recorder.py
-duplicate_toi_detector.py
-eb_classifier.py
-ensemble_weight_optimizer.py
-ephemeris_converter.py
-ephemeris_drift_projector.py
-ephemeris_predictor.py
-ephemeris_uncertainty_growth.py
-epoch_folding_optimizer.py
-equilibrium_temperature_calculator.py
-evaluate_scorer.py
-exclusion_zone_calculator.py
-expected_depth_calculator.py
-export_candidates.py
-false_alarm_probability_estimator.py
-false_negative_rate_estimator.py
-false_positive_score_aggregator.py
-false_positive_vetter.py
-feature_importance_ranker.py
-fetch_exofop_ctoi.py
-fetch_kepler_tce.py
-fetch_nea_koi_lc_index.py
-fetch_tess_toi.py
-fits_header_extractor.py
-fits_keyword_mapper.py
-fits_lightcurve_exporter.py
-flux_contamination_corrector.py
-flux_periodogram.py
-flux_ratio_calculator.py
-flux_trend_detector.py
-folded_residual_analyzer.py
-folded_transit_stack.py
-follow_up_scheduler.py
-geometric_transit_probability.py
-ground_truth_matcher.py
-harmonic_period_analyzer.py
-impact_parameter_refiner.py
-injection_recovery.py
-json_to_csv_exporter.py
-keplerian_fit.py
-kopparapu_hz_calculator.py
-label_coverage_reporter.py
-label_quality_controller.py
-labelled_lc_collector.py
-lc_quality_bitmask_parser.py
-lc_snippet_batch_builder.py
-lc_statistics.py
-leaderboard_generator.py
-lightcurve_cache.py
-limb_darkening_calculator.py
-model_performance_comparator.py
-model_registry.py
-momentum_dump_flagger.py
-moon_separation_checker.py
-multi_aperture_comparator.py
-multi_band_depth_comparator.py
-multi_epoch_fitter.py
-multi_night_photometry_combiner.py
-multi_observatory_coordinator.py
-multi_planet_checker.py
-multi_planet_period_checker.py
-multi_run_diff_reporter.py
-multi_sector_phase_compare.py
-multi_sector_stacker.py
-multi_source_label_assembler.py
-multi_target_report.py
-nearby_star_checker.py
-noise_model_fitter.py
-notebook_generator.py
-obs_request_formatter.py
-observation_efficiency_calculator.py
-observation_log_parser.py
-observation_window_merger.py
-odd_even_analyzer.py
-oot_rms_tracker.py
-parameter_sweep_runner.py
-period_alias_checker.py
-period_commensurability_checker.py
-period_doubling_checker.py
-period_grid_search.py
-period_recovery_validator.py
-period_refinement_calculator.py
-phase_bin_snr.py
-phase_coverage_checker.py
-phase_fold_quality_checker.py
-phase_plot_generator.py
-photometric_binary_checker.py
-photon_noise_estimator.py
-pipeline_benchmark.py
-pipeline_dependency_checker.py
-pipeline_run_diff.py
-pixel_level_centroid_checker.py
-planet_habitability_scorer.py
-planet_mass_estimator.py
-planet_occurrence_weight.py
-planet_radius_estimator.py
-planet_radius_gap_classifier.py
-plot_lc.py
-polynomial_detrend.py
-pr_auc_calculator.py
-prediction_batch_exporter.py
-rank_candidates.py
-recovery_completeness_map.py
-rms_timescale_profiler.py
-roc_auc_calculator.py
-rolling_bls_periodogram.py
-run_summary_exporter.py
-rv_detectability_checker.py
-rv_phase_sampler.py
-rv_semiamplitude_estimator.py
-saturation_level_checker.py
-scatter_metric_calculator.py
-seasonal_visibility_planner.py
-secondary_eclipse_mapper.py
-sector_baseline_normalizer.py
-sector_completion_tracker.py
-sector_coverage.py
-sector_gap_finder.py
-signal_comparison_reporter.py
-signal_persistence_checker.py
-signal_statistics.py
-significance_threshold_calculator.py
-snippet_batch_progress.py
-snippet_normalizer.py
-snippet_quality_scorer.py
-snr_estimator.py
-snr_sector_stacker.py
-snr_vs_period_plotter.py
-spectral_type_classifier.py
-star_scanner.py
-stellar_activity_filter.py
-stellar_activity_index.py
-stellar_age_gyrochronology.py
-stellar_contamination_scorer.py
-stellar_density_calculator.py
-stellar_flare_detector.py
-stellar_luminosity_calculator.py
-stellar_params_fetcher.py
-stellar_rotation.py
-stellar_surface_gravity_estimator.py
-stratified_dataset_splitter.py
-summary_report.py
-target_coordinates_converter.py
-target_crowding_estimator.py
-target_metadata_fetcher.py
-target_prioritizer.py
-tce_comparison_report.py
-tce_reliability_scorer.py
-telescope_time_estimator.py
-tess_sector_map.py
-tess_visibility_checker.py
-tess_year_planner.py
-toi_checker.py
-toi_disposition_tracker.py
-toi_watcher.py
-train_cnn.py
-train_xgboost.py
-training_curve_logger.py
-training_data_monitor.py
-transit_asymmetry_scorer.py
-transit_count_estimator.py
-transit_depth_corrector.py
-transit_duration_anomaly_checker.py
-transit_duration_calculator.py
-transit_geometry_calculator.py
-transit_ingress_timer.py
-transit_model_residual_tester.py
-transit_modeler.py
-transit_overlap_detector.py
-transit_survey_planner.py
-transit_timing_fitter.py
-transit_window_extractor.py
-transmission_window_predictor.py
-trapezoid_box_comparator.py
-tsm_calculator.py
-ttv_significance_tester.py
-vetting_boolean_adapter.py
-vetting_scorecard.py
-votable_formatter.py
-watchlist.py
-window_function_analyzer.py
+```bash
+rg --files Skills -g '*.py' | sort
 ```
+
+The quick reference below is intentionally workflow-oriented and lists only
+verified entry points used by current production docs.
 
 ---
 
@@ -341,7 +96,7 @@ star_scanner → batch_scan → alert_filter → rank_candidates → watchlist
 
 ```bash
 # targets.txt — one TIC ID per line (or CSV with a "tic_id" column)
-python Skills/batch_scan.py targets.txt \
+.venv/bin/python Skills/batch_scan.py targets.txt \
     --output results.json \
     --resume                     # skip already-done entries on re-run
 ```
@@ -349,7 +104,7 @@ python Skills/batch_scan.py targets.txt \
 ### 3. Check TOI status before investing pipeline time
 
 ```bash
-python Skills/toi_checker.py 150428135
+.venv/bin/python Skills/toi_checker.py 150428135
 # Not found in ExoFOP TOI list. TIC 150428135    (unknown target)
 # — or —
 # TOI 700.01  |  TIC 150428135  |  CP  P = 37.4237 d
@@ -359,7 +114,7 @@ python Skills/toi_checker.py 150428135
 
 ```bash
 # Keep only tfop_ready candidates with FPP < 0.20 and ≥ 2 signals
-python Skills/alert_filter.py results.json \
+.venv/bin/python Skills/alert_filter.py results.json \
     --fpp-max 0.20 \
     --pathway tfop_ready \
     --min-signals 2 \
@@ -370,31 +125,31 @@ python Skills/alert_filter.py results.json \
 
 ```bash
 # Sort by composite rank score
-python Skills/rank_candidates.py filtered.json --top 10
+.venv/bin/python Skills/rank_candidates.py filtered.json --top 10
 
 # Export to CSV and Markdown
-python Skills/export_candidates.py filtered.json \
+.venv/bin/python Skills/export_candidates.py filtered.json \
     --csv out/candidates.csv \
     --markdown out/candidates.md \
     --stats
 
 # Generate Markdown summary report
-python Skills/summary_report.py results.json --output reports/summary.md
+.venv/bin/python Skills/summary_report.py results.json --output reports/summary.md
 ```
 
 ### 6. Manage follow-up watchlist
 
 ```bash
 # Add promising targets
-python Skills/watchlist.py add 150428135 --note "K-dwarf, 2 signals"
-python Skills/watchlist.py add 261136679
+.venv/bin/python Skills/watchlist.py add 150428135 --note "K-dwarf, 2 signals"
+.venv/bin/python Skills/watchlist.py add 261136679
 
 # List watchlist
-python Skills/watchlist.py list
+.venv/bin/python Skills/watchlist.py list
 
 # Feed watchlist directly into batch_scan (IDs one per line)
-python Skills/watchlist.py list | grep "^TIC" | awk '{print $2}' > wl.txt
-python Skills/batch_scan.py wl.txt --output wl_results.json
+.venv/bin/python Skills/watchlist.py list | grep "^TIC" | awk '{print $2}' > wl.txt
+.venv/bin/python Skills/batch_scan.py wl.txt --output wl_results.json
 ```
 
 ---
@@ -403,7 +158,7 @@ python Skills/batch_scan.py wl.txt --output wl_results.json
 
 ```bash
 # Phase-folded PNG for all candidates in a JSON file (requires matplotlib)
-python Skills/plot_lc.py results.json --output-dir plots/
+.venv/bin/python Skills/plot_lc.py results.json --output-dir plots/
 ```
 
 The `phase_fold(time, flux, period, epoch)` function is also importable
@@ -424,8 +179,8 @@ Before downloading light curves for a list of targets, check which sectors
 are available:
 
 ```bash
-python Skills/sector_coverage.py TIC 150428135
-python Skills/sector_coverage.py TIC 150428135 --pipeline QLP --json
+.venv/bin/python Skills/sector_coverage.py TIC 150428135
+.venv/bin/python Skills/sector_coverage.py TIC 150428135 --pipeline QLP --json
 ```
 
 ---
@@ -434,28 +189,28 @@ python Skills/sector_coverage.py TIC 150428135 --pipeline QLP --json
 
 ```bash
 # 1. Download labels
-python Skills/fetch_kepler_tce.py --output data/koi_table.csv
-python Skills/fetch_tess_toi.py   --output data/tess_toi.csv
+.venv/bin/python Skills/fetch_kepler_tce.py --output data/koi_table.csv
+.venv/bin/python Skills/fetch_tess_toi.py   --output data/tess_toi.csv
 
 # 2. Build feature pickles
-python Skills/build_training_data.py \
+.venv/bin/python Skills/build_training_data.py \
     --input data/koi_table.csv --output data/kepler_features.pkl
-python Skills/build_tess_training_data.py \
+.venv/bin/python Skills/build_tess_training_data.py \
     --input data/tess_toi.csv --output data/tess_features.pkl
 
 # 3. Merge
-python Skills/build_combined_training_data.py \
+.venv/bin/python Skills/build_combined_training_data.py \
     --kepler data/kepler_features.pkl \
     --tess   data/tess_features.pkl \
     --output data/combined_features.pkl
 
 # 4. Train
-python Skills/train_xgboost.py \
+.venv/bin/python Skills/train_xgboost.py \
     --input data/combined_features.pkl \
     --output data/model.json
 
 # 5. Evaluate
-python Skills/evaluate_scorer.py \
+.venv/bin/python Skills/evaluate_scorer.py \
     --input data/combined_features.pkl \
     --model data/model.json \
     --roc plots/roc.png
@@ -466,7 +221,7 @@ python Skills/evaluate_scorer.py \
 ## Injection-recovery completeness
 
 ```bash
-python Skills/injection_recovery.py \
+.venv/bin/python Skills/injection_recovery.py \
     --target "TIC 150428135" \
     --n-injections 200 \
     --output data/recovery.json
@@ -512,7 +267,7 @@ git pull origin main
 Generate a ready-to-run Jupyter notebook for any TIC target:
 
 ```bash
-python Skills/notebook_generator.py 150428135 \
+.venv/bin/python Skills/notebook_generator.py 150428135 \
     --mission TESS \
     --stellar-radius 0.42 \
     --stellar-mass 0.40 \
@@ -529,7 +284,7 @@ Rank a list of TIC IDs before committing pipeline time:
 
 ```bash
 # targets.txt — one TIC ID per line
-python Skills/target_prioritizer.py targets.txt \
+.venv/bin/python Skills/target_prioritizer.py targets.txt \
     --min-priority 0.40 \
     --skip-tois \
     --output priority.json
@@ -545,7 +300,7 @@ target as `scan`, `skip_toi`, or `skip_low_priority`.
 Compare results from different pipeline configurations or batch runs:
 
 ```bash
-python Skills/compare_candidates.py \
+.venv/bin/python Skills/compare_candidates.py \
     results_bayesian.json results_xgboost.json \
     --sort-by rank_score \
     --output reports/comparison.md
