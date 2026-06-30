@@ -84,7 +84,7 @@ When the user must take an action to unblock a gap:
 | Option A3 — `--mission JWST` wired into `exo` CLI | **MERGED** (PR #141, 2026-06-27) |
 | Option B1–B4 — TESS target restructuring | **MERGED** (PR #139, 2026-06-27) |
 | Live scanner startup/target-selection hardening | **MERGED** (PR #143, 2026-06-28) |
-| Option B5 — first 200-target discovery scan | **[HUMAN]** — rerun required with QLP after local Lightkurve stdout-race fix (see First action below) |
+| Option B5 — first 200-target discovery scan | **REVIEW NEEDED** — run006 completed locally on 2026-06-29; review candidates/numerical quality before any external action |
 | K2 overlap corpus (`data/tess_k2_overlap_snippets.jsonl`) | **COMPLETE** — 2,086 snippets (2026-06-27) |
 
 **The only active CNN gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80), but CNN work is paused until the first real discovery scan is complete and reviewed.**
@@ -142,29 +142,16 @@ A fifth QLP attempt (`logs/discovery_run_005_qlp_flux_safe.json`) started after 
 
 **PR #143 is merged (2026-06-28).** A live one-target smoke on `main` verified that the ExoFOP SSL loader, Python 3.14 helper imports, bounded TIC target selection, and no-light-curve `no_data` classification all work. Do not re-debug the old pasted failures from before PR #143.
 
-```bash
-git switch main
-git pull --ff-only origin main
-caffeinate -dims .venv/bin/python Skills/star_scanner.py \
-  --max-stars 200 \
-  --pipeline QLP \
-  --exptime long \
-  --max-period-grid-points 20000 \
-  --workers 4 \
-  --request-delay 0.5 \
-  --log logs/discovery_run_006_qlp_progress_safe.json
-.venv/bin/python Skills/rank_candidates.py logs/discovery_run_006_qlp_progress_safe.json --top 20
-.venv/bin/python Skills/alert_filter.py logs/discovery_run_006_qlp_progress_safe.json \
-  --fpp-max 0.15 \
-  --output logs/discovery_filtered_006_qlp_progress_safe.json
-```
+**Run006 completed locally on 2026-06-29.** `logs/discovery_run_006_qlp_progress_safe.json` has 200 entries: 192 `candidate_found`, 6 `scanned_clear`, 1 `no_data`, 1 `error`, and 0 active targets. SHA-256: `8ed084e39fcf1b1f7f0405208a413d4651641aba195305f3ca3b2b8bc3615dc8`. `logs/discovery_filtered_006_qlp_progress_safe.json` has 2 filtered candidates. SHA-256: `17630739c28bed296910512b86c63c77d952708cf84ab2fe6d8f55ae120a5fc9`.
 
-Do not run the ranking or filtering commands until the scanner exits normally
-after printing its completion summary. If the scanner is stopped or suspended
-with Ctrl-C/Ctrl-Z, rerun the scanner on `main` before triage; partial console
-output is not a completed scan log.
+First action now: review the two filtered candidates and the full run006 log. Candidate rows:
 
-If `alert_filter.py` exits with `No candidates matched the filters.`, that is an acceptable null triage result only if the QLP log contains real clear scans or candidates rather than another mostly no-data/error batch; keep the full `logs/discovery_run_006_qlp_progress_safe.json` for review. Do NOT proceed with CNN C20 training until the above scan is complete and has been reviewed for candidates. If zero candidates emerge after scanning ≥1,000 targets, that finding itself dictates the next priority.
+| TIC | Period (d) | FPP | Pathway |
+|---|---:|---:|---|
+| TIC 201252011 | 227.39056281978395 | 0.1160636155807766 | `planet_hunters_discussion` |
+| TIC 257712351 | 142.95415231096942 | 0.12672985673564718 | `planet_hunters_discussion` |
+
+Treat run006 as useful scan evidence, not submission-ready evidence. It flagged 192/200 targets as candidates and 81 detections hit the 0.5 d or 500 d period boundaries, so the next work is candidate/numerical-quality review and false-positive diagnostics. Do NOT proceed with CNN C20 training and do NOT submit/contact externally until this review is complete and the human explicitly approves any external action.
 
 ### CNN production runbook
 

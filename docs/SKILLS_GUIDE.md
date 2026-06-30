@@ -328,13 +328,13 @@ star_scanner → batch_scan → alert_filter → rank_candidates → watchlist
 
 ```bash
 # Query TIC for uncharacterised K/M dwarfs; scan top 500 in priority order
-python Skills/star_scanner.py --log data/scan_log.json --max-stars 500
+.venv/bin/python Skills/star_scanner.py --log logs/scan_log.json --max-stars 500
 
 # Resume after interruption (log tracks already-scanned)
-python Skills/star_scanner.py --log data/scan_log.json --max-stars 500
+.venv/bin/python Skills/star_scanner.py --log logs/scan_log.json --max-stars 500
 
 # Show log summary without scanning
-python Skills/star_scanner.py --summary --log data/scan_log.json
+.venv/bin/python Skills/star_scanner.py --summary --log logs/scan_log.json
 ```
 
 ### 2. Scan a specific target list

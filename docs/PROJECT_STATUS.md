@@ -1,8 +1,8 @@
 # PROJECT STATUS
 
 ## Status: Active Development
-## Phase: Live Discovery Gate — first flux-safe QLP 200-target scan pending
-## Last Updated: 2026-06-28
+## Phase: Live Discovery Gate — run006 QLP candidate review
+## Last Updated: 2026-06-29
 
 ---
 
@@ -106,29 +106,14 @@ without relying on chat context or local terminal output.
 - A stdout-safe QLP attempt completed on 2026-06-28 as `logs/discovery_run_004_qlp_stdout_safe.json`, but it did not close T1-0: it recorded 200 total entries, 0 candidates, 0 clear scans, 1 no-data row, and 199 errors. Root cause: the shared fetch path requested SPOC-style `pdcsap_flux`; valid QLP HLSP products provide `KSPSAP_FLUX`, `DET_FLUX`, `SYS_RM_FLUX`, or `SAP_FLUX`, not `PDCSAP_FLUX`.
 - A flux-safe QLP attempt started as `logs/discovery_run_005_qlp_flux_safe.json`, but it did not close T1-0: the pasted console showed third-party MAST download chatter and warnings but no per-target scanner progress, and no durable log existed before the first completed target.
 - PR #150 is merged on `main`: scanner logs are created immediately, active targets are checkpointed separately, per-target startup/progress is printed, and third-party MAST download banners are suppressed.
-- The next production action is human-run because it requires live services and a long-running Mac-local scan. Use QLP and a fresh `run006` log so the result is not polluted by prior failed resume state:
+- Run006 completed locally on 2026-06-29 and produced durable scan evidence:
+200 entries, 192 `candidate_found`, 6 `scanned_clear`, 1 `no_data`, 1 `error`,
+and 0 active targets. The filtered output contains two rows: TIC 201252011
+(period 227.39056281978395 d, FPP 0.1160636155807766) and TIC 257712351
+(period 142.95415231096942 d, FPP 0.12672985673564718).
 
-```bash
-git switch main
-git pull --ff-only origin main
-caffeinate -dims .venv/bin/python Skills/star_scanner.py \
-  --max-stars 200 \
-  --pipeline QLP \
-  --exptime long \
-  --max-period-grid-points 20000 \
-  --workers 4 \
-  --request-delay 0.5 \
-  --log logs/discovery_run_006_qlp_progress_safe.json
-.venv/bin/python Skills/rank_candidates.py logs/discovery_run_006_qlp_progress_safe.json --top 20
-.venv/bin/python Skills/alert_filter.py logs/discovery_run_006_qlp_progress_safe.json \
-  --fpp-max 0.15 \
-  --output logs/discovery_filtered_006_qlp_progress_safe.json
-```
-
-Run rank/filter only after the scanner exits normally. If the scan is stopped
-or suspended, rerun the scanner from `main` before triage.
-
-If `alert_filter.py` finds no rows, keep `logs/discovery_run_006_qlp_progress_safe.json`; a null batch only informs the next target-selection cycle if it contains real scanned-clear targets or candidates, not mostly no-data/error rows.
+The next action is review, not rerun: inspect the two filtered candidates and
+the high candidate rate / period-boundary behavior before any external action.
 
 ## Paused
 
@@ -176,10 +161,10 @@ If `alert_filter.py` finds no rows, keep `logs/discovery_run_006_qlp_progress_sa
 
 ## Next Actions
 
-1. Run the first QLP 200-target discovery scan after the scanner progress/quiet-download fix on the user's Mac using the command in `docs/DISCOVERY_RUNBOOK.md`.
-2. Review `logs/discovery_run_006_qlp_progress_safe.json`, ranked candidates, and `logs/discovery_filtered_006_qlp_progress_safe.json` if present.
-3. Update `docs/LOCAL_ARTIFACT_LEDGER.md` and `artifacts/manifests/local_artifacts.json` with the scan result so GitHub-only agents can continue without chat context.
-4. Do not run C20 CNN corpus assembly or training until the first discovery scan is complete and reviewed.
+1. Review `logs/discovery_run_006_qlp_progress_safe.json`, ranked candidates, and `logs/discovery_filtered_006_qlp_progress_safe.json`.
+2. Generate candidate plots/report cards or equivalent diagnostic packets for TIC 201252011 and TIC 257712351 if they remain plausible after log review.
+3. Investigate why run006 flagged 192/200 targets as candidates and why many detections hit the 0.5 d / 500 d period boundaries.
+4. Do not run C20 CNN corpus assembly or training until the first discovery scan is reviewed.
 5. Promote nothing unless a future evaluator run reports `Flag: PASS`, raw test
    AUC is at least 0.85, calibrated test F1 is at least 0.80, calibrated
    Brier/ECE are no worse than raw, and the human explicitly approves

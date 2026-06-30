@@ -900,12 +900,12 @@
         "verified_on": "2026-06-29"
       },
       "validation_gate": "Does not close T1-0 because the operator could not verify live progress and no durable log existed before the first completed target.",
-      "next_action": "Retain only as forensic terminal evidence; stop any still-running run005 process and rerun fresh as logs/discovery_run_006_qlp_progress_safe.json from current main."
+      "next_action": "Retain only as forensic terminal evidence; run006 has superseded this failed attempt."
     },
     {
       "path": "logs/discovery_run_006_qlp_progress_safe.json",
       "kind": "discovery_scan_log",
-      "status": "pending_human_run_after_progress_safe_and_bounded_bls_fix",
+      "status": "complete_review_needed",
       "git_policy": "ignored",
       "last_known": {
         "scan": "B5 first QLP discovery scan after scanner progress/quiet-download and bounded-BLS fixes",
@@ -916,24 +916,49 @@
           ".venv/bin/python Skills/rank_candidates.py logs/discovery_run_006_qlp_progress_safe.json --top 20",
           ".venv/bin/python Skills/alert_filter.py logs/discovery_run_006_qlp_progress_safe.json --fpp-max 0.15 --output logs/discovery_filtered_006_qlp_progress_safe.json"
         ],
+        "completed": true,
+        "runtime": "46m35s",
+        "entries": 200,
+        "candidate_found": 192,
+        "scanned_clear": 6,
+        "no_data": 1,
+        "errors": 1,
+        "active": 0,
+        "period_boundary_candidates": 81,
+        "sha256": "8ed084e39fcf1b1f7f0405208a413d4651641aba195305f3ca3b2b8bc3615dc8",
         "verified_on": "2026-06-29"
       },
-      "validation_gate": "This scan must complete and show real clear scans or candidates before C20 CNN corpus assembly or training resumes.",
-      "next_action": "[HUMAN] run the QLP B5 discovery scan on the Mac from current main; run rank/filter only after the scanner exits normally, then paste back the summary."
+      "validation_gate": "Run006 contains real scan evidence, but it is not submission-ready until filtered candidates and high candidate-rate / period-boundary behavior are reviewed.",
+      "next_action": "[AGENT] review filtered candidates, generate diagnostics if useful, and investigate the high candidate rate before any CNN work or external action."
     },
     {
       "path": "logs/discovery_filtered_006_qlp_progress_safe.json",
       "kind": "discovery_triage_output",
-      "status": "pending_scan_result",
+      "status": "complete_review_needed",
       "git_policy": "ignored",
       "last_known": {
         "source": "logs/discovery_run_006_qlp_progress_safe.json",
         "filter": "false_positive_probability <= 0.15",
-        "empty_result_policy": "Empty is acceptable only after a QLP scan with real clear scans or candidates, not another mostly no-data/error batch.",
+        "rows": 2,
+        "sha256": "17630739c28bed296910512b86c63c77d952708cf84ab2fe6d8f55ae120a5fc9",
+        "candidates": [
+          {
+            "tic_id": 201252011,
+            "period_days": 227.39056281978395,
+            "false_positive_probability": 0.1160636155807766,
+            "pathway": "planet_hunters_discussion"
+          },
+          {
+            "tic_id": 257712351,
+            "period_days": 142.95415231096942,
+            "false_positive_probability": 0.12672985673564718,
+            "pathway": "planet_hunters_discussion"
+          }
+        ],
         "verified_on": "2026-06-29"
       },
       "validation_gate": "Use only as triage output; candidate escalation still requires human review and false-positive diagnostics.",
-      "next_action": "Review together with the progress-safe QLP discovery scan log after B5 completes."
+      "next_action": "Review together with the full run006 scan log; no external action without explicit human approval."
     },
     {
       "path": "models/cnn*/",
