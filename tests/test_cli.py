@@ -276,6 +276,42 @@ class TestRunPipeline:
         for key in required:
             assert key in row, f"Missing key: {key}"
 
+    def test_row_serializes_vetting_features(self) -> None:
+        lc = _mock_lc()
+        signal = _make_signal()
+        features = CandidateFeatures(
+            log_snr_score=0.81,
+            odd_even_mismatch_score=0.12,
+        )
+
+        with (
+            patch("exo_toolkit.cli.search_lightcurve", return_value=[signal]),
+            patch(
+                "exo_toolkit.cli.vet_signal",
+                return_value=MagicMock(features=features),
+            ),
+            patch(
+                "exo_toolkit.cli.score_candidate",
+                return_value=(_uniform_posterior(), _make_scores()),
+            ),
+            patch(
+                "exo_toolkit.cli.classify_submission_pathway",
+                return_value="github_only_reproducibility",
+            ),
+        ):
+            result = run_pipeline(
+                "TIC 0", "TESS",
+                fetch_fn=self._patched_fetch(lc),
+                clean_fn=self._patched_clean(lc),
+            )
+
+        assert result[0]["features"]["log_snr_score"] == pytest.approx(0.81)
+        assert result[0]["features"]["odd_even_mismatch_score"] == pytest.approx(0.12)
+        assert result[0]["meta"]["features_available"] == [
+            "log_snr_score",
+            "odd_even_mismatch_score",
+        ]
+
     def test_posterior_sums_to_one(self) -> None:
         lc = _mock_lc()
         signal = _make_signal()

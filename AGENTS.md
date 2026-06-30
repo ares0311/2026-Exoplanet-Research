@@ -111,6 +111,7 @@ When the user must take an action to unblock a gap:
 - **Project version bumped to 0.2.5** — patch release for bounded live discovery search; BLS period grids are capped by default so long-baseline QLP light curves do not generate hundreds of millions of trial periods, and the pipeline now passes `vet_signal(light_curve, signal)` in the documented order.
 - **Project version bumped to 0.2.6** — patch release for live discovery numerical guardrails; BLS peaks with invalid values or period-grid boundary periods fail closed instead of becoming candidate signals.
 - **Project version bumped to 0.2.7** — patch release for targeted run006 follow-up observability; `Skills/star_scanner.py --target` now records an active target before live work starts and prints flushed start/completion progress for explicit TIC candidate review.
+- **Project version bumped to 0.2.8** — patch release for targeted run006/run008 review hardening; QLP stitching no longer uses Lightkurve's implicit pre-clean normalizer, and `exo --output` now serializes computed vetting `features` so `Skills/false_positive_vetter.py` can evaluate actual diagnostics.
 
 ### Where things stand
 
@@ -146,6 +147,8 @@ A fifth QLP attempt (`logs/discovery_run_005_qlp_flux_safe.json`) started after 
 
 **Run006 completed locally on 2026-06-29.** `logs/discovery_run_006_qlp_progress_safe.json` has 200 entries: 192 `candidate_found`, 6 `scanned_clear`, 1 `no_data`, 1 `error`, and 0 active targets. SHA-256: `8ed084e39fcf1b1f7f0405208a413d4651641aba195305f3ca3b2b8bc3615dc8`. `logs/discovery_filtered_006_qlp_progress_safe.json` has 2 filtered candidates. SHA-256: `17630739c28bed296910512b86c63c77d952708cf84ab2fe6d8f55ae120a5fc9`.
 
+**Run008 targeted follow-up completed locally on 2026-06-30 after version 0.2.8 fixes.** `logs/discovery_run_008_targeted_qlp_stitch_safe.json` has 2 entries, both `candidate_found`, active `{}`, SHA-256 `8626587c4fe59565132e078273763c7beac4a0a88597615f71e147a5134d1b0a`. `logs/discovery_filtered_008_targeted_qlp_stitch_safe.json` has 2 rows, SHA-256 `574a4cf188faa9e273128496fcd23b27cb8369a3e9d2ad2c1b5bbaedd9effed4`. TIC 201252011 reproduced at P=227.39056281978395 d, FPP=0.11606180728511539. TIC 257712351 reproduced at P=142.95415231096942 d, FPP=0.12672948535351847. The earlier Lightkurve normalization warning root cause was `LightCurveCollection.stitch()` defaulting to `corrector_func=lambda x: x.normalize()` before project sigma-clipping; fetch now calls `stitch(corrector_func=None)`. Regenerated `exo --output` files now contain computed `features`; false-positive vetting no longer reports all diagnostics missing. Both best signals still fail `limb_darkening_plausibility_score=0.0` and have many missing diagnostics, so they are **not submission-ready**.
+
 First action now: review the two filtered candidates and the full run006 log. Candidate rows:
 
 | TIC | Period (d) | FPP | Pathway |
@@ -153,7 +156,7 @@ First action now: review the two filtered candidates and the full run006 log. Ca
 | TIC 201252011 | 227.39056281978395 | 0.1160636155807766 | `planet_hunters_discussion` |
 | TIC 257712351 | 142.95415231096942 | 0.12672985673564718 | `planet_hunters_discussion` |
 
-Treat run006 as useful scan evidence, not submission-ready evidence. It flagged 192/200 targets as candidates and 81 detections hit the 0.5 d or 500 d period boundaries; subsequent scanner code rejects invalid and period-boundary BLS peaks, so future evidence runs must use `main` at version 0.2.6 or newer. Do NOT proceed with CNN C20 training and do NOT submit/contact externally until this review is complete and the human explicitly approves any external action.
+Treat run006 as useful scan evidence and run008 as useful targeted follow-up evidence, not submission-ready evidence. Run006 flagged 192/200 targets as candidates and 81 detections hit the 0.5 d or 500 d period boundaries; subsequent scanner code rejects invalid and period-boundary BLS peaks, so future evidence runs must use `main` at version 0.2.8 or newer. Do NOT proceed with CNN C20 training and do NOT submit/contact externally until missing candidate-specific false-positive diagnostics are addressed and the human explicitly approves any external action.
 
 ### CNN production runbook
 

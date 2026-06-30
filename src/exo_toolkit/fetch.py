@@ -168,7 +168,10 @@ def fetch_lightcurve(
         search,
         flux_columns=flux_columns,
     )
-    lc = collection.stitch()
+    # Lightkurve's default stitch() normalizes each product before stacking.
+    # Keep project preprocessing order explicit: fetch raw selected flux,
+    # then let clean_lightcurve() remove NaNs/outliers before normalizing.
+    lc = collection.stitch(corrector_func=None)
 
     cadence_raw = lc.meta.get("EXPTIME", 0.0)
     cadence_seconds = (
