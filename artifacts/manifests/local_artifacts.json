@@ -934,10 +934,11 @@
         "period_boundary_candidates": 81,
         "sha256": "8ed084e39fcf1b1f7f0405208a413d4651641aba195305f3ca3b2b8bc3615dc8",
         "verified_on": "2026-06-29",
-        "scanner_version_note": "Run006 predates the 0.2.6 BLS guard that rejects invalid and period-boundary peaks."
+        "scanner_version_note": "Run006 predates the durable review-metrics fix and the 0.2.6 BLS guard that rejects invalid and period-boundary peaks.",
+        "targeted_followup_command_shape": "caffeinate -i .venv/bin/python Skills/star_scanner.py --target <TIC_ID> --pipeline QLP --exptime long --max-period-grid-points 20000 --log logs/discovery_run_007_targeted_qlp_v026.json"
       },
       "validation_gate": "Useful first QLP evidence, but not submission-ready: high candidate rate, 81 period-boundary detections, and one negative-duration error require 0.2.6+ follow-up review.",
-      "next_action": "Review the two filtered candidates as pre-0.2.6 evidence; if another evidence run is needed, sync main and use version 0.2.6 or newer with a fresh log path, not the run006 log."
+      "next_action": "Review the two filtered candidates as pre-0.2.6 evidence, then run targeted 0.2.6+ follow-up scans for TIC 201252011 and TIC 257712351 with Skills/star_scanner.py --target, QLP, long exptime, max-period-grid-points 20000, and a fresh log path."
     },
     {
       "path": "logs/discovery_filtered_006_qlp_progress_safe.json",

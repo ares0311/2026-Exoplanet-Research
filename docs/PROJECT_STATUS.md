@@ -163,11 +163,12 @@ they become candidate signals, so future evidence runs must use 0.2.6 or newer.
 
 ## Next Actions
 
-1. Review `logs/discovery_run_006_qlp_progress_safe.json`, ranked candidates, and `logs/discovery_filtered_006_qlp_progress_safe.json`.
-2. Generate candidate plots/report cards or equivalent diagnostic packets for TIC 201252011 and TIC 257712351 if they remain plausible after log review.
-3. Investigate why run006 flagged 192/200 targets as candidates and why many detections hit the 0.5 d / 500 d period boundaries.
-4. Do not run C20 CNN corpus assembly or training until the first discovery scan is reviewed.
-5. Promote nothing unless a future evaluator run reports `Flag: PASS`, raw test
+1. Review `logs/discovery_run_006_qlp_progress_safe.json`, ranked candidates, and `logs/discovery_filtered_006_qlp_progress_safe.json` as pre-0.2.6 evidence.
+2. Run targeted 0.2.6+ QLP follow-up scans for TIC 201252011 and TIC 257712351 with `Skills/star_scanner.py --target`, `--pipeline QLP`, `--exptime long`, `--max-period-grid-points 20000`, and a fresh log path.
+3. Generate candidate plots/report cards or equivalent diagnostic packets for TIC 201252011 and TIC 257712351 if they remain plausible after targeted follow-up.
+4. Investigate why run006 flagged 192/200 targets as candidates and why many detections hit the 0.5 d / 500 d period boundaries.
+5. Do not run C20 CNN corpus assembly or training until the first discovery scan is reviewed.
+6. Promote nothing unless a future evaluator run reports `Flag: PASS`, raw test
    AUC is at least 0.85, calibrated test F1 is at least 0.80, calibrated
    Brier/ECE are no worse than raw, and the human explicitly approves
    promotion.

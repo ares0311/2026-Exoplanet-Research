@@ -26,6 +26,7 @@ from Skills.star_scanner import (  # noqa: E402
     ScanLog,
     priority_score,
     run_background_scan,
+    run_target_scan,
     scan_star,
     select_targets,
 )
@@ -410,6 +411,39 @@ class TestScanStar:
             scan_star(556, log=log)
         assert log.is_scanned(556)
         assert log.summary()["no_data"] == 1
+
+
+class TestRunTargetScan:
+    def test_target_scan_prints_progress_and_clears_active(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        log_path = tmp_path / "target_log.json"
+        with patch("Skills.star_scanner.run_pipeline") as mock_pipe:
+            mock_pipe.return_value = [_make_pipeline_row()]
+            result = run_target_scan(
+                log_path,
+                201252011,
+                pipeline="QLP",
+                exptime="long",
+                max_period_grid_points=20_000,
+            )
+
+        out = capsys.readouterr().out
+        assert result["status"] == "candidate_found"
+        assert "[start] TIC 201252011" in out
+        assert "[1/1] TIC 201252011" in out
+        assert "pipeline=QLP" in out
+        assert "exptime=long" in out
+        assert "period_grid≤20000" in out
+        assert "elapsed=" in out
+        assert "ETA=" in out
+
+        log = ScanLog(log_path)
+        assert log.is_scanned(201252011)
+        assert log.summary()["active"] == 0
+        assert log.summary()["candidate_found"] == 1
 
 
 # ---------------------------------------------------------------------------

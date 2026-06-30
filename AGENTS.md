@@ -110,6 +110,7 @@ When the user must take an action to unblock a gap:
 - **Project version bumped to 0.2.4** — patch release for discovery triage guardrails; `rank_candidates.py` and `alert_filter.py` now fail closed with operator guidance instead of raw tracebacks when a live scan log is missing or incomplete.
 - **Project version bumped to 0.2.5** — patch release for bounded live discovery search; BLS period grids are capped by default so long-baseline QLP light curves do not generate hundreds of millions of trial periods, and the pipeline now passes `vet_signal(light_curve, signal)` in the documented order.
 - **Project version bumped to 0.2.6** — patch release for live discovery numerical guardrails; BLS peaks with invalid values or period-grid boundary periods fail closed instead of becoming candidate signals.
+- **Project version bumped to 0.2.7** — patch release for targeted run006 follow-up observability; `Skills/star_scanner.py --target` now records an active target before live work starts and prints flushed start/completion progress for explicit TIC candidate review.
 
 ### Where things stand
 

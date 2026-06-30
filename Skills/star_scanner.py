@@ -696,6 +696,52 @@ def _is_no_data_error(message: str) -> bool:
     return any(marker in normalized for marker in no_data_markers)
 
 
+def run_target_scan(
+    log_path: Path,
+    tic_id: int,
+    *,
+    mission: str = "TESS",
+    min_snr: float = 5.0,
+    max_peaks: int = 5,
+    max_period_grid_points: int | None = 20_000,
+    scorer: str = "bayesian",
+    model_path: Path | None = None,
+    pipeline: str = "QLP",
+    exptime: str = "long",
+) -> dict[str, Any]:
+    """Scan one explicit TIC target with durable active-state logging."""
+    log = ScanLog(log_path)
+    start_time = time.monotonic()
+    target = {"tic_id": tic_id, "priority": None}
+    log.mark_started(tic_id, target, pipeline=pipeline, exptime=exptime)
+    print(
+        f"[start] TIC {tic_id}  pipeline={pipeline}  exptime={exptime}  "
+        f"max_peaks={max_peaks}  period_grid≤{max_period_grid_points or 'auto'}  "
+        f"active={log.summary()['active']}  "
+        f"{_progress_suffix(0, 1, start_time)}",
+        flush=True,
+    )
+    result = scan_star(
+        tic_id,
+        mission=mission,
+        log=log,
+        min_snr=min_snr,
+        max_peaks=max_peaks,
+        max_period_grid_points=max_period_grid_points,
+        scorer=scorer,
+        model_path=model_path,
+        pipeline=pipeline,
+        exptime=exptime,
+    )
+    print(
+        f"[1/1] TIC {tic_id}  {_status_text(result)}  "
+        f"active={log.summary()['active']}  "
+        f"{_progress_suffix(1, 1, start_time)}",
+        flush=True,
+    )
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Background scan loop
 # ---------------------------------------------------------------------------
@@ -961,11 +1007,10 @@ if __name__ == "__main__":
         sys.exit(0)
 
     if args.target:
-        _log = ScanLog(_log_path)
-        _result = scan_star(
+        _result = run_target_scan(
+            _log_path,
             args.target,
             mission=args.mission,
-            log=_log,
             min_snr=args.min_snr,
             max_peaks=args.max_peaks,
             max_period_grid_points=args.max_period_grid_points,
