@@ -268,6 +268,14 @@ Version 0.2.6 rejects invalid BLS peaks and peaks pinned to the BLS period-grid
 boundary. Treat any run006 candidate review as pre-0.2.6 evidence; any future
 evidence rerun must start from synced `main` at 0.2.6 or newer.
 
+The immediate follow-up should be targeted, not another blind 200-target scan:
+rerun TIC 201252011 and TIC 257712351 with `Skills/star_scanner.py --target`,
+`--pipeline QLP`, `--exptime long`, `--max-period-grid-points 20000`, and a
+fresh log path such as `logs/discovery_run_007_targeted_qlp_v026.json`. The
+targeted path records the active target before live work begins and prints
+flushed start/completion lines, so the operator can tell whether the process is
+alive.
+
 Do not build the C20 CNN corpus or train C20 until this discovery run has been
 reviewed. Do not submit or contact externally without explicit human approval.
 
