@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-    "last_updated": "2026-06-29",
+  "last_updated": "2026-06-29",
   "production_gap": "T1-0: First Real Discovery Scan Evidence; T1-1: Production Tier 2 CNN Checkpoint paused",
   "policy": {
     "standard_operator_cadence": "git add .",
@@ -625,7 +625,7 @@
         "temperature_T": 1.61363521,
         "raw_val_auc": 0.8262,
         "raw_val_f1": 0.7779,
-        "raw_val_brier": 0.1700,
+        "raw_val_brier": 0.17,
         "raw_val_ece": 0.0466,
         "raw_test_auc": 0.8439,
         "raw_test_f1": 0.7979,
@@ -675,19 +675,19 @@
         "raw_val_auc": 0.8218,
         "raw_val_f1": 0.7765,
         "raw_val_brier": 0.1733,
-        "raw_val_ece": 0.0570,
-        "raw_test_auc": 0.8420,
+        "raw_val_ece": 0.057,
+        "raw_test_auc": 0.842,
         "raw_test_f1": 0.7951,
         "raw_test_brier": 0.1606,
         "raw_test_ece": 0.0377,
-        "calibrated_threshold": 0.40,
-        "calibrated_test_auc": 0.8420,
+        "calibrated_threshold": 0.4,
+        "calibrated_test_auc": 0.842,
         "calibrated_test_f1": 0.7948,
         "calibrated_test_brier": 0.1658,
-        "calibrated_test_ece": 0.0760,
+        "calibrated_test_ece": 0.076,
         "evaluator_flag": "FAIL",
         "root_cause": "freeze_conv_strategy_exhausted_regressed_from_c18",
-        "notes": "LR scheduler fires on val_auc plateaus; during 20 frozen epochs val_auc improved monotonically (0.75->0.82), so LR never decayed. Conv unfroze at epoch 21 with LR still at 1e-4 — same as C18 at epoch 11. Longer frozen phase over-adapted FC head: T=1.88 vs T=1.61 in C18, producing worse calibration AND lower test AUC (0.8420 < C18's 0.8439). freeze_conv strategy is exhausted.",
+        "notes": "LR scheduler fires on val_auc plateaus; during 20 frozen epochs val_auc improved monotonically (0.75->0.82), so LR never decayed. Conv unfroze at epoch 21 with LR still at 1e-4 \u2014 same as C18 at epoch 11. Longer frozen phase over-adapted FC head: T=1.88 vs T=1.61 in C18, producing worse calibration AND lower test AUC (0.8420 < C18's 0.8439). freeze_conv strategy is exhausted.",
         "verified_on": "2026-06-22"
       },
       "validation_gate": "Rejected: test AUC 0.8420 < 0.85 gate, regressed from C18; temperature scaling worsened test Brier/ECE. freeze_conv strategy exhausted.",
@@ -720,7 +720,11 @@
       "git_policy": "ignored",
       "last_known": {
         "strategy": "C20 training corpus: TESS v2 + Kepler overlap + K2 overlap",
-        "components": ["data/tess_snippets_v2.jsonl", "data/tess_kepler_overlap_snippets.jsonl", "data/tess_k2_overlap_snippets.jsonl"],
+        "components": [
+          "data/tess_snippets_v2.jsonl",
+          "data/tess_kepler_overlap_snippets.jsonl",
+          "data/tess_k2_overlap_snippets.jsonl"
+        ],
         "expected_rows": 9569,
         "build_command": "cat data/tess_snippets_v2.jsonl data/tess_kepler_overlap_snippets.jsonl data/tess_k2_overlap_snippets.jsonl > data/tess_c20_combined_snippets.jsonl"
       },
@@ -744,7 +748,10 @@
         "scanned_clear": 0,
         "no_data": 198,
         "errors": 2,
-        "error_tic_ids": [350861149, 149970879],
+        "error_tic_ids": [
+          350861149,
+          149970879
+        ],
         "sha256": "e5ebe5ee0995e13d88ca6f118f192d1ae5cb89a4ab04da90731864fe697e7201",
         "root_cause": "run_pipeline could not override fetch_lightcurve, so background discovery used the SPOC long-cadence default after TIC-only target selection; almost all selected targets had no SPOC light curve",
         "review_commands": [
@@ -926,10 +933,11 @@
         "active": 0,
         "period_boundary_candidates": 81,
         "sha256": "8ed084e39fcf1b1f7f0405208a413d4651641aba195305f3ca3b2b8bc3615dc8",
-        "verified_on": "2026-06-29"
+        "verified_on": "2026-06-29",
+        "scanner_version_note": "Run006 predates the 0.2.6 BLS guard that rejects invalid and period-boundary peaks."
       },
-      "validation_gate": "Run006 contains real scan evidence, but it is not submission-ready until filtered candidates and high candidate-rate / period-boundary behavior are reviewed.",
-      "next_action": "[AGENT] review filtered candidates, generate diagnostics if useful, and investigate the high candidate rate before any CNN work or external action."
+      "validation_gate": "Useful first QLP evidence, but not submission-ready: high candidate rate, 81 period-boundary detections, and one negative-duration error require 0.2.6+ follow-up review.",
+      "next_action": "Review the two filtered candidates as pre-0.2.6 evidence; if another evidence run is needed, sync main and use version 0.2.6 or newer with a fresh log path, not the run006 log."
     },
     {
       "path": "logs/discovery_filtered_006_qlp_progress_safe.json",
@@ -958,7 +966,7 @@
         "verified_on": "2026-06-29"
       },
       "validation_gate": "Use only as triage output; candidate escalation still requires human review and false-positive diagnostics.",
-      "next_action": "Review together with the full run006 scan log; no external action without explicit human approval."
+      "next_action": "Review alongside the full run006 log as pre-0.2.6 evidence; no external contact or CNN work until false-positive diagnostics are documented."
     },
     {
       "path": "models/cnn*/",

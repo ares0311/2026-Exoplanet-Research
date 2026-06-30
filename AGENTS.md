@@ -109,6 +109,7 @@ When the user must take an action to unblock a gap:
 - **Project version bumped to 0.2.3** — patch release for the production-blocking QLP scanner observability fix; scan logs are created immediately, active targets are checkpointed separately from completed entries, and Astroquery MAST download banners are disabled under the Lightkurve per-product path.
 - **Project version bumped to 0.2.4** — patch release for discovery triage guardrails; `rank_candidates.py` and `alert_filter.py` now fail closed with operator guidance instead of raw tracebacks when a live scan log is missing or incomplete.
 - **Project version bumped to 0.2.5** — patch release for bounded live discovery search; BLS period grids are capped by default so long-baseline QLP light curves do not generate hundreds of millions of trial periods, and the pipeline now passes `vet_signal(light_curve, signal)` in the documented order.
+- **Project version bumped to 0.2.6** — patch release for live discovery numerical guardrails; BLS peaks with invalid values or period-grid boundary periods fail closed instead of becoming candidate signals.
 
 ### Where things stand
 
@@ -151,7 +152,7 @@ First action now: review the two filtered candidates and the full run006 log. Ca
 | TIC 201252011 | 227.39056281978395 | 0.1160636155807766 | `planet_hunters_discussion` |
 | TIC 257712351 | 142.95415231096942 | 0.12672985673564718 | `planet_hunters_discussion` |
 
-Treat run006 as useful scan evidence, not submission-ready evidence. It flagged 192/200 targets as candidates and 81 detections hit the 0.5 d or 500 d period boundaries, so the next work is candidate/numerical-quality review and false-positive diagnostics. Do NOT proceed with CNN C20 training and do NOT submit/contact externally until this review is complete and the human explicitly approves any external action.
+Treat run006 as useful scan evidence, not submission-ready evidence. It flagged 192/200 targets as candidates and 81 detections hit the 0.5 d or 500 d period boundaries; subsequent scanner code rejects invalid and period-boundary BLS peaks, so future evidence runs must use `main` at version 0.2.6 or newer. Do NOT proceed with CNN C20 training and do NOT submit/contact externally until this review is complete and the human explicitly approves any external action.
 
 ### CNN production runbook
 

@@ -274,7 +274,7 @@ CI: `.github/workflows/ci.yml`
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
 **Current test surface:** 109 top-level test files. Local validation on 2026-06-19 passed with 2,222 default tests and 2 `integration_live` tests deselected.
-**Skills:** 415 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). See `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference instead of relying on this file for exhaustive per-script counts.
+**Skills:** 98 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
 
 ---
 
@@ -480,8 +480,8 @@ New `RawDiagnostics` fields: `oot_scatter_sigma`, `sector_depths`, `sector_depth
 
 ## CLI Version Flag and Meta Output (Milestone 12f)
 
-- `exo --version` / `exo -V` — prints the installed `exo-toolkit` package version (currently `0.2.5`)
-- `__version__ = "0.2.5"` in `src/exo_toolkit/__init__.py` is the importlib.metadata fallback for direct source-tree execution
+- `exo --version` / `exo -V` — prints the installed `exo-toolkit` package version (currently `0.2.6`)
+- fallback version `0.2.6` in `src/exo_toolkit/__init__.py` is used only if source-tree and installed package metadata are unavailable
 - Each output row gains a `"meta"` dict: `toolkit_version`, `run_at`, `scorer`, `git_commit`, `features_available`
 - `_git_commit_short()` reads `git rev-parse --short HEAD`; returns `None` on failure
 
@@ -1241,7 +1241,7 @@ fix the durable resume ledger before asking the human to run it again.
 - K2 TAP ORA-00904 fix (`Skills/fetch_tess_k2_overlap_snippets.py`) — **MERGED** (PR #134, 2026-06-27)
 - `exo <obsid> --mission JWST` CLI wiring (A3) — **MERGED** (PR #141, 2026-06-27): `Mission` literal extended; `fetch_lightcurve` dispatches to `_fetch_jwst`; 13 new tests
 - Option B1–B4 (TESS target restructuring) — **MERGED** (PR #139, 2026-06-27): CTOI exclusion, confirmed-host exclusion, tmag 12–14.5 default, period_max 500d
-- Option B5 — **REVIEW NEEDED**. Run006 completed locally on 2026-06-29 after scanner progress/quiet-download and bounded-BLS fixes. `logs/discovery_run_006_qlp_progress_safe.json`: 200 entries, 192 `candidate_found`, 6 `scanned_clear`, 1 `no_data`, 1 `error`, active=0, runtime 46m35s, SHA-256 `8ed084e39fcf1b1f7f0405208a413d4651641aba195305f3ca3b2b8bc3615dc8`. `logs/discovery_filtered_006_qlp_progress_safe.json`: 2 candidates, SHA-256 `17630739c28bed296910512b86c63c77d952708cf84ab2fe6d8f55ae120a5fc9`. Next agent should review TIC 201252011 and TIC 257712351 and investigate the high candidate rate / period-boundary behavior before any external action or CNN work.
+- Option B5 — **REVIEW NEEDED**. Run006 completed locally on 2026-06-29 after scanner progress/quiet-download and bounded-BLS fixes. `logs/discovery_run_006_qlp_progress_safe.json`: 200 entries, 192 `candidate_found`, 6 `scanned_clear`, 1 `no_data`, 1 `error`, active=0, runtime 46m35s, SHA-256 `8ed084e39fcf1b1f7f0405208a413d4651641aba195305f3ca3b2b8bc3615dc8`. `logs/discovery_filtered_006_qlp_progress_safe.json`: 2 candidates, SHA-256 `17630739c28bed296910512b86c63c77d952708cf84ab2fe6d8f55ae120a5fc9`. Version 0.2.6 rejects invalid and period-boundary BLS peaks, so run006 is pre-guard evidence. Next agent should review TIC 201252011 and TIC 257712351, then use 0.2.6+ for any follow-up evidence run before any external action or CNN work.
 
 **K2 corpus fetch status (as of 2026-06-27):** **COMPLETE** — 2,086 snippets written to `data/tess_k2_overlap_snippets.jsonl`; wrote=2086, skipped=174, terminal_failures=135, elapsed=2531s (42m11s). No further fetch action needed.
 

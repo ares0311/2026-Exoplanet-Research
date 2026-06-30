@@ -130,6 +130,20 @@ def search_lightcurve(
         depth_err = float(result.depth_err[best])
         snr = depth / depth_err if depth_err > 0.0 else 0.0
 
+        if not _is_usable_peak(
+            period_days=period_days,
+            epoch_bjd=epoch_bjd,
+            duration_hours=duration_hours,
+            depth=depth,
+            depth_err=depth_err,
+            snr=snr,
+            power=float(result.power[best]),
+        ):
+            break
+
+        if _is_period_grid_edge(period_days, period_grid):
+            break
+
         if snr < min_snr:
             break
 
@@ -167,6 +181,43 @@ def search_lightcurve(
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+
+def _is_usable_peak(
+    *,
+    period_days: float,
+    epoch_bjd: float,
+    duration_hours: float,
+    depth: float,
+    depth_err: float,
+    snr: float,
+    power: float,
+) -> bool:
+    """Return True when the best BLS peak can safely become a candidate."""
+    values = (period_days, epoch_bjd, duration_hours, depth, depth_err, snr, power)
+    if not all(np.isfinite(value) for value in values):
+        return False
+    return (
+        period_days > 0.0
+        and duration_hours > 0.0
+        and depth > 0.0
+        and depth_err > 0.0
+        and snr >= 0.0
+    )
+
+
+def _is_period_grid_edge(period_days: float, period_grid: Any) -> bool:
+    """Return True when BLS selected the lower or upper period-grid boundary."""
+    try:
+        periods = np.asarray(period_grid.to_value(u.day), dtype=float)
+    except AttributeError:
+        periods = np.asarray(period_grid, dtype=float)
+    periods = periods[np.isfinite(periods)]
+    if len(periods) < 2:
+        return True
+    low = float(np.min(periods))
+    high = float(np.max(periods))
+    return bool(np.isclose(period_days, low) or np.isclose(period_days, high))
 
 
 def _extract_flux_err(lc: Any, flux: np.ndarray) -> np.ndarray:

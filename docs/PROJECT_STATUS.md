@@ -2,7 +2,7 @@
 
 ## Status: Active Development
 ## Phase: Live Discovery Gate — run006 QLP candidate review
-## Last Updated: 2026-06-29
+## Last Updated: 2026-06-30
 
 ---
 
@@ -14,8 +14,8 @@ The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit w
 - Bayesian log-score model over six hypotheses
 - Optional XGBoost and stacking scorer modes (Tier 1 model trained: Kepler KOI AUC=0.992)
 - SQLite-backed background automation with top-level logs
-- 415 standalone `Skills/` utility scripts
-- 113 top-level test files, 2,328 default tests passing
+- 98 standalone `Skills/` utility scripts (`rg --files Skills -g '*.py'`)
+- 114 top-level test files
 - 27 package Python modules under `src/exo_toolkit/`
 - JWST time-series ingestion wired into the CLI with `--mission JWST`
 - Novel TESS target scanning that excludes TOI, CTOI, and confirmed-host catalogs
@@ -42,7 +42,7 @@ Local validation note: validated on Python 3.14.3 in `.venv` with `xgboost` depe
 | ML Tier 2 scaffolding | `ml/cnn_scorer.py`, `Skills/train_cnn.py`, CNN data utilities | Complete, no production checkpoint; paused until discovery scan evidence exists |
 | Training/evaluation Skills | Kepler, TESS, combined training, CNN data assembly/validation/training support, XGBoost training, scorer evaluation | Complete |
 | Discovery workflow Skills | star scanner, batch scan, alert filter, ranking, watchlist, exports, reports | Complete; first real QLP scan complete and review-blocked |
-| Milestones 13-39 Skills | 354 additional analysis, vetting, observability, ML, physics, reporting, scheduling, and follow-up utilities | Complete |
+| Additional Skills | Analysis, vetting, observability, ML, physics, reporting, scheduling, and follow-up utilities retained after production-scope cleanup | Complete |
 | Milestone 19a Skill | `multi_sector_phase_compare.py` — offline per-sector phase-fold comparison | Complete |
 | Milestone 19b Skill | `candidate_dashboard_export.py` — static conservative candidate dashboard with optional plot artifacts | Complete |
 | Milestone 19c Skill | `candidate_api.py` — local read-only candidate API plus optional background SQLite summaries | Complete |
@@ -114,6 +114,8 @@ and 0 active targets. The filtered output contains two rows: TIC 201252011
 
 The next action is review, not rerun: inspect the two filtered candidates and
 the high candidate rate / period-boundary behavior before any external action.
+Version 0.2.6 rejects invalid BLS peaks and period-grid boundary peaks before
+they become candidate signals, so future evidence runs must use 0.2.6 or newer.
 
 ## Paused
 
@@ -176,7 +178,7 @@ handoff.
 
 ## Latest Local Validation
 
-Validated on 2026-06-27:
+Validated on 2026-06-30:
 
 ```bash
 .venv/bin/ruff check .
@@ -184,7 +186,7 @@ Validated on 2026-06-27:
 .venv/bin/python -m pytest
 ```
 
-Result: ruff passed, mypy passed, pytest passed with 2,328 passed, 2 deselected, and 3 package warnings.
+Result: ruff passed, mypy passed, pytest passed with 2,355 passed, 2 deselected, and 3 package warnings.
 
 ---
 

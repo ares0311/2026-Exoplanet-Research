@@ -11,12 +11,16 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import astropy.units as u
 import numpy as np
 import pytest
 
+import exo_toolkit.search as search_module
 from exo_toolkit.search import (
     _count_transits,
     _extract_flux_err,
+    _is_period_grid_edge,
+    _is_usable_peak,
     _make_candidate_id,
     _make_period_grid,
     search_lightcurve,
@@ -122,6 +126,72 @@ class TestMakePeriodGrid:
         )
 
         assert grid == "auto-grid"
+
+
+class TestBlsPeakGuards:
+    def test_period_grid_edge_detects_lower_and_upper_bounds(self) -> None:
+        grid = np.array([0.5, 2.0, 10.0]) * u.day
+
+        assert _is_period_grid_edge(0.5, grid)
+        assert _is_period_grid_edge(10.0, grid)
+        assert not _is_period_grid_edge(2.0, grid)
+
+    def test_unusable_peak_rejects_negative_duration(self) -> None:
+        assert not _is_usable_peak(
+            period_days=3.0,
+            epoch_bjd=2459000.0,
+            duration_hours=-1.0,
+            depth=0.01,
+            depth_err=0.001,
+            snr=10.0,
+            power=1.0,
+        )
+
+    def test_search_fails_closed_on_invalid_bls_duration(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        class _BadDurationResult:
+            power = np.array([1.0])
+            period = np.array([3.0]) * u.day
+            transit_time = np.array([2459001.0]) * u.day
+            duration = np.array([-1.0]) * u.hour
+            depth = np.array([0.01])
+            depth_err = np.array([0.001])
+
+        class _BadDurationBls:
+            def __init__(self, *_args: object, **_kwargs: object) -> None:
+                pass
+
+            def power(self, *_args: object, **_kwargs: object) -> _BadDurationResult:
+                return _BadDurationResult()
+
+        monkeypatch.setattr(search_module, "BoxLeastSquares", _BadDurationBls)
+
+        assert search_lightcurve(_flat_lc(), "TIC 1", "TESS") == []
+
+    def test_search_rejects_period_boundary_peak(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        class _BoundaryResult:
+            power = np.array([1.0])
+            period = np.array([0.5]) * u.day
+            transit_time = np.array([2459001.0]) * u.day
+            duration = np.array([2.0]) * u.hour
+            depth = np.array([0.01])
+            depth_err = np.array([0.001])
+
+        class _BoundaryBls:
+            def __init__(self, *_args: object, **_kwargs: object) -> None:
+                pass
+
+            def power(self, *_args: object, **_kwargs: object) -> _BoundaryResult:
+                return _BoundaryResult()
+
+        monkeypatch.setattr(search_module, "BoxLeastSquares", _BoundaryBls)
+
+        assert search_lightcurve(_flat_lc(), "TIC 1", "TESS") == []
 
 
 # ---------------------------------------------------------------------------
