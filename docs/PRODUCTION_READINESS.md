@@ -191,7 +191,7 @@ These are enforced in code and must never be bypassed:
 
 | Blocker | What Is Needed | Who |
 |---|---|---|
-| First real discovery scan | Run the 200-target `star_scanner.py` batch on the user's Mac and paste back the rank/filter summary | Human |
+| First real discovery scan review | Review run006 candidates and numerical-quality behavior; generate false-positive diagnostics before any external action | Agent |
 | Next CNN production plan | Wait for T1-0 scan evidence; only then decide whether C20 corpus assembly/training is still production-relevant | Agent + human approval |
 | CNN production promotion | Validate, calibrate, register, and commit only a future checkpoint that passes held-out gates | Agent + human approval |
 | Stacking weight calibration | Tune blend weights on held-out calibration set | Agent after T1-1 resolved |

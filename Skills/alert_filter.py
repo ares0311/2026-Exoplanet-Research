@@ -157,6 +157,8 @@ def _scan_log_to_rows(log: dict[str, Any]) -> list[dict[str, Any]]:
         tic_id = entry.get("tic_id")
         target_id = f"TIC {tic_id}" if tic_id is not None else str(key)
         best_fpp = entry.get("best_fpp")
+        detection_confidence = entry.get("best_detection_confidence")
+        novelty_score = entry.get("best_novelty_score")
         rows.append(
             {
                 "candidate_id": target_id,
@@ -170,9 +172,20 @@ def _scan_log_to_rows(log: dict[str, Any]) -> list[dict[str, Any]]:
                 "best_pathway": entry.get("best_pathway"),
                 "false_positive_probability": best_fpp,
                 "best_fpp": best_fpp,
+                "snr": entry.get("best_snr"),
+                "best_snr": entry.get("best_snr"),
+                "depth_ppm": entry.get("best_depth_ppm"),
+                "duration_hours": entry.get("best_duration_hours"),
+                "transit_count": entry.get("best_transit_count"),
+                "provenance_score": entry.get("provenance_score"),
                 "priority_score": entry.get("priority_score"),
                 "scanned_at": entry.get("scanned_at"),
-                "scores": {"false_positive_probability": best_fpp},
+                "signals": entry.get("signals", []),
+                "scores": {
+                    "false_positive_probability": best_fpp,
+                    "detection_confidence": detection_confidence,
+                    "novelty_score": novelty_score,
+                },
             }
         )
     return rows

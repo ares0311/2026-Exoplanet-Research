@@ -73,18 +73,27 @@ def _scan_log_to_rows(data: dict[str, Any]) -> list[dict[str, Any]]:
         if entry.get("status") != "candidate_found":
             continue
         fpp = entry.get("best_fpp")
+        detection_confidence = entry.get("best_detection_confidence")
+        novelty_score = entry.get("best_novelty_score")
         rows.append({
             "tic_id": entry.get("tic_id"),
             "target_id": f"TIC {entry.get('tic_id', '?')}",
             "candidate_id": f"TIC {entry.get('tic_id', '?')}",
             "period_days": entry.get("best_period_days") or 0.0,
             "pathway": entry.get("best_pathway") or "",
-            "provenance_score": 0.0,
-            "snr": 0.0,
+            "provenance_score": entry.get("provenance_score") or 0.0,
+            "snr": entry.get("best_snr") or 0.0,
+            "n_signals": entry.get("n_signals", 0),
+            "depth_ppm": entry.get("best_depth_ppm"),
+            "duration_hours": entry.get("best_duration_hours"),
+            "transit_count": entry.get("best_transit_count"),
+            "signals": entry.get("signals", []),
             "scores": {
                 "false_positive_probability": fpp if fpp is not None else 1.0,
-                "detection_confidence": 0.0,
-                "novelty_score": 0.0,
+                "detection_confidence": (
+                    detection_confidence if detection_confidence is not None else 0.0
+                ),
+                "novelty_score": novelty_score if novelty_score is not None else 0.0,
             },
         })
     return rows

@@ -324,7 +324,7 @@ Ranks `exo --output` JSON results by composite score and prints a Rich table.
 - `load_candidates(paths)` — flatten one or more JSON output files
 - `compute_rank_score(row)` — `0.45*(1-FPP) + 0.30*DC + 0.15*novelty + 0.10*provenance + pathway_bonus`
 - `rank_candidates(rows, top_n)` — sort by rank_score descending
-- CLI: `python Skills/rank_candidates.py results/*.json --top 10 [--json]`
+- CLI: `.venv/bin/python Skills/rank_candidates.py results/*.json --top 10 [--json]`
 - 12 tests in `tests/test_rank_candidates.py`
 
 ---
@@ -336,7 +336,7 @@ Scans a list of TIC IDs from a text or CSV file, writing incremental JSON result
 - `read_tic_ids(path)` — parse TIC IDs from plain text or CSV (skips comments, headers)
 - `batch_scan(tic_ids, *, output_path, resume, run_pipeline_fn, ...)` — calls `run_pipeline` per target; writes after each result; `--resume` skips already-completed IDs
 - Status per entry: `"candidate_found"` | `"scanned_clear"` | `"error"`
-- CLI: `python Skills/batch_scan.py targets.txt --output results.json [--resume]`
+- CLI: `.venv/bin/python Skills/batch_scan.py targets.txt --output results.json [--resume]`
 - 14 tests in `tests/test_batch_scan.py`
 
 ---
@@ -347,7 +347,7 @@ Queries MAST for which TESS sectors are available for a target without downloadi
 
 - `get_sector_coverage(target_id, *, pipeline, search_fn)` → `SectorCoverage`
 - `format_coverage_table(coverages)` → plain-text table
-- CLI: `python Skills/sector_coverage.py TIC 150428135 [--pipeline QLP] [--json]`
+- CLI: `.venv/bin/python Skills/sector_coverage.py TIC 150428135 [--pipeline QLP] [--json]`
 - 10 tests in `tests/test_sector_coverage.py`
 
 ---
@@ -397,7 +397,7 @@ Persistent JSON watchlist for follow-up TIC IDs. Integrates with `batch_scan.py`
 
 - `Watchlist(path)` — `add(tic_id, note)`, `remove(tic_id)`, `contains(tic_id)`, `list_ids()`, `entries()`, `clear()`, `summary()`
 - Atomic write via tempfile rename
-- CLI: `python Skills/watchlist.py add/remove/list/clear/summary`
+- CLI: `.venv/bin/python Skills/watchlist.py add/remove/list/clear/summary`
 - 13 tests in `tests/test_watchlist.py`
 
 ---
@@ -720,7 +720,7 @@ All pipeline modules are complete.
 **Injection-recovery completeness mapping** (`Skills/injection_recovery.py`): ✅
 - Injects synthetic box transits into real or simulated light curves
 - Recovers via `search_lightcurve`; measures recovery rate vs. period and depth
-- Usable as CLI script (`python Skills/injection_recovery.py`) or importable library
+- Usable as CLI script (`.venv/bin/python Skills/injection_recovery.py`) or importable library
 - 25 tests in `tests/test_injection_recovery.py`
 
 **CLI entry point** (`src/exo_toolkit/cli.py`): ✅
@@ -881,7 +881,7 @@ All pipeline modules are complete.
 | `cnn_feature_augmenter.py` | `augment_snippet`, `augment_dataset`, noise/shift/scale/reverse | 12 |
 | `build_cnn_training_data.py` | `load_training_examples`, `write_training_splits`, offline train/val/test split assembly | 13 |
 | `cnn_split_validator.py` | `validate_split_dir`, `validate_split_manifest`, offline split artifact validation | 15 |
-| `candidate_report_card.py` | `build_report_card`, `save_report_card`, integrated vetting card | 15 |
+| `candidate_dashboard_export.py` | `build_dashboard`, `write_dashboard`, conservative review dashboard | 15 |
 
 ### Completed (2026-05-18) — Milestone 17
 

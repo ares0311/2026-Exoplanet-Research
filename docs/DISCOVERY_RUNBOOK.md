@@ -40,8 +40,9 @@ Step 3: REJECT false positives algorithmically
 Step 4: ESCALATE surviving candidates to human review
          → Run exo <TIC-ID> --output candidate.json
          → Generate phase-fold plot (Skills/plot_lc.py)
-         → Generate report card (Skills/candidate_report_card.py)
-         → Submit to Planet Hunters TESS or CTOI process
+         → Generate false-positive vetting notes (Skills/false_positive_vetter.py)
+         → Generate review dashboard (Skills/candidate_dashboard_export.py)
+         → Submit to Planet Hunters TESS or CTOI process only after explicit human approval
 ```
 
 **If CI has not run on this session's branch, STOP — get CI green before anything else.**
@@ -94,7 +95,10 @@ For Tmag 12–15 specifically:
 - Re-detrend with sigma-clip before BLS (already in `clean.py`)
 - Run even-odd depth check on all candidates (already in `vet.py`)
 
-These are not committed changes — the CLI accepts `--min-snr` already. Period range extension requires a PR to `search.py` defaults.
+The live scanner path uses a bounded BLS grid (`--max-period-grid-points`) so
+long-baseline QLP scans remain operational on the local M4 Max without silently
+launching hundreds of millions of trial periods. Do not change these thresholds
+without candidate-specific evidence.
 
 ---
 
@@ -154,11 +158,11 @@ JWST does not run autonomous surveys the way TESS does. Its time-series observat
 
 ---
 
-## TESS Target Selection: Option B — B1-B4 Merged, B5 Pending
+## TESS Target Selection: Option B — B1-B4 Merged, B5 Review Needed
 
-**Use for the first real discovery scan.**
+**Use for first real discovery-scan review.**
 
-Current gate: `star_scanner.py` excludes TOI, CTOI, and confirmed exoplanet hosts from the NASA Exoplanet Archive, and defaults to the Tmag 12.0-14.5 novelty frontier. The first SPOC-only run completed but did not close the gate because nearly every selected TIC had no SPOC long-cadence light curve. The first QLP rerun also did not close the gate because three stale local Lightkurve cache FITS files were corrupt from interrupted downloads and the shared fetch path did not repair them before retrying. The next QLP attempt repaired cache files but still crashed because Lightkurve public download methods mutate process-global stdout under worker-thread concurrency. The stdout-safe QLP attempt completed but still did not close the gate because the shared fetch path requested SPOC-style `pdcsap_flux`; valid QLP products do not provide `PDCSAP_FLUX`. The flux-safe QLP attempt still did not close the gate because it produced third-party MAST download chatter and no durable scan log before the first completed target. Use QLP with a fresh log after the scanner progress/quiet-download fix is merged for the next scan.
+Current gate: `star_scanner.py` excludes TOI, CTOI, and confirmed exoplanet hosts from the NASA Exoplanet Archive, and defaults to the Tmag 12.0-14.5 novelty frontier. The first SPOC-only run completed but did not close the gate because nearly every selected TIC had no SPOC long-cadence light curve. The first QLP rerun also did not close the gate because three stale local Lightkurve cache FITS files were corrupt from interrupted downloads and the shared fetch path did not repair them before retrying. The next QLP attempt repaired cache files but still crashed because Lightkurve public download methods mutate process-global stdout under worker-thread concurrency. The stdout-safe QLP attempt completed but still did not close the gate because the shared fetch path requested SPOC-style `pdcsap_flux`; valid QLP products do not provide `PDCSAP_FLUX`. The flux-safe QLP attempt still did not close the gate because it produced third-party MAST download chatter and no durable scan log before the first completed target. Run006 completed after the progress/quiet-download and bounded-BLS fixes; T1-0 is now blocked on candidate/numerical-quality review, not another blind scan.
 
 ### Option B build plan
 
@@ -168,9 +172,9 @@ Current gate: `star_scanner.py` excludes TOI, CTOI, and confirmed exoplanet host
 | B2 | Add confirmed-planet cross-check using NASA Exoplanet Archive TAP (`ps` table, `pl_tranflag=1`) | MERGED (PR #139) |
 | B3 | Default `tmag_range` in `star_scanner.py` to `(12.0, 14.5)` to target faint-star novelty frontier | MERGED (PR #139) |
 | B4 | Extend default `period_max` in BLS search to 500 d | MERGED (PR #139) |
-| B5 | Run first 200-target QLP discovery scan and document results | [HUMAN] |
+| B5 | Review first 200-target QLP discovery scan and document candidate/numerical quality | REVIEW NEEDED |
 
-**Status**: B1-B4 merged to `main`. B5 is the highest-priority active production gate.
+**Status**: B1-B4 merged to `main`. B5 run006 is complete locally and review-blocked; this is the highest-priority active production gate.
 
 ---
 
@@ -225,13 +229,14 @@ The pipeline can do these things today without new code:
 | Capability | Command |
 |------------|---------|
 | Scan a single star | `exo <TIC-ID> --output out.json` |
-| Scan a list of stars | `python Skills/batch_scan.py targets.txt --output results.json --resume` |
+| Scan a list of stars | `.venv/bin/python Skills/batch_scan.py targets.txt --output results.json --resume` |
 | Select novel TIC targets | `.venv/bin/python Skills/star_scanner.py --max-stars 500 --tmag-min 12 --tmag-max 15` |
-| Rank candidates by quality | `python Skills/rank_candidates.py results.json --top 20` |
-| Check if target is already TOI | `python Skills/toi_checker.py <TIC-ID>` |
-| Filter by FPP/pathway | `python Skills/alert_filter.py results.json --fpp-max 0.15` |
-| Generate phase-fold plot | `python Skills/plot_lc.py results.json --output-dir plots/` |
-| Generate candidate report | `python Skills/candidate_report_card.py results.json --output reports/` |
+| Rank candidates by quality | `.venv/bin/python Skills/rank_candidates.py results.json --top 20` |
+| Check if target is already TOI | `.venv/bin/python Skills/toi_checker.py <TIC-ID>` |
+| Filter by FPP/pathway | `.venv/bin/python Skills/alert_filter.py results.json --fpp-max 0.15` |
+| Generate phase-fold plot | `.venv/bin/python Skills/plot_lc.py results.json --output-dir plots/` |
+| Generate FP vetting report | `.venv/bin/python Skills/false_positive_vetter.py results.json --output reports/fp_vetting.md` |
+| Generate review dashboard | `.venv/bin/python Skills/candidate_dashboard_export.py results.json --output reports/candidate_dashboard.html` |
 | XGBoost scorer (better FP rejection) | `exo <TIC-ID> --scorer xgboost --model-path models/xgboost_koi.json` |
 
 The XGBoost model (`models/xgboost_koi.json`) is trained and available now.
