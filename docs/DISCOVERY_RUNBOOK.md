@@ -2,7 +2,7 @@
 
 **Purpose**: Prevent doom loops. Every agent and every session must read this before doing anything.
 
-**Last updated**: 2026-06-29 (Option A JWST integration and Option B TESS novelty restructure merged; PR #143 live scanner fix merged; PR #145 worker/ETA fix merged; SPOC-only B5 attempt, QLP corrupt-cache attempt, QLP stdout-race attempt, QLP wrong-flux-column attempt, and QLP no-progress/no-durable-log attempt did not close T1-0; run006 completed and now requires candidate/numerical-quality review)
+**Last updated**: 2026-06-30 (Option A JWST integration and Option B TESS novelty restructure merged; PR #143 live scanner fix merged; PR #145 worker/ETA fix merged; SPOC-only B5 attempt, QLP corrupt-cache attempt, QLP stdout-race attempt, QLP wrong-flux-column attempt, and QLP no-progress/no-durable-log attempt did not close T1-0; run006 completed and now requires candidate/numerical-quality review; version 0.2.6 rejects invalid and period-boundary BLS peaks)
 
 ---
 
@@ -162,7 +162,7 @@ JWST does not run autonomous surveys the way TESS does. Its time-series observat
 
 **Use for first real discovery-scan review.**
 
-Current gate: `star_scanner.py` excludes TOI, CTOI, and confirmed exoplanet hosts from the NASA Exoplanet Archive, and defaults to the Tmag 12.0-14.5 novelty frontier. The first SPOC-only run completed but did not close the gate because nearly every selected TIC had no SPOC long-cadence light curve. The first QLP rerun also did not close the gate because three stale local Lightkurve cache FITS files were corrupt from interrupted downloads and the shared fetch path did not repair them before retrying. The next QLP attempt repaired cache files but still crashed because Lightkurve public download methods mutate process-global stdout under worker-thread concurrency. The stdout-safe QLP attempt completed but still did not close the gate because the shared fetch path requested SPOC-style `pdcsap_flux`; valid QLP products do not provide `PDCSAP_FLUX`. The flux-safe QLP attempt still did not close the gate because it produced third-party MAST download chatter and no durable scan log before the first completed target. Run006 completed after the progress/quiet-download and bounded-BLS fixes; T1-0 is now blocked on candidate/numerical-quality review, not another blind scan.
+Current gate: `star_scanner.py` excludes TOI, CTOI, and confirmed exoplanet hosts from the NASA Exoplanet Archive, and defaults to the Tmag 12.0-14.5 novelty frontier. The first SPOC-only run completed but did not close the gate because nearly every selected TIC had no SPOC long-cadence light curve. The first QLP rerun also did not close the gate because three stale local Lightkurve cache FITS files were corrupt from interrupted downloads and the shared fetch path did not repair them before retrying. The next QLP attempt repaired cache files but still crashed because Lightkurve public download methods mutate process-global stdout under worker-thread concurrency. The stdout-safe QLP attempt completed but still did not close the gate because the shared fetch path requested SPOC-style `pdcsap_flux`; valid QLP products do not provide `PDCSAP_FLUX`. The flux-safe QLP attempt still did not close the gate because it produced third-party MAST download chatter and no durable scan log before the first completed target. Run006 completed after the progress/quiet-download and bounded-BLS fixes; T1-0 is now blocked on candidate/numerical-quality review, not another blind scan. Version 0.2.6 adds a fail-closed BLS guard for invalid peaks and period-grid boundary peaks, directly addressing the run006 negative-duration error and boundary-period artifact class.
 
 ### Option B build plan
 
@@ -263,6 +263,10 @@ log. The run is useful evidence, but not submission-ready: 192/200 targets were
 flagged as candidates and 81 detections landed at the 0.5 d or 500 d period
 boundaries, so the next work is candidate/numerical-quality review and
 false-positive diagnostics.
+
+Version 0.2.6 rejects invalid BLS peaks and peaks pinned to the BLS period-grid
+boundary. Treat any run006 candidate review as pre-0.2.6 evidence; any future
+evidence rerun must start from synced `main` at 0.2.6 or newer.
 
 Do not build the C20 CNN corpus or train C20 until this discovery run has been
 reviewed. Do not submit or contact externally without explicit human approval.

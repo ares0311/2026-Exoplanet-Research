@@ -3,7 +3,7 @@
 Last reviewed: 2026-06-29 (JWST A3 merged — PR #141; TESS novelty restructure B1-B4 merged — PR #139; live scanner startup/target-selection fix merged — PR #143; PR #145 worker/ETA fix merged; run006 completed with real QLP scan evidence and now requires candidate/numerical-quality review)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 2,328 default tests passing, 2 integration_live deselected
+Test baseline: 2,355 default tests passing, 2 integration_live deselected
 
 ---
 
@@ -37,6 +37,7 @@ must not be copied into `models/`, registered, or used for production scoring.
 - **Root cause of run 005**: `ScanLog` created no durable file until the first completed `record()`, `run_background_scan()` printed progress only after a future completed, and the Lightkurve per-product path still let Astroquery `Observations.download_products(verbose=True)` print MAST download banners from worker threads.
 - **Additional preflight finding (2026-06-29)**: A one-target live smoke exposed an internal scanner bottleneck before the production batch: QLP TIC 425884922 produced 37,946 cleaned cadences over a 2,608-day baseline, and Astropy's default BLS `autoperiod()` generated ~620-652 million trial periods. The same smoke then exposed an internal argument-order bug when `run_pipeline()` called `vet_signal(signal, light_curve)` instead of the documented `vet_signal(light_curve, signal)`.
 - **Run006 evidence**: SHA-256 `8ed084e39fcf1b1f7f0405208a413d4651641aba195305f3ca3b2b8bc3615dc8` for the scan log and `17630739c28bed296910512b86c63c77d952708cf84ab2fe6d8f55ae120a5fc9` for the filtered output. Filtered candidates: TIC 201252011, period 227.39056281978395 d, FPP 0.1160636155807766; TIC 257712351, period 142.95415231096942 d, FPP 0.12672985673564718.
+- **Numerical guardrail after run006**: Version 0.2.6 rejects BLS peaks with non-finite/non-positive values and rejects peaks pinned to the lower or upper period-grid boundary. This directly addresses the run006 negative-duration error and the 81 period-boundary detections before any follow-up evidence run.
 - **Required next review**: Review the 2 filtered candidates, inspect phase-fold plots/report cards, check TOI/CTOI/confirmed-host exclusions again, and investigate numerical-quality warnings before any external action. The batch also produced a suspiciously high candidate rate (192/200) and 81 candidates at the 0.5 d or 500 d period boundaries; that is a model/search-quality issue to triage before treating candidates as credible.
 - **Next escalation rule**: Do not resume CNN C20 training and do not submit/contact externally until run006 candidates have been reviewed and false-positive diagnostics are documented. If review rejects the filtered candidates as artifacts, the null/low-quality result should drive the next production-planning cycle.
 
@@ -152,7 +153,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
 | 82 production-critical Skills/ | ✅ |
-| 2,328 default tests, ruff clean, mypy clean | ✅ |
+| 2,355 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
