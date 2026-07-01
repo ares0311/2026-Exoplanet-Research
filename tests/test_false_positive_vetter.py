@@ -78,6 +78,24 @@ class TestVetCandidate:
         oe = next(v for v in verdicts if v.feature_name == "odd_even_mismatch_score")
         assert oe.verdict == "missing"
 
+    def test_missing_odd_even_explains_insufficient_transits(self) -> None:
+        row = {
+            "candidate_id": "x",
+            "features": {"odd_even_mismatch_score": None},
+            "diagnostics": {"individual_depths": [0.001, 0.0011]},
+        }
+        verdicts = vet_candidate(row)
+        oe = next(v for v in verdicts if v.feature_name == "odd_even_mismatch_score")
+        assert oe.verdict == "missing"
+        assert oe.missing_reason is not None
+        assert "only 2 measured transit depth" in oe.missing_reason
+
+    def test_missing_catalog_diagnostic_explains_source(self) -> None:
+        verdicts = vet_candidate(_row({"centroid_offset_score": None}))
+        centroid = next(v for v in verdicts if v.feature_name == "centroid_offset_score")
+        assert centroid.verdict == "missing"
+        assert centroid.missing_reason == "needs in-transit centroid shift diagnostics"
+
 
 class TestFormatVettingReport:
     def test_report_contains_candidate_id(self) -> None:
@@ -89,3 +107,10 @@ class TestFormatVettingReport:
         verdicts = vet_candidate(_row({}))
         report = format_vetting_report(verdicts)
         assert "FP Indicators" in report
+
+    def test_report_contains_missing_diagnostics_section(self) -> None:
+        verdicts = vet_candidate(_row({}))
+        report = format_vetting_report(verdicts)
+        assert "Missing Diagnostics" in report
+        assert "centroid_offset_score" in report
+        assert "needs in-transit centroid shift diagnostics" in report

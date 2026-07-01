@@ -2,7 +2,7 @@
 
 ## Status: Active Development
 ## Phase: Live Discovery Gate — run008 targeted QLP false-positive review
-## Last Updated: 2026-06-30
+## Last Updated: 2026-07-01
 
 ---
 
@@ -115,6 +115,10 @@ and 0 active targets. The filtered output contains two rows: TIC 201252011
 follow-up: Lightkurve stitch no longer normalizes QLP products before project
 sigma-clipping, and `exo --output` now serializes computed vetting features for
 `Skills/false_positive_vetter.py`.
+- Version 0.2.9 adds candidate-review diagnostics: `exo --output` now
+  serializes raw vetting diagnostics, fetch provenance, and missing-feature
+  names, and `Skills/false_positive_vetter.py` explains why missing
+  diagnostics are unavailable.
 - Run008 targeted follow-up reproduced both filtered candidates under the fixed
 path: `logs/discovery_run_008_targeted_qlp_stitch_safe.json` has 2
 `candidate_found` entries and active `{}`. SHA-256:
@@ -123,8 +127,8 @@ Filtered output SHA-256:
 `574a4cf188faa9e273128496fcd23b27cb8369a3e9d2ad2c1b5bbaedd9effed4`.
 
 The next action is false-positive review, not rerun: inspect the two targeted
-candidates and the missing diagnostics before any external action. Both best
-signals still fail `limb_darkening_plausibility_score=0.0`, and many
+candidates and the missing-diagnostic reasons before any external action. Both
+best signals still fail `limb_darkening_plausibility_score=0.0`, and many
 centroid/contamination/odd-even/multi-sector diagnostics remain unavailable.
 
 ## Paused
@@ -174,7 +178,7 @@ centroid/contamination/odd-even/multi-sector diagnostics remain unavailable.
 ## Next Actions
 
 1. Review `logs/discovery_run_008_targeted_qlp_stitch_safe.json`, ranked candidates, and `logs/discovery_filtered_008_targeted_qlp_stitch_safe.json` as the current targeted evidence.
-2. Use the regenerated `exo --output` rows and false-positive vetting reports for TIC 201252011 and TIC 257712351; both best signals remain review-blocked by missing diagnostics and failed limb-darkening plausibility.
+2. Use regenerated 0.2.9+ `exo --output` rows and false-positive vetting reports for TIC 201252011 and TIC 257712351; both best signals remain review-blocked by missing diagnostics and failed limb-darkening plausibility.
 3. Add or run candidate-specific centroid, contamination, odd/even, and multi-sector diagnostics before any external action.
 4. Investigate why run006 flagged 192/200 targets as candidates and why many detections hit the 0.5 d / 500 d period boundaries before another blind scan.
 5. Do not run C20 CNN corpus assembly or training until the first discovery scan is reviewed.
