@@ -67,6 +67,69 @@ class VetVerdict:
     threshold_warn: float
     threshold_fail: float
     is_fp_indicator: bool
+    missing_reason: str | None = None
+
+
+_MISSING_REASON_BY_FEATURE = {
+    "odd_even_mismatch_score": (
+        "needs at least four measured transit depths for an odd/even comparison"
+    ),
+    "secondary_eclipse_score": (
+        "needs enough phase-0.5 coverage and out-of-eclipse baseline to measure a "
+        "secondary eclipse"
+    ),
+    "duration_consistency_score": "needs per-transit duration fitting",
+    "transit_timing_variation_score": "needs per-transit midpoint fitting",
+    "out_of_transit_scatter_score": "needs expected photon-noise or OOT scatter diagnostics",
+    "multi_sector_depth_consistency_score": "needs per-sector transit depth measurements",
+    "stellar_density_consistency_score": "needs host-star radius and mass diagnostics",
+    "centroid_offset_score": "needs in-transit centroid shift diagnostics",
+    "centroid_motion_score": "needs in-transit centroid motion diagnostics",
+    "contamination_score": "needs aperture contamination or CROWDSAP-style diagnostics",
+    "dilution_sensitivity_score": "needs aperture contamination or CROWDSAP-style diagnostics",
+    "nearby_bright_source_score": "needs nearby Gaia/TIC source diagnostics",
+    "aperture_edge_score": "needs aperture-edge proximity diagnostics",
+    "stellar_variability_score": "needs periodogram, flare, or quasi-periodic diagnostics",
+    "variability_periodogram_score": "needs Lomb-Scargle power at the candidate period",
+    "harmonic_score": "needs Lomb-Scargle power at harmonic/sub-harmonic periods",
+    "flare_score": "needs flare-rate diagnostics",
+    "quasi_periodic_score": "needs quasi-periodic variability diagnostics",
+    "systematics_overlap_score": "needs quality-flag, sector-boundary, or background diagnostics",
+    "quality_flag_score": "needs per-transit pipeline quality flag diagnostics",
+    "sector_boundary_score": "needs sector-boundary overlap diagnostics",
+    "background_excursion_score": "needs background-flux excursion diagnostics",
+    "nearby_targets_common_signal_score": "needs neighboring-target common-signal diagnostics",
+    "known_object_score": "needs known-object catalog crossmatch diagnostics",
+    "target_id_match_score": "needs known-object target-ID crossmatch diagnostics",
+    "period_match_score": "needs known-object period-match diagnostics",
+    "epoch_match_score": "needs known-object epoch-match diagnostics",
+    "coordinate_match_score": "needs known-object coordinate-match diagnostics",
+}
+
+
+def _missing_reason(feature_name: str, row: dict[str, Any]) -> str | None:
+    diagnostics = row.get("diagnostics", {}) or {}
+
+    if feature_name == "odd_even_mismatch_score":
+        depths = diagnostics.get("individual_depths")
+        n_depths = len(depths) if isinstance(depths, list | tuple) else 0
+        if n_depths < 4:
+            return (
+                f"only {n_depths} measured transit depth(s); odd/even needs at least 4"
+            )
+
+    if feature_name == "multi_sector_depth_consistency_score":
+        sector_depths = diagnostics.get("sector_depths")
+        n_sectors = len(sector_depths) if isinstance(sector_depths, list | tuple) else 0
+        if n_sectors < 2:
+            return (
+                f"only {n_sectors} sector depth measurement(s); multi-sector check needs at least 2"
+            )
+
+    if feature_name == "secondary_eclipse_score" and "secondary_snr" in diagnostics:
+        return "secondary eclipse SNR was not measurable from the current phase coverage"
+
+    return _MISSING_REASON_BY_FEATURE.get(feature_name)
 
 
 def vet_candidate(
@@ -93,8 +156,10 @@ def vet_candidate(
         score = features.get(name)
         tw = w * warn_threshold_scale
         tf = f * fail_threshold_scale
+        missing_reason = None
         if score is None:
             verdict = "missing"
+            missing_reason = _missing_reason(name, row)
         elif score >= tf:
             verdict = "fail"
         elif score >= tw:
@@ -104,15 +169,17 @@ def vet_candidate(
         verdicts.append(VetVerdict(
             feature_name=name, score=score,
             verdict=verdict, threshold_warn=tw, threshold_fail=tf,
-            is_fp_indicator=True,
+            is_fp_indicator=True, missing_reason=missing_reason,
         ))
 
     for name, (w, f) in _QUALITY_FEATURES.items():
         score = features.get(name)
         tw = w
         tf = f
+        missing_reason = None
         if score is None:
             verdict = "missing"
+            missing_reason = _missing_reason(name, row)
         elif score < tf:
             verdict = "fail"
         elif score < tw:
@@ -122,7 +189,7 @@ def vet_candidate(
         verdicts.append(VetVerdict(
             feature_name=name, score=score,
             verdict=verdict, threshold_warn=tw, threshold_fail=tf,
-            is_fp_indicator=False,
+            is_fp_indicator=False, missing_reason=missing_reason,
         ))
 
     return verdicts
@@ -175,6 +242,18 @@ def format_vetting_report(
         score_str = f"{v.score:.3f}" if v.score is not None else "—"
         icon = {"pass": "✓", "warn": "⚠", "fail": "✗", "missing": "·"}[v.verdict]
         lines.append(f"| {v.feature_name} | {score_str} | {icon} {v.verdict} |")
+
+    missing = [v for v in verdicts if v.verdict == "missing"]
+    if missing:
+        lines += [
+            "",
+            "## Missing Diagnostics",
+            "| Feature | Reason |",
+            "| --- | --- |",
+        ]
+        for v in missing:
+            reason = v.missing_reason or "required diagnostic was not present"
+            lines.append(f"| {v.feature_name} | {reason} |")
 
     return "\n".join(lines) + "\n"
 

@@ -24,6 +24,7 @@ import argparse
 import json
 import subprocess
 from collections.abc import Sequence
+from dataclasses import asdict, is_dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -91,6 +92,15 @@ def _git_commit_short() -> str | None:
         return result.stdout.strip() or None
     except Exception:
         return None
+
+
+def _diagnostics_to_jsonable(vet_result: Any) -> dict[str, Any]:
+    diagnostics = getattr(vet_result, "diagnostics", None)
+    if diagnostics is None:
+        return {}
+    if is_dataclass(diagnostics) and not isinstance(diagnostics, type):
+        return asdict(diagnostics)
+    return {}
 
 
 def _median(values: Sequence[float]) -> float:
@@ -297,6 +307,11 @@ def run_pipeline(
             for name in type(vet_result.features).model_fields
             if getattr(vet_result.features, name) is not None
         ]
+        features_missing = [
+            name
+            for name in type(vet_result.features).model_fields
+            if getattr(vet_result.features, name) is None
+        ]
 
         row: dict[str, Any] = {
             "candidate_id": signal.candidate_id,
@@ -310,6 +325,7 @@ def run_pipeline(
             "snr": signal.snr,
             "scorer": scorer,
             "provenance_score": provenance_score,
+            "fetch_provenance": fetch_result.provenance.model_dump(mode="json"),
             "posterior": {
                 "planet_candidate": posterior.planet_candidate,
                 "eclipsing_binary": posterior.eclipsing_binary,
@@ -319,6 +335,7 @@ def run_pipeline(
                 "known_object": posterior.known_object,
             },
             "features": vet_result.features.model_dump(mode="json"),
+            "diagnostics": _diagnostics_to_jsonable(vet_result),
             "scores": {
                 "false_positive_probability": scores.false_positive_probability,
                 "detection_confidence": scores.detection_confidence,
@@ -331,6 +348,7 @@ def run_pipeline(
                 "scorer": scorer,
                 "git_commit": _git_commit_short(),
                 "features_available": features_available,
+                "features_missing": features_missing,
             },
         }
 

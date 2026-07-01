@@ -11,6 +11,7 @@ import pytest
 from typer.testing import CliRunner
 
 from exo_toolkit.cli import app, run_pipeline
+from exo_toolkit.features import RawDiagnostics
 from exo_toolkit.fetch import FetchProvenance
 from exo_toolkit.schemas import (
     CandidateFeatures,
@@ -311,6 +312,45 @@ class TestRunPipeline:
             "log_snr_score",
             "odd_even_mismatch_score",
         ]
+
+    def test_row_serializes_vetting_diagnostics_and_missing_features(self) -> None:
+        lc = _mock_lc()
+        signal = _make_signal()
+        features = CandidateFeatures(log_snr_score=0.81)
+        diagnostics = RawDiagnostics(
+            individual_depths=(0.001, 0.0011),
+            individual_depth_errors=(0.0001, 0.0001),
+            secondary_snr=None,
+        )
+
+        with (
+            patch("exo_toolkit.cli.search_lightcurve", return_value=[signal]),
+            patch(
+                "exo_toolkit.cli.vet_signal",
+                return_value=MagicMock(features=features, diagnostics=diagnostics),
+            ),
+            patch(
+                "exo_toolkit.cli.score_candidate",
+                return_value=(_uniform_posterior(), _make_scores()),
+            ),
+            patch(
+                "exo_toolkit.cli.classify_submission_pathway",
+                return_value="github_only_reproducibility",
+            ),
+        ):
+            result = run_pipeline(
+                "TIC 0", "TESS",
+                fetch_fn=self._patched_fetch(lc),
+                clean_fn=self._patched_clean(lc),
+            )
+
+        row = result[0]
+        assert row["diagnostics"]["individual_depths"] == (0.001, 0.0011)
+        assert row["diagnostics"]["secondary_snr"] is None
+        assert "odd_even_mismatch_score" in row["meta"]["features_missing"]
+        assert "log_snr_score" not in row["meta"]["features_missing"]
+        assert row["fetch_provenance"]["target_id"] == "TIC 0"
+        assert row["fetch_provenance"]["sectors_or_quarters"] == [1, 2, 3]
 
     def test_posterior_sums_to_one(self) -> None:
         lc = _mock_lc()
