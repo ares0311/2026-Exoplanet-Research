@@ -19,7 +19,8 @@ verify_table_schema(table_name, required_columns, *, tap_fn) -> TableSchemaCheck
 SourceSmokeTestResult(schema_checks, koi_row_count, toi_row_count, exofop_row_count,
                        sample_kepid, sample_tid, kepler_lightcurves_found,
                        tess_lightcurves_found, ok, failure_reason)
-run_source_smoke_test(*, tap_fn, exofop_fn, lightkurve_search_fn) -> SourceSmokeTestResult
+run_source_smoke_test(*, tap_fn, exofop_fn, lightkurve_search_fn, progress_fn)
+    -> SourceSmokeTestResult
 format_smoke_test_result(result) -> str
 """
 from __future__ import annotations
@@ -212,6 +213,7 @@ def run_source_smoke_test(
     tap_fn: TapFn | None = None,
     exofop_fn: ExofopFn | None = None,
     lightkurve_search_fn: LightkurveSearchFn | None = None,
+    progress_fn: Callable[[str], None] | None = None,
 ) -> SourceSmokeTestResult:
     """Run the full T1-1 resource-access smoke test.
 
@@ -223,14 +225,24 @@ def run_source_smoke_test(
     Every step fails closed: on the first failure, the function stops and
     returns ``ok=False`` with ``failure_reason`` set, rather than guessing
     or substituting a fallback value.
+
+    Args:
+        progress_fn: Optional callable invoked with a one-line status message
+            before each of the 6 network-bound steps. A silent multi-step
+            network script is indistinguishable from a hung one, so the CLI
+            entry point always passes a real ``print`` callback; defaults to
+            a no-op here so library/test callers stay silent.
     """
     _tap = tap_fn if tap_fn is not None else _default_tap_fn
     _exofop = exofop_fn if exofop_fn is not None else _default_exofop_fn
     _lk_search = (
         lightkurve_search_fn if lightkurve_search_fn is not None else _default_lightkurve_search_fn
     )
+    _progress = progress_fn if progress_fn is not None else (lambda _msg: None)
 
+    _progress("[1/6] Checking 'cumulative' (KOI) table schema...")
     koi_check = verify_table_schema("cumulative", REQUIRED_KOI_COLUMNS, tap_fn=_tap)
+    _progress("[2/6] Checking 'toi' (TOI) table schema...")
     toi_check = verify_table_schema("toi", REQUIRED_TOI_COLUMNS, tap_fn=_tap)
     schema_checks = (koi_check, toi_check)
 
@@ -250,6 +262,7 @@ def run_source_smoke_test(
     koi_cols = ",".join(sorted(REQUIRED_KOI_COLUMNS))
     toi_cols = ",".join(sorted(REQUIRED_TOI_COLUMNS))
 
+    _progress("[3/6] Fetching 5 sample rows each from 'cumulative' and 'toi'...")
     try:
         koi_rows = _parse_csv_rows(
             _tap(_tap_query_url(f"select top 5 {koi_cols} from cumulative"))
@@ -274,6 +287,7 @@ def run_source_smoke_test(
             failure_reason="toi smoke-test query returned no rows",
         )
 
+    _progress("[4/6] Fetching the ExoFOP public TOI CSV...")
     try:
         exofop_raw = _exofop(_EXOFOP_TOI_CSV)
         exofop_rows = _parse_csv_rows(exofop_raw)
@@ -307,6 +321,7 @@ def run_source_smoke_test(
             failure_reason=f"could not parse sample kepid/tid from smoke-test rows: {exc}",
         )
 
+    _progress(f"[5/6] Searching Lightkurve for Kepler light curves (KIC {sample_kepid})...")
     try:
         kepler_search = _lk_search(f"KIC {sample_kepid}", mission="Kepler")
         n_kepler = len(kepler_search)
@@ -334,6 +349,7 @@ def run_source_smoke_test(
             failure_reason=f"No Kepler light curves found for KIC {sample_kepid}",
         )
 
+    _progress(f"[6/6] Searching Lightkurve for TESS light curves (TIC {sample_tid})...")
     try:
         tess_search = _lk_search(f"TIC {sample_tid}", mission="TESS")
         n_tess = len(tess_search)
@@ -416,6 +432,7 @@ def format_smoke_test_result(result: SourceSmokeTestResult) -> str:
 
 def _cli(argv: list[str] | None = None) -> int:
     import argparse
+    import time
     from pathlib import Path
 
     parser = argparse.ArgumentParser(
@@ -431,7 +448,22 @@ def _cli(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    result = run_source_smoke_test()
+    print(
+        "Starting T1-1 dataset source-access smoke test "
+        "(6 sequential live network calls; each step prints when it starts)...",
+        flush=True,
+    )
+    start = time.monotonic()
+
+    def _progress(message: str) -> None:
+        elapsed = time.monotonic() - start
+        print(f"{message}  elapsed={elapsed:.0f}s", flush=True)
+
+    result = run_source_smoke_test(progress_fn=_progress)
+    elapsed_total = time.monotonic() - start
+    status = "PASS" if result.ok else "FAIL"
+    print(f"Done in {elapsed_total:.0f}s — overall {status}", flush=True)
+
     report = format_smoke_test_result(result)
     print(report)
 
