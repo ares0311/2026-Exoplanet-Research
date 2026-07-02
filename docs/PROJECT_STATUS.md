@@ -119,6 +119,8 @@ sigma-clipping, and `exo --output` now serializes computed vetting features for
   serializes raw vetting diagnostics, fetch provenance, and missing-feature
   names, and `Skills/false_positive_vetter.py` explains why missing
   diagnostics are unavailable.
+- Version 0.2.10 adds bounded retry/backoff for transient MAST/Lightkurve
+  connection disconnects during candidate-review packet regeneration.
 - Run008 targeted follow-up reproduced both filtered candidates under the fixed
 path: `logs/discovery_run_008_targeted_qlp_stitch_safe.json` has 2
 `candidate_found` entries and active `{}`. SHA-256:
@@ -178,7 +180,7 @@ centroid/contamination/odd-even/multi-sector diagnostics remain unavailable.
 ## Next Actions
 
 1. Review `logs/discovery_run_008_targeted_qlp_stitch_safe.json`, ranked candidates, and `logs/discovery_filtered_008_targeted_qlp_stitch_safe.json` as the current targeted evidence.
-2. Use regenerated 0.2.9+ `exo --output` rows and false-positive vetting reports for TIC 201252011 and TIC 257712351; both best signals remain review-blocked by missing diagnostics and failed limb-darkening plausibility.
+2. Use regenerated 0.2.10+ `exo --output` rows and false-positive vetting reports for TIC 201252011 and TIC 257712351; both best signals remain review-blocked by missing diagnostics and failed limb-darkening plausibility.
 3. Add or run candidate-specific centroid, contamination, odd/even, and multi-sector diagnostics before any external action.
 4. Investigate why run006 flagged 192/200 targets as candidates and why many detections hit the 0.5 d / 500 d period boundaries before another blind scan.
 5. Do not run C20 CNN corpus assembly or training until the first discovery scan is reviewed.

@@ -11,6 +11,7 @@ are excluded from the default CI run.
 from __future__ import annotations
 
 import dataclasses
+import http.client
 import sys
 from pathlib import Path
 from typing import Any
@@ -438,6 +439,114 @@ class TestFetchLightcurve:
         mock_lk.search_lightcurve.return_value = search
         with pytest.raises(ValueError, match="No TESS light curves"):
             fetch_lightcurve("TIC 999", "TESS")
+
+    def test_transient_search_disconnect_is_retried(
+        self, mock_lk: MagicMock, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        lc = _make_lc_mock()
+        collection = _make_collection_mock([lc])
+        search = _make_search_mock(collection)
+        mock_lk.search_lightcurve.side_effect = [
+            http.client.RemoteDisconnected("remote end closed connection"),
+            search,
+        ]
+        mock_lk.LightCurveCollection.return_value = collection
+        sleeps: list[float] = []
+        monkeypatch.setattr("exo_toolkit.fetch.time.sleep", sleeps.append)
+
+        result = fetch_lightcurve(
+            "TIC 999", "TESS", retry_attempts=2, retry_delay=0.25
+        )
+
+        assert result.light_curve is collection.stitch.return_value
+        assert mock_lk.search_lightcurve.call_count == 2
+        assert sleeps == [0.25]
+
+    def test_transient_download_disconnect_is_retried(
+        self, mock_lk: MagicMock, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        lc = _make_lc_mock()
+        collection = _make_collection_mock([lc])
+        first_search = _make_search_mock(collection)
+        first_search._download_one.side_effect = http.client.RemoteDisconnected(
+            "remote end closed connection"
+        )
+        second_search = _make_search_mock(collection)
+        mock_lk.search_lightcurve.side_effect = [first_search, second_search]
+        mock_lk.LightCurveCollection.return_value = collection
+        sleeps: list[float] = []
+        monkeypatch.setattr("exo_toolkit.fetch.time.sleep", sleeps.append)
+
+        result = fetch_lightcurve(
+            "TIC 999", "TESS", retry_attempts=2, retry_delay=0.25
+        )
+
+        assert result.light_curve is collection.stitch.return_value
+        assert mock_lk.search_lightcurve.call_count == 2
+        assert first_search._download_one.call_count == 1
+        assert second_search._download_one.call_count == 1
+        assert sleeps == [0.25]
+
+    def test_qlp_search_disconnect_uses_dataurl_fallback(
+        self, mock_lk: MagicMock, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        lc = _make_lc_mock(procver="QLP", sector_val=2)
+        collection = _make_collection_mock([lc])
+        row = {
+            "dataURL": (
+                "mast:HLSP/qlp/s0002/0000/0002/0125/2011/"
+                "hlsp_qlp_tess_ffi_s0002-0000000201252011_tess_v01_llc.fits"
+            ),
+            "obs_collection": "HLSP",
+            "obs_id": "hlsp_qlp_tess_ffi_s0002-0000000201252011_tess_v01_llc",
+        }
+        downloaded: list[Path] = []
+
+        def fake_download_file(
+            uri: str,
+            *,
+            local_path: str,
+            cache: bool,
+            verbose: bool,
+        ) -> tuple[str, None, None]:
+            assert uri == row["dataURL"]
+            assert cache is True
+            assert verbose is False
+            path = Path(local_path)
+            path.parent.mkdir(parents=True)
+            path.write_text("fits placeholder", encoding="utf-8")
+            downloaded.append(path)
+            return ("COMPLETE", None, None)
+
+        from astroquery.mast import Observations
+
+        mock_lk.search_lightcurve.side_effect = http.client.RemoteDisconnected(
+            "remote end closed connection"
+        )
+        mock_lk.config.get_cache_dir.return_value = str(tmp_path)
+        mock_lk.read.return_value = lc
+        mock_lk.LightCurveCollection.return_value = collection
+        monkeypatch.setattr(
+            "exo_toolkit.fetch._query_lightkurve_observations",
+            lambda *_args, **_kwargs: [row],
+        )
+        monkeypatch.setattr(Observations, "download_file", fake_download_file)
+
+        result = fetch_lightcurve(
+            "TIC 201252011",
+            "TESS",
+            pipeline="QLP",
+            retry_attempts=1,
+        )
+
+        assert result.light_curve is collection.stitch.return_value
+        assert result.provenance.flux_column == "kspsap_flux"
+        assert downloaded
+        assert mock_lk.read.call_args == call(
+            downloaded[0],
+            quality_bitmask="default",
+            flux_column="kspsap_flux",
+        )
 
     def test_prefer_pdcsap_true_uses_pdcsap(self, mock_lk: MagicMock) -> None:
         lc = _make_lc_mock()

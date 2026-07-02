@@ -1055,8 +1055,8 @@
           "failed_diagnostic": "limb_darkening_plausibility_score=0.0"
         }
       },
-      "validation_gate": "Not submission-ready: many diagnostics are missing and limb-darkening plausibility fails. Version 0.2.9+ candidate packets add raw diagnostics, fetch provenance, and missing-diagnostic reasons when regenerated.",
-      "next_action": "Regenerate with 0.2.9+, then add/run missing false-positive diagnostics, especially odd-even, secondary eclipse, centroid/contamination, and multi-sector checks."
+      "validation_gate": "Not submission-ready: many diagnostics are missing and limb-darkening plausibility fails. Version 0.2.10+ candidate packets add raw diagnostics, fetch provenance, missing-diagnostic reasons, and transient MAST disconnect retry when regenerated.",
+      "next_action": "Regenerate with 0.2.10+, then add/run missing false-positive diagnostics, especially odd-even, secondary eclipse, centroid/contamination, and multi-sector checks."
     },
     {
       "path": "logs/candidate_257712351_qlp_v027.json",
@@ -1082,8 +1082,8 @@
           "failed_diagnostic": "limb_darkening_plausibility_score=0.0"
         }
       },
-      "validation_gate": "Not submission-ready: many diagnostics are missing and limb-darkening plausibility fails. Version 0.2.9+ candidate packets add raw diagnostics, fetch provenance, and missing-diagnostic reasons when regenerated.",
-      "next_action": "Regenerate with 0.2.9+, then add/run missing false-positive diagnostics, especially odd-even, centroid/contamination, and multi-sector checks; do not escalate the 0.5304 d secondary signal."
+      "validation_gate": "Not submission-ready: many diagnostics are missing and limb-darkening plausibility fails. Version 0.2.10+ candidate packets add raw diagnostics, fetch provenance, missing-diagnostic reasons, and transient MAST disconnect retry when regenerated.",
+      "next_action": "Regenerate with 0.2.10+, then add/run missing false-positive diagnostics, especially odd-even, centroid/contamination, and multi-sector checks; do not escalate the 0.5304 d secondary signal."
     },
     {
       "path": "models/cnn*/",

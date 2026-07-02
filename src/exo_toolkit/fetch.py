@@ -17,10 +17,13 @@ fetch_lightcurve(target_id, mission, *, exptime, pipeline, sectors,
 from __future__ import annotations
 
 import datetime
+import http.client
 import importlib
 import importlib.util
 import re
+import socket
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -108,6 +111,8 @@ def fetch_lightcurve(
     pipeline: str | None = None,
     sectors: tuple[int, ...] | None = None,
     prefer_pdcsap: bool = True,
+    retry_attempts: int = 3,
+    retry_delay: float = 2.0,
 ) -> FetchResult:
     """Download and stitch a light curve from MAST.
 
@@ -126,6 +131,10 @@ def fetch_lightcurve(
             Ignored for JWST.
         prefer_pdcsap: Request PDCSAP (systematics-corrected) flux.
             Set False to use SAP flux instead.  Ignored for JWST.
+        retry_attempts: Maximum attempts for transient remote connection
+            failures from MAST/Lightkurve. Does not retry no-data results.
+        retry_delay: Initial delay between transient retries, in seconds.
+            Later retries use linear backoff.
 
     Returns:
         FetchResult containing the stitched LightCurve and provenance.
@@ -137,6 +146,35 @@ def fetch_lightcurve(
     if mission == "JWST":
         return _fetch_jwst(target_id)
 
+    attempts = max(1, retry_attempts)
+    for attempt in range(1, attempts + 1):
+        try:
+            return _fetch_lightcurve_once(
+                target_id,
+                mission,
+                exptime=exptime,
+                pipeline=pipeline,
+                sectors=sectors,
+                prefer_pdcsap=prefer_pdcsap,
+            )
+        except Exception as exc:
+            if attempt >= attempts or not _is_transient_fetch_error(exc):
+                raise
+            time.sleep(max(0.0, retry_delay) * attempt)
+
+    raise RuntimeError("fetch_lightcurve retry loop exhausted")
+
+
+def _fetch_lightcurve_once(
+    target_id: str,
+    mission: Mission,
+    *,
+    exptime: str,
+    pipeline: str | None,
+    sectors: tuple[int, ...] | None,
+    prefer_pdcsap: bool,
+) -> FetchResult:
+    """Run one non-JWST Lightkurve fetch attempt."""
     try:
         import lightkurve as lk  # noqa: PLC0415
     except ImportError as exc:
@@ -150,24 +188,37 @@ def fetch_lightcurve(
     sector_kwarg = _SECTOR_KWARG[mission]
     sector_value: list[int] | None = list(sectors) if sectors is not None else None
 
-    search = lk.search_lightcurve(
-        target_id,
-        mission=mission,
-        exptime=exptime,
-        author=author,
-        **{sector_kwarg: sector_value},
-    )
-
-    if len(search) == 0:
-        raise ValueError(
-            f"No {mission} light curves found for {target_id!r} "
-            f"(author={author!r}, exptime={exptime!r})"
+    try:
+        search = lk.search_lightcurve(
+            target_id,
+            mission=mission,
+            exptime=exptime,
+            author=author,
+            **{sector_kwarg: sector_value},
         )
 
-    collection, flux_columns_used = _download_collection_with_cache_repair(
-        search,
-        flux_columns=flux_columns,
-    )
+        if len(search) == 0:
+            raise ValueError(
+                f"No {mission} light curves found for {target_id!r} "
+                f"(author={author!r}, exptime={exptime!r})"
+            )
+
+        collection, flux_columns_used = _download_collection_with_cache_repair(
+            search,
+            flux_columns=flux_columns,
+        )
+    except Exception as exc:
+        if author.upper() != "QLP" or not _is_transient_fetch_error(exc):
+            raise
+        collection, flux_columns_used = _download_qlp_collection_from_data_urls(
+            lk,
+            target_id=target_id,
+            mission=mission,
+            exptime=exptime,
+            sectors=sector_value,
+            flux_columns=flux_columns,
+        )
+
     # Lightkurve's default stitch() normalizes each product before stacking.
     # Keep project preprocessing order explicit: fetch raw selected flux,
     # then let clean_lightcurve() remove NaNs/outliers before normalizing.
@@ -199,6 +250,134 @@ def fetch_lightcurve(
     )
 
     return FetchResult(light_curve=lc, provenance=provenance)
+
+
+def _is_transient_fetch_error(exc: BaseException) -> bool:
+    """Return True for remote connection failures that are safe to retry."""
+    transient_type_names = {
+        "ConnectionError",
+        "ConnectTimeout",
+        "MaxRetryError",
+        "ProtocolError",
+        "ReadTimeout",
+        "RemoteDisconnected",
+        "Timeout",
+    }
+    current: BaseException | None = exc
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(
+            current,
+            (
+                ConnectionError,
+                TimeoutError,
+                http.client.RemoteDisconnected,
+                socket.timeout,
+            ),
+        ):
+            return True
+        if current.__class__.__name__ in transient_type_names:
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
+def _download_qlp_collection_from_data_urls(
+    lk: Any,
+    *,
+    target_id: str,
+    mission: Mission,
+    exptime: str,
+    sectors: list[int] | None,
+    flux_columns: tuple[str, ...],
+) -> tuple[Any, tuple[str, ...]]:
+    """Download QLP products directly from MAST-provided observation dataURL values."""
+    from astroquery.mast import Observations  # noqa: PLC0415
+
+    observations = _query_lightkurve_observations(
+        target_id,
+        project=mission,
+        provenance_name=["QLP"],
+        exptime=exptime,
+        sequence_number=sectors,
+        dataproduct_type=["cube", "timeseries"],
+    )
+    if len(observations) == 0:
+        raise ValueError(
+            f"No {mission} light curves found for {target_id!r} "
+            f"(author='QLP', exptime={exptime!r})"
+        )
+
+    light_curves: list[Any] = []
+    flux_columns_used: list[str] = []
+    cache_dir = Path(lk.config.get_cache_dir())
+    for row in observations:
+        uri = str(row["dataURL"])
+        local_path = (
+            cache_dir
+            / "mastDownload"
+            / str(row["obs_collection"])
+            / str(row["obs_id"])
+            / Path(uri).name
+        )
+        if not local_path.exists():
+            status, message, _url = Observations.download_file(
+                uri,
+                local_path=str(local_path),
+                cache=True,
+                verbose=False,
+            )
+            if status != "COMPLETE":
+                raise RuntimeError(f"Download of {uri} failed: {status} {message or ''}")
+
+        light_curve, flux_column = _read_light_curve_with_flux_fallback(
+            lk,
+            local_path,
+            flux_columns=flux_columns,
+        )
+        light_curves.append(light_curve)
+        if flux_column not in flux_columns_used:
+            flux_columns_used.append(flux_column)
+
+    if not light_curves:
+        raise ValueError("No downloadable QLP light curves returned by MAST dataURL fallback")
+    return lk.LightCurveCollection(light_curves), tuple(flux_columns_used)
+
+
+def _query_lightkurve_observations(
+    target_id: str,
+    **kwargs: Any,
+) -> Any:
+    """Query Lightkurve's MAST observation table without product-list expansion."""
+    from lightkurve.search import _query_mast  # noqa: PLC0415
+
+    return _query_mast(target_id, **kwargs)
+
+
+def _read_light_curve_with_flux_fallback(
+    lk: Any,
+    path: Path,
+    *,
+    flux_columns: tuple[str, ...],
+) -> tuple[Any, str]:
+    """Read a local light curve file, trying compatible flux columns in order."""
+    last_error: Exception | None = None
+    for flux_column in flux_columns:
+        try:
+            return (
+                lk.read(
+                    path,
+                    quality_bitmask="default",
+                    flux_column=flux_column,
+                ),
+                flux_column,
+            )
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+    if last_error is not None:
+        raise last_error
+    raise ValueError(f"No flux columns configured for {path}")
 
 
 # ---------------------------------------------------------------------------

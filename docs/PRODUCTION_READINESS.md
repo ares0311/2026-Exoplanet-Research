@@ -1,6 +1,6 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-07-01 (JWST A3 merged — PR #141; TESS novelty restructure B1-B4 merged — PR #139; live scanner startup/target-selection fix merged — PR #143; PR #145 worker/ETA fix merged; run006 completed with real QLP scan evidence; run008 targeted follow-up reproduced both filtered candidates under the stitch-normalization and feature-output fixes; 0.2.9 adds raw diagnostics/provenance and missing-diagnostic explanations, but false-positive diagnostics remain review-blocking)
+Last reviewed: 2026-07-01 (JWST A3 merged — PR #141; TESS novelty restructure B1-B4 merged — PR #139; live scanner startup/target-selection fix merged — PR #143; PR #145 worker/ETA fix merged; run006 completed with real QLP scan evidence; run008 targeted follow-up reproduced both filtered candidates under the stitch-normalization and feature-output fixes; 0.2.9 adds raw diagnostics/provenance and missing-diagnostic explanations; 0.2.10 adds bounded retry for transient MAST disconnects, but false-positive diagnostics remain review-blocking)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
 Test baseline: 2,355 default tests passing, 2 integration_live deselected
@@ -21,10 +21,11 @@ The system is safe to deploy now for Bayesian and XGBoost scoring modes. The
 CNN label gate is open, but all evaluated CNN checkpoints remain rejected; they
 must not be copied into `models/`, registered, or used for production scoring.
 
-Version note: 0.2.9 is the current patch level for candidate-review outputs:
-0.2.8 fixed QLP stitch normalization and feature serialization, while 0.2.9
-adds raw vetting diagnostics, fetch provenance, missing-feature names, and
-human-readable missing-diagnostic reasons for run008 candidate review.
+Version note: 0.2.10 is the current patch level for candidate-review output
+regeneration. 0.2.8 fixed QLP stitch normalization and feature serialization,
+0.2.9 adds raw vetting diagnostics, fetch provenance, missing-feature names,
+and human-readable missing-diagnostic reasons, and 0.2.10 adds bounded retry
+for transient MAST/Lightkurve connection disconnects.
 
 ---
 
@@ -44,7 +45,7 @@ human-readable missing-diagnostic reasons for run008 candidate review.
 - **Run006 evidence**: SHA-256 `8ed084e39fcf1b1f7f0405208a413d4651641aba195305f3ca3b2b8bc3615dc8` for the scan log and `17630739c28bed296910512b86c63c77d952708cf84ab2fe6d8f55ae120a5fc9` for the filtered output. Filtered candidates: TIC 201252011, period 227.39056281978395 d, FPP 0.1160636155807766; TIC 257712351, period 142.95415231096942 d, FPP 0.12672985673564718.
 - **Numerical guardrail after run006**: Version 0.2.6 rejects BLS peaks with non-finite/non-positive values and rejects peaks pinned to the lower or upper period-grid boundary. This directly addresses the run006 negative-duration error and the 81 period-boundary detections before any follow-up evidence run.
 - **Targeted run008 evidence**: `logs/discovery_run_008_targeted_qlp_stitch_safe.json` has 2 entries, both `candidate_found`, active `{}`, SHA-256 `8626587c4fe59565132e078273763c7beac4a0a88597615f71e147a5134d1b0a`. Filtered output SHA-256 `574a4cf188faa9e273128496fcd23b27cb8369a3e9d2ad2c1b5bbaedd9effed4`; both rows remain below FPP 0.15: TIC 201252011 at P=227.39056281978395 d, FPP=0.11606180728511539; TIC 257712351 at P=142.95415231096942 d, FPP=0.12672948535351847.
-- **Run008 root-cause fixes**: Lightkurve's `LightCurveCollection.stitch()` defaulted to `corrector_func=lambda x: x.normalize()`, causing QLP products to be normalized before project sigma-clipping. `fetch_lightcurve()` now calls `stitch(corrector_func=None)` so normalization happens in `clean_lightcurve()` after NaN/outlier removal. `exo --output` now includes the computed `features` dict, so `Skills/false_positive_vetter.py` evaluates real diagnostics instead of reporting all features missing. Version 0.2.9 adds raw `diagnostics`, `fetch_provenance`, `features_missing`, and missing-diagnostic explanations so reviewers can distinguish insufficient phase coverage from not-yet-run catalog/centroid checks.
+- **Run008 root-cause fixes**: Lightkurve's `LightCurveCollection.stitch()` defaulted to `corrector_func=lambda x: x.normalize()`, causing QLP products to be normalized before project sigma-clipping. `fetch_lightcurve()` now calls `stitch(corrector_func=None)` so normalization happens in `clean_lightcurve()` after NaN/outlier removal. `exo --output` now includes the computed `features` dict, so `Skills/false_positive_vetter.py` evaluates real diagnostics instead of reporting all features missing. Version 0.2.9 adds raw `diagnostics`, `fetch_provenance`, `features_missing`, and missing-diagnostic explanations so reviewers can distinguish insufficient phase coverage from not-yet-run catalog/centroid checks. Version 0.2.10 retries transient MAST/Lightkurve connection disconnects in the fetch path instead of failing candidate review on one dropped remote connection.
 - **Required next review**: Review the 2 targeted candidates, inspect phase-fold plots/report cards, check TOI/CTOI/confirmed-host exclusions again, and investigate missing false-positive diagnostics before any external action. The best run008 signals still have many unavailable diagnostics and both fail `limb_darkening_plausibility_score=0.0`, so the evidence is not submission-ready. The next production work should add or run candidate-specific centroid/contamination/odd-even/multi-sector diagnostics; do not resume CNN C20 or contact external communities until this false-positive review is documented.
 - **Next escalation rule**: Do not resume CNN C20 training and do not submit/contact externally until run008 candidates have been reviewed and false-positive diagnostics are documented. If review rejects the filtered candidates as artifacts, the null/low-quality result should drive the next production-planning cycle.
 
