@@ -48,6 +48,7 @@ def vet_signal(
     # Stellar parameters (from TIC/GAIA catalog)
     stellar_radius_rsun: float | None = None,
     stellar_mass_msun: float | None = None,
+    stellar_teff_k: float | None = None,
     # Aperture photometry diagnostics (from pipeline headers)
     contamination_ratio: float | None = None,
     centroid_offset_sigma: float | None = None,
@@ -84,6 +85,7 @@ def vet_signal(
         signal: The candidate signal to vet (from search_lightcurve()).
         stellar_radius_rsun: Host-star radius in solar radii (from TIC/Gaia).
         stellar_mass_msun: Host-star mass in solar masses.
+        stellar_teff_k: Host-star effective temperature in Kelvin (from TIC/Gaia).
         contamination_ratio: Flux contamination fraction from nearby sources.
         centroid_offset_sigma: Significance of in-transit centroid shift.
         nearby_bright_source_count: Number of Gaia sources inside aperture.
@@ -132,6 +134,7 @@ def vet_signal(
         ingress_egress_fraction=ingress_egress_frac,
         stellar_radius_rsun=stellar_radius_rsun,
         stellar_mass_msun=stellar_mass_msun,
+        stellar_teff_k=stellar_teff_k,
         contamination_ratio=contamination_ratio,
         centroid_offset_sigma=centroid_offset_sigma,
         nearby_bright_source_count=nearby_bright_source_count,

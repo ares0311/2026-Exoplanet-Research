@@ -121,6 +121,7 @@ When the user must take an action to unblock a gap:
 - **Project version bumped to 0.2.8** — patch release for targeted run006/run008 review hardening; QLP stitching no longer uses Lightkurve's implicit pre-clean normalizer, and `exo --output` now serializes computed vetting `features` so `Skills/false_positive_vetter.py` can evaluate actual diagnostics.
 - **Project version bumped to 0.2.9** — patch release for candidate-review diagnostics; `exo --output` now serializes raw vetting `diagnostics`, fetch provenance, and missing-feature names, and `Skills/false_positive_vetter.py` explains why review-blocking diagnostics are unavailable.
 - **Project version bumped to 0.2.10** — patch release for candidate-review regeneration reliability; `fetch_lightcurve()` now retries transient MAST/Lightkurve connection disconnects with bounded polite backoff.
+- **Project version bumped to 0.2.11 (2026-07-02)** — supplementary pipeline-correctness patch, not part of the active T1-1 dataset-handoff path. `run_pipeline()` called `vet_signal(light_curve, signal)` with zero catalog keyword arguments, so `stellar_radius_rsun`, `stellar_mass_msun`, `contamination_ratio`, and every score derived from them were always `None`/solar-default — including `limb_darkening_plausibility_score`, which silently used 5778 K for every target because `vet_signal()` did not even accept a `stellar_teff_k` parameter. New `fetch_tic_stellar_params()` in `fetch.py` does one TIC catalog lookup per TESS scan (injectable `stellar_params_fn` for tests; fails open to all-`None` on any error; not called for Kepler/K2/JWST). This is a correctness fix to the already-shipped Bayesian/XGBoost/ensemble scorers, not a reopening of T1-0 as the active path; run006/run008 remain historical per the 2026-07-01 reset below.
 
 ### Where things stand
 
@@ -178,6 +179,12 @@ Historical candidate rows from the superseded review loop:
 | TIC 257712351 | 142.95415231096942 | 0.12672985673564718 | `planet_hunters_discussion` |
 
 Treat run006 as useful scan evidence and run008 as useful targeted follow-up evidence, not submission-ready evidence. Run006 flagged 192/200 targets as candidates and 81 detections hit the 0.5 d or 500 d period boundaries; subsequent scanner code rejects invalid and period-boundary BLS peaks, so future evidence runs must use `main` at version 0.2.10 or newer. Version 0.2.10 regenerated candidate packets moved the two filtered candidates above the prior FPP < 0.15 escalation threshold, so this loop is no longer the primary production path. Do not submit/contact externally without explicit human approval.
+
+Note (2026-07-02, version 0.2.11): a supplementary correctness fix wired real
+TIC catalog stellar/contamination parameters into `vet_signal()` (see the
+0.2.11 changelog entry above). This does not reopen the run006/run008 loop as
+an active task — it is optional forensic curiosity only, not a required next
+step. The active gap is T1-1 below.
 
 ### CNN production runbook
 

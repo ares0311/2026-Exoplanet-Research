@@ -86,6 +86,7 @@ def _run_with_mocks(
         )
     lc = _make_lc()
     fr = _make_fetch_result(lc)
+    pipeline_kwargs.setdefault("stellar_params_fn", lambda *_: {})
     with (
         patch("exo_toolkit.cli.search_lightcurve", return_value=signals),
         patch("exo_toolkit.cli.vet_signal", return_value=MagicMock(features=features)),

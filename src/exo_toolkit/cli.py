@@ -42,7 +42,7 @@ from exo_toolkit.background.runner import background_run_once
 from exo_toolkit.background.storage import BackgroundStore
 from exo_toolkit.calibration import apply_calibration, load_calibration
 from exo_toolkit.clean import clean_lightcurve
-from exo_toolkit.fetch import compute_provenance_score, fetch_lightcurve
+from exo_toolkit.fetch import compute_provenance_score, fetch_lightcurve, fetch_tic_stellar_params
 from exo_toolkit.pathway import classify_submission_pathway
 from exo_toolkit.schemas import CandidateSignal, Mission
 from exo_toolkit.scoring import score_candidate
@@ -211,6 +211,7 @@ def run_pipeline(
     calibration_path: Path | None = None,
     fetch_fn: Any = None,
     clean_fn: Any = None,
+    stellar_params_fn: Any = None,
 ) -> list[dict[str, Any]]:
     """Run the full pipeline on one target and return serialisable results.
 
@@ -233,6 +234,8 @@ def run_pipeline(
             key with probabilities adjusted by the fitted calibration model.
         fetch_fn: Optional callable replacing ``fetch_lightcurve`` (for tests).
         clean_fn: Optional callable replacing ``clean_lightcurve`` (for tests).
+        stellar_params_fn: Optional callable replacing ``fetch_tic_stellar_params``
+            (for tests). Only consulted when ``mission == "TESS"``.
 
     Returns:
         List of dicts, one per candidate signal, suitable for JSON output.
@@ -249,6 +252,9 @@ def run_pipeline(
 
     _fetch = fetch_fn if fetch_fn is not None else fetch_lightcurve
     _clean = clean_fn if clean_fn is not None else clean_lightcurve
+    _stellar_params = (
+        stellar_params_fn if stellar_params_fn is not None else fetch_tic_stellar_params
+    )
 
     xgb_scorer = None
     if scorer in ("xgboost", "ensemble", "full-ensemble"):
@@ -281,6 +287,13 @@ def run_pipeline(
     clean_result = _clean(fetch_result.light_curve)
     provenance_score = compute_provenance_score(fetch_result.provenance)
 
+    stellar_params: dict[str, float | None] = {}
+    if mission == "TESS":
+        try:
+            stellar_params = _stellar_params(target_id)
+        except Exception:  # noqa: BLE001 — catalog lookup is supplementary, fail open
+            stellar_params = {}
+
     signals: list[CandidateSignal] = search_lightcurve(
         clean_result.light_curve,
         target_id=target_id,
@@ -295,7 +308,14 @@ def run_pipeline(
 
     rows: list[dict[str, Any]] = []
     for signal in signals:
-        vet_result = vet_signal(clean_result.light_curve, signal)
+        vet_result = vet_signal(
+            clean_result.light_curve,
+            signal,
+            stellar_radius_rsun=stellar_params.get("stellar_radius_rsun"),
+            stellar_mass_msun=stellar_params.get("stellar_mass_msun"),
+            stellar_teff_k=stellar_params.get("stellar_teff_k"),
+            contamination_ratio=stellar_params.get("contamination_ratio"),
+        )
         posterior, scores = score_candidate(signal, vet_result.features)
         pathway = classify_submission_pathway(
             signal, vet_result.features, posterior, scores,
