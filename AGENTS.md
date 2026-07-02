@@ -220,25 +220,29 @@ and tracks progress/resume in SQLite at `logs/t1_1_kepler_processing.sqlite3`.
 Raw FITS downloads are scoped to `data/raw/t1_1_kepler_lc` and the directory
 is wiped after every target (success or failure), so raw storage never
 accumulates beyond roughly one target's data. `--max-targets` defaults to 25.
-27 offline/injectable tests pass; the tool has **not** been run against live
-Kepler data — this agent's sandbox has no Lightkurve/MAST access.
+27 offline/injectable tests pass. The first live Mac run processed 25 targets
+in 1,216s, wrote 26 snippets, failed 0 rows, left SQLite summary
+`done|25|26|0`, and verified `data/raw/t1_1_kepler_lc` was empty (`0B`) after
+completion.
 
-**Concrete next step — give the human this exact recipe:**
+**Concrete next step — after this ledger update is merged, give the human this
+exact scaled recipe:**
 
 ```bash
 git switch main
 git pull --ff-only origin main
-caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 25
+caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250
 ```
 
-This processes the first 25 not-yet-done targets from the manifest (resumable
+This processes the next 250 not-yet-done targets from the manifest (resumable
 — rerunning the same command continues where it left off) and prints
-per-target progress with elapsed time. Paste back the final summary block. If
+per-target progress with elapsed time. Use `--max-targets 100` instead if the
+operator wants a smaller second step. Paste back the final summary block. If
 any target shows `NO_DATA`/`NO_LIGHTKURVE`/`ERROR:...`, that is expected for
 some KOIs (not every KIC has usable long-cadence data) and is not itself a
-blocker unless most targets fail. Once a small batch is verified, scale up
-with a larger `--max-targets` (or omit it to process everything remaining) in
-further bounded invocations.
+blocker unless most targets fail. Continue with bounded invocations until the
+Kepler manifest is processed; omit `--max-targets` only after several larger
+bounded runs behave well.
 
 The run006/run008 notes below are historical provenance only. Preserve them so
 future agents do not re-debug the same scanner failures, but do not treat them
