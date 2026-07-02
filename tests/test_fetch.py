@@ -30,9 +30,13 @@ from exo_toolkit.fetch import (
     _download_one_quietly,
     _extract_sectors,
     _fetch_jwst,
+    _first_row,
+    _parse_tic_id,
     _remove_corrupt_lightkurve_cache_file,
+    _row_float,
     compute_provenance_score,
     fetch_lightcurve,
+    fetch_tic_stellar_params,
 )
 
 # ---------------------------------------------------------------------------
@@ -1066,3 +1070,143 @@ class TestFetchJwst:
         monkeypatch.setattr(fetch_mod, "_SKILLS_DIR", tmp_path)
         result = fetch_lightcurve("jw12345", "JWST")
         assert result.provenance.mission == "JWST"
+
+
+# ---------------------------------------------------------------------------
+# fetch_tic_stellar_params
+# ---------------------------------------------------------------------------
+
+
+class TestParseTicId:
+    def test_extracts_digits(self) -> None:
+        assert _parse_tic_id("TIC 150428135") == 150428135
+
+    def test_case_insensitive(self) -> None:
+        assert _parse_tic_id("tic 42") == 42
+
+    def test_no_digits_returns_none(self) -> None:
+        assert _parse_tic_id("TIC") is None
+
+    def test_non_tic_target_returns_none(self) -> None:
+        assert _parse_tic_id("KIC 12345") is None
+        assert _parse_tic_id("EPIC 12345") is None
+
+
+class TestFirstRow:
+    def test_returns_first_element(self) -> None:
+        assert _first_row([{"a": 1}, {"a": 2}]) == {"a": 1}
+
+    def test_empty_sequence_returns_none(self) -> None:
+        assert _first_row([]) is None
+
+    def test_non_sized_returns_none(self) -> None:
+        assert _first_row(object()) is None
+
+
+class TestRowFloat:
+    def test_first_matching_key(self) -> None:
+        row = {"rad": 1.2, "radius": 9.9}
+        assert _row_float(row, ("rad", "radius")) == pytest.approx(1.2)
+
+    def test_falls_back_to_second_key(self) -> None:
+        row = {"radius": 1.5}
+        assert _row_float(row, ("rad", "radius")) == pytest.approx(1.5)
+
+    def test_missing_key_returns_none(self) -> None:
+        assert _row_float({}, ("rad", "radius")) is None
+
+    def test_none_value_skipped(self) -> None:
+        row = {"rad": None, "radius": 2.0}
+        assert _row_float(row, ("rad", "radius")) == pytest.approx(2.0)
+
+    def test_non_numeric_value_skipped(self) -> None:
+        row = {"rad": "n/a", "radius": 2.0}
+        assert _row_float(row, ("rad", "radius")) == pytest.approx(2.0)
+
+    def test_nan_skipped(self) -> None:
+        row = {"rad": float("nan"), "radius": 2.0}
+        assert _row_float(row, ("rad", "radius")) == pytest.approx(2.0)
+
+    def test_masked_value_fails_open(self) -> None:
+        class _Masked:
+            def __float__(self) -> float:
+                raise ValueError("masked")
+
+        row = {"rad": _Masked(), "radius": 3.0}
+        assert _row_float(row, ("rad", "radius")) == pytest.approx(3.0)
+
+
+class TestFetchTicStellarParams:
+    _EMPTY = {
+        "stellar_radius_rsun": None,
+        "stellar_mass_msun": None,
+        "stellar_teff_k": None,
+        "contamination_ratio": None,
+    }
+
+    def test_non_tic_target_returns_all_none(self) -> None:
+        result = fetch_tic_stellar_params("KIC 12345", query_fn=lambda _tid: [{"rad": 1.0}])
+        assert result == self._EMPTY
+
+    def test_success_extracts_all_fields(self) -> None:
+        row = {"rad": 1.2, "mass": 1.1, "Teff": 5500.0, "contratio": 0.05}
+        result = fetch_tic_stellar_params("TIC 150428135", query_fn=lambda _tid: [row])
+        assert result["stellar_radius_rsun"] == pytest.approx(1.2)
+        assert result["stellar_mass_msun"] == pytest.approx(1.1)
+        assert result["stellar_teff_k"] == pytest.approx(5500.0)
+        assert result["contamination_ratio"] == pytest.approx(0.05)
+
+    def test_passes_parsed_integer_tic_id(self) -> None:
+        captured: dict[str, Any] = {}
+
+        def _query(tid: int) -> list[dict[str, float]]:
+            captured["tid"] = tid
+            return [{"rad": 1.0}]
+
+        fetch_tic_stellar_params("TIC 150428135", query_fn=_query)
+        assert captured["tid"] == 150428135
+
+    def test_query_exception_fails_open(self) -> None:
+        def _query(_tid: int) -> Any:
+            raise ConnectionError("no network")
+
+        result = fetch_tic_stellar_params("TIC 150428135", query_fn=_query)
+        assert result == self._EMPTY
+
+    def test_empty_result_fails_open(self) -> None:
+        result = fetch_tic_stellar_params("TIC 150428135", query_fn=lambda _tid: [])
+        assert result == self._EMPTY
+
+    def test_missing_columns_stay_none(self) -> None:
+        result = fetch_tic_stellar_params("TIC 150428135", query_fn=lambda _tid: [{}])
+        assert result == self._EMPTY
+
+    def test_column_name_fallback(self) -> None:
+        # Some catalog responses may use alternate column names.
+        row = {"radius": 0.9, "st_mass": 0.8, "teff": 4200.0, "contamination": 0.1}
+        result = fetch_tic_stellar_params("TIC 1", query_fn=lambda _tid: [row])
+        assert result["stellar_radius_rsun"] == pytest.approx(0.9)
+        assert result["stellar_mass_msun"] == pytest.approx(0.8)
+        assert result["stellar_teff_k"] == pytest.approx(4200.0)
+        assert result["contamination_ratio"] == pytest.approx(0.1)
+
+    def test_default_query_fn_uses_astroquery_tic_catalog(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        captured: dict[str, Any] = {}
+
+        def _query_criteria(**kwargs: Any) -> list[dict[str, float]]:
+            captured.update(kwargs)
+            return [{"rad": 1.0, "mass": 1.0, "Teff": 5778.0, "contratio": 0.0}]
+
+        fake_catalogs = MagicMock()
+        fake_catalogs.query_criteria = _query_criteria
+        fake_mast = MagicMock()
+        fake_mast.Catalogs = fake_catalogs
+        monkeypatch.setitem(sys.modules, "astroquery", MagicMock())
+        monkeypatch.setitem(sys.modules, "astroquery.mast", fake_mast)
+
+        result = fetch_tic_stellar_params("TIC 150428135")
+
+        assert captured == {"catalog": "TIC", "ID": 150428135}
+        assert result["stellar_radius_rsun"] == pytest.approx(1.0)

@@ -480,8 +480,8 @@ New `RawDiagnostics` fields: `oot_scatter_sigma`, `sector_depths`, `sector_depth
 
 ## CLI Version Flag and Meta Output (Milestone 12f)
 
-- `exo --version` / `exo -V` — prints the installed `exo-toolkit` package version (currently `0.2.10`)
-- fallback version `0.2.10` in `src/exo_toolkit/__init__.py` is used only if source-tree and installed package metadata are unavailable
+- `exo --version` / `exo -V` — prints the installed `exo-toolkit` package version (currently `0.2.11`)
+- fallback version `0.2.11` in `src/exo_toolkit/__init__.py` is used only if source-tree and installed package metadata are unavailable
 - Each output row gains a `"features"` dict, a raw `"diagnostics"` dict, a `"fetch_provenance"` dict, plus a `"meta"` dict: `toolkit_version`, `run_at`, `scorer`, `git_commit`, `features_available`, `features_missing`
 - `_git_commit_short()` reads `git rev-parse --short HEAD`; returns `None` on failure
 
@@ -1241,6 +1241,8 @@ trained model checkpoint**. CNN/model work is no longer paused, but it must be
 source-contract-first: verified public URLs/schemas, immutable source
 snapshots, leakage-safe manifests/splits, bounded storage, M4 Max/MPS-aware
 training defaults, and production promotion only after held-out gates pass.
+
+**Supplementary fix (2026-07-02, version 0.2.11):** `run_pipeline()` now wires real TIC catalog `stellar_radius_rsun`/`stellar_mass_msun`/`stellar_teff_k`/`contamination_ratio` into `vet_signal()` — a correctness fix to the already-shipped Bayesian/XGBoost/ensemble scorers, not part of the active T1-1 path. See `AGENTS.md` for detail.
 
 **JWST Option A status (as of 2026-06-27):**
 - `Skills/fetch_jwst_targets.py` (A1) — **MERGED** (PR #133)

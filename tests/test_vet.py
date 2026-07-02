@@ -496,6 +496,14 @@ class TestVetSignal:
         assert result.diagnostics.period_match_sigma == pytest.approx(0.5)
         assert result.diagnostics.coordinate_match_arcsec == pytest.approx(1.2)
 
+    def test_stellar_teff_k_flows_to_diagnostics(self) -> None:
+        result = vet_signal(
+            _lc_with_transit(),
+            _signal(),
+            stellar_teff_k=4500.0,
+        )
+        assert result.diagnostics.stellar_teff_k == pytest.approx(4500.0)
+
     def test_all_catalog_none_still_works(self) -> None:
         # All catalog kwargs default to None — should not raise
         result = vet_signal(_lc_with_transit(), _signal())

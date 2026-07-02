@@ -1,9 +1,9 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-07-01 (project reset: run006/run008 candidate review is historical; active production path wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` to close T1-1 with verified data sources, leakage-safe training manifests, and a production-gated trained model)
+Last reviewed: 2026-07-02 (project reset: run006/run008 candidate review is historical; active production path wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` to close T1-1 with verified data sources, leakage-safe training manifests, and a production-gated trained model; a supplementary pipeline-correctness fix wired real TIC catalog stellar/contamination parameters into `run_pipeline()` — see T1-0 notes below)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 2,355 default tests passing, 2 integration_live deselected
+Test baseline: 2,379 default tests passing, 2 integration_live deselected
 
 ---
 
@@ -24,11 +24,17 @@ The active production blocker is now T1-1, and the authorized path is the
 source-contract-first dataset/model plan in
 `docs/exoplanet_exomoon_dataset_handoff.md`.
 
-Version note: 0.2.10 is the current patch level for candidate-review output
-regeneration. 0.2.8 fixed QLP stitch normalization and feature serialization,
-0.2.9 adds raw vetting diagnostics, fetch provenance, missing-feature names,
-and human-readable missing-diagnostic reasons, and 0.2.10 adds bounded retry
-for transient MAST/Lightkurve connection disconnects.
+Version note: 0.2.11 is the current patch level. 0.2.8 fixed QLP stitch
+normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
+fetch provenance, missing-feature names, and human-readable missing-diagnostic
+reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
+disconnects, and 0.2.11 wires real TIC catalog `stellar_radius_rsun`,
+`stellar_mass_msun`, `stellar_teff_k`, and `contamination_ratio` into
+`vet_signal()` for every TESS scan (previously all four were always `None`,
+and `vet_signal()` did not even accept `stellar_teff_k`, so
+`limb_darkening_plausibility_score` silently used the solar-default 5778 K for
+every target). The catalog lookup fails open (all-`None`) on any
+network/parse error or non-TIC target, so it never blocks a scan.
 
 ---
 
@@ -49,6 +55,7 @@ for transient MAST/Lightkurve connection disconnects.
 - **Numerical guardrail after run006**: Version 0.2.6 rejects BLS peaks with non-finite/non-positive values and rejects peaks pinned to the lower or upper period-grid boundary. This directly addresses the run006 negative-duration error and the 81 period-boundary detections before any follow-up evidence run.
 - **Targeted run008 evidence**: `logs/discovery_run_008_targeted_qlp_stitch_safe.json` has 2 entries, both `candidate_found`, active `{}`, SHA-256 `8626587c4fe59565132e078273763c7beac4a0a88597615f71e147a5134d1b0a`. Filtered output SHA-256 `574a4cf188faa9e273128496fcd23b27cb8369a3e9d2ad2c1b5bbaedd9effed4`; both rows remain below FPP 0.15: TIC 201252011 at P=227.39056281978395 d, FPP=0.11606180728511539; TIC 257712351 at P=142.95415231096942 d, FPP=0.12672948535351847.
 - **Run008 root-cause fixes**: Lightkurve's `LightCurveCollection.stitch()` defaulted to `corrector_func=lambda x: x.normalize()`, causing QLP products to be normalized before project sigma-clipping. `fetch_lightcurve()` now calls `stitch(corrector_func=None)` so normalization happens in `clean_lightcurve()` after NaN/outlier removal. `exo --output` now includes the computed `features` dict, so `Skills/false_positive_vetter.py` evaluates real diagnostics instead of reporting all features missing. Version 0.2.9 adds raw `diagnostics`, `fetch_provenance`, `features_missing`, and missing-diagnostic explanations so reviewers can distinguish insufficient phase coverage from not-yet-run catalog/centroid checks. Version 0.2.10 retries transient MAST/Lightkurve connection disconnects in the fetch path instead of failing candidate review on one dropped remote connection.
+- **TIC catalog contamination/stellar-density wiring (2026-07-02, version 0.2.11, forensic/supplementary — not the active production path)**: `run_pipeline()` was not passing any catalog kwargs to `vet_signal()` at all — every scan (including run006/run008) computed `contamination_score`, `dilution_sensitivity_score`, `stellar_density_consistency_score`, `nearby_bright_source_score`, and `companion_radius_too_large_score` from `None`/solar-default inputs, and `limb_darkening_plausibility_score` always used the solar-default 5778 K because `vet_signal()` did not even accept a `stellar_teff_k` argument. New `fetch_tic_stellar_params()` in `fetch.py` queries the TIC catalog once per TESS scan (fails open to all-`None` on any error, and is not called for Kepler/K2/JWST) and `run_pipeline()` now forwards `stellar_radius_rsun`/`stellar_mass_msun`/`stellar_teff_k`/`contamination_ratio` into `vet_signal()`. This is a correctness fix to the already-`PRODUCTION READY` Bayesian/XGBoost/ensemble scorers used by any future scan; it does not reopen T1-0 as the active path and centroid/multi-sector diagnostics remain unaddressed. Not validated against the run008 candidates specifically — that would require the user's Mac and is optional forensic work only, not a required next step.
 - **Next escalation rule**: Do not submit/contact externally from run006/run008 without explicit human approval. Do not use this historical loop to block the T1-1 model-training path.
 
 ### T1-1: Production Tier 2 CNN Checkpoint
@@ -164,7 +171,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
 | 82 production-critical Skills/ | ✅ |
-| 2,355 default tests, ruff clean, mypy clean | ✅ |
+| 2,379 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---

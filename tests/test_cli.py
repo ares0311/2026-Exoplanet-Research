@@ -143,6 +143,7 @@ class TestRunPipeline:
                 "TIC 0", "TESS",
                 fetch_fn=self._patched_fetch(lc),
                 clean_fn=self._patched_clean(lc),
+                stellar_params_fn=lambda *_: {},
             )
         assert isinstance(result, list)
 
@@ -153,6 +154,7 @@ class TestRunPipeline:
                 "TIC 0", "TESS",
                 fetch_fn=self._patched_fetch(lc),
                 clean_fn=self._patched_clean(lc),
+                stellar_params_fn=lambda *_: {},
             )
         assert result == []
 
@@ -174,6 +176,7 @@ class TestRunPipeline:
                 exptime="long",
                 fetch_fn=_fetch,
                 clean_fn=self._patched_clean(lc),
+                stellar_params_fn=lambda *_: {},
             )
 
         assert captured == {
@@ -208,6 +211,7 @@ class TestRunPipeline:
                 "TIC 0", "TESS",
                 fetch_fn=self._patched_fetch(lc),
                 clean_fn=self._patched_clean(lc),
+                stellar_params_fn=lambda *_: {},
             )
 
         assert len(result) == 2
@@ -217,7 +221,7 @@ class TestRunPipeline:
         signal = _make_signal()
         captured: dict[str, Any] = {}
 
-        def _vet(light_curve: Any, candidate_signal: Any) -> Any:
+        def _vet(light_curve: Any, candidate_signal: Any, **_kwargs: Any) -> Any:
             captured["light_curve"] = light_curve
             captured["signal"] = candidate_signal
             return MagicMock(features=CandidateFeatures())
@@ -238,9 +242,114 @@ class TestRunPipeline:
                 "TIC 0", "TESS",
                 fetch_fn=self._patched_fetch(lc),
                 clean_fn=self._patched_clean(lc),
+                stellar_params_fn=lambda *_: {},
             )
 
         assert captured == {"light_curve": lc, "signal": signal}
+
+    def test_stellar_params_flow_to_vet_signal(self) -> None:
+        lc = _mock_lc()
+        signal = _make_signal()
+        captured: dict[str, Any] = {}
+
+        def _vet(light_curve: Any, candidate_signal: Any, **kwargs: Any) -> Any:
+            captured.update(kwargs)
+            return MagicMock(features=CandidateFeatures())
+
+        with (
+            patch("exo_toolkit.cli.search_lightcurve", return_value=[signal]),
+            patch("exo_toolkit.cli.vet_signal", side_effect=_vet),
+            patch(
+                "exo_toolkit.cli.score_candidate",
+                return_value=(_uniform_posterior(), _make_scores()),
+            ),
+            patch(
+                "exo_toolkit.cli.classify_submission_pathway",
+                return_value="planet_hunters_discussion",
+            ),
+        ):
+            run_pipeline(
+                "TIC 0", "TESS",
+                fetch_fn=self._patched_fetch(lc),
+                clean_fn=self._patched_clean(lc),
+                stellar_params_fn=lambda _tid: {
+                    "stellar_radius_rsun": 1.2,
+                    "stellar_mass_msun": 1.1,
+                    "stellar_teff_k": 5200.0,
+                    "contamination_ratio": 0.03,
+                },
+            )
+
+        assert captured == {
+            "stellar_radius_rsun": 1.2,
+            "stellar_mass_msun": 1.1,
+            "stellar_teff_k": 5200.0,
+            "contamination_ratio": 0.03,
+        }
+
+    def test_stellar_params_fn_not_called_for_non_tess_mission(self) -> None:
+        lc = _mock_lc()
+        signal = _make_signal()
+        called: list[str] = []
+
+        def _stellar_params(target_id: str) -> dict[str, Any]:
+            called.append(target_id)
+            return {}
+
+        with (
+            patch("exo_toolkit.cli.search_lightcurve", return_value=[signal]),
+            patch(
+                "exo_toolkit.cli.vet_signal",
+                return_value=MagicMock(features=CandidateFeatures()),
+            ),
+            patch(
+                "exo_toolkit.cli.score_candidate",
+                return_value=(_uniform_posterior(), _make_scores()),
+            ),
+            patch(
+                "exo_toolkit.cli.classify_submission_pathway",
+                return_value="planet_hunters_discussion",
+            ),
+        ):
+            run_pipeline(
+                "KIC 0", "Kepler",
+                fetch_fn=self._patched_fetch(lc),
+                clean_fn=self._patched_clean(lc),
+                stellar_params_fn=_stellar_params,
+            )
+
+        assert called == []
+
+    def test_stellar_params_fn_exception_fails_open(self) -> None:
+        lc = _mock_lc()
+        signal = _make_signal()
+
+        def _stellar_params(_target_id: str) -> dict[str, Any]:
+            raise ConnectionError("no network")
+
+        with (
+            patch("exo_toolkit.cli.search_lightcurve", return_value=[signal]),
+            patch(
+                "exo_toolkit.cli.vet_signal",
+                return_value=MagicMock(features=CandidateFeatures()),
+            ),
+            patch(
+                "exo_toolkit.cli.score_candidate",
+                return_value=(_uniform_posterior(), _make_scores()),
+            ),
+            patch(
+                "exo_toolkit.cli.classify_submission_pathway",
+                return_value="planet_hunters_discussion",
+            ),
+        ):
+            result = run_pipeline(
+                "TIC 0", "TESS",
+                fetch_fn=self._patched_fetch(lc),
+                clean_fn=self._patched_clean(lc),
+                stellar_params_fn=_stellar_params,
+            )
+
+        assert len(result) == 1
 
     def test_row_contains_required_keys(self) -> None:
         lc = _mock_lc()
@@ -267,6 +376,7 @@ class TestRunPipeline:
                 "TIC 0", "TESS",
                 fetch_fn=self._patched_fetch(lc),
                 clean_fn=self._patched_clean(lc),
+                stellar_params_fn=lambda *_: {},
             )
 
         row = result[0]
@@ -304,6 +414,7 @@ class TestRunPipeline:
                 "TIC 0", "TESS",
                 fetch_fn=self._patched_fetch(lc),
                 clean_fn=self._patched_clean(lc),
+                stellar_params_fn=lambda *_: {},
             )
 
         assert result[0]["features"]["log_snr_score"] == pytest.approx(0.81)
@@ -377,6 +488,7 @@ class TestRunPipeline:
                 "TIC 0", "TESS",
                 fetch_fn=self._patched_fetch(lc),
                 clean_fn=self._patched_clean(lc),
+                stellar_params_fn=lambda *_: {},
             )
 
         p = result[0]["posterior"]
@@ -672,6 +784,7 @@ class TestScorerOption:
                 model_path=tmp_path / "model.json",
                 fetch_fn=lambda *_: _make_fetch_result(lc),
                 clean_fn=lambda *_: MagicMock(light_curve=lc),
+                stellar_params_fn=lambda *_: {},
             )
 
         assert len(result) == 1
@@ -708,6 +821,7 @@ class TestScorerOption:
                 cnn_checkpoint_path=tmp_path / "cnn.pt",
                 fetch_fn=lambda *_: _make_fetch_result(lc),
                 clean_fn=lambda *_: MagicMock(light_curve=lc),
+                stellar_params_fn=lambda *_: {},
             )
 
         snippet = mock_cnn.predict_proba.call_args.args[0]
@@ -745,6 +859,7 @@ class TestScorerOption:
                 cnn_checkpoint_path=tmp_path / "cnn.pt",
                 fetch_fn=lambda *_: _make_fetch_result(lc),
                 clean_fn=lambda *_: MagicMock(light_curve=lc),
+                stellar_params_fn=lambda *_: {},
             )
 
         cnn_meta = result[0]["meta"]["cnn"]
@@ -781,6 +896,7 @@ class TestScorerOption:
                 cnn_checkpoint_path=tmp_path / "cnn.pt",
                 fetch_fn=lambda *_: _make_fetch_result(lc),
                 clean_fn=lambda *_: MagicMock(light_curve=lc),
+                stellar_params_fn=lambda *_: {},
             )
 
         assert result[0]["cnn_planet_probability"] == pytest.approx(0.5)
@@ -822,6 +938,7 @@ class TestScorerOption:
                 cnn_checkpoint_path=tmp_path / "cnn.pt",
                 fetch_fn=lambda *_: _make_fetch_result(lc),
                 clean_fn=lambda *_: MagicMock(light_curve=lc),
+                stellar_params_fn=lambda *_: {},
             )
 
         expected = 0.35 * 0.8 + 0.65 * posterior.planet_candidate
@@ -860,6 +977,7 @@ class TestProvenanceScoreFlow:
                 "TESS",
                 fetch_fn=lambda *_: fetch_result,
                 clean_fn=lambda *_: MagicMock(light_curve=lc),
+                stellar_params_fn=lambda *_: {},
             )
 
     def test_provenance_score_present_in_row(self) -> None:
@@ -903,6 +1021,7 @@ class TestProvenanceScoreFlow:
                 "TESS",
                 fetch_fn=lambda *_: fetch_result,
                 clean_fn=lambda *_: MagicMock(light_curve=lc),
+                stellar_params_fn=lambda *_: {},
             )
 
         assert "provenance_score" in captured[0]
@@ -974,6 +1093,7 @@ class TestOutputMetadata:
                 scorer=scorer,
                 fetch_fn=lambda *_: fetch_result,
                 clean_fn=lambda *_: MagicMock(light_curve=lc),
+                stellar_params_fn=lambda *_: {},
             )
 
     def test_row_contains_meta_key(self) -> None:
@@ -1061,6 +1181,7 @@ class TestCalibrationIntegration:
                 "TESS",
                 fetch_fn=lambda *_: fetch_result,
                 clean_fn=lambda *_: MagicMock(light_curve=lc),
+                stellar_params_fn=lambda *_: {},
                 **kwargs,
             )
 
@@ -1153,6 +1274,7 @@ class TestCalibrationIntegration:
                 "TESS",
                 fetch_fn=lambda *_: fetch_result,
                 clean_fn=lambda *_: MagicMock(light_curve=lc),
+                stellar_params_fn=lambda *_: {},
                 calibration_path=tmp_path / "cal.json",
             )
         assert mock_apply.call_count == 2
@@ -1193,6 +1315,7 @@ class TestCalibrationIntegration:
                 "TESS",
                 fetch_fn=lambda *_: _make_fetch_result(lc),
                 clean_fn=lambda *_: MagicMock(light_curve=lc),
+                stellar_params_fn=lambda *_: {},
                 calibration_path=Path("/tmp/cal.json"),
             )
         assert result == []

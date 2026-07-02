@@ -24,6 +24,7 @@ import re
 import socket
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -430,8 +431,126 @@ def compute_provenance_score(provenance: FetchProvenance) -> float:
 
 
 # ---------------------------------------------------------------------------
+# TIC catalog stellar parameters
+# ---------------------------------------------------------------------------
+
+# Candidate TIC catalog column names per stellar parameter. Multiple names
+# are tried because the exact column set returned by astroquery.mast has
+# varied across TIC catalog versions; unmatched fields fail open to None
+# rather than ever raising or silently taking a wrong value.
+_TIC_RADIUS_COLUMNS: tuple[str, ...] = ("rad", "radius", "st_rad")
+_TIC_MASS_COLUMNS: tuple[str, ...] = ("mass", "st_mass")
+_TIC_TEFF_COLUMNS: tuple[str, ...] = ("Teff", "teff", "st_teff")
+_TIC_CONTRATIO_COLUMNS: tuple[str, ...] = ("contratio", "contamination")
+
+
+def fetch_tic_stellar_params(
+    target_id: str,
+    *,
+    query_fn: Callable[[int], Any] | None = None,
+) -> dict[str, float | None]:
+    """Look up TIC catalog stellar parameters for a TESS target.
+
+    Best-effort only: every value defaults to ``None`` when *target_id* is
+    not a parseable TIC identifier, the catalog query fails, or a given
+    column is absent from the response. Diagnostics fed by these values
+    (stellar density, limb-darkening, contamination, dilution) already treat
+    ``None`` as "not available" and fail closed conservatively, so a failed
+    lookup here never blocks or corrupts a scan.
+
+    Args:
+        target_id: Target identifier, e.g. ``"TIC 150428135"``.
+        query_fn: Injectable catalog query callable; accepts the integer TIC
+            ID and returns a sequence of row-like objects (dict-like or
+            astropy Table rows). Defaults to
+            ``astroquery.mast.Catalogs.query_criteria(catalog="TIC", ID=...)``.
+
+    Returns:
+        Dict with keys ``stellar_radius_rsun``, ``stellar_mass_msun``,
+        ``stellar_teff_k``, ``contamination_ratio`` — ready to pass as
+        keyword arguments to :func:`exo_toolkit.vet.vet_signal`.
+    """
+    result: dict[str, float | None] = {
+        "stellar_radius_rsun": None,
+        "stellar_mass_msun": None,
+        "stellar_teff_k": None,
+        "contamination_ratio": None,
+    }
+
+    tic_id = _parse_tic_id(target_id)
+    if tic_id is None:
+        return result
+
+    if query_fn is not None:
+        _query = query_fn
+    else:
+
+        def _query(tid: int) -> Any:
+            mast_module: Any = importlib.import_module("astroquery.mast")
+            catalogs: Any = mast_module.Catalogs
+            return catalogs.query_criteria(catalog="TIC", ID=tid)
+
+    try:
+        rows = _query(tic_id)
+    except Exception:  # noqa: BLE001
+        return result
+
+    row = _first_row(rows)
+    if row is None:
+        return result
+
+    result["stellar_radius_rsun"] = _row_float(row, _TIC_RADIUS_COLUMNS)
+    result["stellar_mass_msun"] = _row_float(row, _TIC_MASS_COLUMNS)
+    result["stellar_teff_k"] = _row_float(row, _TIC_TEFF_COLUMNS)
+    result["contamination_ratio"] = _row_float(row, _TIC_CONTRATIO_COLUMNS)
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+
+def _parse_tic_id(target_id: str) -> int | None:
+    """Extract the integer TIC ID from a ``"TIC 123456789"``-style string."""
+    if "TIC" not in target_id.upper():
+        return None
+    match = re.search(r"\d+", target_id)
+    if match is None:
+        return None
+    try:
+        return int(match.group())
+    except ValueError:
+        return None
+
+
+def _first_row(rows: Any) -> Any | None:
+    """Return the first row of a query result, or None if empty/unusable."""
+    try:
+        if len(rows) == 0:
+            return None
+        return rows[0]
+    except (TypeError, IndexError):
+        return None
+
+
+def _row_float(row: Any, candidate_keys: tuple[str, ...]) -> float | None:
+    """Return the first finite float found under *candidate_keys* in *row*."""
+    for key in candidate_keys:
+        try:
+            value = row[key]
+        except (KeyError, IndexError, TypeError):
+            continue
+        if value is None:
+            continue
+        try:
+            fvalue = float(value)
+        except Exception:  # noqa: BLE001 — masked/invalid catalog cells fail open
+            continue
+        if fvalue != fvalue:  # NaN guard
+            continue
+        return fvalue
+    return None
 
 
 def _fetch_jwst(obsid: str, *, _skills_dir: Path | None = None) -> FetchResult:
