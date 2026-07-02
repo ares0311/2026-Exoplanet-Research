@@ -290,6 +290,68 @@ class TestRunSourceSmokeTest:
 
 
 # ---------------------------------------------------------------------------
+# progress_fn — a silent multi-step network script is indistinguishable from
+# a hung one (AGENTS.md Console Output policy), so every step must report.
+# ---------------------------------------------------------------------------
+
+
+class TestProgressReporting:
+    def test_all_six_steps_reported_on_success(self) -> None:
+        messages: list[str] = []
+        run_source_smoke_test(
+            tap_fn=_good_tap_fn(),
+            exofop_fn=_good_exofop_fn,
+            lightkurve_search_fn=_good_lightkurve_search_fn,
+            progress_fn=messages.append,
+        )
+        assert len(messages) == 6
+        assert "[1/6]" in messages[0]
+        assert "[2/6]" in messages[1]
+        assert "[3/6]" in messages[2]
+        assert "[4/6]" in messages[3]
+        assert "[5/6]" in messages[4]
+        assert "[6/6]" in messages[5]
+
+    def test_stops_reporting_after_early_failure(self) -> None:
+        # koi schema fails -> only step [1/6] and [2/6] should ever report,
+        # since the function returns before steps 3-6 run.
+        messages: list[str] = []
+        tap = _make_tap(
+            koi_schema=_KOI_SCHEMA_MISSING_CSV,
+            toi_schema=_TOI_SCHEMA_CSV,
+            koi_rows=_KOI_ROWS_CSV,
+            toi_rows=_TOI_ROWS_CSV,
+        )
+        run_source_smoke_test(
+            tap_fn=tap,
+            exofop_fn=_good_exofop_fn,
+            lightkurve_search_fn=_good_lightkurve_search_fn,
+            progress_fn=messages.append,
+        )
+        assert len(messages) == 2
+
+    def test_no_progress_fn_does_not_raise(self) -> None:
+        # Library/test callers that omit progress_fn must stay silent, not crash.
+        result = run_source_smoke_test(
+            tap_fn=_good_tap_fn(),
+            exofop_fn=_good_exofop_fn,
+            lightkurve_search_fn=_good_lightkurve_search_fn,
+        )
+        assert result.ok is True
+
+    def test_sample_ids_included_in_lightkurve_progress_messages(self) -> None:
+        messages: list[str] = []
+        run_source_smoke_test(
+            tap_fn=_good_tap_fn(),
+            exofop_fn=_good_exofop_fn,
+            lightkurve_search_fn=_good_lightkurve_search_fn,
+            progress_fn=messages.append,
+        )
+        assert "10000001" in messages[4]
+        assert "150428135" in messages[5]
+
+
+# ---------------------------------------------------------------------------
 # format_smoke_test_result
 # ---------------------------------------------------------------------------
 
