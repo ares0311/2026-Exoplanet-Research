@@ -223,10 +223,14 @@ accumulates beyond roughly one target's data. `--max-targets` defaults to 25.
 27 offline/injectable tests pass. The first live Mac run processed 25 targets
 in 1,216s, wrote 26 snippets, failed 0 rows, left SQLite summary
 `done|25|26|0`, and verified `data/raw/t1_1_kepler_lc` was empty (`0B`) after
-completion.
+completion. At that observed rate (~49s/target), a 250-target run would take
+roughly 3.4 hours, so the per-target progress line now includes an ETA
+(`elapsed=Xs ETA=YmZZs`), not just elapsed time, matching the item-loop
+console-output pattern used elsewhere in this project — a multi-hour batch
+must never look hung. 35 offline/injectable tests pass (8 new for the ETA
+formatter and its wiring into `run_batch`).
 
-**Concrete next step — after this ledger update is merged, give the human this
-exact scaled recipe:**
+**Concrete next step — give the human this exact scaled recipe:**
 
 ```bash
 git switch main
@@ -236,7 +240,7 @@ caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 2
 
 This processes the next 250 not-yet-done targets from the manifest (resumable
 — rerunning the same command continues where it left off) and prints
-per-target progress with elapsed time. Use `--max-targets 100` instead if the
+per-target progress with elapsed time and ETA. Use `--max-targets 100` instead if the
 operator wants a smaller second step. Paste back the final summary block. If
 any target shows `NO_DATA`/`NO_LIGHTKURVE`/`ERROR:...`, that is expected for
 some KOIs (not every KIC has usable long-cadence data) and is not itself a

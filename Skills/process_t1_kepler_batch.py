@@ -364,6 +364,17 @@ class BatchSummary:
     db_path: str
 
 
+def _format_eta(seconds: float) -> str:
+    """Format a remaining-time estimate the same way as the rest of this project."""
+    if seconds == float("inf") or seconds != seconds:  # inf or NaN
+        return "unknown"
+    if seconds > 90:
+        minutes = int(seconds // 60)
+        remainder = int(seconds % 60)
+        return f"{minutes}m{remainder:02d}s"
+    return f"{seconds:.0f}s"
+
+
 def _write_records(fh: Any, records: Iterable[dict[str, Any]]) -> int:
     n = 0
     for record in records:
@@ -441,10 +452,14 @@ def run_batch(
             store.mark_done(target_id, n_written=wrote, n_failed=result.n_failed, flag=result.flag)
             n_written += wrote
             n_failed += result.n_failed
+            elapsed_after = time.monotonic() - start
+            rate = index / elapsed_after if elapsed_after > 0 else 0.0
+            remaining = (len(pending_target_ids) - index) / rate if rate > 0 else float("inf")
             _progress(
                 f"  -> KIC {target_id} flag={result.flag} "
                 f"written={wrote} failed={result.n_failed}  "
-                f"total_written={n_written} total_failed={n_failed}"
+                f"total_written={n_written} total_failed={n_failed}  "
+                f"elapsed={elapsed_after:.0f}s  ETA={_format_eta(remaining)}"
             )
 
     elapsed_total = time.monotonic() - start
