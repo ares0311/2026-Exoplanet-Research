@@ -24,7 +24,7 @@ The active production blocker is now T1-1, and the authorized path is the
 source-contract-first dataset/model plan in
 `docs/exoplanet_exomoon_dataset_handoff.md`.
 
-Version note: 0.2.12 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.13 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -33,9 +33,11 @@ disconnects, 0.2.11 wires real TIC catalog `stellar_radius_rsun`,
 `vet_signal()` for every TESS scan (previously all four were always `None`,
 and `vet_signal()` did not even accept `stellar_teff_k`, so
 `limb_darkening_plausibility_score` silently used the solar-default 5778 K for
-every target), and 0.2.12 records the TAP schema case-sensitivity fix in the
-active dataset handoff contract. The catalog lookup fails open (all-`None`) on
-any network/parse error or non-TIC target, so it never blocks a scan.
+every target), 0.2.12 records the TAP schema case-sensitivity fix in the
+active dataset handoff contract, and 0.2.13 adds the committed leakage-safe
+Kepler training manifest and raw-FITS cleanup policy. The catalog lookup fails
+open (all-`None`) on any network/parse error or non-TIC target, so it never
+blocks a scan.
 
 ---
 
@@ -69,7 +71,8 @@ any network/parse error or non-TIC target, so it never blocks a scan.
 - **First live run found a real bug, fixed same-day (2026-07-02)**: `cumulative` schema check failed with zero missing... zero *available* columns and no error, while `toi` passed. Root cause, confirmed via direct `curl` against `TAP_SCHEMA.tables` (not guessed): the archive registers the table as `"CUMULATIVE"` (upper case); `TAP_SCHEMA.columns.table_name` is an exact-match string column, not a resolved SQL identifier, so `= 'cumulative'` matched nothing. `toi` happened to be registered lower case. Fixed by querying `UPPER(table_name) = UPPER('...')` instead of exact match — general fix, not a per-table hardcode; user re-verified the fixed query live via `curl` and got a real 2,366-byte column list back. `FROM cumulative`/`FROM toi` (the actual row-fetch queries) were not affected — those are ordinary SQL identifiers and this codebase already queries them lower case successfully elsewhere (`Skills/fetch_nea_koi_lc_index.py`).
 - **Full source smoke PASS (2026-07-02)**: the exact verifier ran end-to-end from the project `.venv` and returned `Overall: PASS`: 5 KOI rows, 5 TOI rows, 8,064 ExoFOP public TOI CSV rows, sample KIC `10797460` with 17 Kepler light-curve search results, and sample TIC `182943944` with 21 TESS light-curve search results. The source-access blocker is cleared.
 - **Storage/source snapshot PASS (2026-07-02)**: `Skills/plan_t1_training_batch.py` ran live with `sample_size=5` and wrote committed source snapshots plus sample MAST download metadata without downloading FITS files. Measured source counts: `cumulative` rows=9,564, `toi` rows=7,931, `pscomppars` rows=6,298, KOI label rows=7,454 across 6,515 unique KICs (2,740 confirmed / 4,714 false positive), TOI ephemeris rows=7,824 across 7,535 TICs, and ExoFOP public TOI CSV rows=8,064. MAST search metadata estimated all-KOI Kepler long-cadence raw FITS at 47,099,384,640 bytes (43.86 GiB) and all-TOI TESS raw FITS at 44,994,438,720 bytes (41.90 GiB), combined 92,093,823,360 bytes under the 100 GiB working cap.
-- **Remaining next `[AGENT]` action**: design or verify the leakage-safe training manifest and cleanup path, then run a bounded Kepler-first processing batch. Do not ask the human to run a bulk download until manifest paths, cleanup rules, and copy-paste commands are committed.
+- **Leakage-safe Kepler manifest PASS (2026-07-02)**: `Skills/build_t1_training_manifest.py` ran live against the verified `cumulative` schema and wrote committed metadata without downloading FITS files. `metadata/t1_1_kepler_training_manifest.jsonl` has 7,454 KOI rows across 6,515 target groups; all rows from the same KIC share one deterministic split. Split/label counts: train 5,155 rows (label0=3,268 / label1=1,887), val 1,143 (721 / 422), test 1,156 (725 / 431). `metadata/t1_1_kepler_manifest_summary.json` has `flag=OK` and no leakage errors. Cleanup policy requires raw FITS under `data/raw/t1_1_kepler_lc` to be deleted only after processed snippets validate, manifest summary is OK, `logs/t1_1_kepler_processing.sqlite3` has no incomplete active targets, and the operator confirms failed raw FITS are not needed for debugging.
+- **Remaining next `[AGENT]` action**: implement or verify the bounded Kepler-first processing batch that consumes the committed manifest, writes processed snippets under `data/processed/t1_1_kepler_snippets`, records progress/resume state in top-level SQLite at `logs/t1_1_kepler_processing.sqlite3`, and refuses to exceed the committed storage cap. Do not ask the human to run the batch until the command and tests are committed.
 - **Code status**: Training and state-dict inference paths are operational; the package scorer reconstructs the trained architecture and fails closed when loading fails
 - **Prior local corpus status**: **VALID as of 2026-06-12** — 2,037 snippets (1,012 positive CP+KP, 1,025 negative FP+FA, ratio 0.99); zero-epoch corpus retired and rebuilt from scratch with valid BJD epochs; label bug fixed (KP→1); MAST throttling fix applied (`bbb0877`)
 - **Local corpus status**: **KEPLER LOCAL VALIDATED** — TESS v2 complete at 2,619 snippets; Kepler finite rebuild has 6,837 parseable snippets with zero non-finite flux rows, zero duplicate resume keys, labels negative=4,280 and positive=2,557; `data/kepler_cnn_splits` validator PASS with train/val/test = 4,741 / 1,060 / 1,036

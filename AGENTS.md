@@ -123,6 +123,7 @@ When the user must take an action to unblock a gap:
 - **Project version bumped to 0.2.10** — patch release for candidate-review regeneration reliability; `fetch_lightcurve()` now retries transient MAST/Lightkurve connection disconnects with bounded polite backoff.
 - **Project version bumped to 0.2.11 (2026-07-02)** — supplementary pipeline-correctness patch, not part of the active T1-1 dataset-handoff path. `run_pipeline()` called `vet_signal(light_curve, signal)` with zero catalog keyword arguments, so `stellar_radius_rsun`, `stellar_mass_msun`, `contamination_ratio`, and every score derived from them were always `None`/solar-default — including `limb_darkening_plausibility_score`, which silently used 5778 K for every target because `vet_signal()` did not even accept a `stellar_teff_k` parameter. New `fetch_tic_stellar_params()` in `fetch.py` does one TIC catalog lookup per TESS scan (injectable `stellar_params_fn` for tests; fails open to all-`None` on any error; not called for Kepler/K2/JWST). This is a correctness fix to the already-shipped Bayesian/XGBoost/ensemble scorers, not a reopening of T1-0 as the active path; run006/run008 remain historical per the 2026-07-01 reset below.
 - **Project version bumped to 0.2.12 (2026-07-02)** — source-contract hardening patch for the active T1-1 path. The shipped verifier already fixed the live NASA Exoplanet Archive `TAP_SCHEMA.columns.table_name` case-sensitivity bug with `UPPER(table_name) = UPPER(...)`; this patch updates `docs/exoplanet_exomoon_dataset_handoff.md` and regression tests so future agents do not copy the stale exact-match schema snippets that caused the `CUMULATIVE` smoke-test failure.
+- **Project version bumped to 0.2.13 (2026-07-02)** — leakage-safe manifest planning patch for the active T1-1 path. `Skills/build_t1_training_manifest.py` verifies the KOI schema, queries confirmed/false-positive Kepler KOI rows, assigns all KOIs from the same KIC to one deterministic split, writes committed manifest/summary metadata, and records the raw-FITS cleanup policy before any bulk download is requested.
 
 ### Where things stand
 
@@ -185,12 +186,6 @@ light-curve search results. The source-access blocker is cleared. Do not ask
 the human to rerun this before the next T1-1 step unless a later source change
 invalidates the contract.
 
-**Next T1-1 blocker:** estimate the first production training-data batch size,
-write immutable source snapshot metadata, and design leakage-safe manifests
-per the storage rules in `docs/exoplanet_exomoon_dataset_handoff.md`. Do not
-ask the human to run a bulk download until storage/runtime estimates and
-manifest paths are committed.
-
 **Storage/source snapshot PASS (2026-07-02):**
 `Skills/plan_t1_training_batch.py` writes committed source snapshots and sample
 download metadata without downloading FITS files. Live run with `sample_size=5`
@@ -200,8 +195,27 @@ positive), TOI ephemeris rows=7,824 across 7,535 TICs, and ExoFOP public TOI
 CSV rows=8,064. MAST search metadata estimated all-KOI Kepler long-cadence raw
 FITS at 47,099,384,640 bytes (43.86 GiB) and all-TOI TESS raw FITS at
 44,994,438,720 bytes (41.90 GiB), combined 92,093,823,360 bytes under the
-100 GiB working cap. Next action: design or verify the leakage-safe training
-manifest and cleanup path, then run a bounded Kepler-first processing batch.
+100 GiB working cap.
+
+**Leakage-safe Kepler manifest PASS (2026-07-02):**
+`Skills/build_t1_training_manifest.py` writes
+`metadata/t1_1_kepler_training_manifest.jsonl` and
+`metadata/t1_1_kepler_manifest_summary.json` from verified NASA Exoplanet
+Archive KOI rows without downloading FITS files. Live run with seed 42 produced
+7,454 KOI rows across 6,515 target groups, with all rows for a KIC assigned to
+one split: train 5,155 rows (label0=3,268 / label1=1,887), val 1,143
+(721 / 422), test 1,156 (725 / 431). Summary flag `OK`, leakage errors `[]`.
+Cleanup policy is explicit: raw FITS under `data/raw/t1_1_kepler_lc` are
+deleted only after processed snippets validate, the manifest is OK, the
+top-level SQLite processing log has no incomplete active targets, and the
+operator confirms failed raw FITS are not needed for debugging.
+
+**Next T1-1 blocker:** implement or verify the bounded Kepler-first processing
+batch that consumes `metadata/t1_1_kepler_training_manifest.jsonl`, writes
+processed snippets under `data/processed/t1_1_kepler_snippets`, records progress
+and resume state in `logs/t1_1_kepler_processing.sqlite3`, and refuses to
+exceed the committed storage cap. Do not ask the human to run the batch until
+the processing command and tests are committed.
 
 The run006/run008 notes below are historical provenance only. Preserve them so
 future agents do not re-debug the same scanner failures, but do not treat them

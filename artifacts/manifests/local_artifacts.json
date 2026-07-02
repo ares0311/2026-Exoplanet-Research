@@ -1179,8 +1179,49 @@
         "working_data_cap_bytes": 107374182400,
         "flag": "OK"
       },
-      "validation_gate": "Combined estimated raw bytes remain under the 100 GiB working-data cap, but bulk download still requires leakage-safe manifest and cleanup path.",
-      "next_action": "Design or verify leakage-safe training manifest and cleanup path before any bulk download."
+      "validation_gate": "Combined estimated raw bytes remain under the 100 GiB working-data cap.",
+      "next_action": "Use with the committed Kepler manifest; do not ask for a bulk download until the bounded processor command/tests are committed."
+    },
+    {
+      "path": "metadata/t1_1_kepler_training_manifest.jsonl",
+      "kind": "training_manifest",
+      "status": "committed_leakage_safe",
+      "git_policy": "commit",
+      "last_known": {
+        "created_at_utc": "2026-07-02T08:20:18Z",
+        "manifest_version": "t1-1-kepler-manifest-v1",
+        "rows": 7454,
+        "target_groups": 6515,
+        "seed": 42,
+        "train_rows": 5155,
+        "train_label_0": 3268,
+        "train_label_1": 1887,
+        "val_rows": 1143,
+        "val_label_0": 721,
+        "val_label_1": 422,
+        "test_rows": 1156,
+        "test_label_0": 725,
+        "test_label_1": 431,
+        "lightcurve_search": "mission=Kepler author=Kepler exptime=1800"
+      },
+      "validation_gate": "All rows from the same KIC target group must remain in one split; summary flag must remain OK.",
+      "next_action": "Implement/verify bounded Kepler-first processing batch that consumes this manifest."
+    },
+    {
+      "path": "metadata/t1_1_kepler_manifest_summary.json",
+      "kind": "training_manifest_summary",
+      "status": "committed_leakage_safe",
+      "git_policy": "commit",
+      "last_known": {
+        "created_at_utc": "2026-07-02T08:20:18Z",
+        "flag": "OK",
+        "leakage_errors": 0,
+        "raw_lightcurve_dir": "data/raw/t1_1_kepler_lc",
+        "processed_artifact_dir": "data/processed/t1_1_kepler_snippets",
+        "runtime_log_db": "logs/t1_1_kepler_processing.sqlite3"
+      },
+      "validation_gate": "Raw FITS may be deleted only after processed snippets validate, manifest flag is OK, runtime SQLite has no incomplete active targets, and the operator confirms failed raw FITS are not needed for debugging.",
+      "next_action": "Use as the cleanup contract for the bounded Kepler-first processing batch."
     },
     {
       "path": "reports/",

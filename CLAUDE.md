@@ -482,8 +482,8 @@ New `RawDiagnostics` fields: `oot_scatter_sigma`, `sector_depths`, `sector_depth
 
 ## CLI Version Flag and Meta Output (Milestone 12f)
 
-- `exo --version` / `exo -V` — prints the installed `exo-toolkit` package version (currently `0.2.12`)
-- fallback version `0.2.12` in `src/exo_toolkit/__init__.py` is used only if source-tree and installed package metadata are unavailable
+- `exo --version` / `exo -V` — prints the installed `exo-toolkit` package version (currently `0.2.13`)
+- fallback version `0.2.13` in `src/exo_toolkit/__init__.py` is used only if source-tree and installed package metadata are unavailable
 - Each output row gains a `"features"` dict, a raw `"diagnostics"` dict, a `"fetch_provenance"` dict, plus a `"meta"` dict: `toolkit_version`, `run_at`, `scorer`, `git_commit`, `features_available`, `features_missing`
 - `_git_commit_short()` reads `git rev-parse --short HEAD`; returns `None` on failure
 
@@ -1246,6 +1246,17 @@ training defaults, and production promotion only after held-out gates pass.
 
 **Supplementary fix (2026-07-02, version 0.2.11):** `run_pipeline()` now wires real TIC catalog `stellar_radius_rsun`/`stellar_mass_msun`/`stellar_teff_k`/`contamination_ratio` into `vet_signal()` — a correctness fix to the already-shipped Bayesian/XGBoost/ensemble scorers, not part of the active T1-1 path. See `AGENTS.md` for detail.
 
+**T1-1 source/manifest progress (2026-07-02, versions 0.2.12-0.2.13):**
+`Skills/verify_dataset_sources.py` passed the live source-access smoke test,
+`Skills/plan_t1_training_batch.py` committed source snapshots and storage
+estimates, and `Skills/build_t1_training_manifest.py` committed the
+leakage-safe Kepler manifest plus cleanup policy. Current manifest:
+`metadata/t1_1_kepler_training_manifest.jsonl`, 7,454 KOI rows across 6,515
+KIC groups, seed 42, train/val/test row counts 5,155 / 1,143 / 1,156, no
+leakage errors. Next production work is the bounded Kepler-first processing
+batch that consumes this manifest and logs resumable progress to
+`logs/t1_1_kepler_processing.sqlite3`.
+
 **JWST Option A status (as of 2026-06-27):**
 - `Skills/fetch_jwst_targets.py` (A1) — **MERGED** (PR #133)
 - `Skills/fetch_jwst_lc.py` (A2) — **MERGED** (PR #133)
@@ -1259,10 +1270,10 @@ training defaults, and production promotion only after held-out gates pass.
 **Live scanner fix (PR #143, 2026-06-28):** **MERGED** — live one-target smoke on `main` verified that ExoFOP SSL loading, Python 3.14 helper imports, bounded TIC target selection, and no-light-curve `no_data` classification work. Do not re-debug the pre-PR #143 pasted failures.
 
 **Immediate next actions (in priority order):**
-1. **[AGENT]** Read `docs/exoplanet_exomoon_dataset_handoff.md` and map its source-contract requirements to T1-1 in `docs/PRODUCTION_READINESS.md`.
-2. **[AGENT]** Verify source URLs/schemas with primary providers before writing or asking the human to run any bulk downloader. No guessed columns, URLs, Kaggle mirrors, or unverified pretrained weights.
-3. **[AGENT]** Update manifests/ledgers for expected local artifacts, storage/runtime estimates, leakage-safe split policy, and the exact next local command.
-4. **[HUMAN, only after verification]** Run bounded, resumable, console-visible, Mac/MPS-compliant local download/training commands when the agent has proved the command does not rely on hallucinated source contracts.
+1. **[AGENT]** Implement or verify the bounded Kepler-first processor for `metadata/t1_1_kepler_training_manifest.jsonl`; it must be resumable, progress/ETA visible, storage-capped, and backed by top-level SQLite at `logs/t1_1_kepler_processing.sqlite3`.
+2. **[AGENT]** Add tests proving the processor skips completed rows, preserves terminal failures, refuses cross-split leakage, and never asks the human to rerun from scratch after interruption.
+3. **[AGENT]** Only after those tests pass, provide the exact Mac command for the human; it must use `.venv/bin/python`, `caffeinate`, bounded workers, and committed paths only.
+4. **[HUMAN, only after verification]** Run the bounded local processing command and paste the final summary plus any non-OK SQLite counts.
 
 #### CNN candidate history (what has been tried — do not repeat)
 
