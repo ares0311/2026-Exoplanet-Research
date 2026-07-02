@@ -13,6 +13,7 @@ from process_t1_kepler_batch import (  # noqa: E402
     TargetResult,
     _clear_directory,
     _directory_size_bytes,
+    _format_eta,
     format_batch_summary,
     group_rows_by_target,
     load_manifest_rows,
@@ -356,6 +357,23 @@ class TestRunBatch:
         assert len(messages) > 0
         assert any("KIC" in m for m in messages)
 
+    def test_progress_includes_eta_for_multi_target_run(self, tmp_path: Path) -> None:
+        manifest_path = self._manifest_with_targets(tmp_path, 3)
+        messages: list[str] = []
+        run_batch(
+            manifest_path=manifest_path,
+            output_path=tmp_path / "out" / "snippets.jsonl",
+            db_path=tmp_path / "progress.sqlite3",
+            raw_dir=tmp_path / "raw",
+            max_targets=None,
+            n_bins=51,
+            lc_fetcher=_flat_lc_fetcher(),
+            progress_fn=messages.append,
+        )
+        completion_messages = [m for m in messages if m.startswith("  ->")]
+        assert len(completion_messages) == 3
+        assert all("ETA=" in m for m in completion_messages)
+
     def test_failed_target_marked_done_not_retried(self, tmp_path: Path) -> None:
         manifest_path = self._manifest_with_targets(tmp_path, 1)
         db_path = tmp_path / "progress.sqlite3"
@@ -377,6 +395,34 @@ class TestRunBatch:
             lc_fetcher=lambda tid: (calls.append(tid), None)[1],
         )
         assert calls == []
+
+
+# ---------------------------------------------------------------------------
+# _format_eta
+# ---------------------------------------------------------------------------
+
+
+class TestFormatEta:
+    def test_short_duration_in_seconds(self) -> None:
+        assert _format_eta(45) == "45s"
+
+    def test_boundary_at_90_seconds_stays_in_seconds(self) -> None:
+        assert _format_eta(90) == "90s"
+
+    def test_long_duration_in_minutes_seconds(self) -> None:
+        assert _format_eta(125) == "2m05s"
+
+    def test_hours_scale_duration(self) -> None:
+        assert _format_eta(12160) == "202m40s"
+
+    def test_infinite_is_unknown(self) -> None:
+        assert _format_eta(float("inf")) == "unknown"
+
+    def test_nan_is_unknown(self) -> None:
+        assert _format_eta(float("nan")) == "unknown"
+
+    def test_zero_is_zero_seconds(self) -> None:
+        assert _format_eta(0) == "0s"
 
 
 # ---------------------------------------------------------------------------
