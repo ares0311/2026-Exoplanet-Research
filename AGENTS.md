@@ -166,7 +166,7 @@ exact recipe before proposing or writing any bulk downloader:
 ```bash
 git switch main
 git pull --ff-only origin main
-.venv/bin/python Skills/verify_dataset_sources.py --output reports/t1-1_source_smoke_test.md
+caffeinate -i .venv/bin/python Skills/verify_dataset_sources.py --output reports/t1-1_source_smoke_test.md
 cat reports/t1-1_source_smoke_test.md
 ```
 

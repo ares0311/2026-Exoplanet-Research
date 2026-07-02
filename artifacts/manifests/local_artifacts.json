@@ -1115,7 +1115,7 @@
         "blocker": "agent sandbox network policy returns 403 for exoplanetarchive.ipac.caltech.edu"
       },
       "validation_gate": "Must PASS before any T1-1 bulk download or training run.",
-      "next_action": "[HUMAN] .venv/bin/python Skills/verify_dataset_sources.py --output reports/t1-1_source_smoke_test.md, then paste back the report."
+      "next_action": "[HUMAN] caffeinate -i .venv/bin/python Skills/verify_dataset_sources.py --output reports/t1-1_source_smoke_test.md, then paste back the report."
     },
     {
       "path": "reports/",
