@@ -1,9 +1,9 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-07-02 (project reset: run006/run008 candidate review is historical; active production path wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` to close T1-1 with verified data sources, leakage-safe training manifests, and a production-gated trained model; source-contract examples now use case-insensitive TAP schema table-name matching after the live CUMULATIVE table-name bug; a supplementary pipeline-correctness fix wired real TIC catalog stellar/contamination parameters into `run_pipeline()` — see T1-0 notes below)
+Last reviewed: 2026-07-02 (project reset: run006/run008 candidate review is historical; active production path wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` to close T1-1 with verified data sources, leakage-safe training manifests, and a production-gated trained model; source-contract examples now use case-insensitive TAP schema table-name matching after the live CUMULATIVE table-name bug; the bounded Kepler-first processing batch tool is built and unit-tested, awaiting one bounded live run; a supplementary pipeline-correctness fix wired real TIC catalog stellar/contamination parameters into `run_pipeline()` — see T1-0 notes below)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 2,401 default tests passing, 2 integration_live deselected
+Test baseline: 2,436 default tests passing, 2 integration_live deselected
 
 ---
 
@@ -24,7 +24,7 @@ The active production blocker is now T1-1, and the authorized path is the
 source-contract-first dataset/model plan in
 `docs/exoplanet_exomoon_dataset_handoff.md`.
 
-Version note: 0.2.13 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.14 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -34,10 +34,12 @@ disconnects, 0.2.11 wires real TIC catalog `stellar_radius_rsun`,
 and `vet_signal()` did not even accept `stellar_teff_k`, so
 `limb_darkening_plausibility_score` silently used the solar-default 5778 K for
 every target), 0.2.12 records the TAP schema case-sensitivity fix in the
-active dataset handoff contract, and 0.2.13 adds the committed leakage-safe
-Kepler training manifest and raw-FITS cleanup policy. The catalog lookup fails
-open (all-`None`) on any network/parse error or non-TIC target, so it never
-blocks a scan.
+active dataset handoff contract, 0.2.13 adds the committed leakage-safe
+Kepler training manifest and raw-FITS cleanup policy, and 0.2.14 adds the
+bounded, resumable Kepler-first processing batch tool
+(`Skills/process_t1_kepler_batch.py`) that consumes that manifest. The
+catalog lookup fails open (all-`None`) on any network/parse error or
+non-TIC target, so it never blocks a scan.
 
 ---
 
@@ -72,7 +74,8 @@ blocks a scan.
 - **Full source smoke PASS (2026-07-02)**: the exact verifier ran end-to-end from the project `.venv` and returned `Overall: PASS`: 5 KOI rows, 5 TOI rows, 8,064 ExoFOP public TOI CSV rows, sample KIC `10797460` with 17 Kepler light-curve search results, and sample TIC `182943944` with 21 TESS light-curve search results. The source-access blocker is cleared.
 - **Storage/source snapshot PASS (2026-07-02)**: `Skills/plan_t1_training_batch.py` ran live with `sample_size=5` and wrote committed source snapshots plus sample MAST download metadata without downloading FITS files. Measured source counts: `cumulative` rows=9,564, `toi` rows=7,931, `pscomppars` rows=6,298, KOI label rows=7,454 across 6,515 unique KICs (2,740 confirmed / 4,714 false positive), TOI ephemeris rows=7,824 across 7,535 TICs, and ExoFOP public TOI CSV rows=8,064. MAST search metadata estimated all-KOI Kepler long-cadence raw FITS at 47,099,384,640 bytes (43.86 GiB) and all-TOI TESS raw FITS at 44,994,438,720 bytes (41.90 GiB), combined 92,093,823,360 bytes under the 100 GiB working cap.
 - **Leakage-safe Kepler manifest PASS (2026-07-02)**: `Skills/build_t1_training_manifest.py` ran live against the verified `cumulative` schema and wrote committed metadata without downloading FITS files. `metadata/t1_1_kepler_training_manifest.jsonl` has 7,454 KOI rows across 6,515 target groups; all rows from the same KIC share one deterministic split. Split/label counts: train 5,155 rows (label0=3,268 / label1=1,887), val 1,143 (721 / 422), test 1,156 (725 / 431). `metadata/t1_1_kepler_manifest_summary.json` has `flag=OK` and no leakage errors. Cleanup policy requires raw FITS under `data/raw/t1_1_kepler_lc` to be deleted only after processed snippets validate, manifest summary is OK, `logs/t1_1_kepler_processing.sqlite3` has no incomplete active targets, and the operator confirms failed raw FITS are not needed for debugging.
-- **Remaining next `[AGENT]` action**: implement or verify the bounded Kepler-first processing batch that consumes the committed manifest, writes processed snippets under `data/processed/t1_1_kepler_snippets`, records progress/resume state in top-level SQLite at `logs/t1_1_kepler_processing.sqlite3`, and refuses to exceed the committed storage cap. Do not ask the human to run the batch until the command and tests are committed.
+- **Bounded Kepler-first processing batch built (2026-07-02, version 0.2.14)**: `Skills/process_t1_kepler_batch.py` consumes `metadata/t1_1_kepler_training_manifest.jsonl`, fetches each unique KIC target's Kepler light curve once (reusing the proven phase-fold/normalisation math from `Skills/fetch_kepler_lc_snippets.py`), phase-folds every KOI row sharing that target at its own period/epoch, and writes processed snippets to `data/processed/t1_1_kepler_snippets/kepler_snippets.jsonl`. Progress/resume state lives in SQLite at `logs/t1_1_kepler_processing.sqlite3` (per-target `active`/`done` status; a target only ever gets marked `done` after its snippets are flushed, so an interrupted run never leaves partial/duplicate output). Raw FITS downloads are scoped to `data/raw/t1_1_kepler_lc` and the directory is wiped after every target (success or failure), so local raw storage never exceeds roughly one target's data at a time — this satisfies the storage cap and the "delete raw FITS after verified processing" rule by construction rather than by monitoring a large threshold. `--max-targets` (default 25) bounds each invocation so the first run is a small verifiable batch, not the full 6,515-target corpus. 27 new tests, all injectable/offline (no live network or Lightkurve needed to validate the logic).
+- **Remaining next `[HUMAN]` action**: run a small bounded batch (default `--max-targets 25`) on the operator's Mac to verify the tool against live Kepler data, inspect the resulting snippets and SQLite summary, then scale up in further bounded invocations (the command is resumable, so repeated runs safely continue where the last one left off).
 - **Code status**: Training and state-dict inference paths are operational; the package scorer reconstructs the trained architecture and fails closed when loading fails
 - **Prior local corpus status**: **VALID as of 2026-06-12** — 2,037 snippets (1,012 positive CP+KP, 1,025 negative FP+FA, ratio 0.99); zero-epoch corpus retired and rebuilt from scratch with valid BJD epochs; label bug fixed (KP→1); MAST throttling fix applied (`bbb0877`)
 - **Local corpus status**: **KEPLER LOCAL VALIDATED** — TESS v2 complete at 2,619 snippets; Kepler finite rebuild has 6,837 parseable snippets with zero non-finite flux rows, zero duplicate resume keys, labels negative=4,280 and positive=2,557; `data/kepler_cnn_splits` validator PASS with train/val/test = 4,741 / 1,060 / 1,036
@@ -180,7 +183,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
 | 82 production-critical Skills/ | ✅ |
-| 2,401 default tests, ruff clean, mypy clean | ✅ |
+| 2,436 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -222,7 +225,8 @@ These are enforced in code and must never be bypassed:
 | Dataset/model source contract | Verify source URLs/schemas, storage estimates, manifests, and leakage controls from `docs/exoplanet_exomoon_dataset_handoff.md` before asking the human to run bulk downloads or training | Agent |
 | Source-access smoke test | **Complete** — `Skills/verify_dataset_sources.py` passed end-to-end on 2026-07-02 with TAP schemas/rows, ExoFOP CSV, and Lightkurve Kepler/TESS searches verified | Agent |
 | Storage/runtime/source snapshot plan | **Complete** — live sample metadata estimates are committed under `metadata/`; combined Kepler-long-cadence plus TESS estimate is 92,093,823,360 bytes under the 100 GiB cap | Agent |
-| Leakage-safe training manifest and cleanup path | Design or verify manifest rows, split grouping, raw-redownload metadata, and raw-cache cleanup before any bulk download | Agent |
+| Leakage-safe training manifest and cleanup path | **Complete** — `metadata/t1_1_kepler_training_manifest.jsonl` and `metadata/t1_1_kepler_manifest_summary.json` are committed with 0 leakage errors | Agent |
+| Bounded Kepler-first processing batch | **Complete, not yet run live** — `Skills/process_t1_kepler_batch.py` is built and unit-tested (27 offline tests); needs one bounded live run (`--max-targets 25`) on the operator's Mac to verify against real Kepler data before scaling up | Agent built it; **Human** runs the first live batch |
 | CNN production training run | Build/train/evaluate only after the source contract, manifests, and local artifact ledger are updated; use the local M4 Max GPU path by default | Agent + human approval for long local runs |
 | CNN production promotion | Validate, calibrate, register, and commit only a future checkpoint that passes held-out gates | Agent + human approval |
 | Stacking weight calibration | Tune blend weights on held-out calibration set | Agent after T1-1 resolved |

@@ -124,6 +124,7 @@ When the user must take an action to unblock a gap:
 - **Project version bumped to 0.2.11 (2026-07-02)** — supplementary pipeline-correctness patch, not part of the active T1-1 dataset-handoff path. `run_pipeline()` called `vet_signal(light_curve, signal)` with zero catalog keyword arguments, so `stellar_radius_rsun`, `stellar_mass_msun`, `contamination_ratio`, and every score derived from them were always `None`/solar-default — including `limb_darkening_plausibility_score`, which silently used 5778 K for every target because `vet_signal()` did not even accept a `stellar_teff_k` parameter. New `fetch_tic_stellar_params()` in `fetch.py` does one TIC catalog lookup per TESS scan (injectable `stellar_params_fn` for tests; fails open to all-`None` on any error; not called for Kepler/K2/JWST). This is a correctness fix to the already-shipped Bayesian/XGBoost/ensemble scorers, not a reopening of T1-0 as the active path; run006/run008 remain historical per the 2026-07-01 reset below.
 - **Project version bumped to 0.2.12 (2026-07-02)** — source-contract hardening patch for the active T1-1 path. The shipped verifier already fixed the live NASA Exoplanet Archive `TAP_SCHEMA.columns.table_name` case-sensitivity bug with `UPPER(table_name) = UPPER(...)`; this patch updates `docs/exoplanet_exomoon_dataset_handoff.md` and regression tests so future agents do not copy the stale exact-match schema snippets that caused the `CUMULATIVE` smoke-test failure.
 - **Project version bumped to 0.2.13 (2026-07-02)** — leakage-safe manifest planning patch for the active T1-1 path. `Skills/build_t1_training_manifest.py` verifies the KOI schema, queries confirmed/false-positive Kepler KOI rows, assigns all KOIs from the same KIC to one deterministic split, writes committed manifest/summary metadata, and records the raw-FITS cleanup policy before any bulk download is requested.
+- **Project version bumped to 0.2.14 (2026-07-02)** — bounded Kepler-first processing batch patch for the active T1-1 path. `Skills/process_t1_kepler_batch.py` consumes `metadata/t1_1_kepler_training_manifest.jsonl`, fetches each unique KIC's Kepler light curve once (reusing the proven phase-fold/normalisation math from `Skills/fetch_kepler_lc_snippets.py`), phase-folds every KOI row sharing that target, and writes snippets to `data/processed/t1_1_kepler_snippets/kepler_snippets.jsonl`. Progress/resume state lives in SQLite at `logs/t1_1_kepler_processing.sqlite3`; a target is only marked `done` after its snippets are flushed, so an interrupted run never leaves partial/duplicate output. Raw FITS downloads are scoped to `data/raw/t1_1_kepler_lc` and the directory is wiped after every target (success or failure) — local raw storage never exceeds roughly one target's data at a time, satisfying the storage cap by construction. `--max-targets` defaults to 25 so the first invocation is a small bounded batch, not the full 6,515-target corpus. 27 new tests, all offline/injectable. Not yet run against live Kepler data — this agent's sandbox has no Lightkurve/MAST access.
 
 ### Where things stand
 
@@ -210,12 +211,34 @@ deleted only after processed snippets validate, the manifest is OK, the
 top-level SQLite processing log has no incomplete active targets, and the
 operator confirms failed raw FITS are not needed for debugging.
 
-**Next T1-1 blocker:** implement or verify the bounded Kepler-first processing
-batch that consumes `metadata/t1_1_kepler_training_manifest.jsonl`, writes
-processed snippets under `data/processed/t1_1_kepler_snippets`, records progress
-and resume state in `logs/t1_1_kepler_processing.sqlite3`, and refuses to
-exceed the committed storage cap. Do not ask the human to run the batch until
-the processing command and tests are committed.
+**Bounded Kepler-first processing batch built (2026-07-02, version 0.2.14):**
+`Skills/process_t1_kepler_batch.py` consumes
+`metadata/t1_1_kepler_training_manifest.jsonl`, fetches each unique KIC's
+Kepler light curve once, phase-folds every KOI row sharing that target,
+writes snippets to `data/processed/t1_1_kepler_snippets/kepler_snippets.jsonl`,
+and tracks progress/resume in SQLite at `logs/t1_1_kepler_processing.sqlite3`.
+Raw FITS downloads are scoped to `data/raw/t1_1_kepler_lc` and the directory
+is wiped after every target (success or failure), so raw storage never
+accumulates beyond roughly one target's data. `--max-targets` defaults to 25.
+27 offline/injectable tests pass; the tool has **not** been run against live
+Kepler data — this agent's sandbox has no Lightkurve/MAST access.
+
+**Concrete next step — give the human this exact recipe:**
+
+```bash
+git switch main
+git pull --ff-only origin main
+caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 25
+```
+
+This processes the first 25 not-yet-done targets from the manifest (resumable
+— rerunning the same command continues where it left off) and prints
+per-target progress with elapsed time. Paste back the final summary block. If
+any target shows `NO_DATA`/`NO_LIGHTKURVE`/`ERROR:...`, that is expected for
+some KOIs (not every KIC has usable long-cadence data) and is not itself a
+blocker unless most targets fail. Once a small batch is verified, scale up
+with a larger `--max-targets` (or omit it to process everything remaining) in
+further bounded invocations.
 
 The run006/run008 notes below are historical provenance only. Preserve them so
 future agents do not re-debug the same scanner failures, but do not treat them
