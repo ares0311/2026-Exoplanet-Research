@@ -151,6 +151,31 @@ source-contract-first data/model hardening: verified schemas and URLs,
 immutable source snapshots, training manifests, leakage-safe splits, bounded
 storage, and a production-gated trained classifier/ranker.
 
+**Concrete next step (2026-07-02, blocked on human — read before doing anything else):**
+`Skills/verify_dataset_sources.py` (version 0.2.11) implements the dataset
+handoff doc's "Minimum access smoke test" exactly: it queries
+`TAP_SCHEMA.columns` before trusting any column name, fetches sample rows from
+the `cumulative` and `toi` TAP tables plus the ExoFOP public TOI CSV, and
+confirms Lightkurve can find a Kepler and a TESS light curve for one real
+target from those rows. It is unit-tested (16 tests, offline, no network) but
+has **never been run against the live services** — this agent's sandbox
+network policy blocks `exoplanetarchive.ipac.caltech.edu` outbound (confirmed:
+`curl` to the TAP endpoint gets a `403` at the proxy). Give the human this
+exact recipe before proposing or writing any bulk downloader:
+
+```bash
+git switch main
+git pull --ff-only origin main
+caffeinate -i .venv/bin/python Skills/verify_dataset_sources.py --output reports/t1-1_source_smoke_test.md
+cat reports/t1-1_source_smoke_test.md
+```
+
+If the report says `**Overall**: FAIL`, paste it back — do not attempt to fix
+schema/column names by guessing; the failure reason names the exact broken
+step. If it says `PASS`, the source contract is verified and the next planning
+step is estimating the first Kepler download batch size per the "Storage and
+Data Retention Rules" section of the handoff doc.
+
 The run006/run008 notes below are historical provenance only. Preserve them so
 future agents do not re-debug the same scanner failures, but do not treat them
 as the next production blocker.
