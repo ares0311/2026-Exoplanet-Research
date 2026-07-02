@@ -13,7 +13,8 @@ Every session must begin by reading:
 1. `AGENTS.md`
 2. `docs/PRODUCTION_READINESS.md`
 3. `docs/DISCOVERY_RUNBOOK.md`
-4. `docs/exoplanet_detection_research_brief.md` (skim the satellite table and AI methods section)
+4. `docs/exoplanet_exomoon_dataset_handoff.md`
+5. `docs/exoplanet_detection_research_brief.md` (skim the satellite table and AI methods section)
 
 Before proposing or executing any task you must:
 1. Name the highest-priority unresolved Tier 1 gap from `docs/PRODUCTION_READINESS.md`.
@@ -26,7 +27,8 @@ Before proposing or executing any task you must:
 - Writing "the next N utility scripts" when those scripts do not unblock a named gap.
 - Treating "Apply All System Directives" as permission to add more code — it means read the gap list and work the highest-priority gap only.
 - Running `exo background-run-once` expecting to discover new planets — background automation scans FIXTURES only (see `docs/DISCOVERY_RUNBOOK.md`).
-- Proposing CNN training before at least one real discovery scan has been completed and documented.
+- Continuing the run006/run008 candidate-review loop as the primary production path.
+- Proposing ad hoc CNN retraining against old rejected corpora before satisfying the source-contract, manifest, leakage-control, and storage requirements in `docs/exoplanet_exomoon_dataset_handoff.md`.
 
 ### When the user says "Apply All System Directives"
 1. Read `AGENTS.md` and `docs/PRODUCTION_READINESS.md`.
@@ -480,8 +482,8 @@ New `RawDiagnostics` fields: `oot_scatter_sigma`, `sector_depths`, `sector_depth
 
 ## CLI Version Flag and Meta Output (Milestone 12f)
 
-- `exo --version` / `exo -V` — prints the installed `exo-toolkit` package version (currently `0.2.11`)
-- fallback version `0.2.11` in `src/exo_toolkit/__init__.py` is used only if source-tree and installed package metadata are unavailable
+- `exo --version` / `exo -V` — prints the installed `exo-toolkit` package version (currently `0.2.12`)
+- fallback version `0.2.12` in `src/exo_toolkit/__init__.py` is used only if source-tree and installed package metadata are unavailable
 - Each output row gains a `"features"` dict, a raw `"diagnostics"` dict, a `"fetch_provenance"` dict, plus a `"meta"` dict: `toolkit_version`, `run_at`, `scorer`, `git_commit`, `features_available`, `features_missing`
 - `_git_commit_short()` reads `git rev-parse --short HEAD`; returns `None` on failure
 

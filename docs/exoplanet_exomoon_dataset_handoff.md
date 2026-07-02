@@ -136,7 +136,7 @@ def tap_csv(query: str) -> pd.DataFrame:
 def tap_columns(table_name: str) -> set[str]:
     query = (
         "select column_name from TAP_SCHEMA.columns "
-        f"where table_name = '{table_name}'"
+        f"where UPPER(table_name) = UPPER('{table_name}')"
     )
     df = tap_csv(query)
     return set(df["column_name"].astype(str))
@@ -319,7 +319,7 @@ curl --get 'https://exoplanetarchive.ipac.caltech.edu/TAP/sync' \
 
 ```bash
 curl --get 'https://exoplanetarchive.ipac.caltech.edu/TAP/sync' \
-  --data-urlencode "query=select column_name,datatype from TAP_SCHEMA.columns where table_name = 'cumulative'" \
+  --data-urlencode "query=select column_name,datatype from TAP_SCHEMA.columns where UPPER(table_name) = UPPER('cumulative')" \
   --data-urlencode "format=csv"
 ```
 
@@ -346,18 +346,22 @@ Schema discovery:
 ```sql
 select *
 from TAP_SCHEMA.columns
-where table_name = 'cumulative'
+where UPPER(table_name) = UPPER('cumulative')
 ```
 
 ```sql
 select *
 from TAP_SCHEMA.columns
-where table_name = 'toi'
+where UPPER(table_name) = UPPER('toi')
 ```
 
 Fail-closed requirements:
 
 - Query `TAP_SCHEMA.columns` before every new source table is used.
+- Match `TAP_SCHEMA.columns.table_name` case-insensitively with
+  `UPPER(table_name) = UPPER('<table>')`; live NASA Exoplanet Archive schema
+  rows may store table names in a different case than ordinary `FROM <table>`
+  queries use.
 - Compare required columns by exact name.
 - If a required column is missing, stop and report the missing column list.
 - Do not infer replacement columns from similar names without user approval.

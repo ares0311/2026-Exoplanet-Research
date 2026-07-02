@@ -2,7 +2,7 @@
 
 ## Status: Active Development
 ## Phase: Dataset/Model Training Reset — production checkpoint path
-## Last Updated: 2026-07-01
+## Last Updated: 2026-07-02
 
 ---
 
@@ -192,13 +192,21 @@ evidence without explicit human approval, and do not use it to block T1-1.
   instead of hiding the stale provider behind a generic invalid/empty result.
 - Architecture details: `docs/CNN_SPEC.md`.
 - Human local runbook: `docs/CNN_PRODUCTION_RUNBOOK.md`.
-- Next outside blocker: a human Mac run may be required after the agent verifies source contracts, manifests, storage estimates, and exact commands under `docs/exoplanet_exomoon_dataset_handoff.md`.
+- Source access smoke test passed end-to-end on 2026-07-02 with TAP schemas/rows,
+  ExoFOP CSV, and Lightkurve Kepler/TESS searches verified. The next blocker is
+  leakage-safe manifest and cleanup-path verification before any bulk download.
+- Storage/source snapshot planning passed on 2026-07-02: committed metadata
+  records source row counts, sample MAST product metadata, and an under-cap
+  92,093,823,360-byte combined Kepler-long-cadence plus TESS estimate.
 
 ---
 
 ## Next Actions
 
-1. Implement the source-contract preflight from `docs/exoplanet_exomoon_dataset_handoff.md`: verify source URLs/schemas, storage estimates, and minimum smoke queries before any long local pull.
+1. Design or verify the leakage-safe training manifest and cleanup path from `docs/exoplanet_exomoon_dataset_handoff.md` now that source access and storage/source snapshot planning have passed.
+   - The TAP schema examples must use `UPPER(table_name) = UPPER('<table>')`;
+     the live NASA Exoplanet Archive stores at least `CUMULATIVE` in upper
+     case inside `TAP_SCHEMA.columns.table_name`.
 2. Update source snapshots/manifests and the local artifact ledger so GitHub-only agents can see expected paths, hashes, counts, and next commands.
 3. Build or adjust leakage-safe training manifests/splits by target/system before any model run.
 4. Ask the human to run only commands whose schemas, URLs, worker counts, resume behavior, output, and Mac/MPS compliance were verified.

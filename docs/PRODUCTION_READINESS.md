@@ -1,6 +1,6 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-07-02 (project reset: run006/run008 candidate review is historical; active production path wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` to close T1-1 with verified data sources, leakage-safe training manifests, and a production-gated trained model; a supplementary pipeline-correctness fix wired real TIC catalog stellar/contamination parameters into `run_pipeline()` — see T1-0 notes below)
+Last reviewed: 2026-07-02 (project reset: run006/run008 candidate review is historical; active production path wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` to close T1-1 with verified data sources, leakage-safe training manifests, and a production-gated trained model; source-contract examples now use case-insensitive TAP schema table-name matching after the live CUMULATIVE table-name bug; a supplementary pipeline-correctness fix wired real TIC catalog stellar/contamination parameters into `run_pipeline()` — see T1-0 notes below)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
 Test baseline: 2,397 default tests passing, 2 integration_live deselected
@@ -24,17 +24,18 @@ The active production blocker is now T1-1, and the authorized path is the
 source-contract-first dataset/model plan in
 `docs/exoplanet_exomoon_dataset_handoff.md`.
 
-Version note: 0.2.11 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.12 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
-disconnects, and 0.2.11 wires real TIC catalog `stellar_radius_rsun`,
+disconnects, 0.2.11 wires real TIC catalog `stellar_radius_rsun`,
 `stellar_mass_msun`, `stellar_teff_k`, and `contamination_ratio` into
 `vet_signal()` for every TESS scan (previously all four were always `None`,
 and `vet_signal()` did not even accept `stellar_teff_k`, so
 `limb_darkening_plausibility_score` silently used the solar-default 5778 K for
-every target). The catalog lookup fails open (all-`None`) on any
-network/parse error or non-TIC target, so it never blocks a scan.
+every target), and 0.2.12 records the TAP schema case-sensitivity fix in the
+active dataset handoff contract. The catalog lookup fails open (all-`None`) on
+any network/parse error or non-TIC target, so it never blocks a scan.
 
 ---
 
@@ -64,9 +65,11 @@ network/parse error or non-TIC target, so it never blocks a scan.
 - **Gate status**: **OPEN** — Kepler pretraining, TESS split generation, and two Kepler->TESS fine-tunes are locally complete; both fine-tuned checkpoints failed held-out production gates and must not be promoted
 - **Current priority**: **ACTIVE / HIGHEST PRIORITY** — close this through the source-contract-first dataset/model plan in `docs/exoplanet_exomoon_dataset_handoff.md`, not by repeating old C1-C19/C20 patterns
 - **Active source contract**: Verify every public data source before use; discover schemas from primary services; preserve immutable source snapshots and enough metadata to redownload raw files after cleanup; use leakage-safe manifests/splits; keep storage bounded; use no synthetic examples for supervised model training in this phase; do not use Kaggle mirrors or unverified pretrained weights when primary NASA/MAST sources are available.
-- **Source-contract verification tool (2026-07-02)**: `Skills/verify_dataset_sources.py` implements the "Resource Access Contract" and "Minimum access smoke test" from `docs/exoplanet_exomoon_dataset_handoff.md` exactly — queries `TAP_SCHEMA.columns` for `cumulative` and `toi` before trusting any column name (never infers a renamed column), fetches sample rows from both tables plus the ExoFOP public TOI CSV, and confirms Lightkurve can find both a Kepler and a TESS light curve for one real target pulled from those rows. Fails closed with a specific reason at the first broken step. This agent's sandbox network policy blocks `exoplanetarchive.ipac.caltech.edu`, so the tool's first live run happened on the operator's Mac.
+- **Source-contract verification tool (2026-07-02)**: `Skills/verify_dataset_sources.py` implements the "Resource Access Contract" and "Minimum access smoke test" from `docs/exoplanet_exomoon_dataset_handoff.md` exactly — queries `TAP_SCHEMA.columns` for `cumulative` and `toi` before trusting any column name (never infers a renamed column), fetches sample rows from both tables plus the ExoFOP public TOI CSV, and confirms Lightkurve can find both a Kepler and a TESS light curve for one real target pulled from those rows. Fails closed with a specific reason at the first broken step.
 - **First live run found a real bug, fixed same-day (2026-07-02)**: `cumulative` schema check failed with zero missing... zero *available* columns and no error, while `toi` passed. Root cause, confirmed via direct `curl` against `TAP_SCHEMA.tables` (not guessed): the archive registers the table as `"CUMULATIVE"` (upper case); `TAP_SCHEMA.columns.table_name` is an exact-match string column, not a resolved SQL identifier, so `= 'cumulative'` matched nothing. `toi` happened to be registered lower case. Fixed by querying `UPPER(table_name) = UPPER('...')` instead of exact match — general fix, not a per-table hardcode; user re-verified the fixed query live via `curl` and got a real 2,366-byte column list back. `FROM cumulative`/`FROM toi` (the actual row-fetch queries) were not affected — those are ordinary SQL identifiers and this codebase already queries them lower case successfully elsewhere (`Skills/fetch_nea_koi_lc_index.py`).
-- **Remaining next `[HUMAN]` action**: the schema fix is live-verified, but the full tool (row fetch + ExoFOP CSV + Lightkurve Kepler/TESS search) has not yet been run end-to-end. Run `caffeinate -i .venv/bin/python Skills/verify_dataset_sources.py --output reports/t1-1_source_smoke_test.md` on the operator's Mac and paste back the report before any bulk download or training work.
+- **Full source smoke PASS (2026-07-02)**: the exact verifier ran end-to-end from the project `.venv` and returned `Overall: PASS`: 5 KOI rows, 5 TOI rows, 8,064 ExoFOP public TOI CSV rows, sample KIC `10797460` with 17 Kepler light-curve search results, and sample TIC `182943944` with 21 TESS light-curve search results. The source-access blocker is cleared.
+- **Storage/source snapshot PASS (2026-07-02)**: `Skills/plan_t1_training_batch.py` ran live with `sample_size=5` and wrote committed source snapshots plus sample MAST download metadata without downloading FITS files. Measured source counts: `cumulative` rows=9,564, `toi` rows=7,931, `pscomppars` rows=6,298, KOI label rows=7,454 across 6,515 unique KICs (2,740 confirmed / 4,714 false positive), TOI ephemeris rows=7,824 across 7,535 TICs, and ExoFOP public TOI CSV rows=8,064. MAST search metadata estimated all-KOI Kepler long-cadence raw FITS at 47,099,384,640 bytes (43.86 GiB) and all-TOI TESS raw FITS at 44,994,438,720 bytes (41.90 GiB), combined 92,093,823,360 bytes under the 100 GiB working cap.
+- **Remaining next `[AGENT]` action**: design or verify the leakage-safe training manifest and cleanup path, then run a bounded Kepler-first processing batch. Do not ask the human to run a bulk download until manifest paths, cleanup rules, and copy-paste commands are committed.
 - **Code status**: Training and state-dict inference paths are operational; the package scorer reconstructs the trained architecture and fails closed when loading fails
 - **Prior local corpus status**: **VALID as of 2026-06-12** — 2,037 snippets (1,012 positive CP+KP, 1,025 negative FP+FA, ratio 0.99); zero-epoch corpus retired and rebuilt from scratch with valid BJD epochs; label bug fixed (KP→1); MAST throttling fix applied (`bbb0877`)
 - **Local corpus status**: **KEPLER LOCAL VALIDATED** — TESS v2 complete at 2,619 snippets; Kepler finite rebuild has 6,837 parseable snippets with zero non-finite flux rows, zero duplicate resume keys, labels negative=4,280 and positive=2,557; `data/kepler_cnn_splits` validator PASS with train/val/test = 4,741 / 1,060 / 1,036
@@ -214,7 +217,9 @@ These are enforced in code and must never be bypassed:
 | Blocker | What Is Needed | Who |
 |---|---|---|
 | Dataset/model source contract | Verify source URLs/schemas, storage estimates, manifests, and leakage controls from `docs/exoplanet_exomoon_dataset_handoff.md` before asking the human to run bulk downloads or training | Agent |
-| Run the full source-access smoke test | `Skills/verify_dataset_sources.py`'s schema check is fixed and live-verified (2026-07-02, `UPPER()` case-insensitivity fix). The full tool (row fetch + ExoFOP CSV + Lightkurve search) has not yet been run end-to-end. Run it on the Mac and paste back the report before any bulk download. | **Human** |
+| Source-access smoke test | **Complete** — `Skills/verify_dataset_sources.py` passed end-to-end on 2026-07-02 with TAP schemas/rows, ExoFOP CSV, and Lightkurve Kepler/TESS searches verified | Agent |
+| Storage/runtime/source snapshot plan | **Complete** — live sample metadata estimates are committed under `metadata/`; combined Kepler-long-cadence plus TESS estimate is 92,093,823,360 bytes under the 100 GiB cap | Agent |
+| Leakage-safe training manifest and cleanup path | Design or verify manifest rows, split grouping, raw-redownload metadata, and raw-cache cleanup before any bulk download | Agent |
 | CNN production training run | Build/train/evaluate only after the source contract, manifests, and local artifact ledger are updated; use the local M4 Max GPU path by default | Agent + human approval for long local runs |
 | CNN production promotion | Validate, calibrate, register, and commit only a future checkpoint that passes held-out gates | Agent + human approval |
 | Stacking weight calibration | Tune blend weights on held-out calibration set | Agent after T1-1 resolved |
