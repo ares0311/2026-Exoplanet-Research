@@ -3,7 +3,7 @@
 Last reviewed: 2026-07-02 (project reset: run006/run008 candidate review is historical; active production path wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` to close T1-1 with verified data sources, leakage-safe training manifests, and a production-gated trained model; a supplementary pipeline-correctness fix wired real TIC catalog stellar/contamination parameters into `run_pipeline()` — see T1-0 notes below)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 2,395 default tests passing, 2 integration_live deselected
+Test baseline: 2,397 default tests passing, 2 integration_live deselected
 
 ---
 
@@ -64,7 +64,9 @@ network/parse error or non-TIC target, so it never blocks a scan.
 - **Gate status**: **OPEN** — Kepler pretraining, TESS split generation, and two Kepler->TESS fine-tunes are locally complete; both fine-tuned checkpoints failed held-out production gates and must not be promoted
 - **Current priority**: **ACTIVE / HIGHEST PRIORITY** — close this through the source-contract-first dataset/model plan in `docs/exoplanet_exomoon_dataset_handoff.md`, not by repeating old C1-C19/C20 patterns
 - **Active source contract**: Verify every public data source before use; discover schemas from primary services; preserve immutable source snapshots and enough metadata to redownload raw files after cleanup; use leakage-safe manifests/splits; keep storage bounded; use no synthetic examples for supervised model training in this phase; do not use Kaggle mirrors or unverified pretrained weights when primary NASA/MAST sources are available.
-- **Source-contract verification tool (2026-07-02)**: `Skills/verify_dataset_sources.py` implements the "Resource Access Contract" and "Minimum access smoke test" from `docs/exoplanet_exomoon_dataset_handoff.md` exactly — queries `TAP_SCHEMA.columns` for `cumulative` and `toi` before trusting any column name (never infers a renamed column), fetches sample rows from both tables plus the ExoFOP public TOI CSV, and confirms Lightkurve can find both a Kepler and a TESS light curve for one real target pulled from those rows. Fails closed with a specific reason at the first broken step. **Not yet run against the live services** — this agent's sandbox network policy blocks `exoplanetarchive.ipac.caltech.edu` (confirmed via `curl`: `403` at the proxy). This is the exact next `[HUMAN]` action before any bulk download or training work: run `caffeinate -i .venv/bin/python Skills/verify_dataset_sources.py --output reports/t1-1_source_smoke_test.md` on the operator's Mac and paste back the report.
+- **Source-contract verification tool (2026-07-02)**: `Skills/verify_dataset_sources.py` implements the "Resource Access Contract" and "Minimum access smoke test" from `docs/exoplanet_exomoon_dataset_handoff.md` exactly — queries `TAP_SCHEMA.columns` for `cumulative` and `toi` before trusting any column name (never infers a renamed column), fetches sample rows from both tables plus the ExoFOP public TOI CSV, and confirms Lightkurve can find both a Kepler and a TESS light curve for one real target pulled from those rows. Fails closed with a specific reason at the first broken step. This agent's sandbox network policy blocks `exoplanetarchive.ipac.caltech.edu`, so the tool's first live run happened on the operator's Mac.
+- **First live run found a real bug, fixed same-day (2026-07-02)**: `cumulative` schema check failed with zero missing... zero *available* columns and no error, while `toi` passed. Root cause, confirmed via direct `curl` against `TAP_SCHEMA.tables` (not guessed): the archive registers the table as `"CUMULATIVE"` (upper case); `TAP_SCHEMA.columns.table_name` is an exact-match string column, not a resolved SQL identifier, so `= 'cumulative'` matched nothing. `toi` happened to be registered lower case. Fixed by querying `UPPER(table_name) = UPPER('...')` instead of exact match — general fix, not a per-table hardcode; user re-verified the fixed query live via `curl` and got a real 2,366-byte column list back. `FROM cumulative`/`FROM toi` (the actual row-fetch queries) were not affected — those are ordinary SQL identifiers and this codebase already queries them lower case successfully elsewhere (`Skills/fetch_nea_koi_lc_index.py`).
+- **Remaining next `[HUMAN]` action**: the schema fix is live-verified, but the full tool (row fetch + ExoFOP CSV + Lightkurve Kepler/TESS search) has not yet been run end-to-end. Run `caffeinate -i .venv/bin/python Skills/verify_dataset_sources.py --output reports/t1-1_source_smoke_test.md` on the operator's Mac and paste back the report before any bulk download or training work.
 - **Code status**: Training and state-dict inference paths are operational; the package scorer reconstructs the trained architecture and fails closed when loading fails
 - **Prior local corpus status**: **VALID as of 2026-06-12** — 2,037 snippets (1,012 positive CP+KP, 1,025 negative FP+FA, ratio 0.99); zero-epoch corpus retired and rebuilt from scratch with valid BJD epochs; label bug fixed (KP→1); MAST throttling fix applied (`bbb0877`)
 - **Local corpus status**: **KEPLER LOCAL VALIDATED** — TESS v2 complete at 2,619 snippets; Kepler finite rebuild has 6,837 parseable snippets with zero non-finite flux rows, zero duplicate resume keys, labels negative=4,280 and positive=2,557; `data/kepler_cnn_splits` validator PASS with train/val/test = 4,741 / 1,060 / 1,036
@@ -172,7 +174,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
 | 82 production-critical Skills/ | ✅ |
-| 2,395 default tests, ruff clean, mypy clean | ✅ |
+| 2,397 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -212,7 +214,7 @@ These are enforced in code and must never be bypassed:
 | Blocker | What Is Needed | Who |
 |---|---|---|
 | Dataset/model source contract | Verify source URLs/schemas, storage estimates, manifests, and leakage controls from `docs/exoplanet_exomoon_dataset_handoff.md` before asking the human to run bulk downloads or training | Agent |
-| Run the source-access smoke test | `Skills/verify_dataset_sources.py` is built and unit-tested but has never been run against the live services — this agent's sandbox network policy blocks `exoplanetarchive.ipac.caltech.edu`. Run it on the Mac and paste back the report before any bulk download. | **Human** |
+| Run the full source-access smoke test | `Skills/verify_dataset_sources.py`'s schema check is fixed and live-verified (2026-07-02, `UPPER()` case-insensitivity fix). The full tool (row fetch + ExoFOP CSV + Lightkurve search) has not yet been run end-to-end. Run it on the Mac and paste back the report before any bulk download. | **Human** |
 | CNN production training run | Build/train/evaluate only after the source contract, manifests, and local artifact ledger are updated; use the local M4 Max GPU path by default | Agent + human approval for long local runs |
 | CNN production promotion | Validate, calibrate, register, and commit only a future checkpoint that passes held-out gates | Agent + human approval |
 | Stacking weight calibration | Tune blend weights on held-out calibration set | Agent after T1-1 resolved |

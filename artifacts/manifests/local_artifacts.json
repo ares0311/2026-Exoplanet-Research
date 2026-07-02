@@ -1107,12 +1107,13 @@
     {
       "path": "reports/t1-1_source_smoke_test.md",
       "kind": "verification_report",
-      "status": "not_yet_run",
+      "status": "partially_live_verified",
       "git_policy": "ignored",
       "last_known": {
         "tool": "Skills/verify_dataset_sources.py",
-        "tool_status": "built_and_unit_tested_2026-07-02",
-        "blocker": "agent sandbox network policy returns 403 for exoplanetarchive.ipac.caltech.edu"
+        "tool_status": "schema_check_fixed_and_live_verified_2026-07-02",
+        "bug_found_and_fixed": "cumulative table registered as 'CUMULATIVE' (upper case) in TAP_SCHEMA; table_name is an exact-match string column, not a resolved SQL identifier; fixed by querying UPPER(table_name) = UPPER(...) instead of exact match",
+        "full_tool_run_end_to_end": false
       },
       "validation_gate": "Must PASS before any T1-1 bulk download or training run.",
       "next_action": "[HUMAN] caffeinate -i .venv/bin/python Skills/verify_dataset_sources.py --output reports/t1-1_source_smoke_test.md, then paste back the report."
