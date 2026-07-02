@@ -1089,6 +1089,42 @@
       "next_action": "Retain locally; do not use this historical review packet to block T1-1."
     },
     {
+      "path": "data/processed/t1_1_kepler_snippets/kepler_snippets.jsonl",
+      "kind": "processed_snippet_corpus",
+      "status": "not_yet_run",
+      "git_policy": "ignored",
+      "last_known": {
+        "tool": "Skills/process_t1_kepler_batch.py",
+        "tool_status": "built_and_unit_tested_2026-07-02_v0.2.14",
+        "n_tests": 27,
+        "blocker": "agent sandbox has no Lightkurve/MAST access"
+      },
+      "validation_gate": "Inspect a bounded run's snippets and SQLite summary before scaling up.",
+      "next_action": "[HUMAN] caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 25, then paste back the summary block."
+    },
+    {
+      "path": "logs/t1_1_kepler_processing.sqlite3",
+      "kind": "runtime_progress_store",
+      "status": "not_yet_run",
+      "git_policy": "ignored",
+      "last_known": {
+        "schema": "single targets table keyed by target_id, status active|done"
+      },
+      "validation_gate": "No incomplete active targets before raw FITS cleanup is approved.",
+      "next_action": "Created automatically by the first live run of Skills/process_t1_kepler_batch.py."
+    },
+    {
+      "path": "data/raw/t1_1_kepler_lc/",
+      "kind": "scratch_raw_download_dir",
+      "status": "self_cleaning",
+      "git_policy": "ignored",
+      "last_known": {
+        "cleanup_behavior": "wiped after every target (success or failure) by process_t1_kepler_batch.py"
+      },
+      "validation_gate": "Should be empty or near-empty between runs by construction.",
+      "next_action": "No action needed; do not manually populate."
+    },
+    {
       "path": "models/cnn*/",
       "kind": "promotion_target",
       "status": "no_production_approved_cnn",
@@ -1205,7 +1241,7 @@
         "lightcurve_search": "mission=Kepler author=Kepler exptime=1800"
       },
       "validation_gate": "All rows from the same KIC target group must remain in one split; summary flag must remain OK.",
-      "next_action": "Implement/verify bounded Kepler-first processing batch that consumes this manifest."
+      "next_action": "Consumed by Skills/process_t1_kepler_batch.py; see that entry below for status"
     },
     {
       "path": "metadata/t1_1_kepler_manifest_summary.json",
@@ -1221,7 +1257,7 @@
         "runtime_log_db": "logs/t1_1_kepler_processing.sqlite3"
       },
       "validation_gate": "Raw FITS may be deleted only after processed snippets validate, manifest flag is OK, runtime SQLite has no incomplete active targets, and the operator confirms failed raw FITS are not needed for debugging.",
-      "next_action": "Use as the cleanup contract for the bounded Kepler-first processing batch."
+      "next_action": "Cleanup contract for Skills/process_t1_kepler_batch.py below"
     },
     {
       "path": "reports/",
