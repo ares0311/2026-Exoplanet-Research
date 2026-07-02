@@ -1,6 +1,11 @@
 # ML Tier-2 — 1D CNN Architecture Specification
 
-**Status: NO PRODUCTION CHECKPOINT — CNN work paused until the first real discovery scan is complete and reviewed**
+**Status: NO PRODUCTION CHECKPOINT — active work follows `docs/exoplanet_exomoon_dataset_handoff.md`**
+
+As of the 2026-07-01 project reset, CNN/model work is unpaused but must be
+source-contract-first. Do not repeat rejected C1-C19/C20 strategies unchanged;
+verify public source schemas and URLs, build leakage-safe manifests, and use
+the production gates in `docs/CNN_PRODUCTION_RUNBOOK.md`.
 
 The production corpus gate opened on 2026-06-06. The authorized local corpus
 contains 2,623 usable TESS snippets after 13 recorded fetch/extraction errors.

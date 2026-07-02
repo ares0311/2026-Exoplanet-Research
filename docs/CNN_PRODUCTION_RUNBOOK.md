@@ -7,6 +7,35 @@ local-only artifacts and are not committed to the repository.
 Their GitHub-visible status is tracked in `docs/LOCAL_ARTIFACT_LEDGER.md` and
 `artifacts/manifests/local_artifacts.json`.
 
+## 2026-07-01 Reset — Dataset Handoff Brief Is Authoritative
+
+The project has dropped the run006/run008 candidate-review loop as the active
+production path and wholly adopted
+`docs/exoplanet_exomoon_dataset_handoff.md` to get a trained model over the
+hump. This runbook now exists to execute that brief safely on the user's local
+Mac.
+
+Before asking the human to run any bulk download or training command, an agent
+must verify every otherwise-checkable assumption:
+
+- Primary source URL and schema are verified from the provider, not guessed.
+- Required columns are discovered or checked with a smoke query before a long
+  pull.
+- Storage and runtime estimates are documented before large downloads.
+- Raw large files are not committed; source snapshots, manifests, hashes, and
+  redownload metadata are preserved.
+- Supervised model training uses real labeled public data only for this phase;
+  synthetic examples remain allowed only for CI/background fixtures, not as
+  training positives.
+- Splits are leakage-safe by target/system, not random rows when the same star
+  can appear multiple times.
+- Commands are resumable, bounded, verbose with ETA, and optimized for
+  `docs/SYSTEM_PROFILE.md` including MPS/GPU training where available.
+
+The old C1-C19/C20 notes below are historical evidence. Do not rerun those
+strategies unchanged. The next active work is source-contract and manifest
+hardening from the dataset handoff brief.
+
 Production gates:
 
 - Raw held-out test AUC must be at least `0.85`.
@@ -72,6 +101,26 @@ itself was the bug. With the ECE skip, C20 only needs raw AUC ≥ 0.85 and raw F
 - After every local artifact state change, update the artifact ledger so agents
   that can only see GitHub know whether the corpus, splits, checkpoint, or
   promotion gate is missing, pending, valid, rejected, or approved.
+
+## Step A: Source-Contract Preflight (Active First Step)
+
+Do this before any new training or bulk data pull:
+
+1. Read `docs/exoplanet_exomoon_dataset_handoff.md`.
+2. Verify provider schemas with small source-native queries or provider
+   metadata tables.
+3. Record source contract facts in committed docs or manifests before asking
+   the human to run a long command.
+4. Estimate storage/runtime and identify which raw files are deleted after
+   processing versus which manifests make them reproducible.
+5. Update `docs/LOCAL_ARTIFACT_LEDGER.md` and
+   `artifacts/manifests/local_artifacts.json` with the expected paths and the
+   exact next local command.
+
+If any source schema, URL, or storage estimate cannot be verified from the
+agent environment, stop and give the human a complete copy-paste recipe for the
+smallest possible smoke test. Do not ask them to run a long job from an
+unverified assumption.
 
 ## Step 0: Sync And Verify
 

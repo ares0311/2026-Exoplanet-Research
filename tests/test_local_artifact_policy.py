@@ -72,8 +72,10 @@ def test_local_artifact_manifest_matches_human_ledger() -> None:
 
     assert manifest["policy"]["git_add_dot_must_be_safe"] is True
     assert manifest["policy"]["github_visible_ledger_required"] is True
-    assert manifest["production_gap"].startswith("T1-0: First Real Discovery Scan Evidence")
-    assert "T1-1: Production Tier 2 CNN Checkpoint paused" in manifest["production_gap"]
+    assert manifest["production_gap"].startswith("T1-1: Production Tier 2 CNN")
+    assert "docs/exoplanet_exomoon_dataset_handoff.md" in manifest["production_gap"]
+    assert "run006/run008 evidence historical" in manifest["production_gap"]
+    assert "docs/exoplanet_exomoon_dataset_handoff.md" in ledger
 
     artifact_paths = {artifact["path"] for artifact in manifest["artifacts"]}
     required_paths = {
