@@ -2,11 +2,30 @@
 
 **Purpose**: Prevent doom loops. Every agent and every session must read this before doing anything.
 
-**Last updated**: 2026-07-01 (Option A JWST integration and Option B TESS novelty restructure merged; PR #143 live scanner fix merged; PR #145 worker/ETA fix merged; SPOC-only B5 attempt, QLP corrupt-cache attempt, QLP stdout-race attempt, QLP wrong-flux-column attempt, and QLP no-progress/no-durable-log attempt did not close T1-0; run006 completed; run008 targeted follow-up reproduced both filtered candidates; version 0.2.9 adds candidate-review diagnostics/provenance and missing-diagnostic explanations; version 0.2.10 adds bounded retry for transient MAST disconnects, but false-positive diagnostics remain review-blocking)
+**Last updated**: 2026-07-01 (strategic reset: the run006/run008 candidate-review loop is historical; active production work wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` and `docs/CNN_PRODUCTION_RUNBOOK.md` to close T1-1 with verified public data and a production-gated trained model)
 
 ---
 
-## The Mission (Read This First)
+## Current Production Direction (Read This First)
+
+The active production mission has been reset. The project is no longer spending
+its primary workflow on the run006/run008 QLP candidate-review loop. That loop
+produced useful scanner/debugging evidence, but it did not produce
+submission-ready candidates and should not block the trained-model path.
+
+The authoritative active plan is now:
+
+1. `docs/exoplanet_exomoon_dataset_handoff.md` — source-contract and data/ML
+   strategy
+2. `docs/CNN_PRODUCTION_RUNBOOK.md` — local operator workflow for the trained
+   model gate
+3. `docs/PRODUCTION_READINESS.md` — current Tier 1 gap ordering
+
+Use the discovery workflow below as historical/operational reference for live
+scans. Do not treat it as permission to continue the old review loop unless the
+user explicitly asks for discovery-scan forensics.
+
+## The Discovery Mission (Operational Reference)
 
 The goal is to **discover previously unknown exoplanet transit candidates** by searching photometric data that has not been thoroughly analyzed by existing automated pipelines.
 
@@ -158,11 +177,12 @@ JWST does not run autonomous surveys the way TESS does. Its time-series observat
 
 ---
 
-## TESS Target Selection: Option B — B1-B4 Merged, B5 Review Needed
+## TESS Target Selection: Option B — B1-B4 Merged, B5 Historical
 
-**Use for first real discovery-scan review.**
+**Use only as historical discovery-scan provenance unless a future task
+explicitly reopens live-scan forensics.**
 
-Current gate: `star_scanner.py` excludes TOI, CTOI, and confirmed exoplanet hosts from the NASA Exoplanet Archive, and defaults to the Tmag 12.0-14.5 novelty frontier. The first SPOC-only run completed but did not close the gate because nearly every selected TIC had no SPOC long-cadence light curve. The first QLP rerun also did not close the gate because three stale local Lightkurve cache FITS files were corrupt from interrupted downloads and the shared fetch path did not repair them before retrying. The next QLP attempt repaired cache files but still crashed because Lightkurve public download methods mutate process-global stdout under worker-thread concurrency. The stdout-safe QLP attempt completed but still did not close the gate because the shared fetch path requested SPOC-style `pdcsap_flux`; valid QLP products do not provide `PDCSAP_FLUX`. The flux-safe QLP attempt still did not close the gate because it produced third-party MAST download chatter and no durable scan log before the first completed target. Run006 completed after the progress/quiet-download and bounded-BLS fixes. Version 0.2.6 adds a fail-closed BLS guard for invalid peaks and period-grid boundary peaks, directly addressing the run006 negative-duration error and boundary-period artifact class. Version 0.2.8 disables Lightkurve's implicit pre-clean stitch normalization and serializes vetting features into `exo --output`; version 0.2.9 also serializes raw diagnostics, fetch provenance, and missing-diagnostic reasons for candidate review; version 0.2.10 retries transient MAST/Lightkurve connection disconnects during candidate packet regeneration. Targeted run008 reproduced both run006 filtered candidates, but T1-0 remains blocked on false-positive diagnostics.
+Historical gate: `star_scanner.py` excludes TOI, CTOI, and confirmed exoplanet hosts from the NASA Exoplanet Archive, and defaults to the Tmag 12.0-14.5 novelty frontier. The first SPOC-only run completed but did not close the gate because nearly every selected TIC had no SPOC long-cadence light curve. The first QLP rerun also did not close the gate because three stale local Lightkurve cache FITS files were corrupt from interrupted downloads and the shared fetch path did not repair them before retrying. The next QLP attempt repaired cache files but still crashed because Lightkurve public download methods mutate process-global stdout under worker-thread concurrency. The stdout-safe QLP attempt completed but still did not close the gate because the shared fetch path requested SPOC-style `pdcsap_flux`; valid QLP products do not provide `PDCSAP_FLUX`. The flux-safe QLP attempt still did not close the gate because it produced third-party MAST download chatter and no durable scan log before the first completed target. Run006 completed after the progress/quiet-download and bounded-BLS fixes. Targeted run008 reproduced both run006 filtered candidates, but later v0.2.10 regeneration moved them above the prior FPP < 0.15 escalation threshold. This is useful provenance, not the active production blocker.
 
 ### Option B build plan
 
@@ -172,9 +192,9 @@ Current gate: `star_scanner.py` excludes TOI, CTOI, and confirmed exoplanet host
 | B2 | Add confirmed-planet cross-check using NASA Exoplanet Archive TAP (`ps` table, `pl_tranflag=1`) | MERGED (PR #139) |
 | B3 | Default `tmag_range` in `star_scanner.py` to `(12.0, 14.5)` to target faint-star novelty frontier | MERGED (PR #139) |
 | B4 | Extend default `period_max` in BLS search to 500 d | MERGED (PR #139) |
-| B5 | Review first 200-target QLP discovery scan and document candidate/numerical quality | REVIEW NEEDED |
+| B5 | Review first 200-target QLP discovery scan and document candidate/numerical quality | HISTORICAL / NOT ACTIVE |
 
-**Status**: B1-B4 merged to `main`. B5 run006 is complete locally and review-blocked; this is the highest-priority active production gate.
+**Status**: B1-B4 merged to `main`. B5 run006/run008 evidence is retained for provenance, but it is no longer the highest-priority active production gate.
 
 ---
 
@@ -185,8 +205,13 @@ These rules exist because the same mistakes have been repeated across many sessi
 ### Rule 1: No more Skills milestones
 Do not write new Skills scripts unless they directly enable a running discovery scan or close a named gap in `docs/PRODUCTION_READINESS.md`. The Skills library at 415+ scripts is already overcomplete relative to the number of discovery runs executed (which is zero).
 
-### Rule 2: No more CNN training until discovery runs produce candidates
-CNN training consumed 6 weeks (C1–C19). The CNN improves FP rejection. FP rejection is only useful if there are candidates to reject. Run at least 1,000 TIC targets through the discovery loop before resuming CNN training. If zero candidates emerge, CNN does not matter.
+### Rule 2: Dataset-brief-first model work only
+The old "no more CNN until discovery review" rule is superseded by the
+2026-07-01 project reset. CNN/model work is now authorized because the user
+adopted `docs/exoplanet_exomoon_dataset_handoff.md` as the route to a trained
+AI model. Do not repeat C1-C19/C20-style ad hoc retraining; first verify source
+contracts, schemas, manifests, leakage controls, storage estimates, and local
+artifact ledger state.
 
 ### Rule 3: Background automation is not discovery
 `exo background-run-once` runs on fixtures. It does not search new sky. Do not mention it in a discovery session.
@@ -243,9 +268,19 @@ The XGBoost model (`models/xgboost_koi.json`) is trained and available now.
 
 ---
 
-## The Immediate Next Action (As of 2026-06-29)
+## The Immediate Next Action (As of 2026-07-01)
 
-**Review run006 candidate evidence** (higher priority than CNN training):
+**Adopt the dataset/model-training brief** (higher priority than further
+run006/run008 review):
+
+1. Read `docs/exoplanet_exomoon_dataset_handoff.md`.
+2. Update or implement only work that closes T1-1 in
+   `docs/PRODUCTION_READINESS.md`.
+3. Before any human-run bulk download/training command, verify public source
+   URLs and schemas directly, estimate storage/runtime, and ensure the command
+   is resumable, bounded, visible, and optimized for `docs/SYSTEM_PROFILE.md`.
+
+Historical run006/run008 evidence:
 
 The first real QLP discovery scan completed locally as
 `logs/discovery_run_006_qlp_progress_safe.json`. It produced 200 entries:
@@ -277,8 +312,9 @@ still show many unavailable diagnostics and a `limb_darkening_plausibility_score
 failure for each best signal. The next work is candidate-specific
 false-positive diagnostics, not another blind scan and not CNN training.
 
-Do not build the C20 CNN corpus or train C20 until this discovery run has been
-reviewed. Do not submit or contact externally without explicit human approval.
+Do not submit or contact externally from run006/run008 without explicit human
+approval. Do not use this historical loop to block the T1-1 dataset/model
+training path.
 
 ---
 

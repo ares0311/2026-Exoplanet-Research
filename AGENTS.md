@@ -12,7 +12,8 @@ Every session must begin by reading:
 1. `AGENTS.md` (this file)
 2. `docs/PRODUCTION_READINESS.md`
 3. `docs/DISCOVERY_RUNBOOK.md`
-4. `docs/exoplanet_detection_research_brief.md` (skim satellite table + AI methods)
+4. `docs/exoplanet_exomoon_dataset_handoff.md`
+5. `docs/exoplanet_detection_research_brief.md` (skim satellite table + AI methods)
 
 Before proposing or executing any task you must:
 1. Name the highest-priority unresolved Tier 1 gap from `docs/PRODUCTION_READINESS.md`.
@@ -26,7 +27,8 @@ Before proposing or executing any task you must:
 - Writing "the next N utility scripts" when those scripts do not unblock a named gap.
 - Treating "Apply All System Directives" as permission to add more code — it means read the gap list and work the highest-priority gap only.
 - Running `exo background-run-once` expecting to discover new planets — background automation scans **7 static fixture targets** (3 known planets + 4 synthetics) and is a CI validation tool, not a discovery engine. See `docs/DISCOVERY_RUNBOOK.md §Background Automation`.
-- Proposing CNN training before at least one real discovery scan has been completed and documented. See `docs/DISCOVERY_RUNBOOK.md §Anti-Doom-Loop Rules`.
+- Continuing the run006/run008 candidate-review loop as the primary production path. Those scans are now historical evidence; the active production path is the dataset/model-training plan in `docs/exoplanet_exomoon_dataset_handoff.md`.
+- Proposing ad hoc CNN retraining against the old rejected corpora without first satisfying the dataset/source-contract requirements in `docs/exoplanet_exomoon_dataset_handoff.md`.
 
 ### When the user says "Apply All System Directives"
 
@@ -68,13 +70,17 @@ When the user must take an action to unblock a gap:
 
 ---
 
-## HANDOFF STATE — 2026-06-27 (READ THIS FIRST)
+## HANDOFF STATE — 2026-07-01 (READ THIS FIRST)
 
-**Mission realignment (2026-06-26):** The primary goal is **discovering previously unknown exoplanet transit candidates** by searching data feeds not yet analyzed by existing pipelines. CNN training (T1-1) is secondary to running actual discovery scans. Do not propose further CNN work until at least one real discovery scan is complete and documented. See `docs/DISCOVERY_RUNBOOK.md` for the full discovery workflow.
+**Mission realignment (2026-07-01):** The run006/run008 QLP candidate-review loop is no longer the active production path. It produced useful evidence, but the v0.2.10 regenerated candidate packets moved the two filtered candidates above the prior FPP < 0.15 escalation threshold and did not produce submission-ready evidence. Stop spending the main workflow on that loop unless a future task explicitly asks for forensic review.
+
+**Active production path:** Wholly adopt `docs/exoplanet_exomoon_dataset_handoff.md` as the source contract for getting a trained model over the hump. The highest-priority active Tier 1 gap is now **T1-1: Production Tier 2 CNN / trained model checkpoint**. Work must focus on verified public data access, immutable source snapshots, training manifests, leakage-safe splits, bounded storage, and a production-grade trained exoplanet classifier/ranker. Exomoon work is Track B residual/anomaly ranking only, not a supervised confirmed-exomoon classifier.
 
 **Research brief wired (2026-06-27):** `docs/exoplanet_detection_research_brief.md` is now required reading. Key takeaways: TESS > Kepler/K2 > JWST in discovery priority order; CNN architecture baseline is Shallue & Vanderburg (2018); PLATO launches end-2026 (pipeline should handle long-baseline photometry); GP for correlated noise; citizen submissions require full transit + false-positive diagnostic table.
 
-**Active work: Option B5 run006 review.** JWST integration A1-A3, K2 TAP fixes, and TESS target restructuring B1-B4 are merged. The first QLP scan completed locally and is blocked on candidate/numerical-quality review.
+**Dataset handoff brief wired (2026-07-01):** `docs/exoplanet_exomoon_dataset_handoff.md` is now required reading and the authoritative data/ML strategy. Core rules: no guessed schemas/URLs/columns, no synthetic training data for this phase, no Kaggle mirrors when primary NASA/MAST sources are available, no unverified pretrained weights, no bulk archive downloads without storage estimates and human approval, and preserve enough metadata to redownload raw files after cleanup.
+
+**Historical discovery work:** JWST integration A1-A3, K2 TAP fixes, and TESS target restructuring B1-B4 are merged. Run006/run008 evidence remains useful as live-pipeline evidence but is no longer the main production blocker.
 
 | Item | State |
 |---|---|
@@ -84,10 +90,11 @@ When the user must take an action to unblock a gap:
 | Option A3 — `--mission JWST` wired into `exo` CLI | **MERGED** (PR #141, 2026-06-27) |
 | Option B1–B4 — TESS target restructuring | **MERGED** (PR #139, 2026-06-27) |
 | Live scanner startup/target-selection hardening | **MERGED** (PR #143, 2026-06-28) |
-| Option B5 — first 200-target discovery scan | **REVIEW NEEDED** — run006 completed locally on 2026-06-29; review candidates/numerical quality before any external action |
+| Option B5 — first 200-target discovery scan | **HISTORICAL / NOT ACTIVE** — run006/run008 produced useful evidence, but v0.2.10 candidate regeneration moved the two filtered candidates above FPP 0.15; do not continue as the main loop |
 | K2 overlap corpus (`data/tess_k2_overlap_snippets.jsonl`) | **COMPLETE** — 2,086 snippets (2026-06-27) |
+| Dataset/model-training handoff brief | **ACTIVE CONTRACT** — `docs/exoplanet_exomoon_dataset_handoff.md` |
 
-**The only active CNN gap is T1-1: Production CNN Checkpoint (AUC ≥ 0.85, F1 ≥ 0.80), but CNN work is paused until the first real discovery scan is complete and reviewed.**
+**The active gap is T1-1: Production CNN / trained model checkpoint (AUC ≥ 0.85, F1 ≥ 0.80). CNN/model work is unpaused, but it must follow the dataset handoff brief rather than repeating the rejected C1-C19/C20 patterns.**
 
 ### What was done in the previous sessions (2026-06-21 – 2026-06-26)
 
@@ -135,6 +142,18 @@ When the user must take an action to unblock a gap:
 
 ### First action for the incoming agent
 
+**Do not continue the run006/run008 candidate-review loop as the main workflow.**
+The 2026-07-01 project reset wholly adopts
+`docs/exoplanet_exomoon_dataset_handoff.md` as the active production plan for
+getting a trained AI model. Read that brief, then close T1-1 by implementing
+source-contract-first data/model hardening: verified schemas and URLs,
+immutable source snapshots, training manifests, leakage-safe splits, bounded
+storage, and a production-gated trained classifier/ranker.
+
+The run006/run008 notes below are historical provenance only. Preserve them so
+future agents do not re-debug the same scanner failures, but do not treat them
+as the next production blocker.
+
 **Option B1–B4 is merged (PR #139).** The scanner now excludes TOI + CTOI + confirmed hosts automatically and defaults to Tmag 12–14.5. A first 200-target attempt (`logs/discovery_run_001.json`) completed on 2026-06-28 but does **not** close T1-0: it used the old SPOC-only fetch path and produced 198 no-data rows plus 2 transient remote-disconnect errors, with 0 clear scans and 0 candidates. Root cause: target selection queried TIC stars without requiring light-curve availability, while the pipeline fetched only `author='SPOC', exptime='long'`.
 
 A second QLP attempt (`logs/discovery_run_002_qlp.json`) started on 2026-06-28 but also does **not** close T1-0: it recorded 3 errors, 0 clear scans, and 0 candidates. Root cause: interrupted prior QLP downloads left corrupt FITS files in the local Lightkurve MAST cache (`~/.lightkurve/cache/mastDownload/HLSP/...`), and the shared fetch path treated Lightkurve's "This file may be corrupt due to an interrupted download" error as a terminal scan error instead of deleting the named cache file and retrying. The next run must use a fresh log after the cache-repair fetch fix is merged.
@@ -151,14 +170,14 @@ A fifth QLP attempt (`logs/discovery_run_005_qlp_flux_safe.json`) started after 
 
 **Run008 targeted follow-up completed locally on 2026-06-30 after version 0.2.8 fixes.** `logs/discovery_run_008_targeted_qlp_stitch_safe.json` has 2 entries, both `candidate_found`, active `{}`, SHA-256 `8626587c4fe59565132e078273763c7beac4a0a88597615f71e147a5134d1b0a`. `logs/discovery_filtered_008_targeted_qlp_stitch_safe.json` has 2 rows, SHA-256 `574a4cf188faa9e273128496fcd23b27cb8369a3e9d2ad2c1b5bbaedd9effed4`. TIC 201252011 reproduced at P=227.39056281978395 d, FPP=0.11606180728511539. TIC 257712351 reproduced at P=142.95415231096942 d, FPP=0.12672948535351847. The earlier Lightkurve normalization warning root cause was `LightCurveCollection.stitch()` defaulting to `corrector_func=lambda x: x.normalize()` before project sigma-clipping; fetch now calls `stitch(corrector_func=None)`. Regenerated `exo --output` files now contain computed `features`; false-positive vetting no longer reports all diagnostics missing. Version 0.2.9 adds raw `diagnostics`, fetch provenance, and missing-diagnostic reasons to candidate-review outputs so reviewers can distinguish insufficient phase coverage from not-yet-run catalog/centroid checks. Version 0.2.10 retries transient MAST/Lightkurve connection disconnects during candidate packet regeneration. Both best signals still fail `limb_darkening_plausibility_score=0.0` and have many missing diagnostics, so they are **not submission-ready**.
 
-First action now: review the two filtered candidates and the full run006 log. Candidate rows:
+Historical candidate rows from the superseded review loop:
 
 | TIC | Period (d) | FPP | Pathway |
 |---|---:|---:|---|
 | TIC 201252011 | 227.39056281978395 | 0.1160636155807766 | `planet_hunters_discussion` |
 | TIC 257712351 | 142.95415231096942 | 0.12672985673564718 | `planet_hunters_discussion` |
 
-Treat run006 as useful scan evidence and run008 as useful targeted follow-up evidence, not submission-ready evidence. Run006 flagged 192/200 targets as candidates and 81 detections hit the 0.5 d or 500 d period boundaries; subsequent scanner code rejects invalid and period-boundary BLS peaks, so future evidence runs must use `main` at version 0.2.10 or newer. Do NOT proceed with CNN C20 training and do NOT submit/contact externally until missing candidate-specific false-positive diagnostics are addressed and the human explicitly approves any external action.
+Treat run006 as useful scan evidence and run008 as useful targeted follow-up evidence, not submission-ready evidence. Run006 flagged 192/200 targets as candidates and 81 detections hit the 0.5 d or 500 d period boundaries; subsequent scanner code rejects invalid and period-boundary BLS peaks, so future evidence runs must use `main` at version 0.2.10 or newer. Version 0.2.10 regenerated candidate packets moved the two filtered candidates above the prior FPP < 0.15 escalation threshold, so this loop is no longer the primary production path. Do not submit/contact externally without explicit human approval.
 
 ### CNN production runbook
 

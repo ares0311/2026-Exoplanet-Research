@@ -1,6 +1,6 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-07-01 (JWST A3 merged — PR #141; TESS novelty restructure B1-B4 merged — PR #139; live scanner startup/target-selection fix merged — PR #143; PR #145 worker/ETA fix merged; run006 completed with real QLP scan evidence; run008 targeted follow-up reproduced both filtered candidates under the stitch-normalization and feature-output fixes; 0.2.9 adds raw diagnostics/provenance and missing-diagnostic explanations; 0.2.10 adds bounded retry for transient MAST disconnects, but false-positive diagnostics remain review-blocking)
+Last reviewed: 2026-07-01 (project reset: run006/run008 candidate review is historical; active production path wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` to close T1-1 with verified data sources, leakage-safe training manifests, and a production-gated trained model)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
 Test baseline: 2,355 default tests passing, 2 integration_live deselected
@@ -20,6 +20,9 @@ Test baseline: 2,355 default tests passing, 2 integration_live deselected
 The system is safe to deploy now for Bayesian and XGBoost scoring modes. The
 CNN label gate is open, but all evaluated CNN checkpoints remain rejected; they
 must not be copied into `models/`, registered, or used for production scoring.
+The active production blocker is now T1-1, and the authorized path is the
+source-contract-first dataset/model plan in
+`docs/exoplanet_exomoon_dataset_handoff.md`.
 
 Version note: 0.2.10 is the current patch level for candidate-review output
 regeneration. 0.2.8 fixed QLP stitch normalization and feature serialization,
@@ -33,9 +36,9 @@ for transient MAST/Lightkurve connection disconnects.
 
 ### T1-0: First Real Discovery Scan Evidence
 
-- **What is missing**: Review of the first completed QLP discovery scan candidates and numerical-quality behavior; no external submission is authorized
-- **Gate status**: **OPEN / REVIEW BLOCKED** — Option B1-B4 are merged; PR #143 fixed startup/target-selection failures; PR #145 added bounded workers and ETA output. `logs/discovery_run_001.json` through `logs/discovery_run_005_qlp_flux_safe.json` did **not** close this gate for the documented SPOC/no-data, corrupt-cache, stdout-race, wrong-flux-column, and no-progress/no-durable-log reasons. `logs/discovery_run_006_qlp_progress_safe.json` completed locally on 2026-06-29 with real QLP evidence: 200 entries, 192 `candidate_found`, 6 `scanned_clear`, 1 `no_data`, 1 `error`, and active target count 0. `logs/discovery_filtered_006_qlp_progress_safe.json` contains 2 candidates with FPP <= 0.15. Targeted run008 on 2026-06-30 reproduced both filtered candidates after disabling Lightkurve's implicit pre-clean stitch normalizer and serializing vetting features into `exo --output`. This moves T1-0 from human-run blocked to numerical/false-positive review blocked, not to external-submission-ready.
-- **Why this is highest priority**: `docs/DISCOVERY_RUNBOOK.md` realigned production toward discovering previously unknown transit candidates. CNN work improves false-positive rejection, but it does not matter until the project has real candidates or a documented null discovery result.
+- **What is missing**: Nothing required for the current production path. The first QLP scan evidence exists and is retained as historical provenance; no external submission is authorized.
+- **Gate status**: **HISTORICAL / NO LONGER ACTIVE** — Option B1-B4 are merged; PR #143 fixed startup/target-selection failures; PR #145 added bounded workers and ETA output. `logs/discovery_run_001.json` through `logs/discovery_run_005_qlp_flux_safe.json` did **not** close this gate for the documented SPOC/no-data, corrupt-cache, stdout-race, wrong-flux-column, and no-progress/no-durable-log reasons. `logs/discovery_run_006_qlp_progress_safe.json` completed locally on 2026-06-29 with real QLP evidence: 200 entries, 192 `candidate_found`, 6 `scanned_clear`, 1 `no_data`, 1 `error`, and active target count 0. `logs/discovery_filtered_006_qlp_progress_safe.json` contains 2 candidates with FPP <= 0.15. Targeted run008 on 2026-06-30 reproduced both filtered candidates after disabling Lightkurve's implicit pre-clean stitch normalizer and serializing vetting features into `exo --output`. Version 0.2.10 regenerated candidate packets moved the two filtered candidates above the prior FPP < 0.15 escalation threshold, so the run006/run008 loop is not submission-ready and is not the active blocker.
+- **Why this is not highest priority now**: The user explicitly adopted `docs/exoplanet_exomoon_dataset_handoff.md` as the path to get a trained model. Further run006/run008 review would not close the active production gap unless explicitly requested as forensic work.
 - **Root cause of run 001**: `select_targets()` selected TIC catalog stars without requiring light-curve availability, while `run_pipeline()` could not override `fetch_lightcurve()` and therefore fetched only `author='SPOC', exptime='long'`.
 - **Root cause of run 002**: interrupted prior QLP downloads left corrupt FITS files in the local Lightkurve MAST cache, and the shared fetch path surfaced Lightkurve's "This file may be corrupt due to an interrupted download" error as a terminal scan error instead of deleting the named cache file and retrying.
 - **Root cause of run 003**: the shared fetch path still used Lightkurve public download methods. Lightkurve decorates `SearchResult.download()` and `download_all()` with `suppress_stdout`, which assigns `sys.stdout` process-wide. That is unsafe under `star_scanner.py` worker-thread downloads because the main thread prints progress while a worker can temporarily replace or close stdout.
@@ -46,14 +49,14 @@ for transient MAST/Lightkurve connection disconnects.
 - **Numerical guardrail after run006**: Version 0.2.6 rejects BLS peaks with non-finite/non-positive values and rejects peaks pinned to the lower or upper period-grid boundary. This directly addresses the run006 negative-duration error and the 81 period-boundary detections before any follow-up evidence run.
 - **Targeted run008 evidence**: `logs/discovery_run_008_targeted_qlp_stitch_safe.json` has 2 entries, both `candidate_found`, active `{}`, SHA-256 `8626587c4fe59565132e078273763c7beac4a0a88597615f71e147a5134d1b0a`. Filtered output SHA-256 `574a4cf188faa9e273128496fcd23b27cb8369a3e9d2ad2c1b5bbaedd9effed4`; both rows remain below FPP 0.15: TIC 201252011 at P=227.39056281978395 d, FPP=0.11606180728511539; TIC 257712351 at P=142.95415231096942 d, FPP=0.12672948535351847.
 - **Run008 root-cause fixes**: Lightkurve's `LightCurveCollection.stitch()` defaulted to `corrector_func=lambda x: x.normalize()`, causing QLP products to be normalized before project sigma-clipping. `fetch_lightcurve()` now calls `stitch(corrector_func=None)` so normalization happens in `clean_lightcurve()` after NaN/outlier removal. `exo --output` now includes the computed `features` dict, so `Skills/false_positive_vetter.py` evaluates real diagnostics instead of reporting all features missing. Version 0.2.9 adds raw `diagnostics`, `fetch_provenance`, `features_missing`, and missing-diagnostic explanations so reviewers can distinguish insufficient phase coverage from not-yet-run catalog/centroid checks. Version 0.2.10 retries transient MAST/Lightkurve connection disconnects in the fetch path instead of failing candidate review on one dropped remote connection.
-- **Required next review**: Review the 2 targeted candidates, inspect phase-fold plots/report cards, check TOI/CTOI/confirmed-host exclusions again, and investigate missing false-positive diagnostics before any external action. The best run008 signals still have many unavailable diagnostics and both fail `limb_darkening_plausibility_score=0.0`, so the evidence is not submission-ready. The next production work should add or run candidate-specific centroid/contamination/odd-even/multi-sector diagnostics; do not resume CNN C20 or contact external communities until this false-positive review is documented.
-- **Next escalation rule**: Do not resume CNN C20 training and do not submit/contact externally until run008 candidates have been reviewed and false-positive diagnostics are documented. If review rejects the filtered candidates as artifacts, the null/low-quality result should drive the next production-planning cycle.
+- **Next escalation rule**: Do not submit/contact externally from run006/run008 without explicit human approval. Do not use this historical loop to block the T1-1 model-training path.
 
 ### T1-1: Production Tier 2 CNN Checkpoint
 
 - **What is missing**: A CNN checkpoint that passes held-out performance and calibration gates
 - **Gate status**: **OPEN** — Kepler pretraining, TESS split generation, and two Kepler->TESS fine-tunes are locally complete; both fine-tuned checkpoints failed held-out production gates and must not be promoted
-- **Current priority**: **PAUSED** until T1-0 is complete and reviewed
+- **Current priority**: **ACTIVE / HIGHEST PRIORITY** — close this through the source-contract-first dataset/model plan in `docs/exoplanet_exomoon_dataset_handoff.md`, not by repeating old C1-C19/C20 patterns
+- **Active source contract**: Verify every public data source before use; discover schemas from primary services; preserve immutable source snapshots and enough metadata to redownload raw files after cleanup; use leakage-safe manifests/splits; keep storage bounded; use no synthetic examples for supervised model training in this phase; do not use Kaggle mirrors or unverified pretrained weights when primary NASA/MAST sources are available.
 - **Code status**: Training and state-dict inference paths are operational; the package scorer reconstructs the trained architecture and fails closed when loading fails
 - **Prior local corpus status**: **VALID as of 2026-06-12** — 2,037 snippets (1,012 positive CP+KP, 1,025 negative FP+FA, ratio 0.99); zero-epoch corpus retired and rebuilt from scratch with valid BJD epochs; label bug fixed (KP→1); MAST throttling fix applied (`bbb0877`)
 - **Local corpus status**: **KEPLER LOCAL VALIDATED** — TESS v2 complete at 2,619 snippets; Kepler finite rebuild has 6,837 parseable snippets with zero non-finite flux rows, zero duplicate resume keys, labels negative=4,280 and positive=2,557; `data/kepler_cnn_splits` validator PASS with train/val/test = 4,741 / 1,060 / 1,036
@@ -101,7 +104,7 @@ for transient MAST/Lightkurve connection disconnects.
   - **freeze_conv strategy exhausted.** Do not retry without a materially different corpus or training schedule.
 - **Strategic decision (2026-06-22)**: Human chose Option C — more data. All training-side approaches exhausted on 4,892 examples. Next authorized corpus: K2 EPIC overlap (K2 KOI confirmed planets/FPs with TESS re-observations folded at K2 ephemerides). See runbook Step 7g.
 - **ECE-skip gate fix (2026-06-22)**: `evaluate_cnn_checkpoint.py` now skips temperature scaling when raw test ECE < 0.05. Root cause of C11–C19 calibration doom loop confirmed: val is overconfident due to early-stopping selection bias; T > 1 applied to already-calibrated test structurally worsened ECE. With the fix, C20 gate is: raw AUC ≥ 0.85 AND raw F1 ≥ 0.80 (when ECE < 0.05, cal==raw). `Skills/fetch_tess_k2_overlap_snippets.py` and `configs/cnn_tess_c20.json` committed.
-- **Current data gate**: TESS combined splits VALIDATED; Kepler splits VALIDATED; C13–C19 all rejected; no CNN checkpoint approved for promotion. K2 overlap corpus is complete at 2,086 snippets. C20 corpus assembly is blocked until T1-0 discovery-scan evidence exists.
+- **Current data gate**: TESS combined splits VALIDATED; Kepler splits VALIDATED; C13–C19 all rejected; no CNN checkpoint approved for promotion. K2 overlap corpus is complete at 2,086 snippets. C20-style assembly is not blocked by T1-0 anymore, but it must be re-planned under the dataset handoff brief with source/schema verification and leakage-safe manifests before any local training request.
 - **Current authorized runbook**: `docs/CNN_PRODUCTION_RUNBOOK.md`
 - **Current promotion gate**: raw held-out test AUC ≥ 0.85; calibrated held-out test F1 ≥ 0.80; temperature scaling calibration must not worsen held-out test Brier score or ECE
 - **Calibration note**: Temperature scaling (T fitted via NLL on val split) replaced Platt scaling on 2026-06-21. Platt A≈1.7–1.8 consistently worsened calibration because raw predictions were already well-calibrated (ECE 0.02–0.06). Temperature scaling is the identity at T=1 and will not artificially sharpen probabilities.
@@ -200,8 +203,8 @@ These are enforced in code and must never be bypassed:
 
 | Blocker | What Is Needed | Who |
 |---|---|---|
-| First real discovery scan review | Review run006 candidates and numerical-quality behavior; generate false-positive diagnostics before any external action | Agent |
-| Next CNN production plan | Wait for T1-0 scan evidence; only then decide whether C20 corpus assembly/training is still production-relevant | Agent + human approval |
+| Dataset/model source contract | Verify source URLs/schemas, storage estimates, manifests, and leakage controls from `docs/exoplanet_exomoon_dataset_handoff.md` before asking the human to run bulk downloads or training | Agent |
+| CNN production training run | Build/train/evaluate only after the source contract, manifests, and local artifact ledger are updated; use the local M4 Max GPU path by default | Agent + human approval for long local runs |
 | CNN production promotion | Validate, calibrate, register, and commit only a future checkpoint that passes held-out gates | Agent + human approval |
 | Stacking weight calibration | Tune blend weights on held-out calibration set | Agent after T1-1 resolved |
 
@@ -211,7 +214,7 @@ These are enforced in code and must never be bypassed:
 
 Any plan proposed in a session must:
 
-1. Name the highest-priority unresolved Tier 1 gap (currently **T1-0: First Real Discovery Scan Evidence**)
+1. Name the highest-priority unresolved Tier 1 gap (currently **T1-1: Production Tier 2 CNN Checkpoint**)
 2. Show how each proposed step closes or directly unblocks that gap — or explicitly justify why it is Tier 2 work
 3. Include outside blockers as explicit named steps with responsible party
 4. Never propose log modules, schemas, or scaffolding unless they directly unblock a named gap

@@ -1231,9 +1231,16 @@ terminal failures. Console progress is not resume state. If rerunning a
 downloader reprocesses completed or terminally failed work by default, stop and
 fix the durable resume ledger before asking the human to run it again.
 
-### Next Step — HANDOFF 2026-06-27
+### Next Step — HANDOFF 2026-07-01
 
-**Mission realignment (2026-06-26):** Primary goal is **discovering previously unknown exoplanet transit candidates**. CNN training (T1-1) is explicitly secondary. Do NOT propose further CNN work until at least one real discovery scan over ≥1,000 TIC targets is complete and documented. See `docs/DISCOVERY_RUNBOOK.md`.
+**Mission realignment (2026-07-01):** The project has dropped the run006/run008
+candidate-review loop as the active production path and wholly adopted
+`docs/exoplanet_exomoon_dataset_handoff.md` to get a trained model over the
+hump. The highest-priority active gap is **T1-1: Production Tier 2 CNN /
+trained model checkpoint**. CNN/model work is no longer paused, but it must be
+source-contract-first: verified public URLs/schemas, immutable source
+snapshots, leakage-safe manifests/splits, bounded storage, M4 Max/MPS-aware
+training defaults, and production promotion only after held-out gates pass.
 
 **JWST Option A status (as of 2026-06-27):**
 - `Skills/fetch_jwst_targets.py` (A1) — **MERGED** (PR #133)
@@ -1241,16 +1248,17 @@ fix the durable resume ledger before asking the human to run it again.
 - K2 TAP ORA-00904 fix (`Skills/fetch_tess_k2_overlap_snippets.py`) — **MERGED** (PR #134, 2026-06-27)
 - `exo <obsid> --mission JWST` CLI wiring (A3) — **MERGED** (PR #141, 2026-06-27): `Mission` literal extended; `fetch_lightcurve` dispatches to `_fetch_jwst`; 13 new tests
 - Option B1–B4 (TESS target restructuring) — **MERGED** (PR #139, 2026-06-27): CTOI exclusion, confirmed-host exclusion, tmag 12–14.5 default, period_max 500d
-- Option B5 — **REVIEW NEEDED**. Run006 completed locally on 2026-06-29 after scanner progress/quiet-download and bounded-BLS fixes. `logs/discovery_run_006_qlp_progress_safe.json`: 200 entries, 192 `candidate_found`, 6 `scanned_clear`, 1 `no_data`, 1 `error`, active=0, runtime 46m35s, SHA-256 `8ed084e39fcf1b1f7f0405208a413d4651641aba195305f3ca3b2b8bc3615dc8`. `logs/discovery_filtered_006_qlp_progress_safe.json`: 2 candidates, SHA-256 `17630739c28bed296910512b86c63c77d952708cf84ab2fe6d8f55ae120a5fc9`. Version 0.2.6 rejects invalid and period-boundary BLS peaks, and version 0.2.7 makes explicit `Skills/star_scanner.py --target` follow-up scans operator-visible and durable by recording active targets before live work starts. Version 0.2.8 disables Lightkurve's implicit pre-clean QLP stitch normalization and serializes computed vetting features into `exo --output`; version 0.2.9 also serializes raw diagnostics, fetch provenance, missing feature names, and missing-diagnostic reasons for candidate review; version 0.2.10 retries transient MAST/Lightkurve connection disconnects during candidate packet regeneration. Run008 targeted follow-up completed locally on 2026-06-30: `logs/discovery_run_008_targeted_qlp_stitch_safe.json` has 2 `candidate_found` entries, active `{}`, SHA-256 `8626587c4fe59565132e078273763c7beac4a0a88597615f71e147a5134d1b0a`; filtered output SHA-256 `574a4cf188faa9e273128496fcd23b27cb8369a3e9d2ad2c1b5bbaedd9effed4`. TIC 201252011 reproduced at P=227.39056281978395 d, FPP=0.11606180728511539. TIC 257712351 reproduced at P=142.95415231096942 d, FPP=0.12672948535351847. False-positive vetting now uses real features and explains missing diagnostics, but both best signals fail `limb_darkening_plausibility_score=0.0` and still have many missing diagnostics. Next agent should add/run candidate-specific centroid, contamination, odd/even, and multi-sector diagnostics before any external action or CNN work.
+- Option B5 — **HISTORICAL / NOT ACTIVE**. Run006 completed locally on 2026-06-29 after scanner progress/quiet-download and bounded-BLS fixes. `logs/discovery_run_006_qlp_progress_safe.json`: 200 entries, 192 `candidate_found`, 6 `scanned_clear`, 1 `no_data`, 1 `error`, active=0, runtime 46m35s, SHA-256 `8ed084e39fcf1b1f7f0405208a413d4651641aba195305f3ca3b2b8bc3615dc8`. Run008 targeted follow-up completed locally on 2026-06-30 and reproduced the two filtered candidates under the fixed fetch/stitch path. Later v0.2.10 regenerated candidate packets moved the two candidates above the prior FPP < 0.15 escalation threshold, so the loop is useful provenance only and not the active production blocker. No external action is authorized from this evidence without explicit human approval.
 
 **K2 corpus fetch status (as of 2026-06-27):** **COMPLETE** — 2,086 snippets written to `data/tess_k2_overlap_snippets.jsonl`; wrote=2086, skipped=174, terminal_failures=135, elapsed=2531s (42m11s). No further fetch action needed.
 
 **Live scanner fix (PR #143, 2026-06-28):** **MERGED** — live one-target smoke on `main` verified that ExoFOP SSL loading, Python 3.14 helper imports, bounded TIC target selection, and no-light-curve `no_data` classification work. Do not re-debug the pre-PR #143 pasted failures.
 
 **Immediate next actions (in priority order):**
-1. **[AGENT]** Review run006 output before any more data collection or CNN work. Start with the two filtered candidates: TIC 201252011 (period 227.39056281978395 d, FPP 0.1160636155807766) and TIC 257712351 (period 142.95415231096942 d, FPP 0.12672985673564718).
-2. **[AGENT]** Investigate run006 numerical quality: 192/200 targets were flagged as candidates and 81 detections hit the 0.5 d or 500 d period boundaries. Treat this as a search/model-quality review blocker, not as submission-ready discovery evidence.
-3. **[PAUSED]** CNN C20 training remains paused until run006 is reviewed and false-positive diagnostics are documented.
+1. **[AGENT]** Read `docs/exoplanet_exomoon_dataset_handoff.md` and map its source-contract requirements to T1-1 in `docs/PRODUCTION_READINESS.md`.
+2. **[AGENT]** Verify source URLs/schemas with primary providers before writing or asking the human to run any bulk downloader. No guessed columns, URLs, Kaggle mirrors, or unverified pretrained weights.
+3. **[AGENT]** Update manifests/ledgers for expected local artifacts, storage/runtime estimates, leakage-safe split policy, and the exact next local command.
+4. **[HUMAN, only after verification]** Run bounded, resumable, console-visible, Mac/MPS-compliant local download/training commands when the agent has proved the command does not rely on hallucinated source contracts.
 
 #### CNN candidate history (what has been tried — do not repeat)
 
@@ -1273,8 +1281,7 @@ fix the durable resume ledger before asking the human to run it again.
 
 - Calibration method is **temperature scaling** (not Platt). The evaluator was updated in PR #125.
 - Best checkpoint `checkpoints/cnn_tess_c18/best.pt` (SHA `d33c15f4...`) — retain as reference; do not promote without human approval.
-- C20 training config: use `configs/cnn_tess_c18.json` (`freeze_conv_epochs=10`).
-- C20 split dir: `data/tess_c20_cnn_splits` (new dir; C20 must train on expanded corpus including K2 overlap data).
+- C20-style config/splits are historical until re-planned under `docs/exoplanet_exomoon_dataset_handoff.md`; do not run them unchanged.
 - Gate: raw held-out AUC ≥ 0.85, calibrated F1 ≥ 0.80, temperature scaling must not worsen Brier/ECE.
 
 #### Corpus status
@@ -1285,11 +1292,11 @@ fix the durable resume ledger before asking the human to run it again.
 - **TESS combined**: `data/tess_combined_snippets.jsonl` — 7,483 rows (TESS v2 + Kepler-TESS overlap)
 - **TESS combined splits**: `data/tess_combined_cnn_splits/` — LOCAL VALIDATED; train 4,892 / val 1,049 / test 1,033
 - **K2 overlap**: `data/tess_k2_overlap_snippets.jsonl` — **COMPLETE** — 2,086 snippets (2026-06-27; wrote=2086, skipped=174, terminal_failures=135, elapsed=2531s)
-- **C20 splits**: `data/tess_c20_cnn_splits/` — **NOT YET BUILT**; build only after discovery scan produces candidates
+- **C20 splits**: `data/tess_c20_cnn_splits/` — **NOT YET BUILT**; build only if a new dataset-brief-driven plan authorizes them
 
 #### CNN production runbook
 
-Use `docs/CNN_PRODUCTION_RUNBOOK.md` for authoritative copy-paste workflow. Current authoritative step: **Step 7g** (K2 EPIC overlap corpus).
+Use `docs/CNN_PRODUCTION_RUNBOOK.md` for authoritative copy-paste workflow. Current authoritative step: **Step A: Source-Contract Preflight**, driven by `docs/exoplanet_exomoon_dataset_handoff.md`.
 
 The accepted `train_cnn.py` flags are `--split-dir`, `--checkpoint-dir`, and `--pretrained-checkpoint`.
 The evaluator flag is `--output-calibration` (not `--calibration-output`).

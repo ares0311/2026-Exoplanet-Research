@@ -1,7 +1,7 @@
 # PROJECT STATUS
 
 ## Status: Active Development
-## Phase: Live Discovery Gate — run008 targeted QLP false-positive review
+## Phase: Dataset/Model Training Reset — production checkpoint path
 ## Last Updated: 2026-07-01
 
 ---
@@ -39,9 +39,9 @@ Local validation note: validated on Python 3.14.3 in `.venv` with `xgboost` depe
 | Scheduler docs | `docs/SCHEDULER.md` — cron, launchd, systemd | Complete |
 | ML Tier 1 | `ml/xgboost_scorer.py` + `models/xgboost_koi.json` | Complete — trained on 7,586 Kepler KOIs (AUC=0.992) |
 | ML Tier 3 | `ml/stacking_scorer.py` | Complete, includes optional 3-tier XGBoost/CNN/Bayesian blend |
-| ML Tier 2 scaffolding | `ml/cnn_scorer.py`, `Skills/train_cnn.py`, CNN data utilities | Complete, no production checkpoint; paused until discovery scan evidence exists |
+| ML Tier 2 scaffolding | `ml/cnn_scorer.py`, `Skills/train_cnn.py`, CNN data utilities | Complete, no production checkpoint; active work follows `docs/exoplanet_exomoon_dataset_handoff.md` |
 | Training/evaluation Skills | Kepler, TESS, combined training, CNN data assembly/validation/training support, XGBoost training, scorer evaluation | Complete |
-| Discovery workflow Skills | star scanner, batch scan, alert filter, ranking, watchlist, exports, reports | Complete; first real QLP scan complete and review-blocked |
+| Discovery workflow Skills | star scanner, batch scan, alert filter, ranking, watchlist, exports, reports | Complete; run006/run008 evidence retained as historical provenance, not the active production blocker |
 | Additional Skills | Analysis, vetting, observability, ML, physics, reporting, scheduling, and follow-up utilities retained after production-scope cleanup | Complete |
 | Milestone 19a Skill | `multi_sector_phase_compare.py` — offline per-sector phase-fold comparison | Complete |
 | Milestone 19b Skill | `candidate_dashboard_export.py` — static conservative candidate dashboard with optional plot artifacts | Complete |
@@ -93,6 +93,25 @@ without relying on chat context or local terminal output.
 
 ## Active Production Blocker
 
+**T1-1 — production trained model checkpoint**
+
+- The project reset on 2026-07-01 wholly adopts
+  `docs/exoplanet_exomoon_dataset_handoff.md` as the active path to a trained
+  model.
+- The next production work is source-contract-first data/ML hardening:
+  provider schema verification, immutable source snapshots, training
+  manifests, leakage-safe splits, bounded storage, and a checkpoint that passes
+  the documented held-out gates.
+- Do not repeat old C1-C19/C20-style retraining without first satisfying the
+  handoff brief requirements.
+- Do not use synthetic examples as supervised training positives in this phase;
+  synthetics remain CI/background fixtures only.
+- Any local long-running command must be resumable, print progress/ETA, use
+  top-level logs where applicable, and use the M4 Max/MPS path from
+  `docs/SYSTEM_PROFILE.md` for training.
+
+## Historical Discovery Evidence
+
 **T1-0 — first real discovery scan evidence**
 
 - The project mission has been realigned to discovering previously unknown transit candidates before doing more CNN work.
@@ -128,12 +147,12 @@ path: `logs/discovery_run_008_targeted_qlp_stitch_safe.json` has 2
 Filtered output SHA-256:
 `574a4cf188faa9e273128496fcd23b27cb8369a3e9d2ad2c1b5bbaedd9effed4`.
 
-The next action is false-positive review, not rerun: inspect the two targeted
-candidates and the missing-diagnostic reasons before any external action. Both
-best signals still fail `limb_darkening_plausibility_score=0.0`, and many
-centroid/contamination/odd-even/multi-sector diagnostics remain unavailable.
+This loop is now historical. It is useful scanner evidence, but later v0.2.10
+candidate packet regeneration moved the two filtered candidates above the prior
+FPP < 0.15 escalation threshold. Do not submit/contact externally from this
+evidence without explicit human approval, and do not use it to block T1-1.
 
-## Paused
+## Trained-Model History
 
 **Production ML Tier 2 — checkpoint generalization**
 
@@ -173,18 +192,17 @@ centroid/contamination/odd-even/multi-sector diagnostics remain unavailable.
   instead of hiding the stale provider behind a generic invalid/empty result.
 - Architecture details: `docs/CNN_SPEC.md`.
 - Human local runbook: `docs/CNN_PRODUCTION_RUNBOOK.md`.
-- Next outside blocker: wait for first discovery-scan evidence. Do not build C20 or train another CNN until the scan is complete and reviewed.
+- Next outside blocker: a human Mac run may be required after the agent verifies source contracts, manifests, storage estimates, and exact commands under `docs/exoplanet_exomoon_dataset_handoff.md`.
 
 ---
 
 ## Next Actions
 
-1. Review `logs/discovery_run_008_targeted_qlp_stitch_safe.json`, ranked candidates, and `logs/discovery_filtered_008_targeted_qlp_stitch_safe.json` as the current targeted evidence.
-2. Use regenerated 0.2.10+ `exo --output` rows and false-positive vetting reports for TIC 201252011 and TIC 257712351; both best signals remain review-blocked by missing diagnostics and failed limb-darkening plausibility.
-3. Add or run candidate-specific centroid, contamination, odd/even, and multi-sector diagnostics before any external action.
-4. Investigate why run006 flagged 192/200 targets as candidates and why many detections hit the 0.5 d / 500 d period boundaries before another blind scan.
-5. Do not run C20 CNN corpus assembly or training until the first discovery scan is reviewed.
-6. Promote nothing unless a future evaluator run reports `Flag: PASS`, raw test
+1. Implement the source-contract preflight from `docs/exoplanet_exomoon_dataset_handoff.md`: verify source URLs/schemas, storage estimates, and minimum smoke queries before any long local pull.
+2. Update source snapshots/manifests and the local artifact ledger so GitHub-only agents can see expected paths, hashes, counts, and next commands.
+3. Build or adjust leakage-safe training manifests/splits by target/system before any model run.
+4. Ask the human to run only commands whose schemas, URLs, worker counts, resume behavior, output, and Mac/MPS compliance were verified.
+5. Promote nothing unless a future evaluator run reports `Flag: PASS`, raw test
    AUC is at least 0.85, calibrated test F1 is at least 0.80, calibrated
    Brier/ECE are no worse than raw, and the human explicitly approves
    promotion.

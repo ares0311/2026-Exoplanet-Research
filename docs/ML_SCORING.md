@@ -209,11 +209,13 @@ the output row but does not replace the Bayesian posterior.
 ### Tier 2 — CNN on Phase-Folded Flux
 
 Implementation scaffolding is built, but production CNN use remains gated on a
-checkpoint that passes the documented production thresholds. CNN work is paused
-until the first real discovery scan is complete and reviewed. The default suite
-does not run the live ExoFOP gate check. When the live gate check is intentionally
-run with `.venv/bin/python Skills/count_tess_labels.py`, it records a local SQLite
-audit entry in `logs/tess_label_check.sqlite3`.
+checkpoint that passes the documented production thresholds. As of the
+2026-07-01 reset, CNN/model work is active under
+`docs/exoplanet_exomoon_dataset_handoff.md`: verify source contracts, build
+leakage-safe manifests, and train only from real labeled public data for this
+phase. The default suite does not run the live ExoFOP gate check. When the live
+gate check is intentionally run with `.venv/bin/python Skills/count_tess_labels.py`,
+it records a local SQLite audit entry in `logs/tess_label_check.sqlite3`.
 
 - `Skills/labelled_lc_collector.py`
 - `Skills/cnn_feature_augmenter.py`

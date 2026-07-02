@@ -566,3 +566,48 @@ candidate detection, scoring, classification, or external-service behavior.
 - Preserves portability through CLI/config overrides and CPU fallback.
 - Prevents future agents from treating serial CPU code as acceptable by
   default for large local jobs.
+
+---
+
+## DECISION-019: Adopt Dataset Handoff Brief As Active Model-Training Path
+
+**Date:** 2026-07-01
+**Status:** Accepted
+
+### Context
+
+The run006/run008 QLP candidate-review loop produced useful scanner evidence
+and several production fixes, but it did not produce submission-ready
+candidates. Continuing that loop was no longer the highest-impact path to live
+production. The remaining production blocker is T1-1: no trained CNN/model
+checkpoint has passed the held-out gate.
+
+The new `docs/exoplanet_exomoon_dataset_handoff.md` brief was added to provide
+industry-standard data and model-training guidance for getting a usable trained
+model from public exoplanet/exomoon-relevant sources without relying on guessed
+schemas, synthetic positives, or opaque pretrained weights.
+
+### Decision
+
+1. Wholly adopt `docs/exoplanet_exomoon_dataset_handoff.md` as the active
+   data/ML strategy for T1-1.
+2. Treat run006/run008 as historical discovery evidence, not the active
+   production blocker.
+3. Unpause CNN/model work, but require source-contract-first execution:
+   provider URL/schema verification, immutable source snapshots, training
+   manifests, leakage-safe splits, bounded storage, and reproducible local
+   artifact ledgers.
+4. Use real labeled public data for supervised model training in this phase.
+   Synthetic examples remain valid for CI/background fixtures only, not as
+   supervised training positives.
+5. Do not use Kaggle mirrors, guessed third-party schemas, or unverified
+   pretrained weights when primary NASA/MAST/provider sources are available.
+
+### Rationale
+
+- Stops the project from spending more production time on a low-yield
+  candidate-review loop.
+- Directly addresses the observed CNN ceiling by improving data/source quality
+  and training manifests before another local run.
+- Makes future human-run commands safer: no long download or training command
+  should rely on a URL, schema, or assumption the agent could have verified.
