@@ -157,11 +157,30 @@ handoff doc's "Minimum access smoke test" exactly: it queries
 `TAP_SCHEMA.columns` before trusting any column name, fetches sample rows from
 the `cumulative` and `toi` TAP tables plus the ExoFOP public TOI CSV, and
 confirms Lightkurve can find a Kepler and a TESS light curve for one real
-target from those rows. It is unit-tested (16 tests, offline, no network) but
-has **never been run against the live services** — this agent's sandbox
-network policy blocks `exoplanetarchive.ipac.caltech.edu` outbound (confirmed:
-`curl` to the TAP endpoint gets a `403` at the proxy). Give the human this
-exact recipe before proposing or writing any bulk downloader:
+target from those rows. This agent's sandbox network policy blocks
+`exoplanetarchive.ipac.caltech.edu` outbound, so the human ran the first live
+test.
+
+**First live run found and fixed a real bug (2026-07-02, root cause confirmed
+live, not guessed):** the `cumulative` schema check failed with zero matched
+columns and no error, while `toi` passed. Root cause, confirmed by having the
+human run raw `curl` against `TAP_SCHEMA.tables` directly (bypassing this
+tool's code entirely): the live archive registers the table as `"CUMULATIVE"`
+(upper case). `TAP_SCHEMA.columns.table_name` is an exact-match string
+column, not a resolved SQL identifier, so `where table_name = 'cumulative'`
+silently matched nothing. Fixed by querying
+`where UPPER(table_name) = UPPER('...')` — a general case-insensitivity fix,
+not a hardcoded `'CUMULATIVE'` special case, since a future table could be
+registered in either case. The human re-ran the fixed query live via `curl`
+and got a real 2,366-byte column list back (`kepid`, `kepoi_name`, etc.). This
+project has hit this exact class of TAP case-sensitivity bug before (see the
+K2 TAP `epic_id`/`k2c_objid` note above) — treat any new TAP table
+introspection the same way: verify live, never assume the catalog's stored
+case matches the doc's.
+
+The schema-check fix is live-verified. **The full tool has not yet been run
+end-to-end** (row fetch + ExoFOP CSV + Lightkurve Kepler/TESS search). Give
+the human this exact recipe before proposing or writing any bulk downloader:
 
 ```bash
 git switch main
@@ -172,9 +191,11 @@ cat reports/t1-1_source_smoke_test.md
 
 If the report says `**Overall**: FAIL`, paste it back — do not attempt to fix
 schema/column names by guessing; the failure reason names the exact broken
-step. If it says `PASS`, the source contract is verified and the next planning
-step is estimating the first Kepler download batch size per the "Storage and
-Data Retention Rules" section of the handoff doc.
+step, and if it's another TAP case-sensitivity issue, verify the real
+registered name live via `TAP_SCHEMA.tables` the same way, don't guess a
+replacement. If it says `PASS`, the source contract is verified and the next
+planning step is estimating the first Kepler download batch size per the
+"Storage and Data Retention Rules" section of the handoff doc.
 
 The run006/run008 notes below are historical provenance only. Preserve them so
 future agents do not re-debug the same scanner failures, but do not treat them

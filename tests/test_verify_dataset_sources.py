@@ -138,6 +138,38 @@ class TestVerifyTableSchema:
         assert result.ok is False
         assert result.missing_columns == frozenset({"koi_period"})
 
+    def test_query_uses_upper_for_case_insensitive_table_name_match(self) -> None:
+        # Regression: exoplanetarchive.ipac.caltech.edu registers "cumulative"
+        # as "CUMULATIVE" in TAP_SCHEMA.columns (confirmed live via curl on
+        # 2026-07-02). table_name is an exact-match string column, not a
+        # resolved SQL identifier, so the query must be case-insensitive or a
+        # correctly-spelled lower-case name silently matches zero rows.
+        captured: dict[str, str] = {}
+
+        def _tap(url: str) -> str:
+            captured["query"] = _query_from_url(url)
+            return _KOI_SCHEMA_CSV
+
+        verify_table_schema("cumulative", REQUIRED_KOI_COLUMNS, tap_fn=_tap)
+        query_lower = captured["query"].lower()
+        assert "upper(table_name)" in query_lower
+        assert "upper('cumulative')" in query_lower
+
+    def test_matches_table_registered_in_a_different_case(self) -> None:
+        # Simulates the live archive behavior: the TAP service only returns
+        # rows when the query's UPPER() comparison matches, regardless of
+        # what case the caller requested the table in.
+        def _tap_case_sensitive_upper(url: str) -> str:
+            query = _query_from_url(url)
+            if "upper(table_name) = upper('cumulative')" in query.lower():
+                return _KOI_SCHEMA_CSV
+            return "column_name\n"  # what the live archive returns pre-fix
+
+        result = verify_table_schema(
+            "cumulative", REQUIRED_KOI_COLUMNS, tap_fn=_tap_case_sensitive_upper
+        )
+        assert result.ok is True
+
     def test_network_failure_reports_error_not_ok(self) -> None:
         result = verify_table_schema("cumulative", REQUIRED_KOI_COLUMNS, tap_fn=_raise)
         assert result.ok is False

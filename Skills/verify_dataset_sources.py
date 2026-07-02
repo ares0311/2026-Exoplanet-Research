@@ -127,9 +127,22 @@ def verify_table_schema(
     Never infers or substitutes renamed columns — a missing column is always
     reported, never silently worked around, per the dataset handoff doc's
     "no guessing" rule.
+
+    Matches ``table_name`` case-insensitively: confirmed live against
+    exoplanetarchive.ipac.caltech.edu that ``TAP_SCHEMA.tables``/
+    ``TAP_SCHEMA.columns`` register some tables in upper case (e.g.
+    ``CUMULATIVE``) while ``FROM`` clauses elsewhere in this project already
+    query the same tables lower case successfully (e.g.
+    ``Skills/fetch_nea_koi_lc_index.py``). The catalog's ``table_name``
+    column is an exact-match string value, not a resolved SQL identifier, so
+    without ``UPPER()`` a correctly-spelled lower-case name can silently
+    match zero rows.
     """
     _fn = tap_fn if tap_fn is not None else _default_tap_fn
-    query = f"select column_name from TAP_SCHEMA.columns where table_name = '{table_name}'"
+    query = (
+        "select column_name from TAP_SCHEMA.columns "
+        f"where UPPER(table_name) = UPPER('{table_name}')"
+    )
 
     try:
         raw = _fn(_tap_query_url(query))
