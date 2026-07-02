@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "last_updated": "2026-07-01",
+  "last_updated": "2026-07-02",
   "production_gap": "T1-1: Production Tier 2 CNN / trained model checkpoint active under docs/exoplanet_exomoon_dataset_handoff.md; T1-0 run006/run008 evidence historical",
   "policy": {
     "standard_operator_cadence": "git add .",
@@ -976,7 +976,10 @@
       "git_policy": "ignored",
       "last_known": {
         "scan": "Targeted QLP follow-up after stitch-normalization fix",
-        "target_tic_ids": [201252011, 257712351],
+        "target_tic_ids": [
+          201252011,
+          257712351
+        ],
         "command_shape": "MPLCONFIGDIR=/tmp/exo-mpl-targeted caffeinate -i .venv/bin/python Skills/star_scanner.py --target <TIC_ID> --pipeline QLP --exptime long --max-period-grid-points 20000 --log logs/discovery_run_008_targeted_qlp_stitch_safe.json",
         "completed": true,
         "entries": 2,
@@ -1100,6 +1103,19 @@
       "git_policy": "ignored",
       "validation_gate": "Summaries may be committed in docs; SQLite DBs stay local.",
       "next_action": "Do not commit runtime databases."
+    },
+    {
+      "path": "reports/t1-1_source_smoke_test.md",
+      "kind": "verification_report",
+      "status": "not_yet_run",
+      "git_policy": "ignored",
+      "last_known": {
+        "tool": "Skills/verify_dataset_sources.py",
+        "tool_status": "built_and_unit_tested_2026-07-02",
+        "blocker": "agent sandbox network policy returns 403 for exoplanetarchive.ipac.caltech.edu"
+      },
+      "validation_gate": "Must PASS before any T1-1 bulk download or training run.",
+      "next_action": "[HUMAN] .venv/bin/python Skills/verify_dataset_sources.py --output reports/t1-1_source_smoke_test.md, then paste back the report."
     },
     {
       "path": "reports/",
