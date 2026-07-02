@@ -1246,16 +1246,17 @@ training defaults, and production promotion only after held-out gates pass.
 
 **Supplementary fix (2026-07-02, version 0.2.11):** `run_pipeline()` now wires real TIC catalog `stellar_radius_rsun`/`stellar_mass_msun`/`stellar_teff_k`/`contamination_ratio` into `vet_signal()` — a correctness fix to the already-shipped Bayesian/XGBoost/ensemble scorers, not part of the active T1-1 path. See `AGENTS.md` for detail.
 
-**T1-1 source/manifest progress (2026-07-02, versions 0.2.12-0.2.13):**
+**T1-1 source/manifest/progress state (2026-07-02, versions 0.2.12-0.2.14):**
 `Skills/verify_dataset_sources.py` passed the live source-access smoke test,
 `Skills/plan_t1_training_batch.py` committed source snapshots and storage
 estimates, and `Skills/build_t1_training_manifest.py` committed the
 leakage-safe Kepler manifest plus cleanup policy. Current manifest:
 `metadata/t1_1_kepler_training_manifest.jsonl`, 7,454 KOI rows across 6,515
 KIC groups, seed 42, train/val/test row counts 5,155 / 1,143 / 1,156, no
-leakage errors. Next production work is the bounded Kepler-first processing
-batch that consumes this manifest and logs resumable progress to
-`logs/t1_1_kepler_processing.sqlite3`.
+leakage errors. `Skills/process_t1_kepler_batch.py` now consumes this manifest
+and logs resumable progress to `logs/t1_1_kepler_processing.sqlite3`. First
+live Mac run: 25 targets processed in 1,216s, 26 snippets written, 0 failed
+rows, SQLite summary `done|25|26|0`, raw scratch directory `0B` after cleanup.
 
 **JWST Option A status (as of 2026-06-27):**
 - `Skills/fetch_jwst_targets.py` (A1) — **MERGED** (PR #133)
@@ -1270,10 +1271,9 @@ batch that consumes this manifest and logs resumable progress to
 **Live scanner fix (PR #143, 2026-06-28):** **MERGED** — live one-target smoke on `main` verified that ExoFOP SSL loading, Python 3.14 helper imports, bounded TIC target selection, and no-light-curve `no_data` classification work. Do not re-debug the pre-PR #143 pasted failures.
 
 **Immediate next actions (in priority order):**
-1. **[AGENT]** Implement or verify the bounded Kepler-first processor for `metadata/t1_1_kepler_training_manifest.jsonl`; it must be resumable, progress/ETA visible, storage-capped, and backed by top-level SQLite at `logs/t1_1_kepler_processing.sqlite3`.
-2. **[AGENT]** Add tests proving the processor skips completed rows, preserves terminal failures, refuses cross-split leakage, and never asks the human to rerun from scratch after interruption.
-3. **[AGENT]** Only after those tests pass, provide the exact Mac command for the human; it must use `.venv/bin/python`, `caffeinate`, bounded workers, and committed paths only.
-4. **[HUMAN, only after verification]** Run the bounded local processing command and paste the final summary plus any non-OK SQLite counts.
+1. **[AGENT]** Keep the GitHub-visible artifact ledger current after each ignored local processing run; verify `git add --dry-run .` remains empty for generated payloads.
+2. **[HUMAN]** After the ledger PR is merged, run the next bounded continuation from `main`: `git pull origin main` then `caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250` (use 100 if a smaller step is preferred).
+3. **[AGENT]** Review the pasted summary and SQLite counts. If failure rate stays low and raw scratch remains empty, continue scaling bounded Kepler processing until the manifest is complete.
 
 #### CNN candidate history (what has been tried — do not repeat)
 

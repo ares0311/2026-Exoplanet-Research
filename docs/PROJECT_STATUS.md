@@ -105,8 +105,11 @@ without relying on chat context or local terminal output.
 - Source verification, storage estimates, source snapshots, and the
   leakage-safe Kepler manifest are now complete. `metadata/t1_1_kepler_training_manifest.jsonl`
   has 7,454 KOI rows across 6,515 KIC target groups with no cross-split target
-  leakage; next work is the bounded Kepler-first processing batch with
-  top-level SQLite resume/progress logging.
+  leakage. The first bounded Kepler processing batch live-smoked successfully
+  on the user's Mac: 25 targets, 26 snippets written, 0 failed rows, SQLite
+  summary `done|25|26|0`, raw scratch directory `0B` after cleanup. Next work
+  is continuing the resumable bounded processing pass, then building validated
+  splits for training after enough real snippets accumulate.
 - Do not repeat old C1-C19/C20-style retraining without first satisfying the
   handoff brief requirements.
 - Do not use synthetic examples as supervised training positives in this phase;

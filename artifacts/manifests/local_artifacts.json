@@ -1091,35 +1091,48 @@
     {
       "path": "data/processed/t1_1_kepler_snippets/kepler_snippets.jsonl",
       "kind": "processed_snippet_corpus",
-      "status": "not_yet_run",
+      "status": "live_smoke_pass",
       "git_policy": "ignored",
       "last_known": {
         "tool": "Skills/process_t1_kepler_batch.py",
         "tool_status": "built_and_unit_tested_2026-07-02_v0.2.14",
         "n_tests": 27,
-        "blocker": "agent sandbox has no Lightkurve/MAST access"
+        "live_run_at": "2026-07-02",
+        "command": "caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 25",
+        "targets_processed": 25,
+        "snippets_written": 26,
+        "rows_failed": 0,
+        "elapsed_seconds": 1216,
+        "wc_l": 26
       },
       "validation_gate": "Inspect a bounded run's snippets and SQLite summary before scaling up.",
-      "next_action": "[HUMAN] caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 25, then paste back the summary block."
+      "next_action": "[HUMAN] After this ledger update is merged, run a larger bounded continuation: caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 (or 100 for a smaller step)."
     },
     {
       "path": "logs/t1_1_kepler_processing.sqlite3",
       "kind": "runtime_progress_store",
-      "status": "not_yet_run",
+      "status": "live_smoke_pass",
       "git_policy": "ignored",
       "last_known": {
-        "schema": "single targets table keyed by target_id, status active|done"
+        "schema": "single targets table keyed by target_id, status active|done",
+        "sqlite_summary": "done|25|26|0",
+        "done_targets": 25,
+        "active_targets": 0,
+        "snippets_written": 26,
+        "rows_failed": 0
       },
       "validation_gate": "No incomplete active targets before raw FITS cleanup is approved.",
-      "next_action": "Created automatically by the first live run of Skills/process_t1_kepler_batch.py."
+      "next_action": "Continue using this SQLite file for resume; do not delete before full Kepler processing completes."
     },
     {
       "path": "data/raw/t1_1_kepler_lc/",
       "kind": "scratch_raw_download_dir",
-      "status": "self_cleaning",
+      "status": "self_cleaning_verified",
       "git_policy": "ignored",
       "last_known": {
-        "cleanup_behavior": "wiped after every target (success or failure) by process_t1_kepler_batch.py"
+        "cleanup_behavior": "wiped after every target (success or failure) by process_t1_kepler_batch.py",
+        "verified_after_live_run": "2026-07-02",
+        "du_sh": "0B"
       },
       "validation_gate": "Should be empty or near-empty between runs by construction.",
       "next_action": "No action needed; do not manually populate."
