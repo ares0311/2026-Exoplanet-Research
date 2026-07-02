@@ -261,6 +261,43 @@ Background automation configuration should live in a top-level `configs/` direct
 - Known TESS examples allow deterministic, scientifically inspectable development before live data access.
 - A single-run command keeps scheduled work auditable, restartable, and reproducible.
 - Broad scheduler guidance avoids hardcoding the workflow to one operating system while still supporting macOS well.
+
+---
+
+## DECISION-020: Match NASA TAP Schema Table Names Case-Insensitively
+
+**Date:** 2026-07-02
+**Status:** Accepted
+
+### Context
+
+The T1-1 dataset source-access smoke test failed when querying
+`TAP_SCHEMA.columns` for the NASA Exoplanet Archive `cumulative` table. The
+table itself is queryable as `FROM cumulative`, but the metadata row in
+`TAP_SCHEMA.columns.table_name` is stored as `CUMULATIVE`. Exact string
+comparison with `where table_name = 'cumulative'` therefore returned zero
+columns without an explicit service error.
+
+### Decision
+
+All NASA Exoplanet Archive TAP schema-discovery queries in this project must
+match table names case-insensitively:
+
+```sql
+where UPPER(table_name) = UPPER('<table>')
+```
+
+Required column names are still compared exactly after the metadata rows are
+retrieved.
+
+### Rationale
+
+- Preserves the no-guessing rule while avoiding false schema failures caused by
+  provider metadata casing.
+- Keeps ordinary row-fetch queries (`FROM cumulative`, `FROM toi`) separate
+  from metadata string matching.
+- Prevents future agents from copying stale exact-match TAP schema snippets
+  from the active dataset handoff brief.
 - Top-level configs make scientific thresholds easy for multiple agents to inspect and version.
 - A short lock wait is friendlier to schedulers while still preventing overlapping runs.
 - Markdown and HTML exports support both review in Git and richer local inspection.

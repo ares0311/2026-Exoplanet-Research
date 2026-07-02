@@ -1107,16 +1107,80 @@
     {
       "path": "reports/t1-1_source_smoke_test.md",
       "kind": "verification_report",
-      "status": "partially_live_verified",
+      "status": "live_verified_pass",
       "git_policy": "ignored",
       "last_known": {
         "tool": "Skills/verify_dataset_sources.py",
-        "tool_status": "schema_check_fixed_and_live_verified_2026-07-02",
+        "tool_status": "full_source_smoke_passed_2026-07-02",
         "bug_found_and_fixed": "cumulative table registered as 'CUMULATIVE' (upper case) in TAP_SCHEMA; table_name is an exact-match string column, not a resolved SQL identifier; fixed by querying UPPER(table_name) = UPPER(...) instead of exact match",
-        "full_tool_run_end_to_end": false
+        "full_tool_run_end_to_end": true,
+        "overall": "PASS",
+        "koi_sample_rows": 5,
+        "toi_sample_rows": 5,
+        "exofop_public_toi_csv_rows": 8064,
+        "sample_kepid": 10797460,
+        "kepler_lightcurves_found": 17,
+        "sample_tid": 182943944,
+        "tess_lightcurves_found": 21
       },
       "validation_gate": "Must PASS before any T1-1 bulk download or training run.",
-      "next_action": "[HUMAN] caffeinate -i .venv/bin/python Skills/verify_dataset_sources.py --output reports/t1-1_source_smoke_test.md, then paste back the report."
+      "next_action": "[AGENT] Estimate first production training-data batch size, source snapshot metadata, and leakage-safe manifest paths before asking for any bulk download."
+    },
+    {
+      "path": "metadata/source_snapshots.json",
+      "kind": "source_snapshot",
+      "status": "committed_live_verified",
+      "git_policy": "commit",
+      "last_known": {
+        "created_at_utc": "2026-07-02T07:53:48Z",
+        "cumulative_rows": 9564,
+        "toi_rows": 7931,
+        "pscomppars_rows": 6298,
+        "required_columns_verified": true
+      },
+      "validation_gate": "Refresh before any materially new source-catalog download.",
+      "next_action": "Retain as the source snapshot for the next T1-1 manifest design step."
+    },
+    {
+      "path": "metadata/download_manifest_sample.jsonl",
+      "kind": "sample_download_manifest",
+      "status": "committed_live_verified",
+      "git_policy": "commit",
+      "last_known": {
+        "created_at_utc": "2026-07-02T07:53:48Z",
+        "sample_size": 5,
+        "kepler_filter": "mission=Kepler author=Kepler exptime=1800",
+        "kepler_sample_products": 83,
+        "kepler_sample_total_bytes": 36146880,
+        "tess_filter": "mission=TESS",
+        "tess_sample_products": 41,
+        "tess_sample_total_bytes": 29856960
+      },
+      "validation_gate": "Sample metadata only; does not authorize a bulk download by itself.",
+      "next_action": "Use as the redownload-metadata shape for the bounded processing manifest."
+    },
+    {
+      "path": "metadata/t1_1_training_batch_plan.json",
+      "kind": "training_batch_plan",
+      "status": "storage_estimate_pass",
+      "git_policy": "commit",
+      "last_known": {
+        "created_at_utc": "2026-07-02T07:53:48Z",
+        "koi_label_rows": 7454,
+        "koi_unique_targets": 6515,
+        "koi_positive_rows": 2740,
+        "koi_negative_rows": 4714,
+        "toi_label_rows": 7824,
+        "toi_unique_targets": 7535,
+        "exofop_rows": 8064,
+        "kepler_estimated_raw_bytes": 47099384640,
+        "tess_estimated_raw_bytes": 44994438720,
+        "combined_estimated_raw_bytes": 92093823360,
+        "working_data_cap_bytes": 107374182400,
+        "flag": "OK"
+      },
+      "validation_gate": "Combined estimated raw bytes remain under the 100 GiB working-data cap, but bulk download still requires leakage-safe manifest and cleanup path.",
+      "next_action": "Design or verify leakage-safe training manifest and cleanup path before any bulk download."
     },
     {
       "path": "reports/",

@@ -122,6 +122,7 @@ When the user must take an action to unblock a gap:
 - **Project version bumped to 0.2.9** — patch release for candidate-review diagnostics; `exo --output` now serializes raw vetting `diagnostics`, fetch provenance, and missing-feature names, and `Skills/false_positive_vetter.py` explains why review-blocking diagnostics are unavailable.
 - **Project version bumped to 0.2.10** — patch release for candidate-review regeneration reliability; `fetch_lightcurve()` now retries transient MAST/Lightkurve connection disconnects with bounded polite backoff.
 - **Project version bumped to 0.2.11 (2026-07-02)** — supplementary pipeline-correctness patch, not part of the active T1-1 dataset-handoff path. `run_pipeline()` called `vet_signal(light_curve, signal)` with zero catalog keyword arguments, so `stellar_radius_rsun`, `stellar_mass_msun`, `contamination_ratio`, and every score derived from them were always `None`/solar-default — including `limb_darkening_plausibility_score`, which silently used 5778 K for every target because `vet_signal()` did not even accept a `stellar_teff_k` parameter. New `fetch_tic_stellar_params()` in `fetch.py` does one TIC catalog lookup per TESS scan (injectable `stellar_params_fn` for tests; fails open to all-`None` on any error; not called for Kepler/K2/JWST). This is a correctness fix to the already-shipped Bayesian/XGBoost/ensemble scorers, not a reopening of T1-0 as the active path; run006/run008 remain historical per the 2026-07-01 reset below.
+- **Project version bumped to 0.2.12 (2026-07-02)** — source-contract hardening patch for the active T1-1 path. The shipped verifier already fixed the live NASA Exoplanet Archive `TAP_SCHEMA.columns.table_name` case-sensitivity bug with `UPPER(table_name) = UPPER(...)`; this patch updates `docs/exoplanet_exomoon_dataset_handoff.md` and regression tests so future agents do not copy the stale exact-match schema snippets that caused the `CUMULATIVE` smoke-test failure.
 
 ### Where things stand
 
@@ -151,15 +152,13 @@ source-contract-first data/model hardening: verified schemas and URLs,
 immutable source snapshots, training manifests, leakage-safe splits, bounded
 storage, and a production-gated trained classifier/ranker.
 
-**Concrete next step (2026-07-02, blocked on human — read before doing anything else):**
-`Skills/verify_dataset_sources.py` (version 0.2.11) implements the dataset
+**Concrete next step (2026-07-02 — read before doing anything else):**
+`Skills/verify_dataset_sources.py` (version 0.2.12) implements the dataset
 handoff doc's "Minimum access smoke test" exactly: it queries
 `TAP_SCHEMA.columns` before trusting any column name, fetches sample rows from
 the `cumulative` and `toi` TAP tables plus the ExoFOP public TOI CSV, and
 confirms Lightkurve can find a Kepler and a TESS light curve for one real
-target from those rows. This agent's sandbox network policy blocks
-`exoplanetarchive.ipac.caltech.edu` outbound, so the human ran the first live
-test.
+target from those rows.
 
 **First live run found and fixed a real bug (2026-07-02, root cause confirmed
 live, not guessed):** the `cumulative` schema check failed with zero matched
@@ -178,24 +177,31 @@ K2 TAP `epic_id`/`k2c_objid` note above) — treat any new TAP table
 introspection the same way: verify live, never assume the catalog's stored
 case matches the doc's.
 
-The schema-check fix is live-verified. **The full tool has not yet been run
-end-to-end** (row fetch + ExoFOP CSV + Lightkurve Kepler/TESS search). Give
-the human this exact recipe before proposing or writing any bulk downloader:
+**Full source smoke PASS (2026-07-02):** the exact verifier ran end-to-end from
+the project `.venv` and returned `Overall: PASS`. Measured outputs: 5 KOI rows,
+5 TOI rows, 8,064 ExoFOP public TOI CSV rows, sample KIC `10797460` with 17
+Kepler light-curve search results, and sample TIC `182943944` with 21 TESS
+light-curve search results. The source-access blocker is cleared. Do not ask
+the human to rerun this before the next T1-1 step unless a later source change
+invalidates the contract.
 
-```bash
-git switch main
-git pull --ff-only origin main
-caffeinate -i .venv/bin/python Skills/verify_dataset_sources.py --output reports/t1-1_source_smoke_test.md
-cat reports/t1-1_source_smoke_test.md
-```
+**Next T1-1 blocker:** estimate the first production training-data batch size,
+write immutable source snapshot metadata, and design leakage-safe manifests
+per the storage rules in `docs/exoplanet_exomoon_dataset_handoff.md`. Do not
+ask the human to run a bulk download until storage/runtime estimates and
+manifest paths are committed.
 
-If the report says `**Overall**: FAIL`, paste it back — do not attempt to fix
-schema/column names by guessing; the failure reason names the exact broken
-step, and if it's another TAP case-sensitivity issue, verify the real
-registered name live via `TAP_SCHEMA.tables` the same way, don't guess a
-replacement. If it says `PASS`, the source contract is verified and the next
-planning step is estimating the first Kepler download batch size per the
-"Storage and Data Retention Rules" section of the handoff doc.
+**Storage/source snapshot PASS (2026-07-02):**
+`Skills/plan_t1_training_batch.py` writes committed source snapshots and sample
+download metadata without downloading FITS files. Live run with `sample_size=5`
+verified `cumulative` rows=9,564, `toi` rows=7,931, `pscomppars` rows=6,298,
+KOI label rows=7,454 across 6,515 unique KICs (2,740 confirmed / 4,714 false
+positive), TOI ephemeris rows=7,824 across 7,535 TICs, and ExoFOP public TOI
+CSV rows=8,064. MAST search metadata estimated all-KOI Kepler long-cadence raw
+FITS at 47,099,384,640 bytes (43.86 GiB) and all-TOI TESS raw FITS at
+44,994,438,720 bytes (41.90 GiB), combined 92,093,823,360 bytes under the
+100 GiB working cap. Next action: design or verify the leakage-safe training
+manifest and cleanup path, then run a bounded Kepler-first processing batch.
 
 The run006/run008 notes below are historical provenance only. Preserve them so
 future agents do not re-debug the same scanner failures, but do not treat them
