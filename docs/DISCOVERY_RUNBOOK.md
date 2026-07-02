@@ -2,7 +2,7 @@
 
 **Purpose**: Prevent doom loops. Every agent and every session must read this before doing anything.
 
-**Last updated**: 2026-07-02 (strategic reset: the run006/run008 candidate-review loop is historical; active production work wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` and `docs/CNN_PRODUCTION_RUNBOOK.md` to close T1-1 with verified public data and a production-gated trained model; version 0.2.11 added a supplementary correctness fix wiring real TIC catalog stellar/contamination parameters into `vet_signal()`, and version 0.2.12 hardens the active dataset handoff contract against exact-match TAP schema table-name bugs)
+**Last updated**: 2026-07-02 (strategic reset: the run006/run008 candidate-review loop is historical; active production work wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` and `docs/CNN_PRODUCTION_RUNBOOK.md` to close T1-1 with verified public data and a production-gated trained model; version 0.2.11 added a supplementary correctness fix wiring real TIC catalog stellar/contamination parameters into `vet_signal()`, version 0.2.12 hardens the active dataset handoff contract against exact-match TAP schema table-name bugs, and version 0.2.13 commits the leakage-safe Kepler manifest plus cleanup policy)
 
 ---
 

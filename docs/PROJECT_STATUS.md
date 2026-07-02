@@ -102,6 +102,11 @@ without relying on chat context or local terminal output.
   provider schema verification, immutable source snapshots, training
   manifests, leakage-safe splits, bounded storage, and a checkpoint that passes
   the documented held-out gates.
+- Source verification, storage estimates, source snapshots, and the
+  leakage-safe Kepler manifest are now complete. `metadata/t1_1_kepler_training_manifest.jsonl`
+  has 7,454 KOI rows across 6,515 KIC target groups with no cross-split target
+  leakage; next work is the bounded Kepler-first processing batch with
+  top-level SQLite resume/progress logging.
 - Do not repeat old C1-C19/C20-style retraining without first satisfying the
   handoff brief requirements.
 - Do not use synthetic examples as supervised training positives in this phase;

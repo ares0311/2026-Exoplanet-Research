@@ -1,0 +1,53 @@
+{
+  "cleanup_policy": {
+    "delete_after_verified_processing": [
+      "data/raw/t1_1_kepler_lc"
+    ],
+    "delete_only_after": [
+      "processed snippets validate",
+      "manifest summary flag is OK",
+      "runtime SQLite log has no incomplete active targets",
+      "operator confirms no failed raw FITS are needed for debugging"
+    ],
+    "keep_after_verified_processing": [
+      "metadata/t1_1_kepler_training_manifest.jsonl",
+      "metadata/t1_1_kepler_manifest_summary.json",
+      "data/processed/t1_1_kepler_snippets",
+      "logs/t1_1_kepler_processing.sqlite3"
+    ],
+    "processed_artifact_dir": "data/processed/t1_1_kepler_snippets",
+    "raw_lightcurve_dir": "data/raw/t1_1_kepler_lc",
+    "runtime_log_db": "logs/t1_1_kepler_processing.sqlite3"
+  },
+  "created_at_utc": "2026-07-02T08:20:18Z",
+  "flag": "OK",
+  "label_counts": {
+    "0": 4714,
+    "1": 2740
+  },
+  "leakage_errors": [],
+  "manifest_version": "t1-1-kepler-manifest-v1",
+  "next_action": "Proceed to a bounded Kepler-first processing batch using this manifest.",
+  "row_count": 7454,
+  "source_snapshot": "2026-07-02T07:53:48Z:nasa_exoplanet_archive_cumulative,nasa_exoplanet_archive_toi,nasa_exoplanet_archive_pscomppars",
+  "split_counts": {
+    "test": 1156,
+    "train": 5155,
+    "val": 1143
+  },
+  "split_label_counts": {
+    "test": {
+      "0": 725,
+      "1": 431
+    },
+    "train": {
+      "0": 3268,
+      "1": 1887
+    },
+    "val": {
+      "0": 721,
+      "1": 422
+    }
+  },
+  "target_count": 6515
+}
