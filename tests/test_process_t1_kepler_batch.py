@@ -495,39 +495,82 @@ class TestRunBatchConcurrency:
 
 
 class TestMakeDefaultLcFetcherIsolation:
+    """make_default_lc_fetcher must use exo_toolkit.fetch's already-proven
+    thread-safe per-product downloader, never Lightkurve's public
+    ``download_all()`` (which mutates process-global stdout and caused this
+    project's historical run003 crash -- and a live crash reproducing that
+    exact failure mode the first time this Skill was run with workers > 1).
+    These tests mock at the ``_download_collection_with_cache_repair``
+    boundary, since that function's own thread-safety is already covered by
+    ``tests/test_fetch.py``; re-mocking astroquery/lightkurve internals here
+    would just duplicate that coverage without adding confidence.
+    """
+
+    class _FakeLc:
+        time = type("T", (), {"value": [0.0, 1.0, 2.0]})()
+        flux = type("F", (), {"value": [1.0, 1.0, 1.0]})()
+
+        def normalize(self):
+            return self
+
+    class _FakeCollection:
+        def stitch(self):
+            return TestMakeDefaultLcFetcherIsolation._FakeLc()
+
+    class _FakeSearchResult:
+        def __len__(self):
+            return 1
+
+    def test_never_calls_download_all(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        fake_lk = type(
+            "FakeLightkurve",
+            (),
+            {"search_lightcurve": staticmethod(lambda *a, **k: self._FakeSearchResult())},
+        )
+        monkeypatch.setitem(sys.modules, "lightkurve", fake_lk)
+
+        def _fail_if_called(*_a, **_k):
+            raise AssertionError(
+                "download_all() must never be called -- it mutates process-global "
+                "stdout and is unsafe under concurrent workers"
+            )
+
+        monkeypatch.setattr(
+            self._FakeSearchResult, "download_all", _fail_if_called, raising=False
+        )
+
+        def fake_download(_search, *, flux_columns, download_dir=None):
+            return self._FakeCollection(), flux_columns
+
+        monkeypatch.setattr(
+            "exo_toolkit.fetch._download_collection_with_cache_repair", fake_download
+        )
+
+        fetcher = make_default_lc_fetcher(tmp_path / "raw")
+        result = fetcher(1)
+        assert result is not None
+
     def test_uses_per_target_subdirectory_and_cleans_it_up(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        captured_download_dirs: list[str] = []
-
-        class _FakeLc:
-            time = type("T", (), {"value": [0.0, 1.0, 2.0]})()
-            flux = type("F", (), {"value": [1.0, 1.0, 1.0]})()
-
-            def normalize(self):
-                return self
-
-        class _FakeCollection:
-            def __len__(self):
-                return 1
-
-            def stitch(self):
-                return _FakeLc()
-
-        class _FakeSearchResult:
-            def __len__(self):
-                return 1
-
-            def download_all(self, download_dir):
-                captured_download_dirs.append(download_dir)
-                return _FakeCollection()
+        captured_download_dirs: list[str | None] = []
 
         fake_lk = type(
             "FakeLightkurve",
             (),
-            {"search_lightcurve": staticmethod(lambda *a, **k: _FakeSearchResult())},
+            {"search_lightcurve": staticmethod(lambda *a, **k: self._FakeSearchResult())},
         )
         monkeypatch.setitem(sys.modules, "lightkurve", fake_lk)
+
+        def fake_download(_search, *, flux_columns, download_dir=None):
+            captured_download_dirs.append(download_dir)
+            return self._FakeCollection(), flux_columns
+
+        monkeypatch.setattr(
+            "exo_toolkit.fetch._download_collection_with_cache_repair", fake_download
+        )
 
         raw_dir = tmp_path / "raw"
         fetcher = make_default_lc_fetcher(raw_dir)
@@ -547,38 +590,24 @@ class TestMakeDefaultLcFetcherIsolation:
         seen_dirs_while_active: set[str] = set()
         lock = threading.Lock()
 
-        class _FakeLc:
-            time = type("T", (), {"value": [0.0, 1.0, 2.0]})()
-            flux = type("F", (), {"value": [1.0, 1.0, 1.0]})()
-
-            def normalize(self):
-                return self
-
-        class _FakeCollection:
-            def __len__(self):
-                return 1
-
-            def stitch(self):
-                return _FakeLc()
-
-        class _FakeSearchResult:
-            def __len__(self):
-                return 1
-
-            def download_all(self, download_dir):
-                with lock:
-                    seen_dirs_while_active.add(download_dir)
-                # Hold the "download" open briefly so other threads overlap.
-                time_module.sleep(0.05)
-                assert Path(download_dir).exists(), "directory vanished mid-download"
-                return _FakeCollection()
-
         fake_lk = type(
             "FakeLightkurve",
             (),
-            {"search_lightcurve": staticmethod(lambda *a, **k: _FakeSearchResult())},
+            {"search_lightcurve": staticmethod(lambda *a, **k: self._FakeSearchResult())},
         )
         monkeypatch.setitem(sys.modules, "lightkurve", fake_lk)
+
+        def fake_download(_search, *, flux_columns, download_dir=None):
+            with lock:
+                seen_dirs_while_active.add(download_dir)
+            # Hold the "download" open briefly so other threads overlap.
+            time_module.sleep(0.05)
+            assert Path(download_dir).exists(), "directory vanished mid-download"
+            return self._FakeCollection(), flux_columns
+
+        monkeypatch.setattr(
+            "exo_toolkit.fetch._download_collection_with_cache_repair", fake_download
+        )
 
         raw_dir = tmp_path / "raw"
         fetcher = make_default_lc_fetcher(raw_dir)

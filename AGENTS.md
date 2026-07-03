@@ -127,6 +127,7 @@ When the user must take an action to unblock a gap:
 - **Project version bumped to 0.2.14 (2026-07-02)** — bounded Kepler-first processing batch patch for the active T1-1 path. `Skills/process_t1_kepler_batch.py` consumes `metadata/t1_1_kepler_training_manifest.jsonl`, fetches each unique KIC's Kepler light curve once (reusing the proven phase-fold/normalisation math from `Skills/fetch_kepler_lc_snippets.py`), phase-folds every KOI row sharing that target, and writes snippets to `data/processed/t1_1_kepler_snippets/kepler_snippets.jsonl`. Progress/resume state lives in SQLite at `logs/t1_1_kepler_processing.sqlite3`; a target is only marked `done` after its snippets are flushed, so an interrupted run never leaves partial/duplicate output. Raw FITS downloads are scoped to `data/raw/t1_1_kepler_lc` and the directory is wiped after every target (success or failure) — local raw storage never exceeds roughly one target's data at a time, satisfying the storage cap by construction. `--max-targets` defaults to 25 so the first invocation is a small bounded batch, not the full 6,515-target corpus. 27 new tests, all offline/injectable. Not yet run against live Kepler data — this agent's sandbox has no Lightkurve/MAST access.
 - **Project version bumped to 0.2.15 (2026-07-02)** — the first live 25-target Mac run (PR #168) measured ~49s/target, meaning a 250-target run takes ~3.4 hours; the per-target progress line now prints an ETA (`elapsed=Xs ETA=YmZZs`), not just elapsed time, so a multi-hour batch never looks hung. 8 new tests for the ETA formatter and its wiring into `run_batch`.
 - **Project version bumped to 0.2.16 (2026-07-02)** — `process_t1_kepler_batch.py` gains bounded `--workers` concurrency (default 1, matching `fetch_kepler_lc_snippets.py`'s existing convention; `docs/SYSTEM_PROFILE.md` recommends 4-6 for this external-service workload), using the same `ThreadPoolExecutor` pattern already proven in that sibling script. Building this surfaced a real concurrency-correctness bug: the raw-FITS fetcher wiped one shared scratch directory after every target, which would have let one worker's cleanup delete a different worker's still-downloading files under `workers > 1`. Fixed by giving each target its own `raw_dir/target_<id>` subdirectory. 6 new tests, including a real-thread test asserting concurrent download directories never collide.
+- **Project version bumped to 0.2.17 (2026-07-03)** — crash fix for the live `--workers 4` run, which failed with `ValueError: I/O operation on closed file`. Root cause: `make_default_lc_fetcher()` called Lightkurve's public `search.download_all()`, which is decorated with `suppress_stdout` and mutates process-global `sys.stdout` — the exact same failure class already diagnosed and fixed once before in this project for `star_scanner.py` (see the run003 note below). Fix: extended `fetch.py`'s already-proven-safe `_download_collection_with_cache_repair()` / `_download_one_with_cache_repair()` with an optional `download_dir` parameter (backward compatible, default `None`), and rewired `make_default_lc_fetcher()` to call that path instead of `download_all()`. That helper never mutates `sys.stdout`; it monkey-patches `Observations.download_products(verbose=False)` under a module-level lock instead. Rewrote the affected tests to mock at the `_download_collection_with_cache_repair` boundary and added an explicit regression test, `test_never_calls_download_all`, that fails loudly if any future edit reintroduces the unsafe call. The interrupted 250-target/`--workers 4` run left a few targets in `active` (not `done`) state in SQLite — resuming with the same command is safe and will not duplicate output.
 
 ### Where things stand
 
@@ -249,7 +250,20 @@ target finishes. 41 offline/injectable tests pass (6 new, including one that
 runs three fetches on real threads and asserts their download directories
 never collide).
 
-**Concrete next step — give the human this exact recipe, now with workers:**
+**The first live `--workers 4` attempt crashed (2026-07-02/03) — fixed in
+version 0.2.17.** The crash was `ValueError: I/O operation on closed file`,
+caused by `make_default_lc_fetcher()` calling Lightkurve's public
+`search.download_all()`, which mutates process-global `sys.stdout` via a
+`suppress_stdout` decorator and is therefore unsafe under concurrent worker
+threads — the exact same failure class already documented for
+`star_scanner.py` below (the run003 QLP attempt). The fix reuses `fetch.py`'s
+already-proven-safe `_download_collection_with_cache_repair()` download path
+(module-lock-guarded, does not touch `sys.stdout`) instead of `download_all()`.
+A new regression test (`test_never_calls_download_all`) asserts this stays
+fixed. The interrupted run's SQLite progress is safe to resume — targets that
+were mid-flight are left `active`, not `done`, and are retried automatically.
+
+**Concrete next step — give the human this exact recipe, now with workers, on version 0.2.17 or newer:**
 
 ```bash
 git switch main
@@ -257,19 +271,20 @@ git pull --ff-only origin main
 caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 --workers 4
 ```
 
-This is not yet verified live at `workers > 1` — watch the first concurrent
-run for MAST throttling or errors before recommending a larger `--workers`
-value or omitting `--max-targets`. It processes the next 250 not-yet-done
-targets from the manifest (resumable regardless of worker count — rerunning
-the same command continues where it left off) and prints per-target progress
-with elapsed time and ETA. Use `--max-targets 100` instead if the operator
-wants a smaller second step, or `--workers 1` to fall back to the
-already-proven sequential path if anything looks off. Paste back the final
-summary block. If any target shows `NO_DATA`/`NO_LIGHTKURVE`/`ERROR:...`,
-that is expected for some KOIs (not every KIC has usable long-cadence data)
-and is not itself a blocker unless most targets fail. Continue with bounded
-invocations until the Kepler manifest is processed; omit `--max-targets` only
-after several larger bounded runs behave well.
+This is now fixed but still not yet verified live at `workers > 1` — watch
+this first post-fix concurrent run for MAST throttling or errors before
+recommending a larger `--workers` value or omitting `--max-targets`. It
+processes the next 250 not-yet-done targets from the manifest (resumable
+regardless of worker count — rerunning the same command continues where it
+left off) and prints per-target progress with elapsed time and ETA. Use
+`--max-targets 100` instead if the operator wants a smaller second step, or
+`--workers 1` to fall back to the already-proven sequential path if anything
+looks off. Paste back the final summary block. If any target shows
+`NO_DATA`/`NO_LIGHTKURVE`/`ERROR:...`, that is expected for some KOIs (not
+every KIC has usable long-cadence data) and is not itself a blocker unless
+most targets fail. Continue with bounded invocations until the Kepler
+manifest is processed; omit `--max-targets` only after several larger bounded
+runs behave well.
 
 The run006/run008 notes below are historical provenance only. Preserve them so
 future agents do not re-debug the same scanner failures, but do not treat them

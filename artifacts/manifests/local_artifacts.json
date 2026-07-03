@@ -1091,35 +1091,59 @@
     {
       "path": "data/processed/t1_1_kepler_snippets/kepler_snippets.jsonl",
       "kind": "processed_snippet_corpus",
-      "status": "live_smoke_pass",
+      "status": "live_validated_at_scale",
       "git_policy": "ignored",
       "last_known": {
         "tool": "Skills/process_t1_kepler_batch.py",
-        "tool_status": "built_and_unit_tested_2026-07-02_v0.2.14",
-        "n_tests": 27,
-        "live_run_at": "2026-07-02",
-        "command": "caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 25",
-        "targets_processed": 25,
-        "snippets_written": 26,
-        "rows_failed": 0,
-        "elapsed_seconds": 1216,
-        "wc_l": 26
+        "tool_status": "crash_fixed_2026-07-03_v0.2.17",
+        "n_tests": 42,
+        "runs": [
+          {
+            "live_run_at": "2026-07-02",
+            "command": "caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 25",
+            "targets_processed": 25,
+            "snippets_written": 26,
+            "rows_failed": 0,
+            "elapsed_seconds": 1216
+          },
+          {
+            "live_run_at": "2026-07-02",
+            "command": "caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250",
+            "targets_processed": 250,
+            "snippets_written": 268,
+            "rows_failed": 0,
+            "elapsed_seconds": 7647,
+            "cumulative_done_targets": 277,
+            "cumulative_remaining_targets": 6238
+          },
+          {
+            "live_run_at": "2026-07-02",
+            "command": "caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 --workers 4",
+            "outcome": "crashed",
+            "error": "ValueError: I/O operation on closed file",
+            "root_cause": "make_default_lc_fetcher() called Lightkurve's public search.download_all(), which mutates process-global sys.stdout via a suppress_stdout decorator; unsafe under concurrent worker threads. Same failure class as run003 (see AGENTS.md T1-0 notes).",
+            "fix_version": "0.2.17",
+            "fix_summary": "make_default_lc_fetcher() now calls fetch.py's already-proven-safe _download_collection_with_cache_repair() path instead of download_all(); new regression test test_never_calls_download_all asserts this stays fixed.",
+            "data_integrity": "no partial or duplicate output written; crash-interrupted targets left active (not done) in SQLite and retry automatically"
+          }
+        ]
       },
       "validation_gate": "Inspect a bounded run's snippets and SQLite summary before scaling up.",
-      "next_action": "[HUMAN] After this ledger update is merged, run a larger bounded continuation: caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 (or 100 for a smaller step)."
+      "next_action": "[HUMAN] Resume with: caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 --workers 4 (on version 0.2.17 or newer); watch this first post-fix concurrent run for MAST throttling before scaling further."
     },
     {
       "path": "logs/t1_1_kepler_processing.sqlite3",
       "kind": "runtime_progress_store",
-      "status": "live_smoke_pass",
+      "status": "live_validated_safe_resume_confirmed",
       "git_policy": "ignored",
       "last_known": {
         "schema": "single targets table keyed by target_id, status active|done",
-        "sqlite_summary": "done|25|26|0",
-        "done_targets": 25,
+        "sqlite_summary": "done|277|268|0 (cumulative through the 250-target sequential run)",
+        "done_targets": 277,
         "active_targets": 0,
-        "snippets_written": 26,
-        "rows_failed": 0
+        "snippets_written_this_run": 268,
+        "rows_failed": 0,
+        "note": "the subsequent --workers 4 crash (v0.2.16, fixed in v0.2.17) left a few targets active, not done; resume retries them automatically without duplicating output"
       },
       "validation_gate": "No incomplete active targets before raw FITS cleanup is approved.",
       "next_action": "Continue using this SQLite file for resume; do not delete before full Kepler processing completes."

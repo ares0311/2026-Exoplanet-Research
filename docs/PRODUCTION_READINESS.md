@@ -1,9 +1,9 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-07-02 (project reset: run006/run008 candidate review is historical; active production path wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` to close T1-1 with verified data sources, leakage-safe training manifests, and a production-gated trained model; source-contract examples now use case-insensitive TAP schema table-name matching after the live CUMULATIVE table-name bug; the bounded Kepler-first processing batch tool is built and unit-tested, awaiting one bounded live run; a supplementary pipeline-correctness fix wired real TIC catalog stellar/contamination parameters into `run_pipeline()` — see T1-0 notes below)
+Last reviewed: 2026-07-03 (project reset: run006/run008 candidate review is historical; active production path wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` to close T1-1 with verified data sources, leakage-safe training manifests, and a production-gated trained model; source-contract examples now use case-insensitive TAP schema table-name matching after the live CUMULATIVE table-name bug; the bounded Kepler-first processing batch tool is built, live-smoked sequentially at 25 and 250 targets, and fixed after a live `--workers 4` crash caused by an unsafe Lightkurve `download_all()` call (version 0.2.17); a supplementary pipeline-correctness fix wired real TIC catalog stellar/contamination parameters into `run_pipeline()` — see T1-0 notes below)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 2,450 default tests passing, 2 integration_live deselected
+Test baseline: 2,457 default tests passing, 2 integration_live deselected
 
 ---
 
@@ -24,7 +24,7 @@ The active production blocker is now T1-1, and the authorized path is the
 source-contract-first dataset/model plan in
 `docs/exoplanet_exomoon_dataset_handoff.md`.
 
-Version note: 0.2.16 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.17 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -39,14 +39,20 @@ Kepler training manifest and raw-FITS cleanup policy, 0.2.14 adds the
 bounded, resumable Kepler-first processing batch tool
 (`Skills/process_t1_kepler_batch.py`) that consumes that manifest, 0.2.15
 adds an ETA to that tool's per-target progress output for multi-hour bounded
-runs, and 0.2.16 adds bounded `--workers` concurrency to the same tool
+runs, 0.2.16 adds bounded `--workers` concurrency to the same tool
 (default 1, sequential; `docs/SYSTEM_PROFILE.md` recommends 4-6 for this
 external-service workload once verified) plus a correctness fix required to
 support it safely: raw FITS downloads now use a per-target subdirectory
 instead of a single shared scratch directory, so concurrent fetches can no
-longer delete each other's in-flight files. The catalog lookup fails open
-(all-`None`) on any network/parse error or non-TIC target, so it never blocks
-a scan.
+longer delete each other's in-flight files, and 0.2.17 fixes a live
+`--workers 4` crash (`ValueError: I/O operation on closed file`) caused by
+that tool calling Lightkurve's public `search.download_all()`, which mutates
+process-global `sys.stdout` and is unsafe under concurrent worker threads —
+the same failure class already fixed once before for `star_scanner.py` (see
+run003 under T1-0). The fix reuses `fetch.py`'s already-proven-safe
+`_download_collection_with_cache_repair()` download path instead. The catalog
+lookup fails open (all-`None`) on any network/parse error or non-TIC target,
+so it never blocks a scan.
 
 ---
 
@@ -85,7 +91,8 @@ a scan.
 - **ETA added to per-target progress (2026-07-02)**: at the observed live rate (~49s/target), a 250-target run takes roughly 3.4 hours, so the per-target progress line now prints `elapsed=Xs ETA=YmZZs` instead of elapsed time alone — a multi-hour batch must never look hung. 8 new tests (35 total for this Skill).
 - **Second live run PASS (2026-07-02)**: `--max-targets 250` completed on the user's Mac in 7,647s (2h7m), 250 targets processed, 268 snippets written, 0 failed rows, SQLite summary consistent throughout, `data/raw/t1_1_kepler_lc` empty after completion. 277/6,515 targets now done, 6,238 remaining. Confirms the tool is reliable at scale, not just on the initial 25-target smoke.
 - **Bounded worker concurrency added (2026-07-02, version 0.2.16)**: `Skills/process_t1_kepler_batch.py` now accepts `--workers` (default 1, sequential) using the same `ThreadPoolExecutor` pattern already proven in `Skills/fetch_kepler_lc_snippets.py`. `docs/SYSTEM_PROFILE.md` recommends 4-6 workers for this kind of external-service/live-catalog workload. Fixed a real concurrency-correctness issue in the process of adding this: the raw-FITS fetcher previously wiped one shared scratch directory after every target, which would have let one worker's cleanup delete a different worker's in-flight download; each target now gets its own `raw_dir/target_<id>` subdirectory, deleted independently. 6 new tests, including one that runs three fetches on real threads and asserts their download directories never collide.
-- **Remaining next `[HUMAN]` action**: continue the resumable Kepler processing batch at larger bounded size, now with `--workers 4` for a meaningfully faster run (per `docs/SYSTEM_PROFILE.md` guidance for this workload; still not yet verified live at `workers > 1`, so watch the first concurrent run for any MAST throttling before scaling further). Recommended: `--max-targets 250 --workers 4` with `caffeinate -i`. Repeated runs safely continue from the SQLite `done` set regardless of worker count.
+- **Live `--workers 4` crash, fixed same-day (2026-07-02/03, version 0.2.17)**: the user's first concurrent live run crashed with `ValueError: I/O operation on closed file`. Root cause: `make_default_lc_fetcher()` called Lightkurve's public `search.download_all()`, which is decorated with `suppress_stdout` and mutates process-global `sys.stdout` — unsafe while other worker threads print progress. This is the exact same failure class already diagnosed and fixed once before in this project (see run003 under T1-0 for `star_scanner.py`), which should have been checked against before reusing the older `download_all()` pattern. Fix: extended `fetch.py`'s already-proven-safe `_download_collection_with_cache_repair()` / `_download_one_with_cache_repair()` helpers with an optional `download_dir` parameter (backward compatible; the existing `fetch_lightcurve()` call site is unaffected), and rewired `make_default_lc_fetcher()` to call that path instead of `download_all()`. That helper never touches `sys.stdout`; it monkey-patches `Observations.download_products(verbose=False)` under a module-level lock. Rewrote the affected tests to mock at that function boundary and added an explicit regression test, `test_never_calls_download_all`, asserting the unsafe method is never invoked. The interrupted run's SQLite progress is safe: mid-flight targets were left `active` (not `done`) and are retried automatically on resume — no partial or duplicate output was written.
+- **Remaining next `[HUMAN]` action**: continue the resumable Kepler processing batch at larger bounded size, now with `--workers 4` for a meaningfully faster run (per `docs/SYSTEM_PROFILE.md` guidance for this workload; the crash above is fixed in 0.2.17 but the concurrent path is not yet re-verified live, so watch this first post-fix run for any MAST throttling or errors before scaling further). Recommended: `--max-targets 250 --workers 4` with `caffeinate -i`, on version 0.2.17 or newer. Repeated runs safely continue from the SQLite `done` set regardless of worker count.
 - **Code status**: Training and state-dict inference paths are operational; the package scorer reconstructs the trained architecture and fails closed when loading fails
 - **Prior local corpus status**: **VALID as of 2026-06-12** — 2,037 snippets (1,012 positive CP+KP, 1,025 negative FP+FA, ratio 0.99); zero-epoch corpus retired and rebuilt from scratch with valid BJD epochs; label bug fixed (KP→1); MAST throttling fix applied (`bbb0877`)
 - **Local corpus status**: **KEPLER LOCAL VALIDATED** — TESS v2 complete at 2,619 snippets; Kepler finite rebuild has 6,837 parseable snippets with zero non-finite flux rows, zero duplicate resume keys, labels negative=4,280 and positive=2,557; `data/kepler_cnn_splits` validator PASS with train/val/test = 4,741 / 1,060 / 1,036
@@ -193,7 +200,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
 | 82 production-critical Skills/ | ✅ |
-| 2,450 default tests, ruff clean, mypy clean | ✅ |
+| 2,457 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
