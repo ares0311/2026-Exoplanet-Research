@@ -5,6 +5,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
 
 from process_t1_kepler_batch import (  # noqa: E402
@@ -17,6 +19,7 @@ from process_t1_kepler_batch import (  # noqa: E402
     format_batch_summary,
     group_rows_by_target,
     load_manifest_rows,
+    make_default_lc_fetcher,
     process_target,
     run_batch,
 )
@@ -395,6 +398,202 @@ class TestRunBatch:
             lc_fetcher=lambda tid: (calls.append(tid), None)[1],
         )
         assert calls == []
+
+
+# ---------------------------------------------------------------------------
+# run_batch with workers > 1
+# ---------------------------------------------------------------------------
+
+
+class TestRunBatchConcurrency:
+    def _manifest_with_targets(self, tmp_path: Path, n_targets: int) -> Path:
+        rows = [
+            _manifest_row(target_id=2000 + i, source_row_id=f"c{i}") for i in range(n_targets)
+        ]
+        path = tmp_path / "manifest.jsonl"
+        _write_manifest(path, rows)
+        return path
+
+    def test_all_targets_processed_with_multiple_workers(self, tmp_path: Path) -> None:
+        manifest_path = self._manifest_with_targets(tmp_path, 12)
+        summary = run_batch(
+            manifest_path=manifest_path,
+            output_path=tmp_path / "out" / "snippets.jsonl",
+            db_path=tmp_path / "progress.sqlite3",
+            raw_dir=tmp_path / "raw",
+            max_targets=None,
+            n_bins=51,
+            workers=4,
+            request_delay=0.0,
+            lc_fetcher=_flat_lc_fetcher(),
+        )
+        assert summary.n_targets_processed_this_run == 12
+        assert summary.n_snippets_written == 12
+        lines = (tmp_path / "out" / "snippets.jsonl").read_text().splitlines()
+        assert len(lines) == 12
+        # No duplicate target_ids in the output.
+        target_ids = [json.loads(line)["target_id"] for line in lines]
+        assert len(target_ids) == len(set(target_ids))
+
+    def test_resume_works_with_multiple_workers(self, tmp_path: Path) -> None:
+        manifest_path = self._manifest_with_targets(tmp_path, 10)
+        output_path = tmp_path / "out" / "snippets.jsonl"
+        db_path = tmp_path / "progress.sqlite3"
+
+        run_batch(
+            manifest_path=manifest_path, output_path=output_path, db_path=db_path,
+            raw_dir=tmp_path / "raw", max_targets=4, n_bins=51,
+            workers=3, request_delay=0.0, lc_fetcher=_flat_lc_fetcher(),
+        )
+        summary2 = run_batch(
+            manifest_path=manifest_path, output_path=output_path, db_path=db_path,
+            raw_dir=tmp_path / "raw", max_targets=None, n_bins=51,
+            workers=3, request_delay=0.0, lc_fetcher=_flat_lc_fetcher(),
+        )
+        assert summary2.n_targets_skipped_done == 4
+        assert summary2.n_targets_processed_this_run == 6
+        lines = output_path.read_text().splitlines()
+        assert len(lines) == 10
+
+    def test_progress_fn_reports_every_completion(self, tmp_path: Path) -> None:
+        manifest_path = self._manifest_with_targets(tmp_path, 8)
+        messages: list[str] = []
+        run_batch(
+            manifest_path=manifest_path,
+            output_path=tmp_path / "out" / "snippets.jsonl",
+            db_path=tmp_path / "progress.sqlite3",
+            raw_dir=tmp_path / "raw",
+            max_targets=None,
+            n_bins=51,
+            workers=3,
+            request_delay=0.0,
+            lc_fetcher=_flat_lc_fetcher(),
+            progress_fn=messages.append,
+        )
+        completion_messages = [m for m in messages if m.startswith("  ->")]
+        assert len(completion_messages) == 8
+
+    def test_workers_value_is_clamped_to_at_least_one(self, tmp_path: Path) -> None:
+        manifest_path = self._manifest_with_targets(tmp_path, 2)
+        # workers=0 must not raise or hang; behaves like workers=1.
+        summary = run_batch(
+            manifest_path=manifest_path,
+            output_path=tmp_path / "out" / "snippets.jsonl",
+            db_path=tmp_path / "progress.sqlite3",
+            raw_dir=tmp_path / "raw",
+            max_targets=None,
+            n_bins=51,
+            workers=0,
+            lc_fetcher=_flat_lc_fetcher(),
+        )
+        assert summary.n_targets_processed_this_run == 2
+
+
+# ---------------------------------------------------------------------------
+# make_default_lc_fetcher: per-target directory isolation
+# ---------------------------------------------------------------------------
+
+
+class TestMakeDefaultLcFetcherIsolation:
+    def test_uses_per_target_subdirectory_and_cleans_it_up(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        captured_download_dirs: list[str] = []
+
+        class _FakeLc:
+            time = type("T", (), {"value": [0.0, 1.0, 2.0]})()
+            flux = type("F", (), {"value": [1.0, 1.0, 1.0]})()
+
+            def normalize(self):
+                return self
+
+        class _FakeCollection:
+            def __len__(self):
+                return 1
+
+            def stitch(self):
+                return _FakeLc()
+
+        class _FakeSearchResult:
+            def __len__(self):
+                return 1
+
+            def download_all(self, download_dir):
+                captured_download_dirs.append(download_dir)
+                return _FakeCollection()
+
+        fake_lk = type(
+            "FakeLightkurve",
+            (),
+            {"search_lightcurve": staticmethod(lambda *a, **k: _FakeSearchResult())},
+        )
+        monkeypatch.setitem(sys.modules, "lightkurve", fake_lk)
+
+        raw_dir = tmp_path / "raw"
+        fetcher = make_default_lc_fetcher(raw_dir)
+        result = fetcher(555)
+
+        assert result is not None
+        assert captured_download_dirs == [str(raw_dir / "target_555")]
+        # Cleaned up after the fetch completes.
+        assert not (raw_dir / "target_555").exists()
+
+    def test_concurrent_targets_do_not_collide(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import threading
+        import time as time_module
+
+        seen_dirs_while_active: set[str] = set()
+        lock = threading.Lock()
+
+        class _FakeLc:
+            time = type("T", (), {"value": [0.0, 1.0, 2.0]})()
+            flux = type("F", (), {"value": [1.0, 1.0, 1.0]})()
+
+            def normalize(self):
+                return self
+
+        class _FakeCollection:
+            def __len__(self):
+                return 1
+
+            def stitch(self):
+                return _FakeLc()
+
+        class _FakeSearchResult:
+            def __len__(self):
+                return 1
+
+            def download_all(self, download_dir):
+                with lock:
+                    seen_dirs_while_active.add(download_dir)
+                # Hold the "download" open briefly so other threads overlap.
+                time_module.sleep(0.05)
+                assert Path(download_dir).exists(), "directory vanished mid-download"
+                return _FakeCollection()
+
+        fake_lk = type(
+            "FakeLightkurve",
+            (),
+            {"search_lightcurve": staticmethod(lambda *a, **k: _FakeSearchResult())},
+        )
+        monkeypatch.setitem(sys.modules, "lightkurve", fake_lk)
+
+        raw_dir = tmp_path / "raw"
+        fetcher = make_default_lc_fetcher(raw_dir)
+
+        threads = [threading.Thread(target=fetcher, args=(tid,)) for tid in (1, 2, 3)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert seen_dirs_while_active == {
+            str(raw_dir / "target_1"),
+            str(raw_dir / "target_2"),
+            str(raw_dir / "target_3"),
+        }
 
 
 # ---------------------------------------------------------------------------

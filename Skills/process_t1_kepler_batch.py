@@ -12,11 +12,18 @@ reimplementing it. Processed snippets are written to
 Progress and resume state are tracked in a SQLite database
 (``logs/t1_1_kepler_processing.sqlite3`` by default) so an interrupted run
 restarts without reprocessing completed targets. Raw downloaded FITS files
-are scoped to a dedicated directory and deleted after every target finishes
-(success or failure), so local raw storage never exceeds roughly one target's
-data at a time. This satisfies the dataset handoff doc's storage cap and its
-"delete raw FITS after verified processing" rule by construction, rather than
-by monitoring a large threshold.
+are scoped to a per-target subdirectory and deleted after that target
+finishes (success or failure), so local raw storage never exceeds roughly
+one target's data per in-flight worker. This satisfies the dataset handoff
+doc's storage cap and its "delete raw FITS after verified processing" rule
+by construction, rather than by monitoring a large threshold.
+
+Supports bounded worker concurrency (``--workers``) using the same
+``ThreadPoolExecutor`` pattern already proven in
+``Skills/fetch_kepler_lc_snippets.py``; defaults to 1 (sequential) to match
+that script's convention, since ``docs/SYSTEM_PROFILE.md`` recommends
+starting low and increasing only after measuring for external-service
+workloads.
 
 Public API
 ----------
@@ -27,7 +34,7 @@ T1KeplerProcessingStore(db_path)
     .mark_active/.mark_done/.done_target_ids/.summary
 process_target(target_id, rows, *, lc_fetcher, n_bins) -> TargetResult
 run_batch(*, manifest_path, output_path, db_path, raw_dir, max_targets,
-          lc_fetcher, ...) -> BatchSummary
+          workers, request_delay, lc_fetcher, ...) -> BatchSummary
 format_batch_summary(summary) -> str
 """
 from __future__ import annotations
@@ -38,6 +45,7 @@ import sqlite3
 import sys
 import time
 from collections.abc import Callable, Iterable
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -313,24 +321,29 @@ def _directory_size_bytes(path: Path) -> int:
 def make_default_lc_fetcher(raw_dir: Path) -> LcFetcher:
     """Build the default Kepler light-curve fetcher, scoped to *raw_dir*.
 
-    Downloads via Lightkurve into *raw_dir*, extracts (time_bjd, flux), then
-    deletes everything under *raw_dir* before returning -- regardless of
-    success or failure -- so raw storage never accumulates across targets.
+    Downloads via Lightkurve into a dedicated ``raw_dir/target_<id>``
+    subdirectory, extracts (time_bjd, flux), then deletes that subdirectory
+    before returning -- regardless of success or failure -- so raw storage
+    never accumulates across targets. Each target gets its own subdirectory
+    (rather than sharing *raw_dir* directly) so concurrent fetches under
+    multiple workers never delete a different target's in-flight download.
     """
 
     def _fetch(target_id: int) -> tuple[list[float], list[float]] | None:
         import contextlib
+        import shutil
 
         import lightkurve as lk  # noqa: PLC0415
 
-        raw_dir.mkdir(parents=True, exist_ok=True)
+        target_dir = raw_dir / f"target_{target_id}"
+        target_dir.mkdir(parents=True, exist_ok=True)
         try:
             search = lk.search_lightcurve(
                 f"KIC {target_id}", mission="Kepler", exptime=1800, author="Kepler"
             )
             if len(search) == 0:
                 return None
-            collection = search.download_all(download_dir=str(raw_dir))
+            collection = search.download_all(download_dir=str(target_dir))
             if collection is None or len(collection) == 0:
                 return None
             lc = collection.stitch()
@@ -340,7 +353,7 @@ def make_default_lc_fetcher(raw_dir: Path) -> LcFetcher:
             flux = [float(f) for f in lc.flux.value]
             return time_bjd, flux
         finally:
-            _clear_directory(raw_dir)
+            shutil.rmtree(target_dir, ignore_errors=True)
 
     return _fetch
 
@@ -393,6 +406,8 @@ def run_batch(
     raw_dir: Path = DEFAULT_RAW_DIR,
     max_targets: int | None = 25,
     n_bins: int = 201,
+    workers: int = 1,
+    request_delay: float = 0.25,
     lc_fetcher: LcFetcher | None = None,
     progress_fn: Callable[[str], None] | None = None,
 ) -> BatchSummary:
@@ -408,6 +423,14 @@ def run_batch(
             call. ``None`` means all remaining targets -- use with care given the
             dataset handoff doc's storage/runtime bounding rules.
         n_bins: Phase-fold bin count per snippet.
+        workers: Bounded concurrent light-curve fetches. Per
+            ``docs/SYSTEM_PROFILE.md``, external-service/live-catalog workloads
+            should use lower concurrency (4-6) even on a well-resourced Mac;
+            defaults to 1 (sequential) to match this project's existing
+            ``fetch_kepler_lc_snippets.py`` convention -- pass a higher value
+            explicitly to speed up a bounded run.
+        request_delay: Delay between worker submissions when ``workers > 1``,
+            to stay polite to MAST/Lightkurve.
         lc_fetcher: Injectable light-curve fetcher (for tests); defaults to a
             real Lightkurve fetch scoped to *raw_dir*.
         progress_fn: Optional callable invoked with a one-line status message
@@ -417,9 +440,11 @@ def run_batch(
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     _progress = progress_fn if progress_fn is not None else (lambda _msg: None)
+    workers = max(1, int(workers))
 
     store = T1KeplerProcessingStore(db_path)
     _fetch = lc_fetcher if lc_fetcher is not None else make_default_lc_fetcher(Path(raw_dir))
+    _clear_directory(Path(raw_dir))  # defensive: drop any stale per-target dirs from a prior crash
 
     rows = load_manifest_rows(manifest_path)
     groups = group_rows_by_target(rows)
@@ -432,35 +457,77 @@ def run_batch(
 
     _progress(
         f"T1-1 Kepler batch: {n_targets_total} total targets, "
-        f"{len(done_ids)} already done, {len(pending_target_ids)} to process this run"
+        f"{len(done_ids)} already done, {len(pending_target_ids)} to process this run "
+        f"(workers={workers})"
     )
 
     start = time.monotonic()
     n_written = 0
     n_failed = 0
+    n_completed = 0
+
+    def _record_completion(target_id: int, result: TargetResult, fh: Any) -> None:
+        nonlocal n_written, n_failed, n_completed
+        wrote = _write_records(fh, result.records)
+        store.mark_done(target_id, n_written=wrote, n_failed=result.n_failed, flag=result.flag)
+        n_written += wrote
+        n_failed += result.n_failed
+        n_completed += 1
+        elapsed_after = time.monotonic() - start
+        rate = n_completed / elapsed_after if elapsed_after > 0 else 0.0
+        remaining = (len(pending_target_ids) - n_completed) / rate if rate > 0 else float("inf")
+        _progress(
+            f"  -> KIC {target_id} flag={result.flag} "
+            f"written={wrote} failed={result.n_failed}  "
+            f"total_written={n_written} total_failed={n_failed}  "
+            f"elapsed={elapsed_after:.0f}s  ETA={_format_eta(remaining)}"
+        )
+
     with output_path.open("a", encoding="utf-8") as fh:
-        for index, target_id in enumerate(pending_target_ids, 1):
-            target_rows = groups[target_id]
-            store.mark_active(target_id, len(target_rows))
-            elapsed = time.monotonic() - start
-            _progress(
-                f"[{index}/{len(pending_target_ids)}] KIC {target_id} "
-                f"({len(target_rows)} manifest rows)  elapsed={elapsed:.0f}s"
-            )
-            result = process_target(target_id, target_rows, lc_fetcher=_fetch, n_bins=n_bins)
-            wrote = _write_records(fh, result.records)
-            store.mark_done(target_id, n_written=wrote, n_failed=result.n_failed, flag=result.flag)
-            n_written += wrote
-            n_failed += result.n_failed
-            elapsed_after = time.monotonic() - start
-            rate = index / elapsed_after if elapsed_after > 0 else 0.0
-            remaining = (len(pending_target_ids) - index) / rate if rate > 0 else float("inf")
-            _progress(
-                f"  -> KIC {target_id} flag={result.flag} "
-                f"written={wrote} failed={result.n_failed}  "
-                f"total_written={n_written} total_failed={n_failed}  "
-                f"elapsed={elapsed_after:.0f}s  ETA={_format_eta(remaining)}"
-            )
+        if workers == 1:
+            for index, target_id in enumerate(pending_target_ids, 1):
+                target_rows = groups[target_id]
+                store.mark_active(target_id, len(target_rows))
+                elapsed = time.monotonic() - start
+                _progress(
+                    f"[{index}/{len(pending_target_ids)}] KIC {target_id} "
+                    f"({len(target_rows)} manifest rows)  elapsed={elapsed:.0f}s"
+                )
+                result = process_target(target_id, target_rows, lc_fetcher=_fetch, n_bins=n_bins)
+                _record_completion(target_id, result, fh)
+        else:
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                in_flight: dict[Any, int] = {}
+                next_index = 0  # 0-based index into pending_target_ids
+
+                def _submit_next() -> None:
+                    nonlocal next_index
+                    target_id = pending_target_ids[next_index]
+                    target_rows = groups[target_id]
+                    store.mark_active(target_id, len(target_rows))
+                    elapsed = time.monotonic() - start
+                    _progress(
+                        f"[{next_index + 1}/{len(pending_target_ids)}] KIC {target_id} "
+                        f"({len(target_rows)} manifest rows)  elapsed={elapsed:.0f}s"
+                    )
+                    future = executor.submit(
+                        process_target, target_id, target_rows, lc_fetcher=_fetch, n_bins=n_bins
+                    )
+                    in_flight[future] = target_id
+                    next_index += 1
+                    if request_delay > 0:
+                        time.sleep(request_delay)
+
+                while next_index < len(pending_target_ids) and len(in_flight) < workers:
+                    _submit_next()
+
+                while in_flight:
+                    done, _pending = wait(in_flight, return_when=FIRST_COMPLETED)
+                    for future in done:
+                        target_id = in_flight.pop(future)
+                        _record_completion(target_id, future.result(), fh)
+                    while next_index < len(pending_target_ids) and len(in_flight) < workers:
+                        _submit_next()
 
     elapsed_total = time.monotonic() - start
     _progress(
@@ -526,6 +593,22 @@ def _cli(argv: list[str] | None = None) -> int:
         help="Maximum not-yet-done targets to process this run (default: 25; bounded first batch)",
     )
     parser.add_argument("--n-bins", type=int, default=201)
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help=(
+            "Concurrent light-curve fetches. Defaults to 1 (sequential); "
+            "docs/SYSTEM_PROFILE.md recommends 4-6 for this kind of "
+            "external-service workload once a bounded run has been verified."
+        ),
+    )
+    parser.add_argument(
+        "--request-delay",
+        type=float,
+        default=0.25,
+        help="Delay in seconds between worker submissions when --workers > 1 (default: 0.25)",
+    )
     args = parser.parse_args(argv)
 
     if not args.manifest.exists():
@@ -543,6 +626,8 @@ def _cli(argv: list[str] | None = None) -> int:
         raw_dir=args.raw_dir,
         max_targets=args.max_targets,
         n_bins=args.n_bins,
+        workers=args.workers,
+        request_delay=args.request_delay,
         progress_fn=lambda msg: print(msg, flush=True),
     )
     print(format_batch_summary(summary))
