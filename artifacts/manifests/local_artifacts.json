@@ -1091,11 +1091,11 @@
     {
       "path": "data/processed/t1_1_kepler_snippets/kepler_snippets.jsonl",
       "kind": "processed_snippet_corpus",
-      "status": "live_validated_at_scale",
+      "status": "live_validated_at_scale_with_concurrent_workers",
       "git_policy": "ignored",
       "last_known": {
         "tool": "Skills/process_t1_kepler_batch.py",
-        "tool_status": "crash_fixed_2026-07-03_v0.2.17",
+        "tool_status": "crash_fixed_and_workers4_live_validated_2026-07-03_v0.2.17",
         "n_tests": 42,
         "runs": [
           {
@@ -1112,9 +1112,7 @@
             "targets_processed": 250,
             "snippets_written": 268,
             "rows_failed": 0,
-            "elapsed_seconds": 7647,
-            "cumulative_done_targets": 277,
-            "cumulative_remaining_targets": 6238
+            "elapsed_seconds": 7647
           },
           {
             "live_run_at": "2026-07-02",
@@ -1125,25 +1123,38 @@
             "fix_version": "0.2.17",
             "fix_summary": "make_default_lc_fetcher() now calls fetch.py's already-proven-safe _download_collection_with_cache_repair() path instead of download_all(); new regression test test_never_calls_download_all asserts this stays fixed.",
             "data_integrity": "no partial or duplicate output written; crash-interrupted targets left active (not done) in SQLite and retry automatically"
+          },
+          {
+            "live_run_at": "2026-07-03",
+            "command": "caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 --workers 4",
+            "outcome": "pass",
+            "targets_processed": 250,
+            "snippets_written": 288,
+            "rows_failed": 0,
+            "elapsed_seconds": 6962,
+            "cumulative_done_targets": 530,
+            "cumulative_remaining_targets": 5985,
+            "console_verified": "startup banner printed (workers=4); every completion line printed elapsed=...s ETA=...",
+            "note": "4 workers beat the prior sequential 250-target run (7647s) by only ~9%; workload is MAST-network-bound, not CPU-bound, matching docs/SYSTEM_PROFILE.md guidance"
           }
         ]
       },
       "validation_gate": "Inspect a bounded run's snippets and SQLite summary before scaling up.",
-      "next_action": "[HUMAN] Resume with: caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 --workers 4 (on version 0.2.17 or newer); watch this first post-fix concurrent run for MAST throttling before scaling further."
+      "next_action": "[HUMAN] Continue with: caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 --workers 4 (or a larger --max-targets); --workers 4 is now live-validated, not just fixed."
     },
     {
       "path": "logs/t1_1_kepler_processing.sqlite3",
       "kind": "runtime_progress_store",
-      "status": "live_validated_safe_resume_confirmed",
+      "status": "live_validated_safe_resume_confirmed_with_concurrent_workers",
       "git_policy": "ignored",
       "last_known": {
         "schema": "single targets table keyed by target_id, status active|done",
-        "sqlite_summary": "done|277|268|0 (cumulative through the 250-target sequential run)",
-        "done_targets": 277,
+        "sqlite_summary": "done|530|288|0 (cumulative through the first clean --workers 4 run)",
+        "done_targets": 530,
         "active_targets": 0,
-        "snippets_written_this_run": 268,
+        "snippets_written_this_run": 288,
         "rows_failed": 0,
-        "note": "the subsequent --workers 4 crash (v0.2.16, fixed in v0.2.17) left a few targets active, not done; resume retries them automatically without duplicating output"
+        "note": "the earlier --workers 4 crash (v0.2.16, fixed in v0.2.17) left a few targets active, not done; they were retried automatically on the next run without duplicating output"
       },
       "validation_gate": "No incomplete active targets before raw FITS cleanup is approved.",
       "next_action": "Continue using this SQLite file for resume; do not delete before full Kepler processing completes."
