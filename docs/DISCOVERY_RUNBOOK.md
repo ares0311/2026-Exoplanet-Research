@@ -311,6 +311,15 @@ willing to dedicate, trust in the external service's rate limits, whether
 another task is already running). See `CLAUDE.md`'s "Parallelism-First
 Recipe Policy — MANDATORY" for the full rule.
 
+**Measure before recommending more**: after any parallel/sharded run, compare
+its real per-item rate against the last baseline before proposing the next
+step up in shards/workers — a regressed rate or new errors is a stop signal,
+not something to push past. Sub-linear scaling is itself a bug to investigate
+(check for an artificial in-process bottleneck first), not just a result to
+shrug off because nothing crashed — this project found exactly that twice
+(`_DOWNLOAD_PRODUCTS_LOCK` in `exo_toolkit/fetch.py`, fixed in version
+0.2.19). See CLAUDE.md's "Measure-then-scale cadence" for the full rule.
+
 ---
 
 ## What Has Been Built (Capability Inventory)

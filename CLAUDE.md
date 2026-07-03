@@ -196,6 +196,12 @@ This applies to every recipe, not just Kepler/TESS batch processing: training ru
 
 Do not use this policy to justify over-engineering a task that will run once and take 4 minutes — the 3-minute bar is a prompt to *consider* parallelism, not a mandate to always add it.
 
+**Measure-then-scale cadence — do not recommend more parallelism from assumption alone:**
+- After any parallel/sharded run completes, compute its real per-item rate (from the run report or console output) and compare it against the last known baseline (sequential, prior worker count, or prior shard count) before proposing the next step up.
+- A rate close to or better than the prior baseline, with no new errors/timeouts, is what justifies scaling further (more shards, more workers). A regressed rate, new `ERROR:`/timeout flags, or any sign of throttling is a stop signal — back off, don't push harder.
+- Sub-linear scaling (e.g., 2 shards giving nowhere near ~2x throughput) is itself a bug worth investigating, not just a result to accept because nothing crashed. Check the code for an artificial bottleneck (a lock, a shared mutable global, a serialized third-party call) before concluding the external service itself is the ceiling — this project has twice found a real in-process serialization bug this way (`_DOWNLOAD_PRODUCTS_LOCK` in `exo_toolkit/fetch.py`, fixed in version 0.2.19) rather than the bottleneck being MAST/Astroquery itself.
+- Never recommend "try more tabs" as a bare escalation without this comparison — ground the next recommended shard/worker count in the last real measurement, not in optimism.
+
 ### Python Environment Policy — NEVER TOUCH SYSTEM PYTHON
 - Validated runtime: **Python 3.14.3** inside `.venv` — never use system Python
 - All work happens inside the `.venv` virtual environment
