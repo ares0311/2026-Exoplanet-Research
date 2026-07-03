@@ -131,6 +131,7 @@ When the user must take an action to unblock a gap:
 - **Project version bumped to 0.2.18 (2026-07-03)** — two additions to `process_t1_kepler_batch.py`, both user-requested to remove the need for many console tabs to compete for the same target list:
   - **Process-level sharding**: new `--shard-index`/`--shard-count` flags let multiple console tabs run concurrently against disjoint target sets (partitioned by `target_id % shard_count`), for throughput beyond one process's `--workers` ceiling. All concurrently running tabs share one `--db-path` (now WAL-mode SQLite with a 30s busy timeout, since it's now a genuinely concurrent multi-process writer) but each shard gets its own auto-suffixed output file and its own raw-download scratch subdirectory, so shards can never collide on a file the way the 0.2.16→0.2.17 crash did. New `--status-only` flag prints the combined done/active/written/failed summary across all shards without starting a batch. 17 new tests, including a real-thread test proving two concurrent shards never touch each other's raw-download directory.
   - **Run Report Policy** (new `Skills/run_report.py`, 18 tests): every run now writes a small structured completion record and auto-commits + pushes *only that file* to git (`--no-git-report` to opt out), replacing the pattern of pasting console output for the agent to manually transcribe into tracking docs. See `docs/DISCOVERY_RUNBOOK.md` Rule 7 and `CLAUDE.md`'s "Run Report Policy — MANDATORY" section for the full policy and the retrofit list of other acquisition scripts still to be wired up (`batch_scan.py`, `star_scanner.py`, `fetch_kepler_lc_snippets.py`, and others — not yet done).
+- **Project version bumped to 0.2.19 (2026-07-03)** — fixes the intra-process download-serialization bug that explained why `--workers 4` only ever gave ~9-14% over sequential (see the 2-shard live-test writeup below for the full root cause and fix). `exo_toolkit/fetch.py`'s `_download_one_quietly()` no longer wraps the entire download call in a lock; `Observations.download_products` is now wrapped once, idempotently, and never restored, instead of being monkey-patched-and-restored under `_DOWNLOAD_PRODUCTS_LOCK` (removed) on every call. 4 new tests in `tests/test_fetch.py`, including a real 2-thread test proving concurrent calls now overlap instead of serializing.
 
 ### Where things stand
 
@@ -289,38 +290,81 @@ observed across two consecutive concurrent runs.
 process's `--workers` ceiling, `--shard-index`/`--shard-count` let multiple
 console tabs run concurrently against disjoint target sets. All tabs share
 one `--db-path`; each shard writes its own auto-suffixed output file and its
-own raw-download subdirectory, so tabs never collide. Not yet live-verified
-at `--shard-count > 1` — the single-process `--workers 4` recipe below
-remains the default recommendation until a multi-tab run is observed.
+own raw-download subdirectory, so tabs never collide.
 
-**Concrete next step — give the human this exact recipe:**
+**First live 2-shard test PASS (2026-07-03) — self-reported via the new Run
+Report Policy, not pasted console output:** the human ran `--shard-index 0
+--shard-count 2 --workers 4` and `--shard-index 1 --shard-count 2 --workers
+4` concurrently in two tabs. Both shards' run reports auto-committed and
+pushed themselves
+(`artifacts/manifests/run_reports/process_t1_kepler_batch.shard{0,1}of2.jsonl`):
+shard 0 processed 250 targets (273 snippets, 0 failed) in 8,541s; shard 1
+processed 250 targets (277 snippets, 0 failed) in 8,573s. Since both ran
+concurrently, effective combined wall-clock is ~8,573s (2h22m53s) for 500
+targets total = ~17.1s/target combined, versus the best single-tab
+`--workers 4` rate of 26.3s/target — a real ~35% combined throughput gain
+from sharding, though short of the 2x a fully independent doubling would
+give (~13.2s/target). Cumulative: 780 done before this test + 500 this test =
+**1,280/6,515 done, 5,235 remaining**.
+
+**Root cause of the sub-linear scaling, found and fixed same-day (version
+0.2.19):** `exo_toolkit/fetch.py`'s `_download_one_quietly()` wrapped the
+*entire* download call (`search._download_one(**kwargs)`) inside
+`_DOWNLOAD_PRODUCTS_LOCK`, not just the monkey-patch attribute swap needed to
+force Astroquery's `verbose=False`. That fully serialized every download
+within one process regardless of `--workers` count -- explaining both why
+`--workers 4` alone only ever gave ~9-14% over sequential, and why 2 shards
+(2 separate processes, 2 separate lock instances) only got partial rather
+than full 2x scaling: each shard's own internal 4 workers were still queuing
+on that shard's own lock. Verified from the source (line numbers, not
+guessed): the lock wraps `search._download_one(**kwargs)` directly. Fixed by
+replacing the lock-guarded monkeypatch-then-restore pattern with an
+idempotent, non-restoring wrap (`_ensure_download_products_quiet()`):
+`Observations.download_products` is wrapped once (tagged via a marker
+attribute so repeat calls are a no-op) to always force `verbose=False`, and
+is *never* restored to the noisy original, since there is no scenario in
+this codebase where that's wanted mid-process. A benign race (two threads
+both wrapping once, nesting two harmless verbose=False layers) remains
+possible but does not serialize anything. 4 new tests, including a real
+2-thread test proving concurrent calls now overlap instead of queuing
+(previously would have taken >=0.2s serialized; now completes well under
+that).
+
+**What to expect next**: with the artificial intra-process bottleneck gone,
+both `--workers` (within one shard) and `--shard-count` (across processes)
+should now deliver closer to their real theoretical scaling. This also means
+the *previous* 2-shard test was, without realizing it, accidentally being
+kept polite to MAST by that lock -- removing it could reveal MAST's real
+concurrency ceiling for the first time (2 shards x 4 workers = 8 concurrent
+connections, already past `docs/SYSTEM_PROFILE.md`'s 4-6 guidance for
+external-service work). The next 2-shard run on version 0.2.19+ should be
+watched closely for new errors, timeouts, or slower per-target rates that
+would indicate real throttling, not assumed clean just because it was clean
+before.
+
+**Concrete next step — give the human this exact recipe, now with the lock fix (version 0.2.19+):**
 
 ```bash
 git switch main
 git pull --ff-only origin main
-caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 --workers 4
+caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 --workers 4 --shard-index 0 --shard-count 2
+# in a second tab:
+caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 --workers 4 --shard-index 1 --shard-count 2
 ```
 
-It processes the next 250 not-yet-done targets from the manifest (resumable
-regardless of worker count — rerunning the same command continues where it
-left off) and prints per-target progress with elapsed time and ETA. Use
-`--max-targets 500` or larger if the operator wants to move faster now that
-`--workers 4` is validated across two consecutive runs, or `--workers 1` to
-fall back to the already-proven sequential path if anything looks off. If the
-operator wants to try multiple tabs, use e.g. `--shard-index 0 --shard-count
-4` in one tab, `--shard-index 1 --shard-count 4` in another, etc. — all
-sharing the same `--db-path`.
-
-Each run now auto-commits and pushes its own run report (version 0.2.18's Run
-Report Policy — see `docs/DISCOVERY_RUNBOOK.md` Rule 7), so the cumulative
-progress count is checkable via `.venv/bin/python Skills/run_report.py
-process_t1_kepler_batch` or `--status-only` without needing the full console
-transcript pasted back. Still paste the transcript if anything looks wrong
-(errors, throttling, unexpected flags). If any target shows
-`NO_DATA`/`NO_LIGHTKURVE`/`ERROR:...`, that is expected for some KOIs (not
-every KIC has usable long-cadence data) and is not itself a blocker unless
-most targets fail. Continue with bounded invocations until the Kepler
-manifest is processed.
+Both tabs share the default `--db-path`, so progress is tracked globally
+regardless of which shard did the work. Compare this run's per-target rate
+(from the auto-pushed run report, or `--status-only`) against the prior
+17.1s/target combined rate -- a rate close to or better than that with no
+new errors confirms the fix helped and MAST is tolerating the concurrency;
+a rate that regresses or new `ERROR:`/timeout flags mean back off to fewer
+shards or lower `--workers`. Use `--max-targets 500` or larger per shard
+once a size feels safe, or `--workers 1`/`--shard-count 1` to fall back to
+the already-proven sequential path if anything looks off. If any target
+shows `NO_DATA`/`NO_LIGHTKURVE`/`ERROR:...`, that is expected for some KOIs
+(not every KIC has usable long-cadence data) and is not itself a blocker
+unless most targets fail. Continue with bounded invocations until the
+Kepler manifest is processed.
 
 The run006/run008 notes below are historical provenance only. Preserve them so
 future agents do not re-debug the same scanner failures, but do not treat them
