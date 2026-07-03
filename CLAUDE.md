@@ -175,6 +175,27 @@ run_and_commit_report(report, path)  # appends JSON line, then commits+pushes ON
 - **Retrofit scope**: this applies to every existing acquisition/processing Skill, not just newly-sharded ones — `batch_scan.py`, `star_scanner.py`, `fetch_kepler_lc_snippets.py`, `fetch_tess_lc_snippets.py`, `fetch_tess_kepler_overlap_snippets.py`, `fetch_tess_k2_overlap_snippets.py`, `fetch_kepler_tce.py`, `fetch_tess_toi.py`, `fetch_exofop_ctoi.py`, `fetch_nea_koi_lc_index.py`, `fetch_additional_tess_labels.py`, `fetch_confirmed_hosts.py`, `fetch_jwst_targets.py`, `fetch_jwst_lc.py`, `tess_tce_fetcher.py`. See `docs/DISCOVERY_RUNBOOK.md` Rule 7 for full detail and retrofit tracking.
 - Tests must never invoke the real git commit/push path — inject a fake runner (see `commit_and_push_report`'s `run_fn` parameter and `tests/test_run_report.py`).
 
+### Parallelism-First Recipe Policy — MANDATORY
+
+**Before giving the user any recipe expected to take longer than 3 minutes, always consider sharding, multiprocessing/multithreading, or other parallelism — do not default to a purely sequential recipe without first checking whether a faster shape exists.**
+This applies to every recipe, not just Kepler/TESS batch processing: training runs, injection-recovery sweeps, catalog downloads, evaluation/validation passes, anything with a `--max-*`/`-n`/count-style bound.
+
+**Before proposing a recipe:**
+1. Estimate the wall-clock time. If it's over ~3 minutes, explicitly work through whether the task is:
+   - **Embarrassingly parallel across independent units** (targets, files, folds, sectors) → sharding (`--shard-index`/`--shard-count`, one process per console tab) is the biggest lever, per the pattern in `Skills/process_t1_kepler_batch.py` (version 0.2.18).
+   - **I/O-bound within one process** (network/catalog calls) → in-process worker concurrency (`--workers`, `ThreadPoolExecutor`), per `docs/SYSTEM_PROFILE.md`'s 4-6 worker guidance for external-service workloads.
+   - **CPU-bound** (local computation, no external service) → multiprocessing or vectorization, per `docs/SYSTEM_PROFILE.md`'s higher local worker-count guidance (start near 12, measure before raising).
+   - Genuinely sequential (state must build incrementally, e.g. O-C ephemeris refinement across epochs) → say so explicitly rather than silently defaulting to slow.
+2. If the target script does not yet support the applicable form of parallelism, that absence is itself worth surfacing: either add it (mirroring the sharding/`--workers` pattern already proven in `process_t1_kepler_batch.py`) before recommending a multi-hour sequential recipe, or explicitly tell the user why not (e.g. a one-off task not worth the engineering cost).
+3. Every parallel/sharded recipe must still respect `docs/SYSTEM_PROFILE.md`'s conservative guidance for live external services (do not recommend so many concurrent shards/workers that MAST/ExoFOP/NASA Exoplanet Archive throttling becomes likely) and must use the Run Report Policy above so progress is self-reporting across shards.
+
+**Ask, don't assume, when:**
+- The right shard/worker count depends on the operator's own tradeoffs — how many console tabs they're willing to dedicate, whether they want a tab free for other work, how much they trust the external service's rate limits at higher concurrency.
+- It's unclear whether the task is I/O-bound, CPU-bound, or a mix (measuring first, then asking whether to push further, beats guessing a big number).
+- Two people, one Mac: if a task is already running, ask before recommending starting more concurrent tabs.
+
+Do not use this policy to justify over-engineering a task that will run once and take 4 minutes — the 3-minute bar is a prompt to *consider* parallelism, not a mandate to always add it.
+
 ### Python Environment Policy — NEVER TOUCH SYSTEM PYTHON
 - Validated runtime: **Python 3.14.3** inside `.venv` — never use system Python
 - All work happens inside the `.venv` virtual environment

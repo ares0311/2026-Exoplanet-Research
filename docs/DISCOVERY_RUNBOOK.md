@@ -295,6 +295,22 @@ directly, e.g. `.venv/bin/python Skills/run_report.py process_t1_kepler_batch`,
 or ask for a fresh `--status-only` run where the script supports one (see
 `process_t1_kepler_batch.py --status-only`).
 
+### Rule 8: Parallelism-first for any recipe over ~3 minutes
+
+Before handing the user a recipe expected to take longer than ~3 minutes,
+work through whether sharding (independent units, e.g. targets/files/folds),
+in-process worker concurrency (I/O-bound, e.g. `--workers` per
+`docs/SYSTEM_PROFILE.md`'s 4-6 guidance for external services), or
+multiprocessing (CPU-bound local work) would meaningfully cut wall-clock
+time — do not default to sequential without checking. If the target script
+doesn't yet support the applicable form, either add it (mirroring
+`process_t1_kepler_batch.py`'s `--workers`/`--shard-index`/`--shard-count`
+pattern) or say explicitly why not. Ask the operator rather than guess when
+the right shard/worker count depends on their own tradeoffs (tabs they're
+willing to dedicate, trust in the external service's rate limits, whether
+another task is already running). See `CLAUDE.md`'s "Parallelism-First
+Recipe Policy — MANDATORY" for the full rule.
+
 ---
 
 ## What Has Been Built (Capability Inventory)
