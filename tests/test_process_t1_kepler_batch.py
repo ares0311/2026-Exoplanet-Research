@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from process_t1_kepler_batch import (  # noqa: E402
     _clear_directory,
     _cli,
     _directory_size_bytes,
+    _ensure_wal_mode,
     _format_eta,
     format_batch_summary,
     group_rows_by_target,
@@ -164,6 +166,52 @@ class TestT1KeplerProcessingStore:
 
         store2 = T1KeplerProcessingStore(db_path)
         assert store2.done_target_ids() == {1}
+
+    def test_concurrent_store_construction_does_not_raise(self, tmp_path: Path) -> None:
+        """Regression: N threads each constructing a T1KeplerProcessingStore for
+        the same fresh db_path at nearly the same instant must never raise
+        'database is locked' from the WAL-mode-switch race (found via a real
+        CI failure on the 4-concurrent-shard test)."""
+        import threading
+
+        db_path = tmp_path / "progress.sqlite3"
+        errors: list[BaseException] = []
+        lock = threading.Lock()
+
+        def _construct(i: int) -> None:
+            try:
+                store = T1KeplerProcessingStore(db_path)
+                store.mark_active(i, 1)
+                store.mark_done(i, n_written=1, n_failed=0, flag="OK")
+            except BaseException as exc:  # noqa: BLE001
+                with lock:
+                    errors.append(exc)
+
+        threads = [threading.Thread(target=_construct, args=(i,)) for i in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert errors == []
+        store = T1KeplerProcessingStore(db_path)
+        assert store.done_target_ids() == set(range(8))
+
+    def test_ensure_wal_mode_falls_back_gracefully_when_it_never_succeeds(
+        self, tmp_path: Path
+    ) -> None:
+        """If every attempt raises OperationalError, _ensure_wal_mode must
+        return quietly (fall back to the default journal mode) rather than
+        raise -- WAL is a concurrency nicety, not a correctness requirement."""
+        db_path = tmp_path / "progress.sqlite3"
+        connection = sqlite3.connect(db_path)
+
+        class _AlwaysLocked:
+            def execute(self, _sql: str) -> None:
+                raise sqlite3.OperationalError("database is locked")
+
+        _ensure_wal_mode(_AlwaysLocked(), max_attempts=3, retry_delay=0.0)  # must not raise
+        connection.close()
 
 
 # ---------------------------------------------------------------------------
@@ -646,6 +694,61 @@ class TestRunBatchSharding:
         assert all("shard0of2" in d or "shard1of2" in d for d in seen_dirs)
         store = T1KeplerProcessingStore(db_path)
         assert store.done_target_ids() == set(range(3000, 3006))
+
+    def test_four_concurrent_shards_never_collide(self, tmp_path: Path) -> None:
+        """Same as above but with 4 concurrent shards -- the exact configuration
+        planned for the next live run, not just the 2-shard case already
+        validated live."""
+        import threading
+        import time as time_module
+
+        n_targets = 12  # 3 per shard under a 4-way mod partition
+        manifest_path = self._manifest_with_targets(tmp_path, n_targets)
+        db_path = tmp_path / "progress.sqlite3"
+        output_base = tmp_path / "out" / "snippets.jsonl"
+        raw_dir = tmp_path / "raw"
+        seen_dirs: set[str] = set()
+        lock = threading.Lock()
+        shard_count = 4
+
+        def _fetch(_target_id: int):
+            time_module.sleep(0.02)
+            return [0.0, 1.0], [1.0, 1.0]
+
+        def _run_shard(shard_index: int) -> None:
+            def _tracking_fetch(target_id: int):
+                target_dir = raw_dir / f"shard{shard_index}of{shard_count}" / f"target_{target_id}"
+                with lock:
+                    seen_dirs.add(str(target_dir))
+                return _fetch(target_id)
+
+            run_batch(
+                manifest_path=manifest_path, output_path=output_base, db_path=db_path,
+                raw_dir=raw_dir, max_targets=None, n_bins=2, workers=2,
+                shard_index=shard_index, shard_count=shard_count, lc_fetcher=_tracking_fetch,
+            )
+
+        threads = [threading.Thread(target=_run_shard, args=(i,)) for i in range(shard_count)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # Every observed raw directory is scoped to its own shard, none shared.
+        assert all(
+            any(f"shard{i}of{shard_count}" in d for i in range(shard_count)) for d in seen_dirs
+        )
+        store = T1KeplerProcessingStore(db_path)
+        assert store.done_target_ids() == set(range(3000, 3000 + n_targets))
+
+        # All 4 shards' output files exist and together cover every target exactly once.
+        all_ids: list[int] = []
+        for i in range(shard_count):
+            shard_path = shard_output_path(output_base, i, shard_count)
+            assert shard_path.exists()
+            lines = shard_path.read_text().splitlines()
+            all_ids.extend(json.loads(line)["target_id"] for line in lines)
+        assert sorted(all_ids) == list(range(3000, 3000 + n_targets))
 
 
 # ---------------------------------------------------------------------------

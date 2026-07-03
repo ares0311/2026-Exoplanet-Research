@@ -132,6 +132,8 @@ When the user must take an action to unblock a gap:
   - **Process-level sharding**: new `--shard-index`/`--shard-count` flags let multiple console tabs run concurrently against disjoint target sets (partitioned by `target_id % shard_count`), for throughput beyond one process's `--workers` ceiling. All concurrently running tabs share one `--db-path` (now WAL-mode SQLite with a 30s busy timeout, since it's now a genuinely concurrent multi-process writer) but each shard gets its own auto-suffixed output file and its own raw-download scratch subdirectory, so shards can never collide on a file the way the 0.2.16→0.2.17 crash did. New `--status-only` flag prints the combined done/active/written/failed summary across all shards without starting a batch. 17 new tests, including a real-thread test proving two concurrent shards never touch each other's raw-download directory.
   - **Run Report Policy** (new `Skills/run_report.py`, 18 tests): every run now writes a small structured completion record and auto-commits + pushes *only that file* to git (`--no-git-report` to opt out), replacing the pattern of pasting console output for the agent to manually transcribe into tracking docs. See `docs/DISCOVERY_RUNBOOK.md` Rule 7 and `CLAUDE.md`'s "Run Report Policy — MANDATORY" section for the full policy and the retrofit list of other acquisition scripts still to be wired up (`batch_scan.py`, `star_scanner.py`, `fetch_kepler_lc_snippets.py`, and others — not yet done).
 - **Project version bumped to 0.2.19 (2026-07-03)** — fixes the intra-process download-serialization bug that explained why `--workers 4` only ever gave ~9-14% over sequential (see the 2-shard live-test writeup below for the full root cause and fix). `exo_toolkit/fetch.py`'s `_download_one_quietly()` no longer wraps the entire download call in a lock; `Observations.download_products` is now wrapped once, idempotently, and never restored, instead of being monkey-patched-and-restored under `_DOWNLOAD_PRODUCTS_LOCK` (removed) on every call. 4 new tests in `tests/test_fetch.py`, including a real 2-thread test proving concurrent calls now overlap instead of serializing.
+- **Project version bumped to 0.2.20 (2026-07-03)** — prep for the planned 4-concurrent-shard live test (agreed with the human, one deliberate step up from the only live data point at 2 shards, per the Measure-then-scale cadence rather than jumping straight to the 6-7 tabs available). New `test_four_concurrent_shards_never_collide` in `tests/test_process_t1_kepler_batch.py` runs 4 real concurrent threads through `run_batch()` with `shard_count=4`, verifying disjoint raw-download directories, exactly-once target coverage across all 4 shard output files, and correct global `done` state in the shared SQLite store -- offline validation of the 4-way partition logic before the live run. No functional code changes; `shard_index`/`shard_count` were already N-way generalized (never hardcoded to 2).
+- **Project version bumped to 0.2.21 (2026-07-03)** — CI caught a real bug in the 0.2.20 prep test before it could hit the live 4-shard run: `T1KeplerProcessingStore._connect()` runs `PRAGMA journal_mode=WAL;` on every connection, but SQLite only permits one connection to perform that mode transition at a time. Four threads (or four real shard processes) constructing the store for the same fresh `db_path` at nearly the same instant race for that exclusivity and lose with `sqlite3.OperationalError: database is locked` -- immediately, not smoothed over by the connection's `timeout=30.0` parameter, since the transition itself needs momentary exclusivity rather than ordinary write-lock waiting. Fixed with `_ensure_wal_mode()`: a small retry loop (10 attempts, 0.2s apart) tolerating the concurrent-startup race, falling back gracefully to the default journal mode if it never succeeds within that window (WAL is a concurrency nicety here, not a correctness requirement). 2 new tests: 8 real threads concurrently constructing stores for one fresh db with no errors, and confirming the fallback never raises when every attempt fails. Would have been a real risk for the planned 4-tab live test if the tabs were started close enough together in time -- this is exactly why the offline 4-shard test was worth writing before the live run, not just documentation.
 
 ### Where things stand
 
@@ -337,34 +339,46 @@ the *previous* 2-shard test was, without realizing it, accidentally being
 kept polite to MAST by that lock -- removing it could reveal MAST's real
 concurrency ceiling for the first time (2 shards x 4 workers = 8 concurrent
 connections, already past `docs/SYSTEM_PROFILE.md`'s 4-6 guidance for
-external-service work). The next 2-shard run on version 0.2.19+ should be
-watched closely for new errors, timeouts, or slower per-target rates that
-would indicate real throttling, not assumed clean just because it was clean
-before.
+external-service work). The next run on version 0.2.19+ (planned as 4 shards
+-- see below) should be watched closely for new errors, timeouts, or slower
+per-target rates that would indicate real throttling, not assumed clean just
+because the prior run was clean.
 
-**Concrete next step — give the human this exact recipe, now with the lock fix (version 0.2.19+):**
+**Planned next test (2026-07-03, agreed with the human): 4 concurrent
+shards**, not 2 -- a deliberate single step up from the only live data point
+we have (2 shards, 8 concurrent MAST connections, 17.1s/target combined,
+measured *before* the 0.2.19 lock fix). The human has 6-7 terminal tabs
+available and could go further, but the agreed plan is 4 shards first
+(doubling shard count, 16 concurrent connections) as one clean, isolated
+data point before considering 6-7 -- see CLAUDE.md's "Measure-then-scale
+cadence": never jump straight to the operator's max available concurrency
+without an intermediate measurement. A new real-thread test
+(`test_four_concurrent_shards_never_collide`, version 0.2.20) validates the
+4-shard partition/isolation logic offline before this live run.
+
+**Concrete next step — give the human this exact recipe (version 0.2.21+ required for both the download lock fix and the WAL-mode race fix):**
 
 ```bash
 git switch main
 git pull --ff-only origin main
-caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 --workers 4 --shard-index 0 --shard-count 2
-# in a second tab:
-caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 --workers 4 --shard-index 1 --shard-count 2
+caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 --workers 4 --shard-index 0 --shard-count 4
+# repeat in three more tabs with --shard-index 1, 2, 3 (same --shard-count 4)
 ```
 
-Both tabs share the default `--db-path`, so progress is tracked globally
-regardless of which shard did the work. Compare this run's per-target rate
-(from the auto-pushed run report, or `--status-only`) against the prior
-17.1s/target combined rate -- a rate close to or better than that with no
-new errors confirms the fix helped and MAST is tolerating the concurrency;
-a rate that regresses or new `ERROR:`/timeout flags mean back off to fewer
-shards or lower `--workers`. Use `--max-targets 500` or larger per shard
-once a size feels safe, or `--workers 1`/`--shard-count 1` to fall back to
-the already-proven sequential path if anything looks off. If any target
-shows `NO_DATA`/`NO_LIGHTKURVE`/`ERROR:...`, that is expected for some KOIs
-(not every KIC has usable long-cadence data) and is not itself a blocker
-unless most targets fail. Continue with bounded invocations until the
-Kepler manifest is processed.
+All four tabs share the default `--db-path`, so progress is tracked
+globally regardless of which shard did the work. Compare this run's
+per-target rate (from the auto-pushed run reports, or `--status-only`)
+against the prior 17.1s/target combined baseline (measured at 2 shards,
+pre-fix) -- a rate close to or better than that with no new errors confirms
+the fix helped and MAST is tolerating 16 concurrent connections; a regressed
+rate or new `ERROR:`/timeout flags mean back off to fewer shards or lower
+`--workers` rather than proceeding to 6-7 tabs. Use `--max-targets 500` or
+larger per shard once a size feels safe, or `--workers 1`/`--shard-count 1`
+to fall back to the already-proven sequential path if anything looks off.
+If any target shows `NO_DATA`/`NO_LIGHTKURVE`/`ERROR:...`, that is expected
+for some KOIs (not every KIC has usable long-cadence data) and is not
+itself a blocker unless most targets fail. Continue with bounded
+invocations until the Kepler manifest is processed.
 
 The run006/run008 notes below are historical provenance only. Preserve them so
 future agents do not re-debug the same scanner failures, but do not treat them
