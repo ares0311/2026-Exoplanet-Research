@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from process_t1_kepler_batch import (  # noqa: E402
     _clear_directory,
     _cli,
     _directory_size_bytes,
+    _ensure_wal_mode,
     _format_eta,
     format_batch_summary,
     group_rows_by_target,
@@ -164,6 +166,52 @@ class TestT1KeplerProcessingStore:
 
         store2 = T1KeplerProcessingStore(db_path)
         assert store2.done_target_ids() == {1}
+
+    def test_concurrent_store_construction_does_not_raise(self, tmp_path: Path) -> None:
+        """Regression: N threads each constructing a T1KeplerProcessingStore for
+        the same fresh db_path at nearly the same instant must never raise
+        'database is locked' from the WAL-mode-switch race (found via a real
+        CI failure on the 4-concurrent-shard test)."""
+        import threading
+
+        db_path = tmp_path / "progress.sqlite3"
+        errors: list[BaseException] = []
+        lock = threading.Lock()
+
+        def _construct(i: int) -> None:
+            try:
+                store = T1KeplerProcessingStore(db_path)
+                store.mark_active(i, 1)
+                store.mark_done(i, n_written=1, n_failed=0, flag="OK")
+            except BaseException as exc:  # noqa: BLE001
+                with lock:
+                    errors.append(exc)
+
+        threads = [threading.Thread(target=_construct, args=(i,)) for i in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert errors == []
+        store = T1KeplerProcessingStore(db_path)
+        assert store.done_target_ids() == set(range(8))
+
+    def test_ensure_wal_mode_falls_back_gracefully_when_it_never_succeeds(
+        self, tmp_path: Path
+    ) -> None:
+        """If every attempt raises OperationalError, _ensure_wal_mode must
+        return quietly (fall back to the default journal mode) rather than
+        raise -- WAL is a concurrency nicety, not a correctness requirement."""
+        db_path = tmp_path / "progress.sqlite3"
+        connection = sqlite3.connect(db_path)
+
+        class _AlwaysLocked:
+            def execute(self, _sql: str) -> None:
+                raise sqlite3.OperationalError("database is locked")
+
+        _ensure_wal_mode(_AlwaysLocked(), max_attempts=3, retry_delay=0.0)  # must not raise
+        connection.close()
 
 
 # ---------------------------------------------------------------------------

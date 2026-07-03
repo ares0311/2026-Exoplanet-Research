@@ -123,6 +123,34 @@ def group_rows_by_target(rows: Iterable[dict[str, Any]]) -> dict[int, list[dict[
 # ---------------------------------------------------------------------------
 
 
+def _ensure_wal_mode(
+    connection: sqlite3.Connection, *, max_attempts: int = 10, retry_delay: float = 0.2
+) -> None:
+    """Best-effort switch to WAL mode, tolerating a concurrent-startup race.
+
+    Multiple shard processes (or, in tests, threads) may each construct a
+    ``T1KeplerProcessingStore`` for the same shared ``db_path`` at nearly the
+    same instant. SQLite only allows one connection to perform the WAL-mode
+    transition at a time; a concurrent attempt can raise ``database is
+    locked`` immediately -- this is not the ordinary write-lock contention
+    that the connection's own ``timeout=30.0`` smooths over, since the
+    transition itself requires momentary exclusivity. Retry briefly (some
+    other connection is very likely mid-switch, not deadlocked); once one
+    connection succeeds, WAL mode is a durable property of the file, so every
+    other connection's retry becomes a fast no-op. Fall back to the default
+    journal mode if it never succeeds within *max_attempts* -- WAL is a
+    concurrency nicety here, not a correctness requirement.
+    """
+    for attempt in range(max_attempts):
+        try:
+            connection.execute("PRAGMA journal_mode=WAL;")
+            return
+        except sqlite3.OperationalError:
+            if attempt == max_attempts - 1:
+                return
+            time.sleep(retry_delay)
+
+
 class _ClosingConnection(sqlite3.Connection):
     def __exit__(
         self,
@@ -151,7 +179,7 @@ class T1KeplerProcessingStore:
         # SQLite's default rollback journal takes; each shard only ever
         # writes rows for its own disjoint target_id partition, so there is
         # no write-write conflict, only lock contention to avoid.
-        connection.execute("PRAGMA journal_mode=WAL;")
+        _ensure_wal_mode(connection)
         connection.execute("PRAGMA busy_timeout=30000;")
         return connection
 
