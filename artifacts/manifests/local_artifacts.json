@@ -1136,11 +1136,23 @@
             "cumulative_remaining_targets": 5985,
             "console_verified": "startup banner printed (workers=4); every completion line printed elapsed=...s ETA=...",
             "note": "4 workers beat the prior sequential 250-target run (7647s) by only ~9%; workload is MAST-network-bound, not CPU-bound, matching docs/SYSTEM_PROFILE.md guidance"
+          },
+          {
+            "live_run_at": "2026-07-03",
+            "command": "caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 --workers 4",
+            "outcome": "pass",
+            "targets_processed": 250,
+            "snippets_written": 278,
+            "rows_failed": 0,
+            "elapsed_seconds": 6583,
+            "cumulative_done_targets": 780,
+            "cumulative_remaining_targets": 5735,
+            "note": "second consecutive clean --workers 4 run; no crash or throttling observed"
           }
         ]
       },
       "validation_gate": "Inspect a bounded run's snippets and SQLite summary before scaling up.",
-      "next_action": "[HUMAN] Continue with: caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 --workers 4 (or a larger --max-targets); --workers 4 is now live-validated, not just fixed."
+      "next_action": "[HUMAN] Continue with: caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 --workers 4 (or a larger --max-targets); --workers 4 is now live-validated across two consecutive runs."
     },
     {
       "path": "logs/t1_1_kepler_processing.sqlite3",
@@ -1149,10 +1161,10 @@
       "git_policy": "ignored",
       "last_known": {
         "schema": "single targets table keyed by target_id, status active|done",
-        "sqlite_summary": "done|530|288|0 (cumulative through the first clean --workers 4 run)",
-        "done_targets": 530,
+        "sqlite_summary": "done|780|278|0 (cumulative through the second consecutive clean --workers 4 run)",
+        "done_targets": 780,
         "active_targets": 0,
-        "snippets_written_this_run": 288,
+        "snippets_written_this_run": 278,
         "rows_failed": 0,
         "note": "the earlier --workers 4 crash (v0.2.16, fixed in v0.2.17) left a few targets active, not done; they were retried automatically on the next run without duplicating output"
       },
