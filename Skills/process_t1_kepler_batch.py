@@ -53,6 +53,7 @@ from types import TracebackType
 from typing import Any, Literal
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from fetch_kepler_lc_snippets import _normalise, _phase_fold_bin  # noqa: E402
 
@@ -321,12 +322,18 @@ def _directory_size_bytes(path: Path) -> int:
 def make_default_lc_fetcher(raw_dir: Path) -> LcFetcher:
     """Build the default Kepler light-curve fetcher, scoped to *raw_dir*.
 
-    Downloads via Lightkurve into a dedicated ``raw_dir/target_<id>``
-    subdirectory, extracts (time_bjd, flux), then deletes that subdirectory
-    before returning -- regardless of success or failure -- so raw storage
-    never accumulates across targets. Each target gets its own subdirectory
-    (rather than sharing *raw_dir* directly) so concurrent fetches under
-    multiple workers never delete a different target's in-flight download.
+    Downloads via ``exo_toolkit.fetch``'s already-proven thread-safe
+    per-product downloader (never Lightkurve's public
+    ``SearchResult.download_all()``, which decorates itself with
+    ``suppress_stdout`` and mutates process-global ``sys.stdout`` -- unsafe
+    under concurrent workers; this exact failure mode is already documented
+    as the root cause of this project's historical run003 crash). Downloads
+    into a dedicated ``raw_dir/target_<id>`` subdirectory, extracts
+    (time_bjd, flux), then deletes that subdirectory before returning --
+    regardless of success or failure -- so raw storage never accumulates
+    across targets. Each target gets its own subdirectory (rather than
+    sharing *raw_dir* directly) so concurrent fetches under multiple workers
+    never delete a different target's in-flight download.
     """
 
     def _fetch(target_id: int) -> tuple[list[float], list[float]] | None:
@@ -334,6 +341,8 @@ def make_default_lc_fetcher(raw_dir: Path) -> LcFetcher:
         import shutil
 
         import lightkurve as lk  # noqa: PLC0415
+
+        from exo_toolkit.fetch import _download_collection_with_cache_repair  # noqa: PLC0415
 
         target_dir = raw_dir / f"target_{target_id}"
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -343,9 +352,11 @@ def make_default_lc_fetcher(raw_dir: Path) -> LcFetcher:
             )
             if len(search) == 0:
                 return None
-            collection = search.download_all(download_dir=str(target_dir))
-            if collection is None or len(collection) == 0:
-                return None
+            collection, _flux_columns_used = _download_collection_with_cache_repair(
+                search,
+                flux_columns=("pdcsap_flux",),
+                download_dir=str(target_dir),
+            )
             lc = collection.stitch()
             with contextlib.suppress(Exception):
                 lc = lc.normalize()

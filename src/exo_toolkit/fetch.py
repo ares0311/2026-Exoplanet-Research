@@ -620,6 +620,7 @@ def _download_collection_with_cache_repair(
     search: Any,
     *,
     flux_columns: tuple[str, ...],
+    download_dir: str | None = None,
 ) -> tuple[Any, tuple[str, ...]]:
     """Download a Lightkurve search result without mutating global stdout.
 
@@ -629,6 +630,11 @@ def _download_collection_with_cache_repair(
     worker threads and the main thread prints progress. Use the lower-level
     per-product downloader instead, and still repair corrupt cached FITS files
     when Lightkurve reports an interrupted download.
+
+    Args:
+        download_dir: Optional directory to download into. ``None`` uses
+            Lightkurve's own cache directory (the existing default for every
+            caller before this parameter was added).
     """
     try:
         import lightkurve as lk  # noqa: PLC0415
@@ -645,6 +651,7 @@ def _download_collection_with_cache_repair(
             search,
             table=search.table[idx : idx + 1],
             flux_columns=flux_columns,
+            download_dir=download_dir,
         )
         light_curves.append(light_curve)
         if flux_column not in flux_columns_used:
@@ -659,6 +666,7 @@ def _download_one_with_cache_repair(
     *,
     table: Any,
     flux_columns: tuple[str, ...],
+    download_dir: str | None = None,
 ) -> tuple[Any, str]:
     """Download one Lightkurve product, repairing one corrupt cache file at a time."""
     max_cache_repairs = 4
@@ -671,7 +679,7 @@ def _download_one_with_cache_repair(
                         search,
                         table=table,
                         quality_bitmask="default",
-                        download_dir=None,
+                        download_dir=download_dir,
                         cutout_size=None,
                         flux_column=flux_column,
                     ),
