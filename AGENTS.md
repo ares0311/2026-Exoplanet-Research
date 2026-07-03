@@ -263,7 +263,20 @@ A new regression test (`test_never_calls_download_all`) asserts this stays
 fixed. The interrupted run's SQLite progress is safe to resume — targets that
 were mid-flight are left `active`, not `done`, and are retried automatically.
 
-**Concrete next step — give the human this exact recipe, now with workers, on version 0.2.17 or newer:**
+**First post-fix `--workers 4` run PASS (2026-07-03, version 0.2.17):** the
+human re-ran `--max-targets 250 --workers 4` on the fixed code. No crash.
+Startup banner and per-target lines confirmed both the worker count
+(`workers=4`) and per-completion `elapsed=...s ETA=...` are printed exactly
+as designed — verified from the pasted console output, not asserted from
+memory. Result: 250 targets processed, 288 snippets written, 0 rows failed,
+6,962s elapsed (1h56m). Cumulative: 280 done before this run + 250 this run =
+530/6,515 done, 5,985 remaining. Notably, 4 workers only beat the prior
+sequential 250-target run (7,647s) by ~9%, not ~4x — confirms
+`docs/SYSTEM_PROFILE.md`'s point that this workload is MAST-network-bound,
+not CPU-bound, so `--workers` helps modestly rather than linearly. `--workers
+4` is now live-validated and safe to keep using at this scale.
+
+**Concrete next step — give the human this exact recipe:**
 
 ```bash
 git switch main
@@ -271,20 +284,16 @@ git pull --ff-only origin main
 caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 --workers 4
 ```
 
-This is now fixed but still not yet verified live at `workers > 1` — watch
-this first post-fix concurrent run for MAST throttling or errors before
-recommending a larger `--workers` value or omitting `--max-targets`. It
-processes the next 250 not-yet-done targets from the manifest (resumable
+It processes the next 250 not-yet-done targets from the manifest (resumable
 regardless of worker count — rerunning the same command continues where it
 left off) and prints per-target progress with elapsed time and ETA. Use
-`--max-targets 100` instead if the operator wants a smaller second step, or
-`--workers 1` to fall back to the already-proven sequential path if anything
-looks off. Paste back the final summary block. If any target shows
-`NO_DATA`/`NO_LIGHTKURVE`/`ERROR:...`, that is expected for some KOIs (not
-every KIC has usable long-cadence data) and is not itself a blocker unless
-most targets fail. Continue with bounded invocations until the Kepler
-manifest is processed; omit `--max-targets` only after several larger bounded
-runs behave well.
+`--max-targets 500` or larger if the operator wants to move faster now that
+`--workers 4` is validated, or `--workers 1` to fall back to the
+already-proven sequential path if anything looks off. Paste back the final
+summary block. If any target shows `NO_DATA`/`NO_LIGHTKURVE`/`ERROR:...`,
+that is expected for some KOIs (not every KIC has usable long-cadence data)
+and is not itself a blocker unless most targets fail. Continue with bounded
+invocations until the Kepler manifest is processed.
 
 The run006/run008 notes below are historical provenance only. Preserve them so
 future agents do not re-debug the same scanner failures, but do not treat them
