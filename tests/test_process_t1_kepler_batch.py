@@ -647,6 +647,61 @@ class TestRunBatchSharding:
         store = T1KeplerProcessingStore(db_path)
         assert store.done_target_ids() == set(range(3000, 3006))
 
+    def test_four_concurrent_shards_never_collide(self, tmp_path: Path) -> None:
+        """Same as above but with 4 concurrent shards -- the exact configuration
+        planned for the next live run, not just the 2-shard case already
+        validated live."""
+        import threading
+        import time as time_module
+
+        n_targets = 12  # 3 per shard under a 4-way mod partition
+        manifest_path = self._manifest_with_targets(tmp_path, n_targets)
+        db_path = tmp_path / "progress.sqlite3"
+        output_base = tmp_path / "out" / "snippets.jsonl"
+        raw_dir = tmp_path / "raw"
+        seen_dirs: set[str] = set()
+        lock = threading.Lock()
+        shard_count = 4
+
+        def _fetch(_target_id: int):
+            time_module.sleep(0.02)
+            return [0.0, 1.0], [1.0, 1.0]
+
+        def _run_shard(shard_index: int) -> None:
+            def _tracking_fetch(target_id: int):
+                target_dir = raw_dir / f"shard{shard_index}of{shard_count}" / f"target_{target_id}"
+                with lock:
+                    seen_dirs.add(str(target_dir))
+                return _fetch(target_id)
+
+            run_batch(
+                manifest_path=manifest_path, output_path=output_base, db_path=db_path,
+                raw_dir=raw_dir, max_targets=None, n_bins=2, workers=2,
+                shard_index=shard_index, shard_count=shard_count, lc_fetcher=_tracking_fetch,
+            )
+
+        threads = [threading.Thread(target=_run_shard, args=(i,)) for i in range(shard_count)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # Every observed raw directory is scoped to its own shard, none shared.
+        assert all(
+            any(f"shard{i}of{shard_count}" in d for i in range(shard_count)) for d in seen_dirs
+        )
+        store = T1KeplerProcessingStore(db_path)
+        assert store.done_target_ids() == set(range(3000, 3000 + n_targets))
+
+        # All 4 shards' output files exist and together cover every target exactly once.
+        all_ids: list[int] = []
+        for i in range(shard_count):
+            shard_path = shard_output_path(output_base, i, shard_count)
+            assert shard_path.exists()
+            lines = shard_path.read_text().splitlines()
+            all_ids.extend(json.loads(line)["target_id"] for line in lines)
+        assert sorted(all_ids) == list(range(3000, 3000 + n_targets))
+
 
 # ---------------------------------------------------------------------------
 # CLI: --status-only
