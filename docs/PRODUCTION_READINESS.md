@@ -3,7 +3,7 @@
 Last reviewed: 2026-07-02 (project reset: run006/run008 candidate review is historical; active production path wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` to close T1-1 with verified data sources, leakage-safe training manifests, and a production-gated trained model; source-contract examples now use case-insensitive TAP schema table-name matching after the live CUMULATIVE table-name bug; the bounded Kepler-first processing batch tool is built and unit-tested, awaiting one bounded live run; a supplementary pipeline-correctness fix wired real TIC catalog stellar/contamination parameters into `run_pipeline()` — see T1-0 notes below)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 2,444 default tests passing, 2 integration_live deselected
+Test baseline: 2,450 default tests passing, 2 integration_live deselected
 
 ---
 
@@ -24,7 +24,7 @@ The active production blocker is now T1-1, and the authorized path is the
 source-contract-first dataset/model plan in
 `docs/exoplanet_exomoon_dataset_handoff.md`.
 
-Version note: 0.2.15 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.16 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -37,10 +37,16 @@ every target), 0.2.12 records the TAP schema case-sensitivity fix in the
 active dataset handoff contract, 0.2.13 adds the committed leakage-safe
 Kepler training manifest and raw-FITS cleanup policy, 0.2.14 adds the
 bounded, resumable Kepler-first processing batch tool
-(`Skills/process_t1_kepler_batch.py`) that consumes that manifest, and 0.2.15
+(`Skills/process_t1_kepler_batch.py`) that consumes that manifest, 0.2.15
 adds an ETA to that tool's per-target progress output for multi-hour bounded
-runs. The catalog lookup fails open (all-`None`) on any network/parse error or
-non-TIC target, so it never blocks a scan.
+runs, and 0.2.16 adds bounded `--workers` concurrency to the same tool
+(default 1, sequential; `docs/SYSTEM_PROFILE.md` recommends 4-6 for this
+external-service workload once verified) plus a correctness fix required to
+support it safely: raw FITS downloads now use a per-target subdirectory
+instead of a single shared scratch directory, so concurrent fetches can no
+longer delete each other's in-flight files. The catalog lookup fails open
+(all-`None`) on any network/parse error or non-TIC target, so it never blocks
+a scan.
 
 ---
 
@@ -77,7 +83,9 @@ non-TIC target, so it never blocks a scan.
 - **Leakage-safe Kepler manifest PASS (2026-07-02)**: `Skills/build_t1_training_manifest.py` ran live against the verified `cumulative` schema and wrote committed metadata without downloading FITS files. `metadata/t1_1_kepler_training_manifest.jsonl` has 7,454 KOI rows across 6,515 target groups; all rows from the same KIC share one deterministic split. Split/label counts: train 5,155 rows (label0=3,268 / label1=1,887), val 1,143 (721 / 422), test 1,156 (725 / 431). `metadata/t1_1_kepler_manifest_summary.json` has `flag=OK` and no leakage errors. Cleanup policy requires raw FITS under `data/raw/t1_1_kepler_lc` to be deleted only after processed snippets validate, manifest summary is OK, `logs/t1_1_kepler_processing.sqlite3` has no incomplete active targets, and the operator confirms failed raw FITS are not needed for debugging.
 - **Bounded Kepler-first processing batch built and live-smoked (2026-07-02, version 0.2.14)**: `Skills/process_t1_kepler_batch.py` consumes `metadata/t1_1_kepler_training_manifest.jsonl`, fetches each unique KIC target's Kepler light curve once (reusing the proven phase-fold/normalisation math from `Skills/fetch_kepler_lc_snippets.py`), phase-folds every KOI row sharing that target at its own period/epoch, and writes processed snippets to `data/processed/t1_1_kepler_snippets/kepler_snippets.jsonl`. Progress/resume state lives in SQLite at `logs/t1_1_kepler_processing.sqlite3` (per-target `active`/`done` status; a target only ever gets marked `done` after its snippets are flushed, so an interrupted run never leaves partial/duplicate output). Raw FITS downloads are scoped to `data/raw/t1_1_kepler_lc` and the directory is wiped after every target (success or failure), so local raw storage never exceeds roughly one target's data at a time. The first live run on the user's Mac processed 25 targets in 1,216s, wrote 26 snippets, failed 0 rows, left SQLite summary `done|25|26|0`, and left `data/raw/t1_1_kepler_lc` at `0B`.
 - **ETA added to per-target progress (2026-07-02)**: at the observed live rate (~49s/target), a 250-target run takes roughly 3.4 hours, so the per-target progress line now prints `elapsed=Xs ETA=YmZZs` instead of elapsed time alone — a multi-hour batch must never look hung. 8 new tests (35 total for this Skill).
-- **Remaining next `[HUMAN]` action**: continue the resumable Kepler processing batch at larger bounded size. Recommended next scale step: `--max-targets 250` with `caffeinate -i`; if runtime or network stability is a concern, use `--max-targets 100`. Repeated runs safely continue from the SQLite `done` set.
+- **Second live run PASS (2026-07-02)**: `--max-targets 250` completed on the user's Mac in 7,647s (2h7m), 250 targets processed, 268 snippets written, 0 failed rows, SQLite summary consistent throughout, `data/raw/t1_1_kepler_lc` empty after completion. 277/6,515 targets now done, 6,238 remaining. Confirms the tool is reliable at scale, not just on the initial 25-target smoke.
+- **Bounded worker concurrency added (2026-07-02, version 0.2.16)**: `Skills/process_t1_kepler_batch.py` now accepts `--workers` (default 1, sequential) using the same `ThreadPoolExecutor` pattern already proven in `Skills/fetch_kepler_lc_snippets.py`. `docs/SYSTEM_PROFILE.md` recommends 4-6 workers for this kind of external-service/live-catalog workload. Fixed a real concurrency-correctness issue in the process of adding this: the raw-FITS fetcher previously wiped one shared scratch directory after every target, which would have let one worker's cleanup delete a different worker's in-flight download; each target now gets its own `raw_dir/target_<id>` subdirectory, deleted independently. 6 new tests, including one that runs three fetches on real threads and asserts their download directories never collide.
+- **Remaining next `[HUMAN]` action**: continue the resumable Kepler processing batch at larger bounded size, now with `--workers 4` for a meaningfully faster run (per `docs/SYSTEM_PROFILE.md` guidance for this workload; still not yet verified live at `workers > 1`, so watch the first concurrent run for any MAST throttling before scaling further). Recommended: `--max-targets 250 --workers 4` with `caffeinate -i`. Repeated runs safely continue from the SQLite `done` set regardless of worker count.
 - **Code status**: Training and state-dict inference paths are operational; the package scorer reconstructs the trained architecture and fails closed when loading fails
 - **Prior local corpus status**: **VALID as of 2026-06-12** — 2,037 snippets (1,012 positive CP+KP, 1,025 negative FP+FA, ratio 0.99); zero-epoch corpus retired and rebuilt from scratch with valid BJD epochs; label bug fixed (KP→1); MAST throttling fix applied (`bbb0877`)
 - **Local corpus status**: **KEPLER LOCAL VALIDATED** — TESS v2 complete at 2,619 snippets; Kepler finite rebuild has 6,837 parseable snippets with zero non-finite flux rows, zero duplicate resume keys, labels negative=4,280 and positive=2,557; `data/kepler_cnn_splits` validator PASS with train/val/test = 4,741 / 1,060 / 1,036
@@ -185,7 +193,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
 | 82 production-critical Skills/ | ✅ |
-| 2,444 default tests, ruff clean, mypy clean | ✅ |
+| 2,450 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---

@@ -125,6 +125,8 @@ When the user must take an action to unblock a gap:
 - **Project version bumped to 0.2.12 (2026-07-02)** — source-contract hardening patch for the active T1-1 path. The shipped verifier already fixed the live NASA Exoplanet Archive `TAP_SCHEMA.columns.table_name` case-sensitivity bug with `UPPER(table_name) = UPPER(...)`; this patch updates `docs/exoplanet_exomoon_dataset_handoff.md` and regression tests so future agents do not copy the stale exact-match schema snippets that caused the `CUMULATIVE` smoke-test failure.
 - **Project version bumped to 0.2.13 (2026-07-02)** — leakage-safe manifest planning patch for the active T1-1 path. `Skills/build_t1_training_manifest.py` verifies the KOI schema, queries confirmed/false-positive Kepler KOI rows, assigns all KOIs from the same KIC to one deterministic split, writes committed manifest/summary metadata, and records the raw-FITS cleanup policy before any bulk download is requested.
 - **Project version bumped to 0.2.14 (2026-07-02)** — bounded Kepler-first processing batch patch for the active T1-1 path. `Skills/process_t1_kepler_batch.py` consumes `metadata/t1_1_kepler_training_manifest.jsonl`, fetches each unique KIC's Kepler light curve once (reusing the proven phase-fold/normalisation math from `Skills/fetch_kepler_lc_snippets.py`), phase-folds every KOI row sharing that target, and writes snippets to `data/processed/t1_1_kepler_snippets/kepler_snippets.jsonl`. Progress/resume state lives in SQLite at `logs/t1_1_kepler_processing.sqlite3`; a target is only marked `done` after its snippets are flushed, so an interrupted run never leaves partial/duplicate output. Raw FITS downloads are scoped to `data/raw/t1_1_kepler_lc` and the directory is wiped after every target (success or failure) — local raw storage never exceeds roughly one target's data at a time, satisfying the storage cap by construction. `--max-targets` defaults to 25 so the first invocation is a small bounded batch, not the full 6,515-target corpus. 27 new tests, all offline/injectable. Not yet run against live Kepler data — this agent's sandbox has no Lightkurve/MAST access.
+- **Project version bumped to 0.2.15 (2026-07-02)** — the first live 25-target Mac run (PR #168) measured ~49s/target, meaning a 250-target run takes ~3.4 hours; the per-target progress line now prints an ETA (`elapsed=Xs ETA=YmZZs`), not just elapsed time, so a multi-hour batch never looks hung. 8 new tests for the ETA formatter and its wiring into `run_batch`.
+- **Project version bumped to 0.2.16 (2026-07-02)** — `process_t1_kepler_batch.py` gains bounded `--workers` concurrency (default 1, matching `fetch_kepler_lc_snippets.py`'s existing convention; `docs/SYSTEM_PROFILE.md` recommends 4-6 for this external-service workload), using the same `ThreadPoolExecutor` pattern already proven in that sibling script. Building this surfaced a real concurrency-correctness bug: the raw-FITS fetcher wiped one shared scratch directory after every target, which would have let one worker's cleanup delete a different worker's still-downloading files under `workers > 1`. Fixed by giving each target its own `raw_dir/target_<id>` subdirectory. 6 new tests, including a real-thread test asserting concurrent download directories never collide.
 
 ### Where things stand
 
@@ -219,34 +221,55 @@ writes snippets to `data/processed/t1_1_kepler_snippets/kepler_snippets.jsonl`,
 and tracks progress/resume in SQLite at `logs/t1_1_kepler_processing.sqlite3`.
 Raw FITS downloads are scoped to `data/raw/t1_1_kepler_lc` and the directory
 is wiped after every target (success or failure), so raw storage never
-accumulates beyond roughly one target's data. `--max-targets` defaults to 25.
-27 offline/injectable tests pass. The first live Mac run processed 25 targets
-in 1,216s, wrote 26 snippets, failed 0 rows, left SQLite summary
-`done|25|26|0`, and verified `data/raw/t1_1_kepler_lc` was empty (`0B`) after
-completion. At that observed rate (~49s/target), a 250-target run would take
-roughly 3.4 hours, so the per-target progress line now includes an ETA
-(`elapsed=Xs ETA=YmZZs`), not just elapsed time, matching the item-loop
-console-output pattern used elsewhere in this project — a multi-hour batch
-must never look hung. 35 offline/injectable tests pass (8 new for the ETA
-formatter and its wiring into `run_batch`).
+accumulates beyond roughly one target's data. The first live Mac run
+processed 25 targets in 1,216s, wrote 26 snippets, failed 0 rows, left
+SQLite summary `done|25|26|0`, and verified `data/raw/t1_1_kepler_lc` was
+empty (`0B`) after completion. Version 0.2.15 added an ETA to the per-target
+progress line (`elapsed=Xs ETA=YmZZs`), since a multi-hour batch must never
+look hung.
 
-**Concrete next step — give the human this exact scaled recipe:**
+**Second live run PASS (2026-07-02):** `--max-targets 250` completed in
+7,647s (2h7m): 250 targets processed, 268 snippets written, 0 failed rows,
+SQLite consistent throughout, raw scratch dir empty after completion. 277 of
+6,515 targets are now done, 6,238 remain. This confirms the tool holds up at
+10x the original smoke-test scale, not just on the initial 25-target run.
+
+**Bounded worker concurrency added (2026-07-02, version 0.2.16):**
+`process_t1_kepler_batch.py` now accepts `--workers` (default 1, sequential,
+matching `fetch_kepler_lc_snippets.py`'s existing convention) using the same
+`ThreadPoolExecutor` pattern already proven in that sibling script.
+`docs/SYSTEM_PROFILE.md` recommends 4-6 workers for this kind of
+external-service/live-catalog workload on this machine. Adding this exposed
+and fixed a real concurrency-correctness bug before it could reach
+production: the raw-FITS fetcher previously wiped one *shared* scratch
+directory after every target, which would have let one worker's cleanup
+delete a different worker's still-downloading files. Each target now gets
+its own `raw_dir/target_<id>` subdirectory, deleted independently after that
+target finishes. 41 offline/injectable tests pass (6 new, including one that
+runs three fetches on real threads and asserts their download directories
+never collide).
+
+**Concrete next step — give the human this exact recipe, now with workers:**
 
 ```bash
 git switch main
 git pull --ff-only origin main
-caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250
+caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 --workers 4
 ```
 
-This processes the next 250 not-yet-done targets from the manifest (resumable
-— rerunning the same command continues where it left off) and prints
-per-target progress with elapsed time and ETA. Use `--max-targets 100` instead if the
-operator wants a smaller second step. Paste back the final summary block. If
-any target shows `NO_DATA`/`NO_LIGHTKURVE`/`ERROR:...`, that is expected for
-some KOIs (not every KIC has usable long-cadence data) and is not itself a
-blocker unless most targets fail. Continue with bounded invocations until the
-Kepler manifest is processed; omit `--max-targets` only after several larger
-bounded runs behave well.
+This is not yet verified live at `workers > 1` — watch the first concurrent
+run for MAST throttling or errors before recommending a larger `--workers`
+value or omitting `--max-targets`. It processes the next 250 not-yet-done
+targets from the manifest (resumable regardless of worker count — rerunning
+the same command continues where it left off) and prints per-target progress
+with elapsed time and ETA. Use `--max-targets 100` instead if the operator
+wants a smaller second step, or `--workers 1` to fall back to the
+already-proven sequential path if anything looks off. Paste back the final
+summary block. If any target shows `NO_DATA`/`NO_LIGHTKURVE`/`ERROR:...`,
+that is expected for some KOIs (not every KIC has usable long-cadence data)
+and is not itself a blocker unless most targets fail. Continue with bounded
+invocations until the Kepler manifest is processed; omit `--max-targets` only
+after several larger bounded runs behave well.
 
 The run006/run008 notes below are historical provenance only. Preserve them so
 future agents do not re-debug the same scanner failures, but do not treat them
