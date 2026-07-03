@@ -140,6 +140,62 @@ Print a startup banner before any loop. Print a completion or early-stop line at
 - **Never commit a long-running script without console output.** If a script is silent, add progress prints before committing.
 - When modifying any existing long-running script, check it meets this standard and fix if not.
 
+### Run Report Policy — MANDATORY
+
+**Every acquisition or processing script (sharded or single-threaded) must write a structured completion report and auto-commit + push it after each successful run.**
+Console output is for watching a run live; it is not a record. The old
+pattern — human pastes console output, agent manually transcribes it into
+`AGENTS.md`/`docs/PRODUCTION_READINESS.md`/the local artifact ledger — is
+lossy and does not scale to multiple concurrent console tabs. A script
+reporting its own outcome (like a PR announcing its own merge) replaces that.
+
+**Mechanism** (`Skills/run_report.py` — read it before adding a new
+acquisition script or modifying an existing one):
+```python
+from run_report import RunReport, report_path_for, run_and_commit_report
+
+report = RunReport(
+    script="my_fetch_script", status="success",
+    started_at=started_at, completed_at=completed_at,
+    elapsed_seconds=elapsed, items_processed=n, items_written=w, items_failed=f,
+    output_paths=(str(output_path),),
+    shard_index=shard_index, shard_count=shard_count,  # None/1 if not sharded
+)
+path = report_path_for("my_fetch_script", shard_index=shard_index, shard_count=shard_count)
+run_and_commit_report(report, path)  # appends JSON line, then commits+pushes ONLY that file
+```
+
+**Rules:**
+- Call this at the end of every successful run (or, for sharded scripts, every shard's run) — not per-item.
+- The report ledger lives at `artifacts/manifests/run_reports/<script>.jsonl` (or `.shardIofN.jsonl` when sharded, so concurrent shards never contend for one file) and is **committed to git, never gitignored**.
+- `commit_and_push_report`/`run_and_commit_report` must stage **only** the exact report path (`git add -- <path>`, never `git add .`/`-A`) — it must never sweep up unrelated uncommitted work sitting in the operator's working tree.
+- A report-push failure must never crash the script or discard the data it already fetched: print a warning and exit 0; the human can push manually later.
+- This is a narrow, intentional exception to the branch/PR/CI cycle below: the report push goes directly to whatever branch is checked out (normally `main`). It must never be used to push code, data files, or training manifests — only the small structured JSON completion record.
+- To check cumulative progress without asking for pasted console output, read the ledger: `.venv/bin/python Skills/run_report.py <script-name>`, or use a script's own `--status-only` flag where one exists.
+- **Retrofit scope**: this applies to every existing acquisition/processing Skill, not just newly-sharded ones — `batch_scan.py`, `star_scanner.py`, `fetch_kepler_lc_snippets.py`, `fetch_tess_lc_snippets.py`, `fetch_tess_kepler_overlap_snippets.py`, `fetch_tess_k2_overlap_snippets.py`, `fetch_kepler_tce.py`, `fetch_tess_toi.py`, `fetch_exofop_ctoi.py`, `fetch_nea_koi_lc_index.py`, `fetch_additional_tess_labels.py`, `fetch_confirmed_hosts.py`, `fetch_jwst_targets.py`, `fetch_jwst_lc.py`, `tess_tce_fetcher.py`. See `docs/DISCOVERY_RUNBOOK.md` Rule 7 for full detail and retrofit tracking.
+- Tests must never invoke the real git commit/push path — inject a fake runner (see `commit_and_push_report`'s `run_fn` parameter and `tests/test_run_report.py`).
+
+### Parallelism-First Recipe Policy — MANDATORY
+
+**Before giving the user any recipe expected to take longer than 3 minutes, always consider sharding, multiprocessing/multithreading, or other parallelism — do not default to a purely sequential recipe without first checking whether a faster shape exists.**
+This applies to every recipe, not just Kepler/TESS batch processing: training runs, injection-recovery sweeps, catalog downloads, evaluation/validation passes, anything with a `--max-*`/`-n`/count-style bound.
+
+**Before proposing a recipe:**
+1. Estimate the wall-clock time. If it's over ~3 minutes, explicitly work through whether the task is:
+   - **Embarrassingly parallel across independent units** (targets, files, folds, sectors) → sharding (`--shard-index`/`--shard-count`, one process per console tab) is the biggest lever, per the pattern in `Skills/process_t1_kepler_batch.py` (version 0.2.18).
+   - **I/O-bound within one process** (network/catalog calls) → in-process worker concurrency (`--workers`, `ThreadPoolExecutor`), per `docs/SYSTEM_PROFILE.md`'s 4-6 worker guidance for external-service workloads.
+   - **CPU-bound** (local computation, no external service) → multiprocessing or vectorization, per `docs/SYSTEM_PROFILE.md`'s higher local worker-count guidance (start near 12, measure before raising).
+   - Genuinely sequential (state must build incrementally, e.g. O-C ephemeris refinement across epochs) → say so explicitly rather than silently defaulting to slow.
+2. If the target script does not yet support the applicable form of parallelism, that absence is itself worth surfacing: either add it (mirroring the sharding/`--workers` pattern already proven in `process_t1_kepler_batch.py`) before recommending a multi-hour sequential recipe, or explicitly tell the user why not (e.g. a one-off task not worth the engineering cost).
+3. Every parallel/sharded recipe must still respect `docs/SYSTEM_PROFILE.md`'s conservative guidance for live external services (do not recommend so many concurrent shards/workers that MAST/ExoFOP/NASA Exoplanet Archive throttling becomes likely) and must use the Run Report Policy above so progress is self-reporting across shards.
+
+**Ask, don't assume, when:**
+- The right shard/worker count depends on the operator's own tradeoffs — how many console tabs they're willing to dedicate, whether they want a tab free for other work, how much they trust the external service's rate limits at higher concurrency.
+- It's unclear whether the task is I/O-bound, CPU-bound, or a mix (measuring first, then asking whether to push further, beats guessing a big number).
+- Two people, one Mac: if a task is already running, ask before recommending starting more concurrent tabs.
+
+Do not use this policy to justify over-engineering a task that will run once and take 4 minutes — the 3-minute bar is a prompt to *consider* parallelism, not a mandate to always add it.
+
 ### Python Environment Policy — NEVER TOUCH SYSTEM PYTHON
 - Validated runtime: **Python 3.14.3** inside `.venv` — never use system Python
 - All work happens inside the `.venv` virtual environment

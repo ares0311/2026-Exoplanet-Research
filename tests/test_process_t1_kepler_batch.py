@@ -14,6 +14,7 @@ from process_t1_kepler_batch import (  # noqa: E402
     T1KeplerProcessingStore,
     TargetResult,
     _clear_directory,
+    _cli,
     _directory_size_bytes,
     _format_eta,
     format_batch_summary,
@@ -22,6 +23,8 @@ from process_t1_kepler_batch import (  # noqa: E402
     make_default_lc_fetcher,
     process_target,
     run_batch,
+    shard_output_path,
+    shard_raw_dir,
 )
 
 # ---------------------------------------------------------------------------
@@ -487,6 +490,314 @@ class TestRunBatchConcurrency:
             lc_fetcher=_flat_lc_fetcher(),
         )
         assert summary.n_targets_processed_this_run == 2
+
+
+# ---------------------------------------------------------------------------
+# shard_output_path / shard_raw_dir
+# ---------------------------------------------------------------------------
+
+
+class TestShardOutputPath:
+    def test_no_change_when_shard_count_is_one(self) -> None:
+        path = Path("data/processed/t1_1_kepler_snippets/kepler_snippets.jsonl")
+        assert shard_output_path(path, 0, 1) == path
+
+    def test_inserts_shard_suffix_before_extension(self) -> None:
+        path = Path("kepler_snippets.jsonl")
+        assert shard_output_path(path, 2, 4) == Path("kepler_snippets.shard2of4.jsonl")
+
+    def test_distinct_shards_produce_distinct_paths(self) -> None:
+        path = Path("kepler_snippets.jsonl")
+        paths = {shard_output_path(path, i, 4) for i in range(4)}
+        assert len(paths) == 4
+
+
+class TestShardRawDir:
+    def test_no_change_when_shard_count_is_one(self, tmp_path: Path) -> None:
+        raw_dir = tmp_path / "raw"
+        assert shard_raw_dir(raw_dir, 0, 1) == raw_dir
+
+    def test_distinct_shards_produce_distinct_subdirectories(self, tmp_path: Path) -> None:
+        raw_dir = tmp_path / "raw"
+        dirs = {shard_raw_dir(raw_dir, i, 3) for i in range(3)}
+        assert len(dirs) == 3
+        assert all(str(d).startswith(str(raw_dir)) for d in dirs)
+
+
+# ---------------------------------------------------------------------------
+# run_batch with sharding (--shard-index / --shard-count)
+# ---------------------------------------------------------------------------
+
+
+class TestRunBatchSharding:
+    def _manifest_with_targets(self, tmp_path: Path, n_targets: int) -> Path:
+        rows = [
+            _manifest_row(target_id=3000 + i, source_row_id=f"s{i}") for i in range(n_targets)
+        ]
+        path = tmp_path / "manifest.jsonl"
+        _write_manifest(path, rows)
+        return path
+
+    def test_invalid_shard_index_raises(self, tmp_path: Path) -> None:
+        manifest_path = self._manifest_with_targets(tmp_path, 2)
+        with pytest.raises(ValueError, match="shard_index"):
+            run_batch(
+                manifest_path=manifest_path,
+                output_path=tmp_path / "out" / "snippets.jsonl",
+                db_path=tmp_path / "progress.sqlite3",
+                raw_dir=tmp_path / "raw",
+                shard_index=4,
+                shard_count=4,
+                lc_fetcher=_flat_lc_fetcher(),
+            )
+
+    def test_single_shard_processes_only_its_partition(self, tmp_path: Path) -> None:
+        manifest_path = self._manifest_with_targets(tmp_path, 8)  # target_ids 3000..3007
+        summary = run_batch(
+            manifest_path=manifest_path,
+            output_path=tmp_path / "out" / "snippets.jsonl",
+            db_path=tmp_path / "progress.sqlite3",
+            raw_dir=tmp_path / "raw",
+            max_targets=None,
+            n_bins=51,
+            shard_index=1,
+            shard_count=4,
+            lc_fetcher=_flat_lc_fetcher(),
+        )
+        # Exactly the target_ids congruent to 1 mod 4 in [3000, 3008).
+        expected = {tid for tid in range(3000, 3008) if tid % 4 == 1}
+        assert summary.n_targets_processed_this_run == len(expected)
+        output_path = shard_output_path(tmp_path / "out" / "snippets.jsonl", 1, 4)
+        lines = output_path.read_text().splitlines()
+        written_ids = {json.loads(line)["target_id"] for line in lines}
+        assert written_ids == expected
+
+    def test_two_shards_cover_all_targets_with_no_overlap(self, tmp_path: Path) -> None:
+        manifest_path = self._manifest_with_targets(tmp_path, 8)
+        db_path = tmp_path / "progress.sqlite3"
+        output_base = tmp_path / "out" / "snippets.jsonl"
+
+        summary0 = run_batch(
+            manifest_path=manifest_path, output_path=output_base, db_path=db_path,
+            raw_dir=tmp_path / "raw", max_targets=None, n_bins=51,
+            shard_index=0, shard_count=2, lc_fetcher=_flat_lc_fetcher(),
+        )
+        summary1 = run_batch(
+            manifest_path=manifest_path, output_path=output_base, db_path=db_path,
+            raw_dir=tmp_path / "raw", max_targets=None, n_bins=51,
+            shard_index=1, shard_count=2, lc_fetcher=_flat_lc_fetcher(),
+        )
+        assert summary0.n_targets_processed_this_run + summary1.n_targets_processed_this_run == 8
+
+        ids0 = {
+            json.loads(line)["target_id"]
+            for line in shard_output_path(output_base, 0, 2).read_text().splitlines()
+        }
+        ids1 = {
+            json.loads(line)["target_id"]
+            for line in shard_output_path(output_base, 1, 2).read_text().splitlines()
+        }
+        assert ids0.isdisjoint(ids1)
+        assert ids0 | ids1 == set(range(3000, 3008))
+
+        # A shared db_path means resume/status correctly reflects both shards' work.
+        store = T1KeplerProcessingStore(db_path)
+        assert store.done_target_ids() == set(range(3000, 3008))
+
+    def test_concurrent_shards_never_collide_on_raw_dir(self, tmp_path: Path) -> None:
+        """Two shards running as real concurrent threads must never touch the
+        same raw-download subdirectory or delete each other's in-flight work,
+        the same class of hazard the original --workers fix addressed, now at
+        the shard level."""
+        import threading
+        import time as time_module
+
+        manifest_path = self._manifest_with_targets(tmp_path, 6)
+        db_path = tmp_path / "progress.sqlite3"
+        output_base = tmp_path / "out" / "snippets.jsonl"
+        raw_dir = tmp_path / "raw"
+        seen_dirs: set[str] = set()
+        lock = threading.Lock()
+
+        def _fetch(_target_id: int):
+            time_module.sleep(0.05)
+            return [0.0, 1.0], [1.0, 1.0]
+
+        def _run_shard(shard_index: int) -> None:
+            def _tracking_fetch(target_id: int):
+                target_dir = raw_dir / f"shard{shard_index}of2" / f"target_{target_id}"
+                with lock:
+                    seen_dirs.add(str(target_dir))
+                return _fetch(target_id)
+
+            run_batch(
+                manifest_path=manifest_path, output_path=output_base, db_path=db_path,
+                raw_dir=raw_dir, max_targets=None, n_bins=2,
+                shard_index=shard_index, shard_count=2, lc_fetcher=_tracking_fetch,
+            )
+
+        threads = [threading.Thread(target=_run_shard, args=(i,)) for i in range(2)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # Every observed raw directory is scoped to its own shard.
+        assert all("shard0of2" in d or "shard1of2" in d for d in seen_dirs)
+        store = T1KeplerProcessingStore(db_path)
+        assert store.done_target_ids() == set(range(3000, 3006))
+
+
+# ---------------------------------------------------------------------------
+# CLI: --status-only
+# ---------------------------------------------------------------------------
+
+
+class TestCliStatusOnly:
+    def test_status_only_prints_summary_without_processing(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        db_path = tmp_path / "progress.sqlite3"
+        store = T1KeplerProcessingStore(db_path)
+        store.mark_active(42, 1)
+        store.mark_done(42, n_written=1, n_failed=0, flag="OK")
+
+        code = _cli(["--status-only", "--db-path", str(db_path)])
+        assert code == 0
+        out = capsys.readouterr().out
+        assert "1 done" in out
+        assert "0 active" in out
+
+    def test_status_only_does_not_require_manifest(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        db_path = tmp_path / "progress.sqlite3"
+        # No manifest file exists at all; --status-only must not fail on that.
+        code = _cli(
+            [
+                "--status-only",
+                "--db-path", str(db_path),
+                "--manifest", str(tmp_path / "does_not_exist.jsonl"),
+            ]
+        )
+        assert code == 0
+
+
+# ---------------------------------------------------------------------------
+# CLI: run-report auto-commit/push (never touches real git in tests)
+# ---------------------------------------------------------------------------
+
+
+class _FakeGitRun:
+    """Injectable git runner for CLI tests -- never shells out for real."""
+
+    def __init__(self) -> None:
+        self.calls: list[list[str]] = []
+
+    def __call__(self, args, **_kwargs):
+        import subprocess
+
+        self.calls.append(list(args))
+        return subprocess.CompletedProcess(args, returncode=0, stdout="", stderr="")
+
+
+class TestCliRunReport:
+    def _manifest(self, tmp_path: Path, n_targets: int = 2) -> Path:
+        rows = [
+            _manifest_row(target_id=4000 + i, source_row_id=f"r{i}") for i in range(n_targets)
+        ]
+        path = tmp_path / "manifest.jsonl"
+        _write_manifest(path, rows)
+        return path
+
+    def test_default_run_writes_and_commits_report(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        manifest_path = self._manifest(tmp_path)
+        monkeypatch.setattr(
+            "process_t1_kepler_batch.make_default_lc_fetcher",
+            lambda _raw_dir: _flat_lc_fetcher(),
+        )
+        fake_git = _FakeGitRun()
+        report_dir = tmp_path / "reports"
+
+        code = _cli(
+            [
+                "--manifest", str(manifest_path),
+                "--output", str(tmp_path / "out" / "snippets.jsonl"),
+                "--db-path", str(tmp_path / "progress.sqlite3"),
+                "--raw-dir", str(tmp_path / "raw"),
+                "--n-bins", "51",
+                "--report-dir", str(report_dir),
+            ],
+            git_run_fn=fake_git,
+        )
+        assert code == 0
+
+        report_path = report_dir / "process_t1_kepler_batch.jsonl"
+        assert report_path.exists()
+        record = json.loads(report_path.read_text().splitlines()[0])
+        assert record["script"] == "process_t1_kepler_batch"
+        assert record["items_processed"] == 2
+        assert record["status"] == "success"
+
+        # Only the report file was ever staged -- never the whole tree.
+        add_calls = [c for c in fake_git.calls if c[:2] == ["git", "add"]]
+        assert add_calls == [["git", "add", "--", str(report_path)]]
+
+    def test_no_git_report_flag_skips_reporting_entirely(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        manifest_path = self._manifest(tmp_path)
+        monkeypatch.setattr(
+            "process_t1_kepler_batch.make_default_lc_fetcher",
+            lambda _raw_dir: _flat_lc_fetcher(),
+        )
+        fake_git = _FakeGitRun()
+        report_dir = tmp_path / "reports"
+
+        code = _cli(
+            [
+                "--manifest", str(manifest_path),
+                "--output", str(tmp_path / "out" / "snippets.jsonl"),
+                "--db-path", str(tmp_path / "progress.sqlite3"),
+                "--raw-dir", str(tmp_path / "raw"),
+                "--n-bins", "51",
+                "--report-dir", str(report_dir),
+                "--no-git-report",
+            ],
+            git_run_fn=fake_git,
+        )
+        assert code == 0
+        assert not (report_dir / "process_t1_kepler_batch.jsonl").exists()
+        assert fake_git.calls == []
+
+    def test_shard_report_uses_shard_scoped_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        manifest_path = self._manifest(tmp_path, n_targets=4)
+        monkeypatch.setattr(
+            "process_t1_kepler_batch.make_default_lc_fetcher",
+            lambda _raw_dir: _flat_lc_fetcher(),
+        )
+        fake_git = _FakeGitRun()
+        report_dir = tmp_path / "reports"
+
+        code = _cli(
+            [
+                "--manifest", str(manifest_path),
+                "--output", str(tmp_path / "out" / "snippets.jsonl"),
+                "--db-path", str(tmp_path / "progress.sqlite3"),
+                "--raw-dir", str(tmp_path / "raw"),
+                "--n-bins", "51",
+                "--report-dir", str(report_dir),
+                "--shard-index", "0",
+                "--shard-count", "2",
+            ],
+            git_run_fn=fake_git,
+        )
+        assert code == 0
+        assert (report_dir / "process_t1_kepler_batch.shard0of2.jsonl").exists()
 
 
 # ---------------------------------------------------------------------------
