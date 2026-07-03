@@ -28,6 +28,7 @@ from exo_toolkit.fetch import (
     FetchProvenance,
     FetchResult,
     _download_one_quietly,
+    _ensure_download_products_quiet,
     _extract_sectors,
     _fetch_jwst,
     _first_row,
@@ -169,6 +170,90 @@ def test_download_one_quietly_forces_astroquery_verbose_false(
 
     assert result is expected
     assert calls == [{"mrp_only": False, "verbose": False}]
+
+
+def _make_fake_observations(calls: list[dict[str, Any]], *, sleep: float = 0.0) -> type:
+    """Build a fresh fake Observations class recording kwargs of each call."""
+
+    class FakeObservations:
+        @staticmethod
+        def download_products(products: Any, *args: Any, **kwargs: Any) -> list[dict[str, str]]:
+            if sleep:
+                import time
+
+                time.sleep(sleep)
+            calls.append(dict(kwargs))
+            return [{"Status": "COMPLETE", "Local Path": "/tmp/example.fits"}]
+
+    return FakeObservations
+
+
+def test_ensure_download_products_quiet_forces_verbose_false() -> None:
+    calls: list[dict[str, Any]] = []
+    fake_observations = _make_fake_observations(calls)
+
+    _ensure_download_products_quiet(fake_observations)
+    fake_observations.download_products(["product"])
+
+    assert calls == [{"verbose": False}]
+
+
+def test_ensure_download_products_quiet_is_idempotent() -> None:
+    """A second call must not double-wrap an already-quiet function."""
+    calls: list[dict[str, Any]] = []
+    fake_observations = _make_fake_observations(calls)
+
+    _ensure_download_products_quiet(fake_observations)
+    wrapped_once = fake_observations.download_products
+    _ensure_download_products_quiet(fake_observations)
+    wrapped_twice = fake_observations.download_products
+
+    assert wrapped_once is wrapped_twice
+
+
+def test_ensure_download_products_quiet_never_restores() -> None:
+    """Unlike the old lock-based implementation, the wrap is permanent -- there
+    is no legitimate scenario in this codebase where noisy verbose output
+    should come back mid-process."""
+    calls: list[dict[str, Any]] = []
+    fake_observations = _make_fake_observations(calls)
+
+    original = fake_observations.download_products
+    _ensure_download_products_quiet(fake_observations)
+
+    assert fake_observations.download_products is not original
+    # Calling the real underlying function still works via the wrapper.
+    fake_observations.download_products(["product"])
+    assert calls == [{"verbose": False}]
+
+
+def test_concurrent_downloads_no_longer_serialize_on_one_lock() -> None:
+    """Regression: the old implementation wrapped the *entire* download call
+    in a lock, so --workers > 1 barely helped (all downloads queued one at a
+    time). Two concurrent calls through the quiet wrapper must be able to
+    overlap, not serialize."""
+    import threading
+    import time
+
+    calls: list[dict[str, Any]] = []
+    fake_observations = _make_fake_observations(calls, sleep=0.1)
+    _ensure_download_products_quiet(fake_observations)
+
+    def _call() -> None:
+        fake_observations.download_products(["product"])
+
+    start = time.monotonic()
+    threads = [threading.Thread(target=_call) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    elapsed = time.monotonic() - start
+
+    assert len(calls) == 2
+    # Fully serialized would take >= 0.2s; concurrent execution should finish
+    # well under that even with scheduling overhead.
+    assert elapsed < 0.18
 
 
 # ---------------------------------------------------------------------------

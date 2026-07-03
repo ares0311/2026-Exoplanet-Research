@@ -22,7 +22,6 @@ import importlib
 import importlib.util
 import re
 import socket
-import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -95,8 +94,6 @@ _EXPTIME_FALLBACK: dict[str, float] = {
     "short": 120.0,
     "fast": 20.0,
 }
-
-_DOWNLOAD_PRODUCTS_LOCK = threading.Lock()
 
 
 # ---------------------------------------------------------------------------
@@ -699,29 +696,53 @@ def _download_one_with_cache_repair(
     raise RuntimeError("Lightkurve cache repair retry loop exhausted")
 
 
-def _download_one_quietly(search: Any, **kwargs: Any) -> Any:
-    """Call Lightkurve's per-product downloader with Astroquery verbosity disabled.
+_QUIET_WRAPPER_MARKER = "_exo_toolkit_quiet_download_products"
 
-    Lightkurve's lower-level ``_download_one`` avoids its ``suppress_stdout``
-    decorator, but it still calls ``Observations.download_products`` with
-    Astroquery's default ``verbose=True``.  Force ``verbose=False`` while the
-    third-party call is active so worker-thread scans keep operator progress
-    readable without redirecting process-global stdout.
+
+def _ensure_download_products_quiet(observations: Any) -> None:
+    """Idempotently wrap ``observations.download_products`` to force ``verbose=False``.
+
+    Never restores the original -- there is no scenario in this codebase
+    where a caller wants Astroquery's noisy per-file download prints back,
+    so a one-way, idempotent wrap (tagged via ``_QUIET_WRAPPER_MARKER`` so
+    repeat calls are a fast no-op) replaces the previous
+    monkeypatch-then-restore-under-a-lock pattern. That pattern held a lock
+    around the *entire* download call (not just the attribute swap), which
+    fully serialized every download within one process regardless of
+    ``--workers`` count -- explaining why worker concurrency barely helped.
+    A benign race remains possible (two threads both seeing "not yet
+    wrapped" and each wrapping once, nesting two verbose=False layers around
+    the true original) but is harmless: every layer still forces
+    ``verbose=False`` and delegates to the same real function underneath.
     """
-    mast_module: Any = importlib.import_module("astroquery.mast")
-    observations: Any = mast_module.Observations
-    original = observations.download_products
+    current = observations.download_products
+    if getattr(current, _QUIET_WRAPPER_MARKER, False):
+        return
+    original = current
 
     def quiet_download_products(products: Any, *args: Any, **inner_kwargs: Any) -> Any:
         inner_kwargs["verbose"] = False
         return original(products, *args, **inner_kwargs)
 
-    with _DOWNLOAD_PRODUCTS_LOCK:
-        observations.download_products = quiet_download_products
-        try:
-            return search._download_one(**kwargs)  # noqa: SLF001
-        finally:
-            observations.download_products = original
+    setattr(quiet_download_products, _QUIET_WRAPPER_MARKER, True)
+    observations.download_products = quiet_download_products
+
+
+def _download_one_quietly(search: Any, **kwargs: Any) -> Any:
+    """Call Lightkurve's per-product downloader with Astroquery verbosity disabled.
+
+    Lightkurve's lower-level ``_download_one`` avoids its ``suppress_stdout``
+    decorator, but it still calls ``Observations.download_products`` with
+    Astroquery's default ``verbose=True``. Force ``verbose=False`` (see
+    :func:`_ensure_download_products_quiet`) so worker-thread scans keep
+    operator progress readable without redirecting process-global stdout --
+    and, unlike the previous lock-based implementation, without serializing
+    concurrent downloads onto one process-wide lock.
+    """
+    mast_module: Any = importlib.import_module("astroquery.mast")
+    observations: Any = mast_module.Observations
+    _ensure_download_products_quiet(observations)
+    return search._download_one(**kwargs)  # noqa: SLF001
 
 
 def _is_missing_flux_column_error(exc: Exception, flux_column: str) -> bool:
