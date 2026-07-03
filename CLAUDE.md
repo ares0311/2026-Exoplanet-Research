@@ -140,6 +140,41 @@ Print a startup banner before any loop. Print a completion or early-stop line at
 - **Never commit a long-running script without console output.** If a script is silent, add progress prints before committing.
 - When modifying any existing long-running script, check it meets this standard and fix if not.
 
+### Run Report Policy — MANDATORY
+
+**Every acquisition or processing script (sharded or single-threaded) must write a structured completion report and auto-commit + push it after each successful run.**
+Console output is for watching a run live; it is not a record. The old
+pattern — human pastes console output, agent manually transcribes it into
+`AGENTS.md`/`docs/PRODUCTION_READINESS.md`/the local artifact ledger — is
+lossy and does not scale to multiple concurrent console tabs. A script
+reporting its own outcome (like a PR announcing its own merge) replaces that.
+
+**Mechanism** (`Skills/run_report.py` — read it before adding a new
+acquisition script or modifying an existing one):
+```python
+from run_report import RunReport, report_path_for, run_and_commit_report
+
+report = RunReport(
+    script="my_fetch_script", status="success",
+    started_at=started_at, completed_at=completed_at,
+    elapsed_seconds=elapsed, items_processed=n, items_written=w, items_failed=f,
+    output_paths=(str(output_path),),
+    shard_index=shard_index, shard_count=shard_count,  # None/1 if not sharded
+)
+path = report_path_for("my_fetch_script", shard_index=shard_index, shard_count=shard_count)
+run_and_commit_report(report, path)  # appends JSON line, then commits+pushes ONLY that file
+```
+
+**Rules:**
+- Call this at the end of every successful run (or, for sharded scripts, every shard's run) — not per-item.
+- The report ledger lives at `artifacts/manifests/run_reports/<script>.jsonl` (or `.shardIofN.jsonl` when sharded, so concurrent shards never contend for one file) and is **committed to git, never gitignored**.
+- `commit_and_push_report`/`run_and_commit_report` must stage **only** the exact report path (`git add -- <path>`, never `git add .`/`-A`) — it must never sweep up unrelated uncommitted work sitting in the operator's working tree.
+- A report-push failure must never crash the script or discard the data it already fetched: print a warning and exit 0; the human can push manually later.
+- This is a narrow, intentional exception to the branch/PR/CI cycle below: the report push goes directly to whatever branch is checked out (normally `main`). It must never be used to push code, data files, or training manifests — only the small structured JSON completion record.
+- To check cumulative progress without asking for pasted console output, read the ledger: `.venv/bin/python Skills/run_report.py <script-name>`, or use a script's own `--status-only` flag where one exists.
+- **Retrofit scope**: this applies to every existing acquisition/processing Skill, not just newly-sharded ones — `batch_scan.py`, `star_scanner.py`, `fetch_kepler_lc_snippets.py`, `fetch_tess_lc_snippets.py`, `fetch_tess_kepler_overlap_snippets.py`, `fetch_tess_k2_overlap_snippets.py`, `fetch_kepler_tce.py`, `fetch_tess_toi.py`, `fetch_exofop_ctoi.py`, `fetch_nea_koi_lc_index.py`, `fetch_additional_tess_labels.py`, `fetch_confirmed_hosts.py`, `fetch_jwst_targets.py`, `fetch_jwst_lc.py`, `tess_tce_fetcher.py`. See `docs/DISCOVERY_RUNBOOK.md` Rule 7 for full detail and retrofit tracking.
+- Tests must never invoke the real git commit/push path — inject a fake runner (see `commit_and_push_report`'s `run_fn` parameter and `tests/test_run_report.py`).
+
 ### Python Environment Policy — NEVER TOUCH SYSTEM PYTHON
 - Validated runtime: **Python 3.14.3** inside `.venv` — never use system Python
 - All work happens inside the `.venv` virtual environment

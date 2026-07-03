@@ -25,6 +25,20 @@ that script's convention, since ``docs/SYSTEM_PROFILE.md`` recommends
 starting low and increasing only after measuring for external-service
 workloads.
 
+Also supports process-level sharding (``--shard-index``/``--shard-count``)
+so multiple console tabs can run concurrently against disjoint target sets,
+for throughput beyond one process's ``--workers`` ceiling. Every concurrently
+running tab must share the same ``--db-path`` (a single shared, WAL-mode
+SQLite database is the source of truth for which targets are globally done,
+so no two tabs ever reprocess the same target) and the same ``--shard-count``
+(each tab passes its own unique ``--shard-index`` from ``0`` to
+``shard_count - 1``). Partitioning is by ``target_id % shard_count``, which
+is disjoint by construction, so per-target raw-download subdirectories never
+collide across shards. Each shard writes to its own auto-suffixed output
+JSONL file (large per-record lines are not safe to interleave from two
+processes appending to one file); concatenate the shard files afterward to
+get the full corpus -- no dedup is needed since the partition is disjoint.
+
 Public API
 ----------
 ManifestRow -- TypedDict-like alias for one manifest JSONL row
@@ -33,8 +47,10 @@ group_rows_by_target(rows) -> dict[int, list[dict]]
 T1KeplerProcessingStore(db_path)
     .mark_active/.mark_done/.done_target_ids/.summary
 process_target(target_id, rows, *, lc_fetcher, n_bins) -> TargetResult
+shard_output_path(output_path, shard_index, shard_count) -> Path
 run_batch(*, manifest_path, output_path, db_path, raw_dir, max_targets,
-          workers, request_delay, lc_fetcher, ...) -> BatchSummary
+          workers, request_delay, shard_index, shard_count,
+          lc_fetcher, ...) -> BatchSummary
 format_batch_summary(summary) -> str
 """
 from __future__ import annotations
@@ -56,6 +72,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from fetch_kepler_lc_snippets import _normalise, _phase_fold_bin  # noqa: E402
+from run_report import (  # noqa: E402
+    DEFAULT_REPORT_DIR,
+    RunReport,
+    report_path_for,
+    run_and_commit_report,
+)
 
 _KEPLER_BJD_OFFSET = 2454833.0  # Kepler time is BJD - 2454833
 
@@ -124,6 +146,13 @@ class T1KeplerProcessingStore:
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.db_path, timeout=30.0, factory=_ClosingConnection)
         connection.row_factory = sqlite3.Row
+        # WAL mode lets multiple concurrent shard processes read/write this
+        # database without blocking each other on the whole-file lock that
+        # SQLite's default rollback journal takes; each shard only ever
+        # writes rows for its own disjoint target_id partition, so there is
+        # no write-write conflict, only lock contention to avoid.
+        connection.execute("PRAGMA journal_mode=WAL;")
+        connection.execute("PRAGMA busy_timeout=30000;")
         return connection
 
     def _initialize(self) -> None:
@@ -386,6 +415,8 @@ class BatchSummary:
     elapsed_seconds: float
     output_path: str
     db_path: str
+    shard_index: int = 0
+    shard_count: int = 1
 
 
 def _format_eta(seconds: float) -> str:
@@ -397,6 +428,40 @@ def _format_eta(seconds: float) -> str:
         remainder = int(seconds % 60)
         return f"{minutes}m{remainder:02d}s"
     return f"{seconds:.0f}s"
+
+
+def shard_raw_dir(raw_dir: Path, shard_index: int, shard_count: int) -> Path:
+    """Return *raw_dir* unchanged for ``shard_count == 1``, else a per-shard subdirectory.
+
+    Each shard's startup defensively clears its whole raw-download scratch
+    directory (to drop stale per-target dirs left by a prior crash). If two
+    shards shared one *raw_dir*, one shard starting up could wipe another
+    shard's in-flight download. Scoping to ``raw_dir/shardIofN`` makes that
+    impossible, matching :func:`shard_output_path`'s approach.
+    """
+    raw_dir = Path(raw_dir)
+    if shard_count <= 1:
+        return raw_dir
+    return raw_dir / f"shard{shard_index}of{shard_count}"
+
+
+def shard_output_path(output_path: Path, shard_index: int, shard_count: int) -> Path:
+    """Return *output_path* unchanged for ``shard_count == 1``, else suffixed.
+
+    Concurrent shard processes must never append to the same output file
+    (large per-record JSON lines are not guaranteed atomic to interleave), so
+    when sharding is active the filename gets an explicit
+    ``.shardIofN`` marker inserted before the suffix, e.g.
+    ``kepler_snippets.jsonl`` -> ``kepler_snippets.shard0of4.jsonl``. This is
+    automatic (not left to the operator) so two tabs can never accidentally
+    collide on the same output path.
+    """
+    output_path = Path(output_path)
+    if shard_count <= 1:
+        return output_path
+    return output_path.with_name(
+        f"{output_path.stem}.shard{shard_index}of{shard_count}{output_path.suffix}"
+    )
 
 
 def _write_records(fh: Any, records: Iterable[dict[str, Any]]) -> int:
@@ -419,6 +484,8 @@ def run_batch(
     n_bins: int = 201,
     workers: int = 1,
     request_delay: float = 0.25,
+    shard_index: int = 0,
+    shard_count: int = 1,
     lc_fetcher: LcFetcher | None = None,
     progress_fn: Callable[[str], None] | None = None,
 ) -> BatchSummary:
@@ -428,34 +495,53 @@ def run_batch(
         manifest_path: Leakage-safe manifest JSONL from ``build_t1_training_manifest.py``.
         output_path: Destination JSONL for processed snippets (appended; never
             duplicates a target already marked ``done`` in the SQLite store).
-        db_path: SQLite progress/resume database.
+            When ``shard_count > 1`` this is passed through
+            :func:`shard_output_path` first, so each shard writes its own file.
+        db_path: SQLite progress/resume database. Safe to share across
+            concurrently running shard processes -- see ``shard_index``.
         raw_dir: Scratch directory for raw FITS downloads; wiped after every target.
         max_targets: Maximum number of *not-yet-done* targets to process in this
             call. ``None`` means all remaining targets -- use with care given the
             dataset handoff doc's storage/runtime bounding rules.
         n_bins: Phase-fold bin count per snippet.
-        workers: Bounded concurrent light-curve fetches. Per
-            ``docs/SYSTEM_PROFILE.md``, external-service/live-catalog workloads
-            should use lower concurrency (4-6) even on a well-resourced Mac;
-            defaults to 1 (sequential) to match this project's existing
-            ``fetch_kepler_lc_snippets.py`` convention -- pass a higher value
-            explicitly to speed up a bounded run.
+        workers: Bounded concurrent light-curve fetches within this one
+            process. Per ``docs/SYSTEM_PROFILE.md``, external-service/live-catalog
+            workloads should use lower concurrency (4-6) even on a
+            well-resourced Mac; defaults to 1 (sequential) to match this
+            project's existing ``fetch_kepler_lc_snippets.py`` convention --
+            pass a higher value explicitly to speed up a bounded run.
         request_delay: Delay between worker submissions when ``workers > 1``,
             to stay polite to MAST/Lightkurve.
+        shard_index: This process's shard index in ``[0, shard_count)``. Every
+            concurrently running process must use the same ``shard_count``
+            with a distinct ``shard_index`` -- partitioning is by
+            ``target_id % shard_count``, which is disjoint across shards, so
+            no two shards ever touch the same target or raw-download
+            subdirectory. Default ``0`` with ``shard_count=1`` (no sharding)
+            reproduces the exact prior single-process behavior.
+        shard_count: Total number of concurrently running shard processes.
+            ``1`` (the default) disables sharding entirely.
         lc_fetcher: Injectable light-curve fetcher (for tests); defaults to a
             real Lightkurve fetch scoped to *raw_dir*.
         progress_fn: Optional callable invoked with a one-line status message
             before/after each target, so a long batch never looks hung.
     """
     manifest_path = Path(manifest_path)
-    output_path = Path(output_path)
+    shard_count = max(1, int(shard_count))
+    shard_index = int(shard_index)
+    if not 0 <= shard_index < shard_count:
+        raise ValueError(
+            f"shard_index must be in [0, {shard_count}), got {shard_index}"
+        )
+    output_path = shard_output_path(Path(output_path), shard_index, shard_count)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    raw_dir = shard_raw_dir(Path(raw_dir), shard_index, shard_count)
     _progress = progress_fn if progress_fn is not None else (lambda _msg: None)
     workers = max(1, int(workers))
 
     store = T1KeplerProcessingStore(db_path)
-    _fetch = lc_fetcher if lc_fetcher is not None else make_default_lc_fetcher(Path(raw_dir))
-    _clear_directory(Path(raw_dir))  # defensive: drop any stale per-target dirs from a prior crash
+    _fetch = lc_fetcher if lc_fetcher is not None else make_default_lc_fetcher(raw_dir)
+    _clear_directory(raw_dir)  # defensive: drop any stale per-target dirs from a prior crash
 
     rows = load_manifest_rows(manifest_path)
     groups = group_rows_by_target(rows)
@@ -463,13 +549,16 @@ def run_batch(
 
     done_ids = store.done_target_ids()
     pending_target_ids = [tid for tid in groups if tid not in done_ids]
+    if shard_count > 1:
+        pending_target_ids = [tid for tid in pending_target_ids if tid % shard_count == shard_index]
     if max_targets is not None:
         pending_target_ids = pending_target_ids[:max_targets]
 
+    shard_note = f", shard={shard_index}/{shard_count}" if shard_count > 1 else ""
     _progress(
         f"T1-1 Kepler batch: {n_targets_total} total targets, "
         f"{len(done_ids)} already done, {len(pending_target_ids)} to process this run "
-        f"(workers={workers})"
+        f"(workers={workers}{shard_note})  output={output_path}"
     )
 
     start = time.monotonic()
@@ -555,25 +644,28 @@ def run_batch(
         elapsed_seconds=elapsed_total,
         output_path=str(output_path),
         db_path=str(db_path),
+        shard_index=shard_index,
+        shard_count=shard_count,
     )
 
 
 def format_batch_summary(summary: BatchSummary) -> str:
     """Render a :class:`BatchSummary` as a short Markdown report."""
-    return "\n".join(
-        [
-            "# T1-1 Kepler Processing Batch",
-            "",
-            f"- Total targets in manifest: {summary.n_targets_total}",
-            f"- Already done before this run: {summary.n_targets_skipped_done}",
-            f"- Processed this run: {summary.n_targets_processed_this_run}",
-            f"- Snippets written: {summary.n_snippets_written}",
-            f"- Manifest rows failed: {summary.n_rows_failed}",
-            f"- Elapsed: {summary.elapsed_seconds:.0f}s",
-            f"- Output: `{summary.output_path}`",
-            f"- Progress DB: `{summary.db_path}`",
-        ]
-    )
+    lines = [
+        "# T1-1 Kepler Processing Batch",
+        "",
+        f"- Total targets in manifest: {summary.n_targets_total}",
+        f"- Already done before this run: {summary.n_targets_skipped_done}",
+        f"- Processed this run: {summary.n_targets_processed_this_run}",
+        f"- Snippets written: {summary.n_snippets_written}",
+        f"- Manifest rows failed: {summary.n_rows_failed}",
+        f"- Elapsed: {summary.elapsed_seconds:.0f}s",
+        f"- Output: `{summary.output_path}`",
+        f"- Progress DB: `{summary.db_path}`",
+    ]
+    if summary.shard_count > 1:
+        lines.append(f"- Shard: {summary.shard_index}/{summary.shard_count}")
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -581,7 +673,14 @@ def format_batch_summary(summary: BatchSummary) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _cli(argv: list[str] | None = None) -> int:
+def _cli(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
+    """CLI entry point.
+
+    ``git_run_fn`` is exposed only for tests (an injectable stand-in for
+    ``subprocess.run`` so tests never touch the real repository's git state);
+    the real CLI invocation never passes it, so ``run_and_commit_report``
+    falls back to its own real ``subprocess.run`` default.
+    """
     import argparse
 
     parser = argparse.ArgumentParser(
@@ -620,7 +719,61 @@ def _cli(argv: list[str] | None = None) -> int:
         default=0.25,
         help="Delay in seconds between worker submissions when --workers > 1 (default: 0.25)",
     )
+    parser.add_argument(
+        "--shard-index",
+        type=int,
+        default=0,
+        help=(
+            "This process's shard index in [0, --shard-count), for running many "
+            "console tabs concurrently against disjoint target sets. All "
+            "concurrently running tabs must share --db-path and --shard-count, "
+            "each with its own unique --shard-index (default: 0)."
+        ),
+    )
+    parser.add_argument(
+        "--shard-count",
+        type=int,
+        default=1,
+        help=(
+            "Total number of concurrently running shard processes. 1 (default) "
+            "disables sharding. Partitioning is target_id %% shard_count, so "
+            "shards never touch the same target; each shard's output file is "
+            "auto-suffixed (see shard_output_path)."
+        ),
+    )
+    parser.add_argument(
+        "--status-only",
+        action="store_true",
+        help=(
+            "Print the shared SQLite progress summary (done/active targets "
+            "across all shards) and exit, without processing anything."
+        ),
+    )
+    parser.add_argument(
+        "--no-git-report",
+        action="store_true",
+        help=(
+            "Skip writing and auto-committing/pushing the run-report ledger "
+            "entry after this run. Auto-reporting is ON by default -- see "
+            "docs/DISCOVERY_RUNBOOK.md's Run Report Policy."
+        ),
+    )
+    parser.add_argument(
+        "--report-dir",
+        type=Path,
+        default=DEFAULT_REPORT_DIR,
+        help="Directory for the run-report ledger (default: artifacts/manifests/run_reports)",
+    )
     args = parser.parse_args(argv)
+
+    if args.status_only:
+        summary = T1KeplerProcessingStore(args.db_path).summary()
+        print(
+            f"T1-1 Kepler batch status: {summary['n_done']} done, "
+            f"{summary['n_active']} active, {summary['n_written']} snippets written, "
+            f"{summary['n_failed']} rows failed (db: {args.db_path})"
+        )
+        return 0
 
     if not args.manifest.exists():
         print(f"Manifest not found: {args.manifest}", file=sys.stderr)
@@ -630,6 +783,7 @@ def _cli(argv: list[str] | None = None) -> int:
         )
         return 1
 
+    started_at = datetime.now(UTC).isoformat()
     summary = run_batch(
         manifest_path=args.manifest,
         output_path=args.output,
@@ -639,9 +793,44 @@ def _cli(argv: list[str] | None = None) -> int:
         n_bins=args.n_bins,
         workers=args.workers,
         request_delay=args.request_delay,
+        shard_index=args.shard_index,
+        shard_count=args.shard_count,
         progress_fn=lambda msg: print(msg, flush=True),
     )
     print(format_batch_summary(summary))
+
+    if not args.no_git_report:
+        report = RunReport(
+            script="process_t1_kepler_batch",
+            status="success" if summary.n_rows_failed == 0 else "partial",
+            started_at=started_at,
+            completed_at=datetime.now(UTC).isoformat(),
+            elapsed_seconds=summary.elapsed_seconds,
+            items_processed=summary.n_targets_processed_this_run,
+            items_written=summary.n_snippets_written,
+            items_failed=summary.n_rows_failed,
+            output_paths=(summary.output_path,),
+            shard_index=summary.shard_index,
+            shard_count=summary.shard_count,
+        )
+        report_path = report_path_for(
+            "process_t1_kepler_batch",
+            shard_index=summary.shard_index,
+            shard_count=summary.shard_count,
+            report_dir=args.report_dir,
+        )
+        report_kwargs: dict[str, Any] = {}
+        if git_run_fn is not None:
+            report_kwargs["run_fn"] = git_run_fn
+        ok = run_and_commit_report(report, report_path, **report_kwargs)
+        if ok:
+            print(f"Run report committed and pushed: {report_path}")
+        else:
+            print(
+                f"Run report written to {report_path} but commit/push failed "
+                "-- push it manually when convenient.",
+                file=sys.stderr,
+            )
     return 0
 
 

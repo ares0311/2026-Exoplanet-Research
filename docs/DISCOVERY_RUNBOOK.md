@@ -245,6 +245,56 @@ rm -rf data/tess_c20_cnn_splits/             # can regenerate
 
 **When to run this**: After each formal REJECTION is documented. Do not run speculatively. Confirm with the user before deleting anything larger than 1 GB.
 
+### Rule 7: Run Report Policy — every acquisition/processing script self-reports
+
+Every long-running acquisition or processing Skill (fetchers, batch scanners,
+corpus builders — sharded or single-threaded) must, at the end of each
+successful invocation (or each shard's invocation), write a small structured
+completion record via `Skills/run_report.py` and auto-commit + push *only
+that record* to git. This replaces the old pattern of a human pasting console
+output for the agent to manually transcribe into tracking docs.
+
+**Why**: pasted console output is lossy, easy to mis-transcribe, and clutters
+chat context. A script that reports its own outcome — like a CI job posting a
+status, or a PR announcing its own merge — is more reliable and scales to
+many concurrently running console tabs.
+
+**Mechanism** (`Skills/run_report.py`):
+- `RunReport` — a small dataclass: script name, status (`success`/`partial`/`failed`),
+  timestamps, elapsed seconds, items processed/written/failed, output paths,
+  and shard index/count when sharded.
+- `append_run_report(report, path)` — appends one JSON line to a ledger file
+  under `artifacts/manifests/run_reports/<script>.jsonl` (or
+  `<script>.shardIofN.jsonl` when sharded, so concurrent shards never contend
+  for the same file — mirrors how sharded output/raw-dir paths are already scoped).
+- `commit_and_push_report(path, message=...)` — stages **only** that exact
+  file (never `git add .`/`-A`), commits, and pushes, retrying once via
+  `git fetch` + `git rebase` on a non-fast-forward rejection. Never raises —
+  a report-push failure prints a warning and exits 0; it must never crash or
+  block the actual data-acquisition work that already succeeded.
+- This is a narrow, intentional exception to the branch/PR/CI policy: a
+  run-report push goes directly to whatever branch is checked out (normally
+  `main`), bypassing the feature-branch cycle, because it only ever touches
+  one small, git-tracked metadata file that the operator did not otherwise
+  edit. It must never be used to push code, data, or manifest changes.
+
+**Retrofit scope**: applies to all existing acquisition/processing Skills —
+`batch_scan.py`, `star_scanner.py`, `fetch_kepler_lc_snippets.py`,
+`fetch_tess_lc_snippets.py`, `fetch_tess_kepler_overlap_snippets.py`,
+`fetch_tess_k2_overlap_snippets.py`, `fetch_kepler_tce.py`,
+`fetch_tess_toi.py`, `fetch_exofop_ctoi.py`, `fetch_nea_koi_lc_index.py`,
+`fetch_additional_tess_labels.py`, `fetch_confirmed_hosts.py`,
+`fetch_jwst_targets.py`, `fetch_jwst_lc.py`, `tess_tce_fetcher.py` — not just
+`process_t1_kepler_batch.py` (the first adopter). Retrofit these
+incrementally; do not block using a script on it having a run report yet, but
+do not consider the retrofit complete until each of the scripts above calls
+`run_and_commit_report` at the end of a successful run.
+
+**Checking progress without pasted console output**: read the ledger
+directly, e.g. `.venv/bin/python Skills/run_report.py process_t1_kepler_batch`,
+or ask for a fresh `--status-only` run where the script supports one (see
+`process_t1_kepler_batch.py --status-only`).
+
 ---
 
 ## What Has Been Built (Capability Inventory)

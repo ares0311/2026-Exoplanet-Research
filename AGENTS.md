@@ -128,6 +128,9 @@ When the user must take an action to unblock a gap:
 - **Project version bumped to 0.2.15 (2026-07-02)** — the first live 25-target Mac run (PR #168) measured ~49s/target, meaning a 250-target run takes ~3.4 hours; the per-target progress line now prints an ETA (`elapsed=Xs ETA=YmZZs`), not just elapsed time, so a multi-hour batch never looks hung. 8 new tests for the ETA formatter and its wiring into `run_batch`.
 - **Project version bumped to 0.2.16 (2026-07-02)** — `process_t1_kepler_batch.py` gains bounded `--workers` concurrency (default 1, matching `fetch_kepler_lc_snippets.py`'s existing convention; `docs/SYSTEM_PROFILE.md` recommends 4-6 for this external-service workload), using the same `ThreadPoolExecutor` pattern already proven in that sibling script. Building this surfaced a real concurrency-correctness bug: the raw-FITS fetcher wiped one shared scratch directory after every target, which would have let one worker's cleanup delete a different worker's still-downloading files under `workers > 1`. Fixed by giving each target its own `raw_dir/target_<id>` subdirectory. 6 new tests, including a real-thread test asserting concurrent download directories never collide.
 - **Project version bumped to 0.2.17 (2026-07-03)** — crash fix for the live `--workers 4` run, which failed with `ValueError: I/O operation on closed file`. Root cause: `make_default_lc_fetcher()` called Lightkurve's public `search.download_all()`, which is decorated with `suppress_stdout` and mutates process-global `sys.stdout` — the exact same failure class already diagnosed and fixed once before in this project for `star_scanner.py` (see the run003 note below). Fix: extended `fetch.py`'s already-proven-safe `_download_collection_with_cache_repair()` / `_download_one_with_cache_repair()` with an optional `download_dir` parameter (backward compatible, default `None`), and rewired `make_default_lc_fetcher()` to call that path instead of `download_all()`. That helper never mutates `sys.stdout`; it monkey-patches `Observations.download_products(verbose=False)` under a module-level lock instead. Rewrote the affected tests to mock at the `_download_collection_with_cache_repair` boundary and added an explicit regression test, `test_never_calls_download_all`, that fails loudly if any future edit reintroduces the unsafe call. The interrupted 250-target/`--workers 4` run left a few targets in `active` (not `done`) state in SQLite — resuming with the same command is safe and will not duplicate output.
+- **Project version bumped to 0.2.18 (2026-07-03)** — two additions to `process_t1_kepler_batch.py`, both user-requested to remove the need for many console tabs to compete for the same target list:
+  - **Process-level sharding**: new `--shard-index`/`--shard-count` flags let multiple console tabs run concurrently against disjoint target sets (partitioned by `target_id % shard_count`), for throughput beyond one process's `--workers` ceiling. All concurrently running tabs share one `--db-path` (now WAL-mode SQLite with a 30s busy timeout, since it's now a genuinely concurrent multi-process writer) but each shard gets its own auto-suffixed output file and its own raw-download scratch subdirectory, so shards can never collide on a file the way the 0.2.16→0.2.17 crash did. New `--status-only` flag prints the combined done/active/written/failed summary across all shards without starting a batch. 17 new tests, including a real-thread test proving two concurrent shards never touch each other's raw-download directory.
+  - **Run Report Policy** (new `Skills/run_report.py`, 18 tests): every run now writes a small structured completion record and auto-commits + pushes *only that file* to git (`--no-git-report` to opt out), replacing the pattern of pasting console output for the agent to manually transcribe into tracking docs. See `docs/DISCOVERY_RUNBOOK.md` Rule 7 and `CLAUDE.md`'s "Run Report Policy — MANDATORY" section for the full policy and the retrofit list of other acquisition scripts still to be wired up (`batch_scan.py`, `star_scanner.py`, `fetch_kepler_lc_snippets.py`, and others — not yet done).
 
 ### Where things stand
 
@@ -282,6 +285,14 @@ same recipe, same result shape: 250 targets processed, 278 snippets written,
 250 this run = 780/6,515 done, 5,735 remaining. No crash, no throttling
 observed across two consecutive concurrent runs.
 
+**Sharding added (2026-07-03, version 0.2.18):** for throughput beyond one
+process's `--workers` ceiling, `--shard-index`/`--shard-count` let multiple
+console tabs run concurrently against disjoint target sets. All tabs share
+one `--db-path`; each shard writes its own auto-suffixed output file and its
+own raw-download subdirectory, so tabs never collide. Not yet live-verified
+at `--shard-count > 1` — the single-process `--workers 4` recipe below
+remains the default recommendation until a multi-tab run is observed.
+
 **Concrete next step — give the human this exact recipe:**
 
 ```bash
@@ -295,8 +306,17 @@ regardless of worker count — rerunning the same command continues where it
 left off) and prints per-target progress with elapsed time and ETA. Use
 `--max-targets 500` or larger if the operator wants to move faster now that
 `--workers 4` is validated across two consecutive runs, or `--workers 1` to
-fall back to the already-proven sequential path if anything looks off. Paste
-back the final summary block. If any target shows
+fall back to the already-proven sequential path if anything looks off. If the
+operator wants to try multiple tabs, use e.g. `--shard-index 0 --shard-count
+4` in one tab, `--shard-index 1 --shard-count 4` in another, etc. — all
+sharing the same `--db-path`.
+
+Each run now auto-commits and pushes its own run report (version 0.2.18's Run
+Report Policy — see `docs/DISCOVERY_RUNBOOK.md` Rule 7), so the cumulative
+progress count is checkable via `.venv/bin/python Skills/run_report.py
+process_t1_kepler_batch` or `--status-only` without needing the full console
+transcript pasted back. Still paste the transcript if anything looks wrong
+(errors, throttling, unexpected flags). If any target shows
 `NO_DATA`/`NO_LIGHTKURVE`/`ERROR:...`, that is expected for some KOIs (not
 every KIC has usable long-cadence data) and is not itself a blocker unless
 most targets fail. Continue with bounded invocations until the Kepler
