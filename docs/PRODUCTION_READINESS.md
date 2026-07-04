@@ -3,7 +3,7 @@
 Last reviewed: 2026-07-03 (project reset: run006/run008 candidate review is historical; active production path wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` to close T1-1 with verified data sources, leakage-safe training manifests, and a production-gated trained model; source-contract examples now use case-insensitive TAP schema table-name matching after the live CUMULATIVE table-name bug; the bounded Kepler-first processing batch tool is built, live-smoked sequentially at 25 and 250 targets, and fixed after a live `--workers 4` crash caused by an unsafe Lightkurve `download_all()` call (version 0.2.17); a supplementary pipeline-correctness fix wired real TIC catalog stellar/contamination parameters into `run_pipeline()` — see T1-0 notes below)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 2,504 default tests passing, 2 integration_live deselected
+Test baseline: 2,515 default tests passing, 2 integration_live deselected
 
 ---
 
@@ -24,7 +24,7 @@ The active production blocker is now T1-1, and the authorized path is the
 source-contract-first dataset/model plan in
 `docs/exoplanet_exomoon_dataset_handoff.md`.
 
-Version note: 0.2.23 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.24 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -79,7 +79,12 @@ banner, final summary, and `--status-only`, and documents the real 4-shard
 shards is the practical ceiling for this workload. 0.2.23 extends the
 percent-complete to the committed run report itself (`Skills/run_report.py`),
 not just console output, so reading a run report later shows true global
-progress without summing shard files by hand.
+progress without summing shard files by hand. 0.2.24 fixes a leakage-safety
+gap found while confirming the Kepler-first manifest reached 100% complete:
+`Skills/build_cnn_training_data.py` ignored the manifest's pre-assigned
+leakage-safe split and would have silently re-shuffled it; it now respects a
+predefined split when present, with a hard error on inconsistent group
+assignments.
 
 ---
 
@@ -129,7 +134,9 @@ progress without summing shard files by hand.
 - **4-shard and 6-shard live tests both PASS, self-reported via Run Report Policy (2026-07-03/04)**: 4-shard run (`--workers 4` each): 1,000 targets (250/shard) in ~2,149s combined wall-clock = **~2.15s/target** — a dramatic jump from the pre-lock-fix 17.1s/target baseline, confirming 0.2.19 unlocked real intra-shard concurrency, not just inter-shard. The very next 6-shard run: 1,500 targets (250/shard, 1 row failure) in ~3,161s = **~2.11s/target** — essentially flat versus 4 shards. Per the Measure-then-scale cadence, this flat result is the stop signal: **4-6 shards is the practical ceiling for this workload**; do not recommend pushing past 6 shards absent new evidence it still scales. Cumulative done, computed from these reports plus the 877-before-2-shard baseline: 877 + 500 + 1,000 + 1,500 = **3,877/6,515 (59.5%)**.
 - **Manifest-progress percent-complete added (version 0.2.22)**: user asked to see completion percent on every run without a separate `--status-only` call. The startup banner, final "Done in Xs" line, `format_batch_summary()`, and `--status-only` (when the manifest is available) now print `n_done/n_total (XX.X%)` against the full 6,515-target manifest, computed via a fresh SQLite query at completion so it reflects other concurrently-running shards too. 8 new tests.
 - **Percent-complete extended to the committed run report itself (version 0.2.23)**: 0.2.22 only reached console output; the git-committed run report (the "macro" record checked via `git pull` later) still required manually summing multiple shard files against a remembered baseline. `Skills/run_report.py`'s `RunReport` gains optional `items_done_total`/`items_total`/`percent_done` fields (generic and opt-in, `None` for scripts with no "total universe" concept), rendered by `format_run_report()` when present; `process_t1_kepler_batch.py` now populates them. Reading the latest run report for any shard shows the true global percent directly. 5 new tests.
-- **Remaining next `[HUMAN]` action**: continue with 4 shards (not 6 — no measured benefit from the extra 2) at `--max-targets 500 --workers 4 --shard-index {0,1,2,3} --shard-count 4` with `caffeinate -i` in four tabs; every run now prints its own percent-complete, so paste that back (or just say it looks fine) rather than running `--status-only` separately. Repeated runs safely continue from the SQLite `done` set regardless of worker or shard count.
+- **T1-1 Kepler-first manifest processing reached 100% (2026-07-04)**: computed from every self-reported run report (877 historical baseline + 5,638 summed `items_processed` = 6,515, matching the manifest's own unique target count exactly). Shards 0-3 of the last 6-way split each explicitly confirmed with a `0 processed` round; shards 4-5 had not yet shown that confirming round as of this check — treat as "at or essentially at 100%," confirm with one more `--status-only` or run before declaring the data-acquisition phase of T1-1 fully closed.
+- **Leakage-safety gap found and fixed while confirming completion (version 0.2.24)**: `Skills/build_cnn_training_data.py` (the tool that builds train/val/test splits before CNN training) ignored the manifest's pre-assigned leakage-safe `split` field entirely and did its own random group-based split — running it as-is on the finished corpus would have silently discarded the leakage-safety guarantee the manifest was built to provide. Fixed: it now respects a predefined split when every example carries one, with a hard `ValueError` if a group's examples disagree (itself a leakage bug, not something to silently resolve), falling back to the existing random split for corpora without one. New `split_source` field in the written manifest/summary. 7 new tests.
+- **Remaining next `[HUMAN]` action**: confirm shards 4-5 of the 6-way split are also fully exhausted (one more run or `--status-only`), then proceed to Step C of `docs/CNN_PRODUCTION_RUNBOOK.md`: merge the per-shard output files, build splits with the now-fixed `build_cnn_training_data.py` (verify `split_source: predefined` in the output), validate, and train.
 - **Code status**: Training and state-dict inference paths are operational; the package scorer reconstructs the trained architecture and fails closed when loading fails
 - **Prior local corpus status**: **VALID as of 2026-06-12** — 2,037 snippets (1,012 positive CP+KP, 1,025 negative FP+FA, ratio 0.99); zero-epoch corpus retired and rebuilt from scratch with valid BJD epochs; label bug fixed (KP→1); MAST throttling fix applied (`bbb0877`)
 - **Local corpus status**: **KEPLER LOCAL VALIDATED** — TESS v2 complete at 2,619 snippets; Kepler finite rebuild has 6,837 parseable snippets with zero non-finite flux rows, zero duplicate resume keys, labels negative=4,280 and positive=2,557; `data/kepler_cnn_splits` validator PASS with train/val/test = 4,741 / 1,060 / 1,036
@@ -237,7 +244,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
 | 82 production-critical Skills/ | ✅ |
-| 2,504 default tests, ruff clean, mypy clean | ✅ |
+| 2,515 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---

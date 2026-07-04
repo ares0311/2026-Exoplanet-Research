@@ -1373,7 +1373,7 @@ rows, SQLite summary `done|25|26|0`, raw scratch directory `0B` after cleanup.
 
 #### CNN production runbook
 
-Use `docs/CNN_PRODUCTION_RUNBOOK.md` for authoritative copy-paste workflow. Current authoritative step: **Step B: Bounded Kepler-First Processing (ACTIVE)** — Step A (source-contract preflight) is done; `Skills/process_t1_kepler_batch.py` is actively processing the leakage-safe manifest and was last self-reported at 3,877/6,515 targets (59.5%) done. Step C (build splits, train, evaluate) is planned but not yet executed — the manifest is not at 100% yet.
+Use `docs/CNN_PRODUCTION_RUNBOOK.md` for authoritative copy-paste workflow. Current authoritative step: **Step B is essentially complete, confirm then move to Step C** — the leakage-safe manifest appears to have reached 100% (877 + 5,638 summed self-reported `items_processed` = 6,515, matching the manifest's own target count exactly; shards 0-3 of the last 6-way split confirmed with a `0 processed` round, shards 4-5 had not yet as of the last check). Confirm the last few targets, then proceed to Step C: merge shard outputs, build splits with the now-fixed `Skills/build_cnn_training_data.py` (version 0.2.24 — it previously ignored the manifest's leakage-safe split assignment), validate, train, evaluate.
 
 The accepted `train_cnn.py` flags are `--split-dir`, `--checkpoint-dir`, and `--pretrained-checkpoint`.
 The evaluator flag is `--output-calibration` (not `--calibration-output`).

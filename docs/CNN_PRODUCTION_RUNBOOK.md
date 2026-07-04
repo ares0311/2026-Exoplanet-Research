@@ -149,10 +149,13 @@ per-target so local storage never accumulates. Supports `--workers` (in-process
 concurrency) and `--shard-index`/`--shard-count` (multi-tab process-level
 concurrency, sharing one `--db-path`).
 
-**Progress as of 2026-07-04 (self-reported via `artifacts/manifests/run_reports/process_t1_kepler_batch*.jsonl` —
-read those or a fresh run's own printed percent for the current true count,
-this number will already be stale by the time you read it):
-3,877/6,515 targets done (59.5%).**
+**Update (2026-07-04): the manifest appears to have reached 100%.** Computed
+from every self-reported run report (877 historical baseline + 5,638 summed
+`items_processed` = 6,515, matching the manifest's own unique target count
+exactly). Shards 0-3 of the last 6-way split each explicitly confirmed with
+a `0 processed` round; shards 4-5 had not yet shown that confirming round as
+of this check. Confirm with one more `--status-only` or run before treating
+data acquisition as fully closed and moving to Step C.
 
 **Concurrency findings (live-tested, not estimated)**: a 4-shard run
 (`--workers 4` each) processed 1,000 targets at ~2.15s/target combined — a
@@ -174,17 +177,20 @@ Every run prints its own manifest-progress percent in the startup banner and
 final summary (version 0.2.22+) — no separate `--status-only` call needed.
 Continue bounded invocations until the manifest reaches 100%.
 
-## Step C: Once The Manifest Reaches 100% (not yet reached — plan only)
+## Step C: Once The Manifest Reaches 100% (confirm shards 4-5, then proceed)
 
 1. Concatenate the per-shard output files into one corpus:
    `cat data/processed/t1_1_kepler_snippets/kepler_snippets*.jsonl > data/processed/t1_1_kepler_snippets/kepler_snippets_combined.jsonl`
    (safe to do naively — the shard partition is disjoint by construction, so
    there is no risk of duplicate rows across shard files).
 2. Build leakage-safe train/val/test splits from that combined corpus with
-   `Skills/build_cnn_training_data.py` (the manifest already assigns each KIC
-   to exactly one split, so the split step must respect that assignment, not
-   re-split randomly — verify this before running; the manifest's own `split`
-   field on each row is authoritative).
+   `Skills/build_cnn_training_data.py`. **Fixed in version 0.2.24**: this tool
+   previously ignored the manifest's pre-assigned `split` field and did its
+   own random group-based split, which would have silently discarded the
+   leakage-safety guarantee. It now respects the predefined split when every
+   example carries one (raising `ValueError` on an inconsistent group rather
+   than silently resolving it) — verify the printed summary says
+   `Split source: predefined`, not `random_grouped`, before proceeding.
 3. Validate with `Skills/cnn_split_validator.py`; do not train if it does not
    report `PASS`.
 4. Train with `Skills/train_cnn.py --device auto` (resolves to MPS on the
