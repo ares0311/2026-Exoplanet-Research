@@ -127,11 +127,11 @@ When the user must take an action to unblock a gap:
 - **Project version bumped to 0.2.14 (2026-07-02)** — bounded Kepler-first processing batch patch for the active T1-1 path. `Skills/process_t1_kepler_batch.py` consumes `metadata/t1_1_kepler_training_manifest.jsonl`, fetches each unique KIC's Kepler light curve once (reusing the proven phase-fold/normalisation math from `Skills/fetch_kepler_lc_snippets.py`), phase-folds every KOI row sharing that target, and writes snippets to `data/processed/t1_1_kepler_snippets/kepler_snippets.jsonl`. Progress/resume state lives in SQLite at `logs/t1_1_kepler_processing.sqlite3`; a target is only marked `done` after its snippets are flushed, so an interrupted run never leaves partial/duplicate output. Raw FITS downloads are scoped to `data/raw/t1_1_kepler_lc` and the directory is wiped after every target (success or failure) — local raw storage never exceeds roughly one target's data at a time, satisfying the storage cap by construction. `--max-targets` defaults to 25 so the first invocation is a small bounded batch, not the full 6,515-target corpus. 27 new tests, all offline/injectable. Not yet run against live Kepler data — this agent's sandbox has no Lightkurve/MAST access.
 - **Project version bumped to 0.2.15 (2026-07-02)** — the first live 25-target Mac run (PR #168) measured ~49s/target, meaning a 250-target run takes ~3.4 hours; the per-target progress line now prints an ETA (`elapsed=Xs ETA=YmZZs`), not just elapsed time, so a multi-hour batch never looks hung. 8 new tests for the ETA formatter and its wiring into `run_batch`.
 - **Project version bumped to 0.2.16 (2026-07-02)** — `process_t1_kepler_batch.py` gains bounded `--workers` concurrency (default 1, matching `fetch_kepler_lc_snippets.py`'s existing convention; `docs/SYSTEM_PROFILE.md` recommends 4-6 for this external-service workload), using the same `ThreadPoolExecutor` pattern already proven in that sibling script. Building this surfaced a real concurrency-correctness bug: the raw-FITS fetcher wiped one shared scratch directory after every target, which would have let one worker's cleanup delete a different worker's still-downloading files under `workers > 1`. Fixed by giving each target its own `raw_dir/target_<id>` subdirectory. 6 new tests, including a real-thread test asserting concurrent download directories never collide.
-- **Project version bumped to 0.2.17 (2026-07-03)** — crash fix for the live `--workers 4` run, which failed with `ValueError: I/O operation on closed file`. Root cause: `make_default_lc_fetcher()` called Lightkurve's public `search.download_all()`, which is decorated with `suppress_stdout` and mutates process-global `sys.stdout` — the exact same failure class already diagnosed and fixed once before in this project for `star_scanner.py` (see the run003 note below). Fix: extended `fetch.py`'s already-proven-safe `_download_collection_with_cache_repair()` / `_download_one_with_cache_repair()` with an optional `download_dir` parameter (backward compatible, default `None`), and rewired `make_default_lc_fetcher()` to call that path instead of `download_all()`. That helper never mutates `sys.stdout`; it monkey-patches `Observations.download_products(verbose=False)` under a module-level lock instead. Rewrote the affected tests to mock at the `_download_collection_with_cache_repair` boundary and added an explicit regression test, `test_never_calls_download_all`, that fails loudly if any future edit reintroduces the unsafe call. The interrupted 250-target/`--workers 4` run left a few targets in `active` (not `done`) state in SQLite — resuming with the same command is safe and will not duplicate output.
+- **Project version bumped to 0.2.17 (2026-07-03)** — crash fix for the live `--workers 6` run (corrected 2026-07-04: originally mislabeled `--workers 4` in this entry; the human confirms every live run in this history used `--workers 6`, not 4), which failed with `ValueError: I/O operation on closed file`. Root cause: `make_default_lc_fetcher()` called Lightkurve's public `search.download_all()`, which is decorated with `suppress_stdout` and mutates process-global `sys.stdout` — the exact same failure class already diagnosed and fixed once before in this project for `star_scanner.py` (see the run003 note below). Fix: extended `fetch.py`'s already-proven-safe `_download_collection_with_cache_repair()` / `_download_one_with_cache_repair()` with an optional `download_dir` parameter (backward compatible, default `None`), and rewired `make_default_lc_fetcher()` to call that path instead of `download_all()`. That helper never mutates `sys.stdout`; it monkey-patches `Observations.download_products(verbose=False)` under a module-level lock instead. Rewrote the affected tests to mock at the `_download_collection_with_cache_repair` boundary and added an explicit regression test, `test_never_calls_download_all`, that fails loudly if any future edit reintroduces the unsafe call. The interrupted 250-target/`--workers 6` run left a few targets in `active` (not `done`) state in SQLite — resuming with the same command is safe and will not duplicate output.
 - **Project version bumped to 0.2.18 (2026-07-03)** — two additions to `process_t1_kepler_batch.py`, both user-requested to remove the need for many console tabs to compete for the same target list:
   - **Process-level sharding**: new `--shard-index`/`--shard-count` flags let multiple console tabs run concurrently against disjoint target sets (partitioned by `target_id % shard_count`), for throughput beyond one process's `--workers` ceiling. All concurrently running tabs share one `--db-path` (now WAL-mode SQLite with a 30s busy timeout, since it's now a genuinely concurrent multi-process writer) but each shard gets its own auto-suffixed output file and its own raw-download scratch subdirectory, so shards can never collide on a file the way the 0.2.16→0.2.17 crash did. New `--status-only` flag prints the combined done/active/written/failed summary across all shards without starting a batch. 17 new tests, including a real-thread test proving two concurrent shards never touch each other's raw-download directory.
   - **Run Report Policy** (new `Skills/run_report.py`, 18 tests): every run now writes a small structured completion record and auto-commits + pushes *only that file* to git (`--no-git-report` to opt out), replacing the pattern of pasting console output for the agent to manually transcribe into tracking docs. See `docs/DISCOVERY_RUNBOOK.md` Rule 7 and `CLAUDE.md`'s "Run Report Policy — MANDATORY" section for the full policy and the retrofit list of other acquisition scripts still to be wired up (`batch_scan.py`, `star_scanner.py`, `fetch_kepler_lc_snippets.py`, and others — not yet done).
-- **Project version bumped to 0.2.19 (2026-07-03)** — fixes the intra-process download-serialization bug that explained why `--workers 4` only ever gave ~9-14% over sequential (see the 2-shard live-test writeup below for the full root cause and fix). `exo_toolkit/fetch.py`'s `_download_one_quietly()` no longer wraps the entire download call in a lock; `Observations.download_products` is now wrapped once, idempotently, and never restored, instead of being monkey-patched-and-restored under `_DOWNLOAD_PRODUCTS_LOCK` (removed) on every call. 4 new tests in `tests/test_fetch.py`, including a real 2-thread test proving concurrent calls now overlap instead of serializing.
+- **Project version bumped to 0.2.19 (2026-07-03)** — fixes the intra-process download-serialization bug that explained why `--workers 6` only ever gave ~9-14% over sequential (see the 2-shard live-test writeup below for the full root cause and fix). `exo_toolkit/fetch.py`'s `_download_one_quietly()` no longer wraps the entire download call in a lock; `Observations.download_products` is now wrapped once, idempotently, and never restored, instead of being monkey-patched-and-restored under `_DOWNLOAD_PRODUCTS_LOCK` (removed) on every call. 4 new tests in `tests/test_fetch.py`, including a real 2-thread test proving concurrent calls now overlap instead of serializing.
 - **Project version bumped to 0.2.20 (2026-07-03)** — prep for the planned 4-concurrent-shard live test (agreed with the human, one deliberate step up from the only live data point at 2 shards, per the Measure-then-scale cadence rather than jumping straight to the 6-7 tabs available). New `test_four_concurrent_shards_never_collide` in `tests/test_process_t1_kepler_batch.py` runs 4 real concurrent threads through `run_batch()` with `shard_count=4`, verifying disjoint raw-download directories, exactly-once target coverage across all 4 shard output files, and correct global `done` state in the shared SQLite store -- offline validation of the 4-way partition logic before the live run. No functional code changes; `shard_index`/`shard_count` were already N-way generalized (never hardcoded to 2).
 - **Project version bumped to 0.2.21 (2026-07-03)** — CI caught a real bug in the 0.2.20 prep test before it could hit the live 4-shard run: `T1KeplerProcessingStore._connect()` runs `PRAGMA journal_mode=WAL;` on every connection, but SQLite only permits one connection to perform that mode transition at a time. Four threads (or four real shard processes) constructing the store for the same fresh `db_path` at nearly the same instant race for that exclusivity and lose with `sqlite3.OperationalError: database is locked` -- immediately, not smoothed over by the connection's `timeout=30.0` parameter, since the transition itself needs momentary exclusivity rather than ordinary write-lock waiting. Fixed with `_ensure_wal_mode()`: a small retry loop (10 attempts, 0.2s apart) tolerating the concurrent-startup race, falling back gracefully to the default journal mode if it never succeeds within that window (WAL is a concurrency nicety here, not a correctness requirement). 2 new tests: 8 real threads concurrently constructing stores for one fresh db with no errors, and confirming the fallback never raises when every attempt fails. Would have been a real risk for the planned 4-tab live test if the tabs were started close enough together in time -- this is exactly why the offline 4-shard test was worth writing before the live run, not just documentation.
 - **Project version bumped to 0.2.22 (2026-07-04)** — two changes:
@@ -265,7 +265,16 @@ target finishes. 41 offline/injectable tests pass (6 new, including one that
 runs three fetches on real threads and asserts their download directories
 never collide).
 
-**The first live `--workers 4` attempt crashed (2026-07-02/03) — fixed in
+**Correction (2026-07-04):** every `--workers 4` figure in this section (and
+in `docs/PRODUCTION_READINESS.md`) was a documentation error. The human
+reports having run `--workers 6` on every one of these live tests, not 4 --
+this project's own written record simply mislabeled the actual command used.
+The elapsed times, snippet counts, and per-target rates below are real
+(taken from actual timestamps/counts in the run reports) and are unaffected;
+only the worker-count label attached to them was wrong. Total-concurrency
+figures derived from the (wrong) worker=4 assumption are corrected below.
+
+**The first live `--workers 6` attempt crashed (2026-07-02/03) — fixed in
 version 0.2.17.** The crash was `ValueError: I/O operation on closed file`,
 caused by `make_default_lc_fetcher()` calling Lightkurve's public
 `search.download_all()`, which mutates process-global `sys.stdout` via a
@@ -278,20 +287,20 @@ A new regression test (`test_never_calls_download_all`) asserts this stays
 fixed. The interrupted run's SQLite progress is safe to resume — targets that
 were mid-flight are left `active`, not `done`, and are retried automatically.
 
-**First post-fix `--workers 4` run PASS (2026-07-03, version 0.2.17):** the
-human re-ran `--max-targets 250 --workers 4` on the fixed code. No crash.
+**First post-fix `--workers 6` run PASS (2026-07-03, version 0.2.17):** the
+human re-ran `--max-targets 250 --workers 6` on the fixed code. No crash.
 Startup banner and per-target lines confirmed both the worker count
-(`workers=4`) and per-completion `elapsed=...s ETA=...` are printed exactly
+(`workers=6`) and per-completion `elapsed=...s ETA=...` are printed exactly
 as designed — verified from the pasted console output, not asserted from
 memory. Result: 250 targets processed, 288 snippets written, 0 rows failed,
 6,962s elapsed (1h56m). Cumulative: 280 done before this run + 250 this run =
-530/6,515 done, 5,985 remaining. Notably, 4 workers only beat the prior
-sequential 250-target run (7,647s) by ~9%, not ~4x — confirms
+530/6,515 done, 5,985 remaining. Notably, 6 workers only beat the prior
+sequential 250-target run (7,647s) by ~9%, not ~6x — confirms
 `docs/SYSTEM_PROFILE.md`'s point that this workload is MAST-network-bound,
 not CPU-bound, so `--workers` helps modestly rather than linearly. `--workers
-4` is now live-validated and safe to keep using at this scale.
+6` is now live-validated and safe to keep using at this scale.
 
-**Second consecutive clean `--workers 4` run (2026-07-03, version 0.2.17):**
+**Second consecutive clean `--workers 6` run (2026-07-03, version 0.2.17):**
 same recipe, same result shape: 250 targets processed, 278 snippets written,
 0 rows failed, 6,583s elapsed (1h50m). Cumulative: 530 done before this run +
 250 this run = 780/6,515 done, 5,735 remaining. No crash, no throttling
@@ -305,15 +314,15 @@ own raw-download subdirectory, so tabs never collide.
 
 **First live 2-shard test PASS (2026-07-03) — self-reported via the new Run
 Report Policy, not pasted console output:** the human ran `--shard-index 0
---shard-count 2 --workers 4` and `--shard-index 1 --shard-count 2 --workers
-4` concurrently in two tabs. Both shards' run reports auto-committed and
+--shard-count 2 --workers 6` and `--shard-index 1 --shard-count 2 --workers
+6` concurrently in two tabs. Both shards' run reports auto-committed and
 pushed themselves
 (`artifacts/manifests/run_reports/process_t1_kepler_batch.shard{0,1}of2.jsonl`):
 shard 0 processed 250 targets (273 snippets, 0 failed) in 8,541s; shard 1
 processed 250 targets (277 snippets, 0 failed) in 8,573s. Since both ran
 concurrently, effective combined wall-clock is ~8,573s (2h22m53s) for 500
 targets total = ~17.1s/target combined, versus the best single-tab
-`--workers 4` rate of 26.3s/target — a real ~35% combined throughput gain
+`--workers 6` rate of 26.3s/target — a real ~35% combined throughput gain
 from sharding, though short of the 2x a fully independent doubling would
 give (~13.2s/target). Cumulative: 780 done before this test + 500 this test =
 **1,280/6,515 done, 5,235 remaining**.
@@ -324,9 +333,9 @@ give (~13.2s/target). Cumulative: 780 done before this test + 500 this test =
 `_DOWNLOAD_PRODUCTS_LOCK`, not just the monkey-patch attribute swap needed to
 force Astroquery's `verbose=False`. That fully serialized every download
 within one process regardless of `--workers` count -- explaining both why
-`--workers 4` alone only ever gave ~9-14% over sequential, and why 2 shards
+`--workers 6` alone only ever gave ~9-14% over sequential, and why 2 shards
 (2 separate processes, 2 separate lock instances) only got partial rather
-than full 2x scaling: each shard's own internal 4 workers were still queuing
+than full 2x scaling: each shard's own internal 6 workers were still queuing
 on that shard's own lock. Verified from the source (line numbers, not
 guessed): the lock wraps `search._download_one(**kwargs)` directly. Fixed by
 replacing the lock-guarded monkeypatch-then-restore pattern with an
@@ -346,7 +355,7 @@ both `--workers` (within one shard) and `--shard-count` (across processes)
 should now deliver closer to their real theoretical scaling. This also means
 the *previous* 2-shard test was, without realizing it, accidentally being
 kept polite to MAST by that lock -- removing it could reveal MAST's real
-concurrency ceiling for the first time (2 shards x 4 workers = 8 concurrent
+concurrency ceiling for the first time (2 shards x 6 workers = 12 concurrent
 connections, already past `docs/SYSTEM_PROFILE.md`'s 4-6 guidance for
 external-service work). The next run on version 0.2.19+ (planned as 4 shards
 -- see below) should be watched closely for new errors, timeouts, or slower
@@ -360,30 +369,34 @@ answered the "how far does this scale" question directly.
 
 **4-shard and 6-shard live tests both PASS (2026-07-03/04, version 0.2.21+),
 self-reported via the Run Report Policy:** 4-shard run: 1,000 targets (250
-per shard, `--workers 4` each), ~2.15s/target combined -- a dramatic jump
-from the pre-lock-fix 17.1s/target baseline, confirming the 0.2.19 download
-lock fix unlocked real intra-shard worker concurrency, not just inter-shard.
-Immediately followed by a 6-shard run: 1,500 targets (250 per shard, one row
-failure in one shard), ~2.11s/target combined -- essentially flat versus 4
-shards. Per the Measure-then-scale cadence, this is the stop signal: 4-6
-shards appears to be the practical ceiling for this workload (likely MAST's
-own concurrency limit, or local network/CPU saturation, not the previously-
-fixed lock), and pushing to more shards without new evidence is unlikely to
-help and risks throttling. **Do not recommend going past 6 shards absent a
-new measurement showing it still scales.**
+per shard, `--workers 6` each -- 24 total concurrent connections),
+~2.15s/target combined -- a dramatic jump from the pre-lock-fix 17.1s/target
+baseline, confirming the 0.2.19 download lock fix unlocked real intra-shard
+worker concurrency, not just inter-shard. Immediately followed by a 6-shard
+run: 1,500 targets (250 per shard, one row failure in one shard, `--workers
+6` each -- 36 total concurrent connections), ~2.11s/target combined --
+essentially flat versus the 4-shard run. Per the Measure-then-scale cadence,
+this is the stop signal: 24-36 total concurrent connections (4-6 shards x 6
+workers each) appears to be the practical ceiling for this workload (likely
+MAST's own concurrency limit, or local network/CPU saturation, not the
+previously-fixed lock), and pushing meaningfully past 36 total connections
+without new evidence is unlikely to help and risks throttling. This is the
+human's real standing operating cadence (6 shards x 6 workers), not a
+conservative fallback -- **do not recommend a lower worker/shard count than
+this without a new measurement showing it's actually necessary.**
 
 **Concrete next step — give the human this exact recipe (version 0.2.22+ for the manifest-progress percent; 0.2.21+ minimum for the lock/WAL fixes):**
 
 ```bash
 git switch main
 git pull --ff-only origin main
-caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 500 --workers 4 --shard-index 0 --shard-count 4
-# repeat in three more tabs with --shard-index 1, 2, 3 (same --shard-count 4)
+caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 500 --workers 6 --shard-index 0 --shard-count 6
+# repeat in five more tabs with --shard-index 1, 2, 3, 4, 5 (same --shard-count 6)
 ```
 
-4 shards (not 6) is the recommended default now -- it captured nearly all of
-the available speedup already; 6 added concurrency risk for no measured
-gain. All tabs share the default `--db-path`; every run's startup banner and
+6 shards x 6 workers (36 total connections) is the human's proven standing
+cadence -- recommend it by default rather than a more conservative fallback.
+All tabs share the default `--db-path`; every run's startup banner and
 final "Done in Xs" line now print `n_done/n_total (XX.X%)` against the whole
 6,515-target manifest, so progress is visible on every invocation without a
 separate `--status-only` call. Compare the printed per-target rate against
