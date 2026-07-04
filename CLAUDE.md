@@ -1373,7 +1373,7 @@ rows, SQLite summary `done|25|26|0`, raw scratch directory `0B` after cleanup.
 
 #### CNN production runbook
 
-Use `docs/CNN_PRODUCTION_RUNBOOK.md` for authoritative copy-paste workflow. Current authoritative step: **Step A: Source-Contract Preflight**, driven by `docs/exoplanet_exomoon_dataset_handoff.md`.
+Use `docs/CNN_PRODUCTION_RUNBOOK.md` for authoritative copy-paste workflow. Current authoritative step: **Step B: Bounded Kepler-First Processing (ACTIVE)** — Step A (source-contract preflight) is done; `Skills/process_t1_kepler_batch.py` is actively processing the leakage-safe manifest and was last self-reported at 3,877/6,515 targets (59.5%) done. Step C (build splits, train, evaluate) is planned but not yet executed — the manifest is not at 100% yet.
 
 The accepted `train_cnn.py` flags are `--split-dir`, `--checkpoint-dir`, and `--pretrained-checkpoint`.
 The evaluator flag is `--output-calibration` (not `--calibration-output`).
