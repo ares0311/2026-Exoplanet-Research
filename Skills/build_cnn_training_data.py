@@ -47,6 +47,7 @@ class TrainingExample:
     group_id: str | None = None
     augmentation: str | None = None
     normalization: str = "local_median_mad"
+    predefined_split: str | None = None
 
 
 @dataclass(frozen=True)
@@ -77,9 +78,24 @@ def split_examples(
     examples: list[TrainingExample],
     config: SplitConfig | None = None,
 ) -> dict[str, tuple[TrainingExample, ...]]:
-    """Split examples into deterministic train/validation/test partitions."""
+    """Split examples into deterministic train/validation/test partitions.
+
+    When every example carries a ``predefined_split`` (e.g. from a
+    leakage-safe manifest that already assigned each target/group to exactly
+    one split, such as ``metadata/t1_1_kepler_training_manifest.jsonl``),
+    that assignment is respected verbatim instead of being discarded and
+    re-shuffled -- re-splitting at this stage would silently break whatever
+    leakage-safety guarantee the upstream manifest was built to provide.
+    Falls back to the existing deterministic group-based random split for
+    corpora without a predefined split (the historical ad hoc snippet
+    files this tool has always supported).
+    """
     config = config or SplitConfig()
     _validate_config(config)
+    if examples and all(
+        example.predefined_split in ("train", "val", "test") for example in examples
+    ):
+        return _split_by_predefined_assignment(examples)
     example_groups = _group_examples(examples)
     groups: list[list[list[TrainingExample]]]
     if config.stratify:
@@ -104,6 +120,37 @@ def split_examples(
         for split_name, assigned_groups in split_groups.items():
             for assigned_group in assigned_groups:
                 splits[split_name].extend(assigned_group)
+
+    for split_name in splits:
+        splits[split_name].sort(key=lambda example: example.example_id)
+    return {name: tuple(rows) for name, rows in splits.items()}
+
+
+def _split_by_predefined_assignment(
+    examples: list[TrainingExample],
+) -> dict[str, tuple[TrainingExample, ...]]:
+    """Bucket *examples* by their already-assigned split, verifying group consistency.
+
+    Every example sharing a group (the same target/system) must agree on the
+    same predefined split -- a mismatch means the upstream manifest assigned
+    the same group to two different splits, which is exactly the leakage bug
+    this whole mechanism exists to prevent, so it is treated as a hard error
+    rather than silently overridden.
+    """
+    splits: dict[str, list[TrainingExample]] = {"train": [], "val": [], "test": []}
+    group_splits: dict[str, str] = {}
+    for example in examples:
+        key = example.group_id or f"tic:{example.tic_id}"
+        assigned = group_splits.get(key)
+        if assigned is not None and assigned != example.predefined_split:
+            raise ValueError(
+                f"group {key!r} has inconsistent predefined splits "
+                f"({assigned!r} vs {example.predefined_split!r}) -- this indicates "
+                "a leakage bug in the upstream manifest or corpus, not something "
+                "to silently resolve by re-splitting"
+            )
+        group_splits[key] = example.predefined_split
+        splits[example.predefined_split].append(example)
 
     for split_name in splits:
         splits[split_name].sort(key=lambda example: example.example_id)
@@ -135,6 +182,9 @@ def write_training_splits(
         _atomic_write_json(path, split_payload)
         split_files[split_name] = path.name
 
+    used_predefined_split = bool(examples) and all(
+        example.predefined_split in ("train", "val", "test") for example in examples
+    )
     manifest = {
         "created_at": created_at,
         "n_examples": len(examples),
@@ -147,6 +197,7 @@ def write_training_splits(
         "split_files": split_files,
         "live_services": False,
         "source_files": sorted({example.source_file for example in examples}),
+        "split_source": "predefined" if used_predefined_split else "random_grouped",
         "language_guardrail": (
             "offline CNN preparation only; no candidate confirmation or discovery claim"
         ),
@@ -167,6 +218,7 @@ def format_split_summary(manifest: dict[str, Any]) -> str:
         f"- Positive labels: {labels.get(1, 0)}",
         f"- Negative labels: {labels.get(0, 0)}",
         f"- Live services: {manifest['live_services']}",
+        f"- Split source: {manifest.get('split_source', 'random_grouped')}",
     ]
     return "\n".join(lines) + "\n"
 
@@ -236,6 +288,9 @@ def _training_example(
         or row.get("candidate_id")
         or _fallback_example_id(source_file, row_index, row, tic_id, label)
     )
+    predefined_split = row.get("split")
+    if predefined_split not in ("train", "val", "test"):
+        predefined_split = None
     return TrainingExample(
         example_id=example_id,
         tic_id=tic_id,
@@ -247,6 +302,7 @@ def _training_example(
         group_id=group_id,
         augmentation=str(augmentation) if augmentation is not None else None,
         normalization=normalized.normalization,
+        predefined_split=predefined_split,
     )
 
 

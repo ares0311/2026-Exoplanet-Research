@@ -266,6 +266,106 @@ def test_split_config_rejects_bad_fraction_sum() -> None:
         split_examples([], SplitConfig(train_fraction=0.5, val_fraction=0.2, test_fraction=0.2))
 
 
+def _kepler_row_with_split(*, kepid: int, label: int, split: str) -> dict:
+    row = _snippet(tic_id=0, label=label, source="kepler")
+    row.pop("phase")
+    row["kepid"] = kepid
+    row["n_bins"] = len(row["flux"])
+    row["split"] = split
+    return row
+
+
+def test_split_examples_respects_predefined_split_verbatim(tmp_path: Path) -> None:
+    rows = [
+        _kepler_row_with_split(kepid=1, label=1, split="train"),
+        _kepler_row_with_split(kepid=2, label=0, split="train"),
+        _kepler_row_with_split(kepid=3, label=1, split="val"),
+        _kepler_row_with_split(kepid=4, label=0, split="test"),
+    ]
+    path = _write_jsonl(tmp_path / "kepler_manifest_driven.jsonl", rows)
+
+    splits = split_examples(load_training_examples([path]))
+
+    assert {e.group_id for e in splits["train"]} == {"kepid:1", "kepid:2"}
+    assert {e.group_id for e in splits["val"]} == {"kepid:3"}
+    assert {e.group_id for e in splits["test"]} == {"kepid:4"}
+
+
+def test_split_examples_predefined_split_ignores_fraction_config(tmp_path: Path) -> None:
+    """Predefined splits must win even when the configured fractions would
+    otherwise imply a completely different partition -- the whole point is
+    that this assignment is authoritative, not a suggestion."""
+    rows = [_kepler_row_with_split(kepid=i, label=i % 2, split="train") for i in range(10)]
+    path = _write_jsonl(tmp_path / "all_train.jsonl", rows)
+
+    splits = split_examples(
+        load_training_examples([path]),
+        SplitConfig(train_fraction=0.1, val_fraction=0.1, test_fraction=0.8),
+    )
+
+    assert len(splits["train"]) == 10
+    assert len(splits["val"]) == 0
+    assert len(splits["test"]) == 0
+
+
+def test_split_examples_falls_back_to_random_when_split_field_absent(tmp_path: Path) -> None:
+    path = _write_json(
+        tmp_path / "no_split_field.json",
+        {"snippets": [_snippet(tic_id=i, label=i % 2) for i in range(10)]},
+    )
+    splits = split_examples(load_training_examples([path]), SplitConfig(stratify=False))
+    assert sum(len(rows) for rows in splits.values()) == 10
+
+
+def test_split_examples_falls_back_to_random_when_split_field_only_partial(
+    tmp_path: Path,
+) -> None:
+    """If only some examples carry a predefined split (mixed corpus), do not
+    half-apply it -- fall back to the existing random group-split for
+    everything, since a partial application would be an inconsistent mix."""
+    rows = [
+        _kepler_row_with_split(kepid=1, label=1, split="train"),
+        _snippet(tic_id=2, label=0),  # no "split" key at all
+    ]
+    path = _write_jsonl(tmp_path / "mixed.jsonl", rows)
+    splits = split_examples(load_training_examples([path]), SplitConfig(stratify=False))
+    assert sum(len(rows) for rows in splits.values()) == 2
+
+
+def test_split_examples_raises_on_inconsistent_predefined_split_within_group(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        _kepler_row_with_split(kepid=1, label=1, split="train"),
+        _kepler_row_with_split(kepid=1, label=1, split="val"),
+    ]
+    path = _write_jsonl(tmp_path / "inconsistent.jsonl", rows)
+
+    with pytest.raises(ValueError, match="inconsistent predefined splits"):
+        split_examples(load_training_examples([path]))
+
+
+def test_write_training_splits_records_split_source_predefined(tmp_path: Path) -> None:
+    rows = [_kepler_row_with_split(kepid=i, label=i % 2, split="train") for i in range(4)]
+    path = _write_jsonl(tmp_path / "predefined.jsonl", rows)
+    manifest = write_training_splits(
+        load_training_examples([path]), tmp_path / "splits", created_at="2026-01-01T00:00:00"
+    )
+    assert manifest["split_source"] == "predefined"
+    assert "predefined" in format_split_summary(manifest)
+
+
+def test_write_training_splits_records_split_source_random(tmp_path: Path) -> None:
+    path = _write_json(
+        tmp_path / "dataset.json",
+        {"snippets": [_snippet(tic_id=i, label=i % 2) for i in range(4)]},
+    )
+    manifest = write_training_splits(
+        load_training_examples([path]), tmp_path / "splits", created_at="2026-01-01T00:00:00"
+    )
+    assert manifest["split_source"] == "random_grouped"
+
+
 def test_split_config_rejects_negative_fraction() -> None:
     with pytest.raises(ValueError, match="non-negative"):
         split_examples([], SplitConfig(train_fraction=1.1, val_fraction=-0.1, test_fraction=0.0))
