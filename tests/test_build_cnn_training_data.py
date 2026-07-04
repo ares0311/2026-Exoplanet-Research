@@ -452,3 +452,81 @@ def test_load_training_examples_jsonl_201_bins(tmp_path: Path) -> None:
     examples = load_training_examples([path])
     assert len(examples) == 1
     assert len(examples[0].phase) == 201
+
+
+# ---------------------------------------------------------------------------
+# Regression: T1-1 Kepler-first manifest pipeline's actual snippet schema
+# (Skills/process_t1_kepler_batch.py's _snippet_record) -- target_id/group_key,
+# never tic_id/kepid/original_tic_id. A live run hit exactly this: every row
+# collapsed into one fake group "tic:0" and _split_by_predefined_assignment
+# correctly (but confusingly) raised on the resulting cross-split "conflict".
+# ---------------------------------------------------------------------------
+
+
+def _t1_1_snippet_row(*, target_id: int, label: int, split: str, n_bins: int = 5) -> dict:
+    return {
+        "target_id": target_id,
+        "target_name": f"KIC {target_id}",
+        "source_row_id": f"K{target_id:05d}.01",
+        "group_key": f"kepler:kic:{target_id}",
+        "split": split,
+        "label": label,
+        "label_name": "CONFIRMED" if label == 1 else "FALSE POSITIVE",
+        "period_days": 5.0,
+        "epoch_bjd": 2458000.0,
+        "duration_hours": 3.0,
+        "n_bins": n_bins,
+        "flux": [0.99 if i == n_bins // 2 else 1.0 for i in range(n_bins)],
+        "manifest_version": "t1-1-kepler-manifest-v1",
+        "source": "nasa_exoplanet_archive_dr25_koi",
+    }
+
+
+def test_group_id_uses_t1_1_group_key_not_fake_shared_group(tmp_path: Path) -> None:
+    rows = [
+        _t1_1_snippet_row(target_id=10797460, label=1, split="train"),
+        _t1_1_snippet_row(target_id=10811496, label=0, split="test"),
+    ]
+    path = _write_jsonl(tmp_path / "t1_1_shard.jsonl", rows)
+
+    examples = load_training_examples([path])
+
+    group_ids = {e.group_id for e in examples}
+    assert group_ids == {"kepler:kic:10797460", "kepler:kic:10811496"}
+    assert "tic:0" not in group_ids
+
+
+def test_split_examples_handles_real_t1_1_shaped_corpus_without_raising(
+    tmp_path: Path,
+) -> None:
+    """Reproduces the exact live crash: multiple T1-1 targets assigned to
+    different splits by the manifest must not collide into one fake group."""
+    rows = [
+        _t1_1_snippet_row(target_id=10797460, label=1, split="train"),
+        _t1_1_snippet_row(target_id=10811496, label=0, split="test"),
+        _t1_1_snippet_row(target_id=11446443, label=1, split="val"),
+    ]
+    path = _write_jsonl(tmp_path / "t1_1_shard.jsonl", rows)
+
+    splits = split_examples(load_training_examples([path]))
+
+    assert len(splits["train"]) == 1
+    assert len(splits["val"]) == 1
+    assert len(splits["test"]) == 1
+
+
+def test_tic_id_falls_back_to_target_id_when_absent(tmp_path: Path) -> None:
+    path = _write_jsonl(
+        tmp_path / "t1_1.jsonl", [_t1_1_snippet_row(target_id=10797460, label=1, split="train")]
+    )
+    examples = load_training_examples([path])
+    assert examples[0].tic_id == 10797460
+
+
+def test_fallback_example_id_labels_target_id_rows_as_kic_not_tic(tmp_path: Path) -> None:
+    path = _write_jsonl(
+        tmp_path / "t1_1.jsonl", [_t1_1_snippet_row(target_id=10797460, label=1, split="train")]
+    )
+    examples = load_training_examples([path])
+    assert "KIC10797460" in examples[0].example_id
+    assert "TIC" not in examples[0].example_id
