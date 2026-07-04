@@ -216,7 +216,7 @@ Continue bounded invocations until the manifest reaches 100%.
 3. ✅ **DONE (2026-07-04).** Validate with `Skills/cnn_split_validator.py
    data/t1_1_kepler_cnn_splits` -- reported `Status: PASS`, 0 errors, 0
    warnings.
-4. **NEXT.** Train with `Skills/train_cnn.py`. This new corpus is Kepler KOI
+4. ✅ **DONE (2026-07-04).** Train with `Skills/train_cnn.py`. This new corpus is Kepler KOI
    data in the same domain as `checkpoints/cnn_kepler_pretrain/` (also
    trained on Kepler KOI data, just an older/smaller sample), so loading it
    via `--pretrained-checkpoint` would not be cross-domain transfer learning
@@ -237,11 +237,43 @@ Continue bounded invocations until the manifest reaches 100%.
    materially below 0.9186, consider whether the larger/leakage-safe corpus
    changed the difficulty distribution enough to warrant hyperparameter
    re-tuning, but do not assume that without measuring first.
-5. Evaluate against the production gates (raw AUC ≥ 0.85, calibrated F1 ≥
-   0.80, temperature scaling must not worsen Brier/ECE) with
-   `Skills/evaluate_cnn_checkpoint.py`.
+   Result: best epoch 22, best val loss 0.3807, best val AUC 0.9148 -- close
+   to the older checkpoint's 0.9186, no regression.
+5. ✅ **DONE (2026-07-04).** Evaluate against the production gates (raw AUC
+   ≥ 0.85, calibrated F1 ≥ 0.80, temperature scaling must not worsen
+   Brier/ECE) with `Skills/evaluate_cnn_checkpoint.py`. Result: raw test
+   AUC=0.9252, calibrated F1=0.8281, temperature T=1.0 (no calibration
+   change, since none was needed). **`Flag: PASS`** -- the first checkpoint
+   in the full C1-C19 + T1-1 history to clear both gates.
 6. A passing checkpoint still requires explicit human approval before
-   promotion to `models/`.
+   promotion to `models/`. **Not yet granted** as of this writing.
+
+## Kepler Corpus Expansion (DR24 TCE, optional, does not block the above)
+
+With the Kepler gate already cleared, `Q1_Q17_DR24_TCE` (NASA Exoplanet
+Archive TAP) was found and live-verified to carry real `av_training_set`
+labels (`PC`/`AFP`/`NTP`; `UNK` excluded as ambiguous) across 20,367 rows /
+12,669 unique KICs -- 7,091 of which are genuinely new relative to the
+committed manifest (more than the entire current 6,515-target manifest).
+The same label field was confirmed live to be entirely empty in the newer
+`Q1_Q17_DR25_TCE` delivery -- a real dead end ruled out before building
+anything against it.
+
+`Skills/build_t1_dr24_tce_expansion_manifest.py` (version 0.2.26) builds a
+leakage-safe expansion manifest from this source, excluding any KIC already
+in `metadata/t1_1_kepler_training_manifest.jsonl`. `Skills/
+process_t1_kepler_batch.py` needs no changes -- `--manifest` already accepts
+an arbitrary path. Next `[HUMAN]` action:
+
+```bash
+git switch main
+git pull --ff-only origin main
+.venv/bin/python Skills/build_t1_dr24_tce_expansion_manifest.py
+```
+
+This is catalog-only (no FITS download) and should take well under a
+minute. Confirm `flag: OK` and commit the generated manifest/summary/report
+before running any bounded processing batch against it.
 
 ## Step 0: Sync And Verify
 
