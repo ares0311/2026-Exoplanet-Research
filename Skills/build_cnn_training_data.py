@@ -328,7 +328,14 @@ def _label(value: Any) -> int | None:
 
 
 def _tic_id(row: dict[str, Any]) -> int:
-    value = row.get("tic_id", row.get("original_tic_id", 0))
+    # dict.get's default is only used when the key is absent, not merely
+    # falsy -- older ad hoc Kepler rows explicitly set tic_id=0 as a
+    # placeholder (grouping uses kepid instead, see _group_id), so this
+    # chain still returns 0 for them unchanged. target_id is the T1-1
+    # Kepler-first manifest pipeline's KIC identifier field (see
+    # Skills/process_t1_kepler_batch.py's _snippet_record), consulted only
+    # when neither tic_id nor original_tic_id is present at all.
+    value = row.get("tic_id", row.get("original_tic_id", row.get("target_id", 0)))
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -366,6 +373,19 @@ def _phase_tuple(row: dict[str, Any], *, n_flux: int) -> tuple[float, ...]:
 
 
 def _group_id(row: dict[str, Any], *, tic_id: int) -> str | None:
+    # group_key is the T1-1 Kepler-first manifest pipeline's own leakage-safe
+    # grouping key (e.g. "kepler:kic:10797460"; see
+    # Skills/build_t1_training_manifest.py and process_t1_kepler_batch.py's
+    # _snippet_record). It is already a complete, unique, self-describing
+    # string, so it is used verbatim rather than re-prefixed -- and checked
+    # first so it takes priority over the tic_id-based fallback below, which
+    # would otherwise silently collapse every T1-1 example into a single
+    # fake group (this project's own live data hit exactly that bug: every
+    # row landed in group "tic:0", since T1-1 records carry neither tic_id
+    # nor kepid, only target_id/group_key).
+    group_key = row.get("group_key")
+    if isinstance(group_key, str) and group_key.strip():
+        return group_key
     for key, prefix in (
         ("group_id", "group"),
         ("kepid", "kepid"),
@@ -386,7 +406,14 @@ def _fallback_example_id(
     tic_id: int,
     label: int,
 ) -> str:
-    target = f"KIC{row['kepid']}" if row.get("kepid") not in (None, "") else f"TIC{tic_id}"
+    # kepid (old ad hoc Kepler corpora) and target_id (T1-1 Kepler-first
+    # manifest pipeline) are both Kepler KIC identifiers -- label either as
+    # "KIC", never "TIC", or a Kepler target's fallback ID would misleadingly
+    # claim to be a TESS target.
+    kic_value = row.get("kepid")
+    if kic_value in (None, ""):
+        kic_value = row.get("target_id")
+    target = f"KIC{kic_value}" if kic_value not in (None, "") else f"TIC{tic_id}"
     return f"{Path(source_file).stem}_{row_index}_{target}_{label}"
 
 

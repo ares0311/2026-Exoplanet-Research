@@ -192,13 +192,15 @@ Continue bounded invocations until the manifest reaches 100%.
    Safe to do naively otherwise — the shard partition is disjoint by
    construction, so there is no risk of duplicate rows across shard files.
 2. Build leakage-safe train/val/test splits from that combined corpus with
-   `Skills/build_cnn_training_data.py`. **Fixed in version 0.2.24**: this tool
-   previously ignored the manifest's pre-assigned `split` field and did its
-   own random group-based split, which would have silently discarded the
-   leakage-safety guarantee. It now respects the predefined split when every
-   example carries one (raising `ValueError` on an inconsistent group rather
-   than silently resolving it) — verify the printed summary says
-   `Split source: predefined`, not `random_grouped`, before proceeding.
+   `Skills/build_cnn_training_data.py`, **version 0.2.25 or newer required**.
+   This tool previously ignored the manifest's pre-assigned `split` field and
+   did its own random group-based split (fixed in 0.2.24), and separately
+   never recognized the T1-1 pipeline's actual `target_id`/`group_key` field
+   names at all -- only the older corpora's `kepid`/`tic_id` (fixed in
+   0.2.25, found by a live crash on the real 7,442-row corpus:
+   `ValueError: group 'tic:0' has inconsistent predefined splits`). Verify
+   the printed summary says `Split source: predefined`, not
+   `random_grouped`, before proceeding.
 3. Validate with `Skills/cnn_split_validator.py`; do not train if it does not
    report `PASS`.
 4. Train with `Skills/train_cnn.py --device auto` (resolves to MPS on the
