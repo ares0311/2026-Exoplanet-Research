@@ -19,6 +19,7 @@ from process_t1_kepler_batch import (  # noqa: E402
     _directory_size_bytes,
     _ensure_wal_mode,
     _format_eta,
+    _percent_done,
     format_batch_summary,
     group_rows_by_target,
     load_manifest_rows,
@@ -428,6 +429,46 @@ class TestRunBatch:
         assert len(completion_messages) == 3
         assert all("ETA=" in m for m in completion_messages)
 
+    def test_summary_reports_manifest_progress_percent(self, tmp_path: Path) -> None:
+        manifest_path = self._manifest_with_targets(tmp_path, 4)
+        db_path = tmp_path / "progress.sqlite3"
+        output_path = tmp_path / "out" / "snippets.jsonl"
+
+        summary1 = run_batch(
+            manifest_path=manifest_path, output_path=output_path, db_path=db_path,
+            raw_dir=tmp_path / "raw", max_targets=2, n_bins=51,
+            lc_fetcher=_flat_lc_fetcher(),
+        )
+        assert summary1.n_targets_done_total == 2
+        assert summary1.percent_done == 50.0
+
+        summary2 = run_batch(
+            manifest_path=manifest_path, output_path=output_path, db_path=db_path,
+            raw_dir=tmp_path / "raw", max_targets=None, n_bins=51,
+            lc_fetcher=_flat_lc_fetcher(),
+        )
+        assert summary2.n_targets_done_total == 4
+        assert summary2.percent_done == 100.0
+
+    def test_progress_messages_include_percent(self, tmp_path: Path) -> None:
+        manifest_path = self._manifest_with_targets(tmp_path, 4)
+        messages: list[str] = []
+        run_batch(
+            manifest_path=manifest_path,
+            output_path=tmp_path / "out" / "snippets.jsonl",
+            db_path=tmp_path / "progress.sqlite3",
+            raw_dir=tmp_path / "raw",
+            max_targets=2,
+            n_bins=51,
+            lc_fetcher=_flat_lc_fetcher(),
+            progress_fn=messages.append,
+        )
+        banner = messages[0]
+        assert "0.0%" in banner  # nothing done yet at startup
+        done_line = next(m for m in messages if m.startswith("Done in"))
+        assert "50.0%" in done_line
+        assert "2/4 done" in done_line
+
     def test_failed_target_marked_done_not_retried(self, tmp_path: Path) -> None:
         manifest_path = self._manifest_with_targets(tmp_path, 1)
         db_path = tmp_path / "progress.sqlite3"
@@ -784,6 +825,26 @@ class TestCliStatusOnly:
             ]
         )
         assert code == 0
+        out = capsys.readouterr().out
+        assert "%" not in out  # no manifest available to compute a percent against
+
+    def test_status_only_includes_percent_when_manifest_present(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        rows = [_manifest_row(target_id=5000 + i, source_row_id=f"p{i}") for i in range(4)]
+        manifest_path = tmp_path / "manifest.jsonl"
+        _write_manifest(manifest_path, rows)
+        db_path = tmp_path / "progress.sqlite3"
+        store = T1KeplerProcessingStore(db_path)
+        store.mark_active(5000, 1)
+        store.mark_done(5000, n_written=1, n_failed=0, flag="OK")
+
+        code = _cli(
+            ["--status-only", "--db-path", str(db_path), "--manifest", str(manifest_path)]
+        )
+        assert code == 0
+        out = capsys.readouterr().out
+        assert "25.0% of 4 manifest targets" in out
 
 
 # ---------------------------------------------------------------------------
@@ -1083,3 +1144,33 @@ class TestFormatBatchSummary:
         assert "10" in text
         assert "out.jsonl" in text
         assert "db.sqlite3" in text
+
+    def test_includes_manifest_progress_percent(self) -> None:
+        summary = BatchSummary(
+            n_targets_total=200, n_targets_processed_this_run=50, n_targets_skipped_done=50,
+            n_snippets_written=55, n_rows_failed=0, elapsed_seconds=12.3,
+            output_path="out.jsonl", db_path="db.sqlite3",
+            n_targets_done_total=100, percent_done=50.0,
+        )
+        text = format_batch_summary(summary)
+        assert "100/200" in text
+        assert "50.0%" in text
+
+
+# ---------------------------------------------------------------------------
+# _percent_done
+# ---------------------------------------------------------------------------
+
+
+class TestPercentDone:
+    def test_zero_total_returns_zero(self) -> None:
+        assert _percent_done(0, 0) == 0.0
+
+    def test_computes_expected_ratio(self) -> None:
+        assert _percent_done(50, 200) == 25.0
+
+    def test_full_completion_is_100(self) -> None:
+        assert _percent_done(6515, 6515) == 100.0
+
+    def test_zero_done_is_zero_percent(self) -> None:
+        assert _percent_done(0, 6515) == 0.0
