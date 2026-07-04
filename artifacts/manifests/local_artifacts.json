@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "last_updated": "2026-07-02",
+  "last_updated": "2026-07-04",
   "production_gap": "T1-1: Production Tier 2 CNN / trained model checkpoint active under docs/exoplanet_exomoon_dataset_handoff.md; T1-0 run006/run008 evidence historical",
   "policy": {
     "standard_operator_cadence": "git add .",
@@ -1089,70 +1089,75 @@
       "next_action": "Retain locally; do not use this historical review packet to block T1-1."
     },
     {
-      "path": "data/processed/t1_1_kepler_snippets/kepler_snippets.jsonl",
+      "path": "data/processed/t1_1_kepler_snippets/kepler_snippets*.jsonl",
       "kind": "processed_snippet_corpus",
-      "status": "live_validated_at_scale_with_concurrent_workers",
+      "status": "complete_manifest_fully_processed",
       "git_policy": "ignored",
       "last_known": {
         "tool": "Skills/process_t1_kepler_batch.py",
-        "tool_status": "crash_fixed_and_workers4_live_validated_2026-07-03_v0.2.17",
-        "n_tests": 42,
-        "runs": [
-          {
-            "live_run_at": "2026-07-02",
-            "command": "caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 25",
-            "targets_processed": 25,
-            "snippets_written": 26,
-            "rows_failed": 0,
-            "elapsed_seconds": 1216
-          },
-          {
-            "live_run_at": "2026-07-02",
-            "command": "caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250",
-            "targets_processed": 250,
-            "snippets_written": 268,
-            "rows_failed": 0,
-            "elapsed_seconds": 7647
-          },
-          {
-            "live_run_at": "2026-07-02",
-            "command": "caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 --workers 4",
-            "outcome": "crashed",
-            "error": "ValueError: I/O operation on closed file",
-            "root_cause": "make_default_lc_fetcher() called Lightkurve's public search.download_all(), which mutates process-global sys.stdout via a suppress_stdout decorator; unsafe under concurrent worker threads. Same failure class as run003 (see AGENTS.md T1-0 notes).",
-            "fix_version": "0.2.17",
-            "fix_summary": "make_default_lc_fetcher() now calls fetch.py's already-proven-safe _download_collection_with_cache_repair() path instead of download_all(); new regression test test_never_calls_download_all asserts this stays fixed.",
-            "data_integrity": "no partial or duplicate output written; crash-interrupted targets left active (not done) in SQLite and retry automatically"
-          },
-          {
-            "live_run_at": "2026-07-03",
-            "command": "caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 --workers 4",
-            "outcome": "pass",
-            "targets_processed": 250,
-            "snippets_written": 288,
-            "rows_failed": 0,
-            "elapsed_seconds": 6962,
-            "cumulative_done_targets": 530,
-            "cumulative_remaining_targets": 5985,
-            "console_verified": "startup banner printed (workers=4); every completion line printed elapsed=...s ETA=...",
-            "note": "4 workers beat the prior sequential 250-target run (7647s) by only ~9%; workload is MAST-network-bound, not CPU-bound, matching docs/SYSTEM_PROFILE.md guidance"
-          },
-          {
-            "live_run_at": "2026-07-03",
-            "command": "caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 --workers 4",
-            "outcome": "pass",
-            "targets_processed": 250,
-            "snippets_written": 278,
-            "rows_failed": 0,
-            "elapsed_seconds": 6583,
-            "cumulative_done_targets": 780,
-            "cumulative_remaining_targets": 5735,
-            "note": "second consecutive clean --workers 4 run; no crash or throttling observed"
-          }
-        ]
+        "tool_status": "manifest_100_percent_processed_2026-07-04",
+        "manifest_target_groups": 6515,
+        "final_shard_totals_summed": "877 + 5638 = 6515",
+        "verification_method": "direct arithmetic against metadata/t1_1_kepler_training_manifest.jsonl's own committed target-group count; disjoint shard partitioning plus shared SQLite done-tracking makes the sum a complete proof, no further per-shard confirmation needed",
+        "completed_at": "2026-07-04"
       },
-      "validation_gate": "Inspect a bounded run's snippets and SQLite summary before scaling up.",
-      "next_action": "[HUMAN] Continue with: caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250 --workers 4 (or a larger --max-targets); --workers 4 is now live-validated across two consecutive runs."
+      "validation_gate": "Manifest processing is complete; no further Skills/process_t1_kepler_batch.py runs are needed.",
+      "next_action": "Merged into data/processed/t1_1_kepler_snippets/combined.jsonl; see that entry and data/t1_1_kepler_cnn_splits/ below."
+    },
+    {
+      "path": "data/processed/t1_1_kepler_snippets/combined.jsonl",
+      "kind": "processed_snippet_corpus",
+      "status": "built",
+      "git_policy": "ignored",
+      "last_known": {
+        "build_command": "cat data/processed/t1_1_kepler_snippets/kepler_snippets*.jsonl > data/processed/t1_1_kepler_snippets/combined.jsonl",
+        "rows": 7442,
+        "manifest_koi_rows": 7454,
+        "shortfall": 12,
+        "shortfall_explanation": "known per-row processing failures already recorded across prior batch runs, not a new bug",
+        "self_matching_glob_note": "output filename deliberately does not match the input glob kepler_snippets*.jsonl to avoid a silent data-loss hazard on rerun",
+        "verified_on": "2026-07-04"
+      },
+      "validation_gate": "Row count cross-checked against manifest KOI row count; 12-row shortfall explained by known failures.",
+      "next_action": "Source input to Skills/build_cnn_training_data.py; retain until splits are retrained from scratch under a materially different plan."
+    },
+    {
+      "path": "data/t1_1_kepler_cnn_splits/",
+      "kind": "cnn_split",
+      "status": "local_validated",
+      "git_policy": "ignored",
+      "last_known": {
+        "source_corpus": "data/processed/t1_1_kepler_snippets/combined.jsonl",
+        "build_tool_version": "0.2.25",
+        "build_fixes_applied": [
+          "leakage-safe predefined-split respect (0.2.24)",
+          "target_id/group_key field-name recognition (0.2.25)"
+        ],
+        "split_source": "predefined",
+        "total_examples": 7442,
+        "train": 5148,
+        "val": 1141,
+        "test": 1153,
+        "train_negative": 3264,
+        "train_positive": 1884,
+        "val_negative": 720,
+        "val_positive": 421,
+        "test_negative": 724,
+        "test_positive": 429,
+        "validator_status": "PASS",
+        "validator_errors": 0,
+        "validator_warnings": 0,
+        "manifest_committed_split_sizes": {
+          "train": 5155,
+          "val": 1143,
+          "test": 1156,
+          "total": 7454
+        },
+        "cross_check_note": "12-row shortfall vs manifest matches combined.jsonl's row count exactly; class balance (~63%/37%) consistent across all three splits",
+        "verified_on": "2026-07-04"
+      },
+      "validation_gate": "Skills/cnn_split_validator.py data/t1_1_kepler_cnn_splits reported PASS on 2026-07-04.",
+      "next_action": "[HUMAN] Train a CNN from scratch on these splits (do not fine-tune checkpoints/cnn_kepler_pretrain/ in place); use a new checkpoint directory such as checkpoints/cnn_t1_1_kepler/ to avoid overwriting the retained-valid existing checkpoint (SHA c782d7af..., val AUC 0.9186). See docs/CNN_PRODUCTION_RUNBOOK.md Step C item 4."
     },
     {
       "path": "logs/t1_1_kepler_processing.sqlite3",

@@ -149,13 +149,17 @@ per-target so local storage never accumulates. Supports `--workers` (in-process
 concurrency) and `--shard-index`/`--shard-count` (multi-tab process-level
 concurrency, sharing one `--db-path`).
 
-**Update (2026-07-04): the manifest appears to have reached 100%.** Computed
-from every self-reported run report (877 historical baseline + 5,638 summed
-`items_processed` = 6,515, matching the manifest's own unique target count
-exactly). Shards 0-3 of the last 6-way split each explicitly confirmed with
-a `0 processed` round; shards 4-5 had not yet shown that confirming round as
-of this check. Confirm with one more `--status-only` or run before treating
-data acquisition as fully closed and moving to Step C.
+**Update (2026-07-04): the manifest is confirmed at 100% (6,515/6,515).**
+Final shard totals summed to exactly the manifest's target-group count
+(877 + 5,638 = 6,515). Disjoint shard partitioning plus shared SQLite
+done-tracking makes this arithmetic a complete proof; no further per-shard
+confirmation is needed. Step C items 1-3 below are complete: the combined
+corpus (`data/processed/t1_1_kepler_snippets/combined.jsonl`, 7,442 rows) was
+built, leakage-safe splits were built with `build_cnn_training_data.py`
+0.2.25 (`Split source: predefined`), and `cnn_split_validator.py` reported
+`PASS` on `data/t1_1_kepler_cnn_splits/` (train/val/test = 5,148 / 1,141 /
+1,153; see `docs/LOCAL_ARTIFACT_LEDGER.md` for full label counts). Item 4
+(training) is next.
 
 **Concurrency findings (live-tested, not estimated)**: a 4-shard run
 (`--workers 4` each) processed 1,000 targets at ~2.15s/target combined — a
@@ -177,48 +181,67 @@ Every run prints its own manifest-progress percent in the startup banner and
 final summary (version 0.2.22+) — no separate `--status-only` call needed.
 Continue bounded invocations until the manifest reaches 100%.
 
-## Step C: Once The Manifest Reaches 100% (confirm shards 4-5, then proceed)
+## Step C: Once The Manifest Reaches 100% (items 1-3 complete; item 4 next)
 
-1. Concatenate the per-shard output files (plus the original non-sharded
-   `kepler_snippets.jsonl` from the earliest single-tab runs, before sharding
-   was introduced -- it holds real data and must be included) into one
-   corpus. **The output filename must not match the input glob**, or a
-   second run of this command would read its own prior output back in as an
-   input while simultaneously truncating it, silently losing data:
+1. ✅ **DONE (2026-07-04).** Concatenate the per-shard output files (plus the
+   original non-sharded `kepler_snippets.jsonl` from the earliest single-tab
+   runs, before sharding was introduced -- it holds real data and must be
+   included) into one corpus. **The output filename must not match the input
+   glob**, or a second run of this command would read its own prior output
+   back in as an input while simultaneously truncating it, silently losing
+   data:
    `cat data/processed/t1_1_kepler_snippets/kepler_snippets*.jsonl > data/processed/t1_1_kepler_snippets/combined.jsonl`
    (verified: `kepler_snippets*.jsonl` matches `kepler_snippets.jsonl` and
    every `kepler_snippets.shardIofN.jsonl`, but not `combined.jsonl` --
    do not rename the output to anything starting with `kepler_snippets`).
    Safe to do naively otherwise — the shard partition is disjoint by
    construction, so there is no risk of duplicate rows across shard files.
-2. Build leakage-safe train/val/test splits from that combined corpus with
-   `Skills/build_cnn_training_data.py`, **version 0.2.25 or newer required**.
-   This tool previously ignored the manifest's pre-assigned `split` field and
-   did its own random group-based split (fixed in 0.2.24), and separately
-   never recognized the T1-1 pipeline's actual `target_id`/`group_key` field
-   names at all -- only the older corpora's `kepid`/`tic_id` (fixed in
-   0.2.25, found by a live crash on the real 7,442-row corpus:
-   `ValueError: group 'tic:0' has inconsistent predefined splits`). Verify
-   the printed summary says `Split source: predefined`, not
-   `random_grouped`, before proceeding.
-3. Validate with `Skills/cnn_split_validator.py`; do not train if it does not
-   report `PASS`.
-4. Train with `Skills/train_cnn.py --device auto` (resolves to MPS on the
-   recorded M4 Max); consider `--pretrained-checkpoint
-   checkpoints/cnn_kepler_pretrain/best.pt` since that checkpoint remains
-   valid (val AUC 0.9186) even though it was built from the old ad hoc
-   Kepler corpus, as a transfer-learning starting point — but treat this as a
-   choice to make explicitly, not a default, since the new corpus is Kepler
-   KOI data too and pretraining on a different sample of the same source may
-   or may not help; measure both with/without pretraining if time allows.
+   Result: 7,442 rows (12 fewer than the manifest's 7,454 KOI rows, fully
+   explained by known per-row processing failures already recorded across
+   prior batch runs).
+2. ✅ **DONE (2026-07-04).** Build leakage-safe train/val/test splits from
+   that combined corpus with `Skills/build_cnn_training_data.py`, **version
+   0.2.25 or newer required**. This tool previously ignored the manifest's
+   pre-assigned `split` field and did its own random group-based split
+   (fixed in 0.2.24), and separately never recognized the T1-1 pipeline's
+   actual `target_id`/`group_key` field names at all -- only the older
+   corpora's `kepid`/`tic_id` (fixed in 0.2.25, found by a live crash on the
+   real 7,442-row corpus: `ValueError: group 'tic:0' has inconsistent
+   predefined splits`). Confirmed printed summary said `Split source:
+   predefined`, not `random_grouped`. Output directory:
+   `data/t1_1_kepler_cnn_splits/`. Result: total examples=7,442; train/val/
+   test = 5,148 / 1,141 / 1,153; train labels negative=3,264 positive=1,884;
+   val labels negative=720 positive=421; test labels negative=724
+   positive=429.
+3. ✅ **DONE (2026-07-04).** Validate with `Skills/cnn_split_validator.py
+   data/t1_1_kepler_cnn_splits` -- reported `Status: PASS`, 0 errors, 0
+   warnings.
+4. **NEXT.** Train with `Skills/train_cnn.py`. This new corpus is Kepler KOI
+   data in the same domain as `checkpoints/cnn_kepler_pretrain/` (also
+   trained on Kepler KOI data, just an older/smaller sample), so loading it
+   via `--pretrained-checkpoint` would not be cross-domain transfer learning
+   the way the historical TESS fine-tunes were -- it would just be
+   continuing training on a different sample of the same source. Train from
+   scratch first, reusing the already-proven `configs/cnn_kepler_pretrain.json`
+   architecture/hyperparameters (the same config that reached val AUC 0.9186
+   on the older, smaller Kepler corpus) as the baseline, into a **new**
+   checkpoint directory so the retained-valid existing checkpoint is never
+   overwritten:
+   ```bash
+   git switch main
+   git pull --ff-only origin main
+   caffeinate -dims .venv/bin/python Skills/train_cnn.py --split-dir data/t1_1_kepler_cnn_splits --checkpoint-dir checkpoints/cnn_t1_1_kepler --config configs/cnn_kepler_pretrain.json --device auto
+   ```
+   (`--device auto` resolves to MPS on the recorded M4 Max; the startup
+   banner will confirm `device=mps`.) If this baseline's val AUC is
+   materially below 0.9186, consider whether the larger/leakage-safe corpus
+   changed the difficulty distribution enough to warrant hyperparameter
+   re-tuning, but do not assume that without measuring first.
 5. Evaluate against the production gates (raw AUC ≥ 0.85, calibrated F1 ≥
    0.80, temperature scaling must not worsen Brier/ECE) with
    `Skills/evaluate_cnn_checkpoint.py`.
 6. A passing checkpoint still requires explicit human approval before
    promotion to `models/`.
-
-This is a forward plan, not yet executed — do not run Step C commands until
-Step B reports the manifest at 100%.
 
 ## Step 0: Sync And Verify
 

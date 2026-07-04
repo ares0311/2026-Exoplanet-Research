@@ -1370,10 +1370,11 @@ rows, SQLite summary `done|25|26|0`, raw scratch directory `0B` after cleanup.
 - **TESS combined splits**: `data/tess_combined_cnn_splits/` — LOCAL VALIDATED; train 4,892 / val 1,049 / test 1,033
 - **K2 overlap**: `data/tess_k2_overlap_snippets.jsonl` — **COMPLETE** — 2,086 snippets (2026-06-27; wrote=2086, skipped=174, terminal_failures=135, elapsed=2531s)
 - **C20 splits**: `data/tess_c20_cnn_splits/` — **NOT YET BUILT**; build only if a new dataset-brief-driven plan authorizes them
+- **T1-1 Kepler-first splits**: `data/t1_1_kepler_cnn_splits/` — **LOCAL VALIDATED PASS** (2026-07-04); built from `data/processed/t1_1_kepler_snippets/combined.jsonl` (7,442 rows); train/val/test = 5,148 / 1,141 / 1,153; `split_source=predefined`
 
 #### CNN production runbook
 
-Use `docs/CNN_PRODUCTION_RUNBOOK.md` for authoritative copy-paste workflow. Current authoritative step: **Step B is essentially complete, confirm then move to Step C** — the leakage-safe manifest appears to have reached 100% (877 + 5,638 summed self-reported `items_processed` = 6,515, matching the manifest's own target count exactly; shards 0-3 of the last 6-way split confirmed with a `0 processed` round, shards 4-5 had not yet as of the last check). Confirm the last few targets, then proceed to Step C: merge shard outputs, build splits with the now-fixed `Skills/build_cnn_training_data.py` (version 0.2.25 or newer required — 0.2.24 fixed leakage-safe split respect, 0.2.25 fixed a real field-name mismatch (`target_id`/`group_key` vs the old `kepid`/`tic_id`) that crashed the human's first live run), validate, train, evaluate.
+Use `docs/CNN_PRODUCTION_RUNBOOK.md` for authoritative copy-paste workflow. Current authoritative step: **Step C items 1-3 are complete, item 4 (training) is next** — the leakage-safe manifest reached confirmed 100% (877 + 5,638 = 6,515, matching the manifest's own target count exactly), the combined corpus and `data/t1_1_kepler_cnn_splits/` were built and validated PASS with `Skills/build_cnn_training_data.py` 0.2.25 (`Split source: predefined`). Next: train from scratch (not fine-tuned) into a new `checkpoints/cnn_t1_1_kepler/` directory using `configs/cnn_kepler_pretrain.json`, then evaluate against the production gates.
 
 The accepted `train_cnn.py` flags are `--split-dir`, `--checkpoint-dir`, and `--pretrained-checkpoint`.
 The evaluator flag is `--output-calibration` (not `--calibration-output`).
