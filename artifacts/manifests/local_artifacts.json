@@ -1157,7 +1157,76 @@
         "verified_on": "2026-07-04"
       },
       "validation_gate": "Skills/cnn_split_validator.py data/t1_1_kepler_cnn_splits reported PASS on 2026-07-04.",
-      "next_action": "[HUMAN] Train a CNN from scratch on these splits (do not fine-tune checkpoints/cnn_kepler_pretrain/ in place); use a new checkpoint directory such as checkpoints/cnn_t1_1_kepler/ to avoid overwriting the retained-valid existing checkpoint (SHA c782d7af..., val AUC 0.9186). See docs/CNN_PRODUCTION_RUNBOOK.md Step C item 4."
+      "next_action": "Consumed by checkpoints/cnn_t1_1_kepler/ below; retain for reproducibility."
+    },
+    {
+      "path": "checkpoints/cnn_t1_1_kepler/",
+      "kind": "checkpoint_dir",
+      "status": "passed_gates_awaiting_promotion_approval",
+      "git_policy": "ignored",
+      "last_known": {
+        "checkpoint": "checkpoints/cnn_t1_1_kepler/best.pt",
+        "split_dir": "data/t1_1_kepler_cnn_splits/",
+        "config": "configs/cnn_kepler_pretrain.json",
+        "strategy": "trained from scratch, not fine-tuned",
+        "train": 5148,
+        "val": 1141,
+        "test": 1153,
+        "best_epoch": 22,
+        "best_val_loss": 0.3807,
+        "best_val_auc": 0.9148,
+        "epochs_run": 37,
+        "raw_val_auc": 0.9148,
+        "raw_val_f1": 0.8022,
+        "raw_test_auc": 0.9252,
+        "raw_test_f1": 0.8281,
+        "raw_test_brier": 0.1052,
+        "raw_test_ece": 0.0441,
+        "temperature_T": 1.0,
+        "calibrated_threshold": 0.46,
+        "calibrated_test_auc": 0.9252,
+        "calibrated_test_f1": 0.8281,
+        "calibrated_test_brier": 0.1052,
+        "calibrated_test_ece": 0.0441,
+        "evaluator_flag": "PASS",
+        "notes": "First checkpoint in the full C1-C19 + T1-1 history to clear both the 0.85 AUC and 0.80 F1 production gates. Temperature scaling made no change (T=1.0) since none was needed, trivially satisfying the non-degradation requirement.",
+        "verified_on": "2026-07-04"
+      },
+      "validation_gate": "Evaluator PASS confirmed; promotion to models/ additionally requires explicit human approval per the Git-Add-Safe Artifact Policy -- not yet granted.",
+      "next_action": "[HUMAN] Confirm whether to approve promotion to models/ now."
+    },
+    {
+      "path": "metadata/t1_1_kepler_dr24_expansion_manifest.jsonl",
+      "kind": "training_manifest",
+      "status": "not_yet_generated_builder_committed",
+      "git_policy": "commit_once_generated",
+      "last_known": {
+        "builder_script": "Skills/build_t1_dr24_tce_expansion_manifest.py",
+        "builder_version": "0.2.26",
+        "source_table": "Q1_Q17_DR24_TCE",
+        "source_label_field": "av_training_set",
+        "live_verified_label_counts": {
+          "PC": 3600,
+          "AFP": 9596,
+          "NTP": 2541,
+          "UNK": 4630
+        },
+        "unk_policy": "excluded as ambiguous, matching the existing KOI CANDIDATE-exclusion policy",
+        "dr24_total_rows": 20367,
+        "dr24_unique_kepids": 12669,
+        "dead_end_ruled_out": "av_training_set (and av_pred_class) confirmed live to be entirely empty in the newer Q1_Q17_DR25_TCE delivery",
+        "existing_manifest_kepids": 6515,
+        "overlap_kepids": 5578,
+        "genuinely_new_kepids": 7091,
+        "label_mapping": {"PC": 1, "AFP": 0, "NTP": 0},
+        "reused_helpers": "TrainingManifestRow/CleanupPolicy/summarize_manifest/write_manifest_outputs/_split_for_group from build_t1_training_manifest.py; verify_table_schema from verify_dataset_sources.py",
+        "processor_changes_needed": false,
+        "processor_reason": "Skills/process_t1_kepler_batch.py already accepts an arbitrary --manifest path and _snippet_record() reads fields generically",
+        "n_tests": 7,
+        "verified_on": "2026-07-04"
+      },
+      "validation_gate": "Script's own verify_table_schema() call performs a live schema check against Q1_Q17_DR24_TCE on every run and fails fast (SCHEMA_FAIL) before writing any manifest rows if a required column is missing.",
+      "next_action": "[HUMAN] Run Skills/build_t1_dr24_tce_expansion_manifest.py live (catalog-only query, no FITS download), confirm flag: OK, and commit the generated manifest/summary/report."
     },
     {
       "path": "logs/t1_1_kepler_processing.sqlite3",
