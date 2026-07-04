@@ -179,10 +179,18 @@ Continue bounded invocations until the manifest reaches 100%.
 
 ## Step C: Once The Manifest Reaches 100% (confirm shards 4-5, then proceed)
 
-1. Concatenate the per-shard output files into one corpus:
-   `cat data/processed/t1_1_kepler_snippets/kepler_snippets*.jsonl > data/processed/t1_1_kepler_snippets/kepler_snippets_combined.jsonl`
-   (safe to do naively — the shard partition is disjoint by construction, so
-   there is no risk of duplicate rows across shard files).
+1. Concatenate the per-shard output files (plus the original non-sharded
+   `kepler_snippets.jsonl` from the earliest single-tab runs, before sharding
+   was introduced -- it holds real data and must be included) into one
+   corpus. **The output filename must not match the input glob**, or a
+   second run of this command would read its own prior output back in as an
+   input while simultaneously truncating it, silently losing data:
+   `cat data/processed/t1_1_kepler_snippets/kepler_snippets*.jsonl > data/processed/t1_1_kepler_snippets/combined.jsonl`
+   (verified: `kepler_snippets*.jsonl` matches `kepler_snippets.jsonl` and
+   every `kepler_snippets.shardIofN.jsonl`, but not `combined.jsonl` --
+   do not rename the output to anything starting with `kepler_snippets`).
+   Safe to do naively otherwise — the shard partition is disjoint by
+   construction, so there is no risk of duplicate rows across shard files.
 2. Build leakage-safe train/val/test splits from that combined corpus with
    `Skills/build_cnn_training_data.py`. **Fixed in version 0.2.24**: this tool
    previously ignored the manifest's pre-assigned `split` field and did its
