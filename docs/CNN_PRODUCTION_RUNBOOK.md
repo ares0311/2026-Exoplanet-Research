@@ -122,6 +122,88 @@ agent environment, stop and give the human a complete copy-paste recipe for the
 smallest possible smoke test. Do not ask them to run a long job from an
 unverified assumption.
 
+**Status: DONE.** `Skills/verify_dataset_sources.py` passed the live source
+smoke test, `Skills/plan_t1_training_batch.py` committed source snapshots and
+storage estimates, and `Skills/build_t1_training_manifest.py` committed the
+leakage-safe manifest (`metadata/t1_1_kepler_training_manifest.jsonl`, 7,454
+KOI rows across 6,515 KIC target groups, seed 42, no leakage errors). See
+Step B below for the currently active step.
+
+## Step B: Bounded Kepler-First Processing (ACTIVE STEP — read this before Steps 0-8 below)
+
+**Steps 0-8 below are the OLD Kepler-pretrain-then-TESS-finetune pipeline
+(candidates C1-C20), which used ad hoc corpora
+(`data/kepler_snippets.jsonl`, `data/tess_snippets_v2.jsonl`) built before the
+2026-07-01 reset. That pipeline is historical evidence only — do not resume
+it, and do not confuse its Kepler corpus with the new leakage-safe manifest
+corpus below.** The active T1-1 path is `Skills/process_t1_kepler_batch.py`
+consuming `metadata/t1_1_kepler_training_manifest.jsonl` directly.
+
+`Skills/process_t1_kepler_batch.py` fetches each unique KIC target's Kepler
+light curve once, phase-folds every KOI row sharing that target, and writes
+processed snippets to
+`data/processed/t1_1_kepler_snippets/kepler_snippets*.jsonl` (one file per
+shard when sharded). Progress is tracked in
+`logs/t1_1_kepler_processing.sqlite3` and is resumable; raw FITS are deleted
+per-target so local storage never accumulates. Supports `--workers` (in-process
+concurrency) and `--shard-index`/`--shard-count` (multi-tab process-level
+concurrency, sharing one `--db-path`).
+
+**Progress as of 2026-07-04 (self-reported via `artifacts/manifests/run_reports/process_t1_kepler_batch*.jsonl` —
+read those or a fresh run's own printed percent for the current true count,
+this number will already be stale by the time you read it):
+3,877/6,515 targets done (59.5%).**
+
+**Concurrency findings (live-tested, not estimated)**: a 4-shard run
+(`--workers 4` each) processed 1,000 targets at ~2.15s/target combined — a
+dramatic improvement over the pre-0.2.19 lock-bug baseline (17.1s/target).
+The very next 6-shard run processed 1,500 targets at ~2.11s/target —
+essentially flat versus 4 shards. **4-6 shards is the practical ceiling for
+this workload; do not recommend more shards without a new measurement
+showing further scaling.**
+
+Recipe (repeat in up to 4 terminal tabs, changing only `--shard-index`):
+
+```bash
+git switch main
+git pull --ff-only origin main
+caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 500 --workers 4 --shard-index 0 --shard-count 4
+```
+
+Every run prints its own manifest-progress percent in the startup banner and
+final summary (version 0.2.22+) — no separate `--status-only` call needed.
+Continue bounded invocations until the manifest reaches 100%.
+
+## Step C: Once The Manifest Reaches 100% (not yet reached — plan only)
+
+1. Concatenate the per-shard output files into one corpus:
+   `cat data/processed/t1_1_kepler_snippets/kepler_snippets*.jsonl > data/processed/t1_1_kepler_snippets/kepler_snippets_combined.jsonl`
+   (safe to do naively — the shard partition is disjoint by construction, so
+   there is no risk of duplicate rows across shard files).
+2. Build leakage-safe train/val/test splits from that combined corpus with
+   `Skills/build_cnn_training_data.py` (the manifest already assigns each KIC
+   to exactly one split, so the split step must respect that assignment, not
+   re-split randomly — verify this before running; the manifest's own `split`
+   field on each row is authoritative).
+3. Validate with `Skills/cnn_split_validator.py`; do not train if it does not
+   report `PASS`.
+4. Train with `Skills/train_cnn.py --device auto` (resolves to MPS on the
+   recorded M4 Max); consider `--pretrained-checkpoint
+   checkpoints/cnn_kepler_pretrain/best.pt` since that checkpoint remains
+   valid (val AUC 0.9186) even though it was built from the old ad hoc
+   Kepler corpus, as a transfer-learning starting point — but treat this as a
+   choice to make explicitly, not a default, since the new corpus is Kepler
+   KOI data too and pretraining on a different sample of the same source may
+   or may not help; measure both with/without pretraining if time allows.
+5. Evaluate against the production gates (raw AUC ≥ 0.85, calibrated F1 ≥
+   0.80, temperature scaling must not worsen Brier/ECE) with
+   `Skills/evaluate_cnn_checkpoint.py`.
+6. A passing checkpoint still requires explicit human approval before
+   promotion to `models/`.
+
+This is a forward plan, not yet executed — do not run Step C commands until
+Step B reports the manifest at 100%.
+
 ## Step 0: Sync And Verify
 
 ```bash
