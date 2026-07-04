@@ -161,20 +161,28 @@ built, leakage-safe splits were built with `build_cnn_training_data.py`
 1,153; see `docs/LOCAL_ARTIFACT_LEDGER.md` for full label counts). Item 4
 (training) is next.
 
-**Concurrency findings (live-tested, not estimated)**: a 4-shard run
-(`--workers 4` each) processed 1,000 targets at ~2.15s/target combined — a
-dramatic improvement over the pre-0.2.19 lock-bug baseline (17.1s/target).
-The very next 6-shard run processed 1,500 targets at ~2.11s/target —
-essentially flat versus 4 shards. **4-6 shards is the practical ceiling for
-this workload; do not recommend more shards without a new measurement
-showing further scaling.**
+**Concurrency findings (live-tested, not estimated; corrected 2026-07-04 —
+these were originally mislabeled `--workers 4`, the human's real standing
+practice is `--workers 6`)**: a 4-shard run (`--workers 6` each, 24 total
+concurrent connections) processed 1,000 targets at ~2.15s/target combined —
+a dramatic improvement over the pre-0.2.19 lock-bug baseline (17.1s/target).
+The very next 6-shard run (`--workers 6` each, 36 total concurrent
+connections) processed 1,500 targets at ~2.11s/target — essentially flat
+versus the 4-shard run. **24-36 total concurrent connections (4-6 shards ×
+6 workers each) is the practical ceiling for this workload** — this is the
+human's real standing cadence, not a conservative default; do not recommend
+fewer shards/workers than this without a new measurement showing it's
+necessary. A subsequent 6×6 run against the T1-1 Kepler DR24 expansion
+manifest (4,760 targets) completed the entire manifest in one pass at
+~1.21s/target combined, consistent with this cadence being solid on this
+workload.
 
-Recipe (repeat in up to 4 terminal tabs, changing only `--shard-index`):
+Recipe (repeat in up to 6 terminal tabs, changing only `--shard-index`):
 
 ```bash
 git switch main
 git pull --ff-only origin main
-caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 500 --workers 4 --shard-index 0 --shard-count 4
+caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 1000 --workers 6 --shard-index 0 --shard-count 6
 ```
 
 Every run prints its own manifest-progress percent in the startup banner and
@@ -263,17 +271,38 @@ anything against it.
 leakage-safe expansion manifest from this source, excluding any KIC already
 in `metadata/t1_1_kepler_training_manifest.jsonl`. `Skills/
 process_t1_kepler_batch.py` needs no changes -- `--manifest` already accepts
-an arbitrary path. Next `[HUMAN]` action:
+an arbitrary path.
+
+✅ **DONE (2026-07-04).** Manifest built live: `flag: OK`, 8,213 rows across
+4,760 new target groups (label filtering + period/epoch/duration sanity
+bounds reduced this from the raw 7,091-new-KIC overlap count, not a bug --
+see `docs/LOCAL_ARTIFACT_LEDGER.md`). Split/label counts: train 5,658
+(474 pos / 5,184 neg), val 1,252 (97 / 1,155), test 1,303 (108 / 1,195) --
+noticeably more class-imbalanced (~8% positive) than the existing KOI-based
+manifest (~37% positive), a real consideration for the eventual combined
+retrain, not a defect.
+
+✅ **DONE (2026-07-04).** Bounded processing run: 6 shards × 6 workers (the
+human's proven standing cadence) against the full 4,760-target manifest
+completed in a single pass -- 4,760/4,760 processed (100%), 8,207 snippets
+written, 6 rows failed, ~1.21s/target combined. No further processing runs
+needed.
+
+**Next `[HUMAN]` action** -- combine with the existing corpus and rebuild CNN splits:
 
 ```bash
 git switch main
 git pull --ff-only origin main
-.venv/bin/python Skills/build_t1_dr24_tce_expansion_manifest.py
+cat data/processed/t1_1_kepler_dr24_expansion_snippets/kepler_snippets.shard*of6.jsonl > data/processed/t1_1_kepler_dr24_expansion_snippets/combined.jsonl
+cat data/processed/t1_1_kepler_snippets/combined.jsonl data/processed/t1_1_kepler_dr24_expansion_snippets/combined.jsonl > data/processed/t1_1_kepler_master_combined.jsonl
+.venv/bin/python Skills/build_cnn_training_data.py data/processed/t1_1_kepler_master_combined.jsonl --output-dir data/t1_1_kepler_master_cnn_splits
+.venv/bin/python Skills/cnn_split_validator.py data/t1_1_kepler_master_cnn_splits
 ```
 
-This is catalog-only (no FITS download) and should take well under a
-minute. Confirm `flag: OK` and commit the generated manifest/summary/report
-before running any bounded processing batch against it.
+Expect 8,207 combined expansion rows and 15,649 total master rows (7,442 +
+8,207). Confirm `Split source: predefined` and validator `PASS` before
+training a new checkpoint from this larger, more realistically-imbalanced
+corpus.
 
 ## Step 0: Sync And Verify
 

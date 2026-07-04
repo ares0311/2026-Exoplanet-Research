@@ -1198,8 +1198,8 @@
     {
       "path": "metadata/t1_1_kepler_dr24_expansion_manifest.jsonl",
       "kind": "training_manifest",
-      "status": "not_yet_generated_builder_committed",
-      "git_policy": "commit_once_generated",
+      "status": "live_generated_flag_ok",
+      "git_policy": "commit",
       "last_known": {
         "builder_script": "Skills/build_t1_dr24_tce_expansion_manifest.py",
         "builder_version": "0.2.26",
@@ -1217,7 +1217,20 @@
         "dead_end_ruled_out": "av_training_set (and av_pred_class) confirmed live to be entirely empty in the newer Q1_Q17_DR25_TCE delivery",
         "existing_manifest_kepids": 6515,
         "overlap_kepids": 5578,
-        "genuinely_new_kepids": 7091,
+        "genuinely_new_kepids_any_tce": 7091,
+        "genuinely_new_kepids_with_usable_label": 4760,
+        "reduction_explanation": "confirmed via console's own [15737/15737] processed-row count matching PC+AFP+NTP (3600+9596+2541) exactly; the 7091->4760 drop is UNK-only stars plus period/epoch/duration sanity-bound failures, not a bug",
+        "manifest_rows": 8213,
+        "manifest_target_groups": 4760,
+        "manifest_flag": "OK",
+        "split_counts": {"train": 5658, "val": 1252, "test": 1303},
+        "split_label_counts": {
+          "train": {"positive": 474, "negative": 5184},
+          "val": {"positive": 97, "negative": 1155},
+          "test": {"positive": 108, "negative": 1195}
+        },
+        "overall_positive_rate_pct": 8.3,
+        "comparison_note": "existing KOI-based manifest is ~37% positive; this expansion is far more class-imbalanced, a real consideration for the combined retrain, not a defect",
         "label_mapping": {"PC": 1, "AFP": 0, "NTP": 0},
         "reused_helpers": "TrainingManifestRow/CleanupPolicy/summarize_manifest/write_manifest_outputs/_split_for_group from build_t1_training_manifest.py; verify_table_schema from verify_dataset_sources.py",
         "processor_changes_needed": false,
@@ -1225,8 +1238,31 @@
         "n_tests": 7,
         "verified_on": "2026-07-04"
       },
-      "validation_gate": "Script's own verify_table_schema() call performs a live schema check against Q1_Q17_DR24_TCE on every run and fails fast (SCHEMA_FAIL) before writing any manifest rows if a required column is missing.",
-      "next_action": "[HUMAN] Run Skills/build_t1_dr24_tce_expansion_manifest.py live (catalog-only query, no FITS download), confirm flag: OK, and commit the generated manifest/summary/report."
+      "validation_gate": "Live run confirmed flag: OK, no leakage errors.",
+      "next_action": "Consumed by the bounded processing run below; retain for reproducibility."
+    },
+    {
+      "path": "data/processed/t1_1_kepler_dr24_expansion_snippets/kepler_snippets.shard*of6.jsonl",
+      "kind": "processed_snippet_corpus",
+      "status": "complete_100_percent_one_pass",
+      "git_policy": "ignored",
+      "last_known": {
+        "shard_config": "6 shards x 6 workers (36 total concurrent connections) -- the human's proven standing cadence",
+        "concurrency_history_correction": "this project's earlier changelog entries (AGENTS.md/docs/PRODUCTION_READINESS.md) mislabeled every historical live run as --workers 4; the human confirms --workers 6 was used throughout, corrected 2026-07-04",
+        "max_targets_per_shard": 1000,
+        "targets_processed": 4760,
+        "targets_total": 4760,
+        "percent_done": 100.0,
+        "snippets_written": 8207,
+        "rows_failed": 6,
+        "elapsed_seconds_bounding": 5768,
+        "rate_seconds_per_target": 1.21,
+        "rate_note": "faster than the corrected 6x6 KOI-processing rate (~2.11s/target), consistent with this cadence being solid on this workload",
+        "completed_in_single_pass": true,
+        "verified_on": "2026-07-04"
+      },
+      "validation_gate": "All 6 shard run reports summed to exactly 4760/4760 processed, matching the manifest's target-group count exactly.",
+      "next_action": "[HUMAN] Combine shards (cat kepler_snippets.shard*of6.jsonl > combined.jsonl, output name avoids matching input glob), merge with data/processed/t1_1_kepler_snippets/combined.jsonl, rebuild CNN splits with Skills/build_cnn_training_data.py, validate with Skills/cnn_split_validator.py. See docs/CNN_PRODUCTION_RUNBOOK.md's Kepler Corpus Expansion section."
     },
     {
       "path": "logs/t1_1_kepler_processing.sqlite3",
