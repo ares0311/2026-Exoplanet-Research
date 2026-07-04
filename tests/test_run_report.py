@@ -86,6 +86,24 @@ class TestAppendRunReport:
         assert json.loads(lines[0])["items_processed"] == 1
         assert json.loads(lines[1])["items_processed"] == 2
 
+    def test_overall_progress_fields_round_trip(self, tmp_path: Path) -> None:
+        path = tmp_path / "script.jsonl"
+        append_run_report(
+            _report(items_done_total=3877, items_total=6515, percent_done=59.5), path
+        )
+        record = json.loads(path.read_text().splitlines()[0])
+        assert record["items_done_total"] == 3877
+        assert record["items_total"] == 6515
+        assert record["percent_done"] == 59.5
+
+    def test_overall_progress_fields_default_to_none(self, tmp_path: Path) -> None:
+        path = tmp_path / "script.jsonl"
+        append_run_report(_report(), path)
+        record = json.loads(path.read_text().splitlines()[0])
+        assert record["items_done_total"] is None
+        assert record["items_total"] is None
+        assert record["percent_done"] is None
+
 
 class TestFormatRunReport:
     def test_includes_key_fields(self) -> None:
@@ -106,6 +124,17 @@ class TestFormatRunReport:
     def test_includes_notes_when_present(self) -> None:
         text = format_run_report(_report(notes="two targets returned NO_DATA"))
         assert "two targets returned NO_DATA" in text
+
+    def test_includes_overall_progress_when_present(self) -> None:
+        text = format_run_report(
+            _report(items_done_total=3877, items_total=6515, percent_done=59.5)
+        )
+        assert "3877/6515" in text
+        assert "59.5%" in text
+
+    def test_omits_overall_progress_when_absent(self) -> None:
+        text = format_run_report(_report())
+        assert "Overall progress" not in text
 
 
 class TestCommitAndPushReport:

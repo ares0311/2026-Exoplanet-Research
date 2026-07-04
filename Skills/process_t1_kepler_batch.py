@@ -866,6 +866,9 @@ def _cli(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
             output_paths=(summary.output_path,),
             shard_index=summary.shard_index,
             shard_count=summary.shard_count,
+            items_done_total=summary.n_targets_done_total,
+            items_total=summary.n_targets_total,
+            percent_done=summary.percent_done,
         )
         report_path = report_path_for(
             "process_t1_kepler_batch",
