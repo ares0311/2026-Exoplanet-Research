@@ -3,7 +3,7 @@
 Last reviewed: 2026-07-03 (project reset: run006/run008 candidate review is historical; active production path wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` to close T1-1 with verified data sources, leakage-safe training manifests, and a production-gated trained model; source-contract examples now use case-insensitive TAP schema table-name matching after the live CUMULATIVE table-name bug; the bounded Kepler-first processing batch tool is built, live-smoked sequentially at 25 and 250 targets, and fixed after a live `--workers 4` crash caused by an unsafe Lightkurve `download_all()` call (version 0.2.17); a supplementary pipeline-correctness fix wired real TIC catalog stellar/contamination parameters into `run_pipeline()` — see T1-0 notes below)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 2,494 default tests passing, 2 integration_live deselected
+Test baseline: 2,504 default tests passing, 2 integration_live deselected
 
 ---
 
@@ -24,7 +24,7 @@ The active production blocker is now T1-1, and the authorized path is the
 source-contract-first dataset/model plan in
 `docs/exoplanet_exomoon_dataset_handoff.md`.
 
-Version note: 0.2.21 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.22 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -67,7 +67,16 @@ validation (`test_four_concurrent_shards_never_collide`) for the planned
 4-concurrent-shard live test, agreed with the human as one deliberate step
 up from the only live data point (2 shards) rather than jumping straight to
 the 6-7 tabs available -- no functional code changes, since sharding was
-already N-way generalized.
+already N-way generalized. 0.2.21 fixes a WAL-mode race
+(`sqlite3.OperationalError: database is locked`) that CI caught on that
+offline test before it could hit the live 4-shard run -- concurrent shards
+constructing `T1KeplerProcessingStore` for the same fresh db at nearly the
+same instant could lose the one-connection-only WAL transition; fixed with
+a tolerant retry, falling back to the default journal mode if it never
+succeeds. 0.2.22 adds manifest-progress percent-complete to the startup
+banner, final summary, and `--status-only`, and documents the real 4-shard
+(~2.15s/target) and 6-shard (~2.11s/target, flat) live test results -- 4-6
+shards is the practical ceiling for this workload.
 
 ---
 
@@ -114,7 +123,9 @@ already N-way generalized.
 - **Root cause of sub-linear scaling found and fixed same-day (version 0.2.19)**: `exo_toolkit/fetch.py`'s `_download_one_quietly()` held `_DOWNLOAD_PRODUCTS_LOCK` around the *entire* download call, not just the monkey-patch needed to force Astroquery's `verbose=False` — fully serializing every download within one process regardless of `--workers`, and explaining both the earlier disappointing `--workers 4` results and the sub-2x shard scaling (each shard's own 4 workers were still queuing on that shard's own lock). Fixed by replacing the lock-guarded monkeypatch-and-restore with an idempotent, non-restoring wrap (`_ensure_download_products_quiet()`) — no lock held during any download. 4 new tests, including a real 2-thread test proving concurrent calls now overlap. Removing this artificial brake could reveal MAST's real concurrency ceiling for the first time (2 shards × 4 workers = 8 concurrent connections, already past `docs/SYSTEM_PROFILE.md`'s 4-6 external-service guidance) — the next shard run should be watched for new errors/throttling, not assumed clean by default.
 - **4-shard test planned (2026-07-03, prep in version 0.2.20)**: agreed with the human to step up from 2 to 4 concurrent shards next (16 concurrent MAST connections), not jump straight to the 6-7 tabs available, per the Measure-then-scale cadence. New `test_four_concurrent_shards_never_collide` validates the 4-way partition/isolation logic offline (disjoint raw dirs, exactly-once target coverage, correct global `done` state) before the live run; no functional code changes were needed since `shard_index`/`shard_count` were already N-way generalized.
 - **Real bug found by that offline test, fixed same-day (version 0.2.21)**: CI failed on the new 4-shard test with `sqlite3.OperationalError: database is locked`. Root cause: `T1KeplerProcessingStore._connect()` runs `PRAGMA journal_mode=WAL;` on every connection, but SQLite only permits one connection to perform that mode transition at a time — 4 threads (or 4 real shard processes) constructing the store for the same fresh `db_path` at nearly the same instant race for that exclusivity and lose immediately, not smoothed over by the connection's `timeout=30.0` parameter (the transition needs momentary exclusivity, not just ordinary write-lock waiting). Fixed with `_ensure_wal_mode()`: a small retry loop (10 attempts, 0.2s apart), falling back to the default journal mode if it never succeeds (WAL is a concurrency nicety here, not a correctness requirement). 2 new tests. This would have been a real risk for the planned 4-tab live test if the tabs were started close together in time — caught by the offline test before it could happen live.
-- **Remaining next `[HUMAN]` action**: run 4 concurrent shards on version 0.2.19+ (the lock fix) and compare the per-target rate against the 17.1s/target baseline above (measured at 2 shards, pre-fix); a similar-or-better rate with no new errors validates the fix and confirms MAST tolerates 16 concurrent connections, a regression or new `ERROR:`/timeout flags mean back off rather than proceeding to more tabs. Recommended: `--max-targets 250 --workers 4 --shard-index {0,1,2,3} --shard-count 4` with `caffeinate -i` in four tabs. Repeated runs safely continue from the SQLite `done` set regardless of worker or shard count.
+- **4-shard and 6-shard live tests both PASS, self-reported via Run Report Policy (2026-07-03/04)**: 4-shard run (`--workers 4` each): 1,000 targets (250/shard) in ~2,149s combined wall-clock = **~2.15s/target** — a dramatic jump from the pre-lock-fix 17.1s/target baseline, confirming 0.2.19 unlocked real intra-shard concurrency, not just inter-shard. The very next 6-shard run: 1,500 targets (250/shard, 1 row failure) in ~3,161s = **~2.11s/target** — essentially flat versus 4 shards. Per the Measure-then-scale cadence, this flat result is the stop signal: **4-6 shards is the practical ceiling for this workload**; do not recommend pushing past 6 shards absent new evidence it still scales. Cumulative done, computed from these reports plus the 877-before-2-shard baseline: 877 + 500 + 1,000 + 1,500 = **3,877/6,515 (59.5%)**.
+- **Manifest-progress percent-complete added (version 0.2.22)**: user asked to see completion percent on every run without a separate `--status-only` call. The startup banner, final "Done in Xs" line, `format_batch_summary()`, and `--status-only` (when the manifest is available) now print `n_done/n_total (XX.X%)` against the full 6,515-target manifest, computed via a fresh SQLite query at completion so it reflects other concurrently-running shards too. 8 new tests.
+- **Remaining next `[HUMAN]` action**: continue with 4 shards (not 6 — no measured benefit from the extra 2) at `--max-targets 500 --workers 4 --shard-index {0,1,2,3} --shard-count 4` with `caffeinate -i` in four tabs; every run now prints its own percent-complete, so paste that back (or just say it looks fine) rather than running `--status-only` separately. Repeated runs safely continue from the SQLite `done` set regardless of worker or shard count.
 - **Code status**: Training and state-dict inference paths are operational; the package scorer reconstructs the trained architecture and fails closed when loading fails
 - **Prior local corpus status**: **VALID as of 2026-06-12** — 2,037 snippets (1,012 positive CP+KP, 1,025 negative FP+FA, ratio 0.99); zero-epoch corpus retired and rebuilt from scratch with valid BJD epochs; label bug fixed (KP→1); MAST throttling fix applied (`bbb0877`)
 - **Local corpus status**: **KEPLER LOCAL VALIDATED** — TESS v2 complete at 2,619 snippets; Kepler finite rebuild has 6,837 parseable snippets with zero non-finite flux rows, zero duplicate resume keys, labels negative=4,280 and positive=2,557; `data/kepler_cnn_splits` validator PASS with train/val/test = 4,741 / 1,060 / 1,036
@@ -222,7 +233,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
 | 82 production-critical Skills/ | ✅ |
-| 2,494 default tests, ruff clean, mypy clean | ✅ |
+| 2,504 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---

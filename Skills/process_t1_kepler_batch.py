@@ -445,6 +445,13 @@ class BatchSummary:
     db_path: str
     shard_index: int = 0
     shard_count: int = 1
+    n_targets_done_total: int = 0
+    percent_done: float = 0.0
+
+
+def _percent_done(n_done: int, n_total: int) -> float:
+    """Return the percent of *n_total* targets completed, 0.0 for an empty manifest."""
+    return (n_done / n_total * 100.0) if n_total else 0.0
 
 
 def _format_eta(seconds: float) -> str:
@@ -583,9 +590,11 @@ def run_batch(
         pending_target_ids = pending_target_ids[:max_targets]
 
     shard_note = f", shard={shard_index}/{shard_count}" if shard_count > 1 else ""
+    percent_before = _percent_done(len(done_ids), n_targets_total)
     _progress(
         f"T1-1 Kepler batch: {n_targets_total} total targets, "
-        f"{len(done_ids)} already done, {len(pending_target_ids)} to process this run "
+        f"{len(done_ids)} already done ({percent_before:.1f}%), "
+        f"{len(pending_target_ids)} to process this run "
         f"(workers={workers}{shard_note})  output={output_path}"
     )
 
@@ -658,9 +667,15 @@ def run_batch(
                         _submit_next()
 
     elapsed_total = time.monotonic() - start
+    # Re-query rather than reuse done_ids + this run's count: other shards may
+    # have completed targets concurrently, so this reflects the true global
+    # state at completion, not just this process's own contribution.
+    n_done_total = len(store.done_target_ids())
+    percent_after = _percent_done(n_done_total, n_targets_total)
     _progress(
         f"Done in {elapsed_total:.0f}s: {len(pending_target_ids)} targets processed, "
-        f"{n_written} snippets written, {n_failed} rows failed"
+        f"{n_written} snippets written, {n_failed} rows failed  |  "
+        f"manifest {n_done_total}/{n_targets_total} done ({percent_after:.1f}%)"
     )
 
     return BatchSummary(
@@ -674,6 +689,8 @@ def run_batch(
         db_path=str(db_path),
         shard_index=shard_index,
         shard_count=shard_count,
+        n_targets_done_total=n_done_total,
+        percent_done=percent_after,
     )
 
 
@@ -690,6 +707,10 @@ def format_batch_summary(summary: BatchSummary) -> str:
         f"- Elapsed: {summary.elapsed_seconds:.0f}s",
         f"- Output: `{summary.output_path}`",
         f"- Progress DB: `{summary.db_path}`",
+        (
+            f"- Manifest progress: {summary.n_targets_done_total}/{summary.n_targets_total} "
+            f"done ({summary.percent_done:.1f}%)"
+        ),
     ]
     if summary.shard_count > 1:
         lines.append(f"- Shard: {summary.shard_index}/{summary.shard_count}")
@@ -796,8 +817,13 @@ def _cli(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
 
     if args.status_only:
         summary = T1KeplerProcessingStore(args.db_path).summary()
+        percent_note = ""
+        if args.manifest.exists():
+            n_manifest_targets = len(group_rows_by_target(load_manifest_rows(args.manifest)))
+            percent = _percent_done(summary["n_done"], n_manifest_targets)
+            percent_note = f" ({percent:.1f}% of {n_manifest_targets} manifest targets)"
         print(
-            f"T1-1 Kepler batch status: {summary['n_done']} done, "
+            f"T1-1 Kepler batch status: {summary['n_done']} done{percent_note}, "
             f"{summary['n_active']} active, {summary['n_written']} snippets written, "
             f"{summary['n_failed']} rows failed (db: {args.db_path})"
         )
