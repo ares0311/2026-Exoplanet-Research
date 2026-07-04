@@ -55,6 +55,9 @@ class RunReport:
     output_paths: tuple[str, ...] = field(default_factory=tuple)
     shard_index: int | None = None
     shard_count: int | None = None
+    items_done_total: int | None = None
+    items_total: int | None = None
+    percent_done: float | None = None
     notes: str = ""
 
 
@@ -97,6 +100,11 @@ def format_run_report(report: RunReport) -> str:
     ]
     if report.shard_count is not None and report.shard_count > 1:
         lines.append(f"- Shard: {report.shard_index}/{report.shard_count}")
+    if report.items_total is not None and report.percent_done is not None:
+        lines.append(
+            f"- Overall progress: {report.items_done_total}/{report.items_total} "
+            f"({report.percent_done:.1f}%)"
+        )
     if report.output_paths:
         lines.append(f"- Output: {', '.join(report.output_paths)}")
     if report.notes:

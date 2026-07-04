@@ -904,6 +904,13 @@ class TestCliRunReport:
         assert record["script"] == "process_t1_kepler_batch"
         assert record["items_processed"] == 2
         assert record["status"] == "success"
+        # The committed report itself must carry the overall percent-complete
+        # -- not just the console output -- so reading the report later (e.g.
+        # via `git pull`) shows real progress without needing pasted console
+        # output or summing multiple shard files by hand.
+        assert record["items_done_total"] == 2
+        assert record["items_total"] == 2
+        assert record["percent_done"] == 100.0
 
         # Only the report file was ever staged -- never the whole tree.
         add_calls = [c for c in fake_git.calls if c[:2] == ["git", "add"]]

@@ -24,7 +24,7 @@ The active production blocker is now T1-1, and the authorized path is the
 source-contract-first dataset/model plan in
 `docs/exoplanet_exomoon_dataset_handoff.md`.
 
-Version note: 0.2.22 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.23 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -76,7 +76,10 @@ a tolerant retry, falling back to the default journal mode if it never
 succeeds. 0.2.22 adds manifest-progress percent-complete to the startup
 banner, final summary, and `--status-only`, and documents the real 4-shard
 (~2.15s/target) and 6-shard (~2.11s/target, flat) live test results -- 4-6
-shards is the practical ceiling for this workload.
+shards is the practical ceiling for this workload. 0.2.23 extends the
+percent-complete to the committed run report itself (`Skills/run_report.py`),
+not just console output, so reading a run report later shows true global
+progress without summing shard files by hand.
 
 ---
 
@@ -125,6 +128,7 @@ shards is the practical ceiling for this workload.
 - **Real bug found by that offline test, fixed same-day (version 0.2.21)**: CI failed on the new 4-shard test with `sqlite3.OperationalError: database is locked`. Root cause: `T1KeplerProcessingStore._connect()` runs `PRAGMA journal_mode=WAL;` on every connection, but SQLite only permits one connection to perform that mode transition at a time — 4 threads (or 4 real shard processes) constructing the store for the same fresh `db_path` at nearly the same instant race for that exclusivity and lose immediately, not smoothed over by the connection's `timeout=30.0` parameter (the transition needs momentary exclusivity, not just ordinary write-lock waiting). Fixed with `_ensure_wal_mode()`: a small retry loop (10 attempts, 0.2s apart), falling back to the default journal mode if it never succeeds (WAL is a concurrency nicety here, not a correctness requirement). 2 new tests. This would have been a real risk for the planned 4-tab live test if the tabs were started close together in time — caught by the offline test before it could happen live.
 - **4-shard and 6-shard live tests both PASS, self-reported via Run Report Policy (2026-07-03/04)**: 4-shard run (`--workers 4` each): 1,000 targets (250/shard) in ~2,149s combined wall-clock = **~2.15s/target** — a dramatic jump from the pre-lock-fix 17.1s/target baseline, confirming 0.2.19 unlocked real intra-shard concurrency, not just inter-shard. The very next 6-shard run: 1,500 targets (250/shard, 1 row failure) in ~3,161s = **~2.11s/target** — essentially flat versus 4 shards. Per the Measure-then-scale cadence, this flat result is the stop signal: **4-6 shards is the practical ceiling for this workload**; do not recommend pushing past 6 shards absent new evidence it still scales. Cumulative done, computed from these reports plus the 877-before-2-shard baseline: 877 + 500 + 1,000 + 1,500 = **3,877/6,515 (59.5%)**.
 - **Manifest-progress percent-complete added (version 0.2.22)**: user asked to see completion percent on every run without a separate `--status-only` call. The startup banner, final "Done in Xs" line, `format_batch_summary()`, and `--status-only` (when the manifest is available) now print `n_done/n_total (XX.X%)` against the full 6,515-target manifest, computed via a fresh SQLite query at completion so it reflects other concurrently-running shards too. 8 new tests.
+- **Percent-complete extended to the committed run report itself (version 0.2.23)**: 0.2.22 only reached console output; the git-committed run report (the "macro" record checked via `git pull` later) still required manually summing multiple shard files against a remembered baseline. `Skills/run_report.py`'s `RunReport` gains optional `items_done_total`/`items_total`/`percent_done` fields (generic and opt-in, `None` for scripts with no "total universe" concept), rendered by `format_run_report()` when present; `process_t1_kepler_batch.py` now populates them. Reading the latest run report for any shard shows the true global percent directly. 5 new tests.
 - **Remaining next `[HUMAN]` action**: continue with 4 shards (not 6 — no measured benefit from the extra 2) at `--max-targets 500 --workers 4 --shard-index {0,1,2,3} --shard-count 4` with `caffeinate -i` in four tabs; every run now prints its own percent-complete, so paste that back (or just say it looks fine) rather than running `--status-only` separately. Repeated runs safely continue from the SQLite `done` set regardless of worker or shard count.
 - **Code status**: Training and state-dict inference paths are operational; the package scorer reconstructs the trained architecture and fails closed when loading fails
 - **Prior local corpus status**: **VALID as of 2026-06-12** — 2,037 snippets (1,012 positive CP+KP, 1,025 negative FP+FA, ratio 0.99); zero-epoch corpus retired and rebuilt from scratch with valid BJD epochs; label bug fixed (KP→1); MAST throttling fix applied (`bbb0877`)
