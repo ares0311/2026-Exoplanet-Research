@@ -274,6 +274,63 @@ promotion may require a documented `git add -f`.
 
 ---
 
+### Label-Source Discovery Protocol — MANDATORY
+
+Before claiming any labeled data source (Kepler, K2, TESS, SETI/BL, or future
+missions) is exhausted, follow the methodology in
+`docs/seti_labeled_hit_data_research.md`'s "Comprehensive Protocol: Ensuring
+All Labeled Kepler and TESS Datasets Have Been Found" section, generalized to
+whatever mission/domain is in scope:
+
+1. **Discover tables via schema introspection, never hardcoded names.** For
+   NASA Exoplanet Archive TAP, query `TAP_SCHEMA.tables` with a broad
+   `LIKE` sweep across every relevant mission keyword (e.g.
+   `%kepler%`/`%koi%`/`%tce%`/`%k2%`/`%tess%`/`%toi%`), not just the term
+   that matches your current best guess — a `%tce%`-only sweep in this
+   project's own history missed the `_KOI` table family and `k2pandc`
+   entirely until the broader sweep was run.
+2. **Audit VizieR/CDS and the literature** for mission-specific
+   publication-backed catalogs (e.g. Planet Hunters TESS/Kepler,
+   robovetter releases) before concluding a mission's official archive
+   tables are the only source.
+3. **Accept a source only with positive evidence**: a real downloadable
+   machine-readable table, row-level records, and a human/published-review
+   verdict column that is not merely a model's own prediction. Log
+   rejections with an explicit reason (`no_machine_readable_table_found`,
+   `aggregate_counts_only`, `model_outputs_not_ground_truth`,
+   `data_available_upon_request_only`, etc.) rather than silently dropping
+   a checked lead.
+4. **Do not repeat an already-logged investigation.** Current label-source
+   completeness status as of 2026-07-05 (see `AGENTS.md`/
+   `docs/PRODUCTION_READINESS.md` for the full narrative):
+   - **Kepler**: close to exhausted via NASA Exoplanet Archive TAP.
+     `cumulative` (KOI) + `Q1_Q17_DR24_TCE` are both in use. `Q1_Q17_DR25_TCE`
+     is confirmed live to have its label columns (`av_training_set`,
+     `av_pred_class`) entirely empty; its ~6,382 kepids not in DR24 mostly
+     have no usable label anywhere (only 535 have a KOI disposition, and
+     those were already captured by the KOI-based manifest independent of
+     any TCE table). `Q1_Q12_TCE`/`Q1_Q16_TCE` have the `av_training_set`
+     column but are reasoned (not independently verified) to be redundant
+     subsets of DR24's full-mission reprocessing. The one genuinely untried
+     lever is fetching K2's own native light curves for every `k2pandc`
+     entry (not just the TESS-re-observed subset already used).
+   - **TESS**: three open, unresolved threads, do not re-search from
+     scratch — pick these up directly. (a) The TEV TCE catalog
+     (`tev.mit.edu`) has confirmed real disposition fields (EXOFOP/Group/
+     Human-Triage) across SPOC+QLP+FAINT-search TCEs, but its data API has
+     not been found (JS SPA; needs a real browser session with dev tools
+     open, not a static fetch). (b) Planet Hunters TESS / NotPlaNET
+     (`github.com/vtardugno/TESS-CNN`) has real human-vetted PC/EB/OTH
+     labels, confirmed not publicly downloadable — the README states data
+     is available only by emailing the authors. (c) The T16 Planet Hunt
+     (arXiv:2604.18579, ~11,554 candidates from 83.7M light curves) is a
+     very recent, potentially large lead whose data-availability statement
+     could not be checked — both arXiv and IOPscience returned 403s to
+     automated fetches (their own anti-scraper measures, not this
+     project's network policy); needs a real browser check.
+
+---
+
 ## Standing Rules
 
 - **Skills directory**: Any standalone `.py` utility script created to perform a task (data processing, report generation, injection-recovery, etc.) must be saved in `Skills/` at the project root. Create the directory if it does not exist. This allows scripts to be discovered and reused across sessions rather than recreated.
