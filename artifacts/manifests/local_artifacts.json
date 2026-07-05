@@ -1162,7 +1162,7 @@
     {
       "path": "checkpoints/cnn_t1_1_kepler/",
       "kind": "checkpoint_dir",
-      "status": "passed_gates_awaiting_promotion_approval",
+      "status": "passed_gates_superseded",
       "git_policy": "ignored",
       "last_known": {
         "checkpoint": "checkpoints/cnn_t1_1_kepler/best.pt",
@@ -1192,8 +1192,47 @@
         "notes": "First checkpoint in the full C1-C19 + T1-1 history to clear both the 0.85 AUC and 0.80 F1 production gates. Temperature scaling made no change (T=1.0) since none was needed, trivially satisfying the non-degradation requirement.",
         "verified_on": "2026-07-04"
       },
+      "validation_gate": "Evaluator PASS confirmed; superseded on every metric by checkpoints/cnn_t1_1_kepler_master/ below.",
+      "next_action": "Retain locally for reproducibility; not the current promotion candidate."
+    },
+    {
+      "path": "checkpoints/cnn_t1_1_kepler_master/",
+      "kind": "checkpoint_dir",
+      "status": "passed_gates_best_to_date_awaiting_promotion_approval",
+      "git_policy": "ignored",
+      "last_known": {
+        "checkpoint": "checkpoints/cnn_t1_1_kepler_master/best.pt",
+        "split_dir": "data/t1_1_kepler_master_cnn_splits/",
+        "config": "configs/cnn_kepler_pretrain.json",
+        "strategy": "trained from scratch, not fine-tuned",
+        "source_corpus": "merged KOI-based (7,442) + DR24 TCE expansion (8,207) = 15,649 examples",
+        "train": 10800,
+        "val": 2393,
+        "test": 2456,
+        "overall_positive_rate_pct": 21.8,
+        "best_epoch": 17,
+        "best_val_loss": 0.2099,
+        "best_val_auc": 0.9581,
+        "epochs_run": 32,
+        "raw_val_auc": 0.9581,
+        "raw_val_f1": 0.8183,
+        "raw_test_auc": 0.9572,
+        "raw_test_f1": 0.8347,
+        "raw_test_brier": 0.0580,
+        "raw_test_ece": 0.0142,
+        "temperature_T": 1.0,
+        "calibrated_threshold": 0.52,
+        "calibrated_test_auc": 0.9572,
+        "calibrated_test_f1": 0.8347,
+        "calibrated_test_brier": 0.0580,
+        "calibrated_test_ece": 0.0142,
+        "evaluator_flag": "PASS",
+        "comparison_to_prior_checkpoint": "strictly better than checkpoints/cnn_t1_1_kepler/ on every metric (AUC +0.032, F1 +0.007, Brier nearly halved, ECE nearly a third) despite a notably more class-imbalanced training corpus (~22% positive vs ~37%) -- more data outweighed the harder class balance",
+        "notes": "Best Kepler CNN checkpoint in the project's history to date.",
+        "verified_on": "2026-07-04"
+      },
       "validation_gate": "Evaluator PASS confirmed; promotion to models/ additionally requires explicit human approval per the Git-Add-Safe Artifact Policy -- not yet granted.",
-      "next_action": "[HUMAN] Confirm whether to approve promotion to models/ now."
+      "next_action": "[HUMAN] Confirm whether to approve promotion to models/ now (recommended over the superseded cnn_t1_1_kepler)."
     },
     {
       "path": "metadata/t1_1_kepler_dr24_expansion_manifest.jsonl",
@@ -1262,7 +1301,48 @@
         "verified_on": "2026-07-04"
       },
       "validation_gate": "All 6 shard run reports summed to exactly 4760/4760 processed, matching the manifest's target-group count exactly.",
-      "next_action": "[HUMAN] Combine shards (cat kepler_snippets.shard*of6.jsonl > combined.jsonl, output name avoids matching input glob), merge with data/processed/t1_1_kepler_snippets/combined.jsonl, rebuild CNN splits with Skills/build_cnn_training_data.py, validate with Skills/cnn_split_validator.py. See docs/CNN_PRODUCTION_RUNBOOK.md's Kepler Corpus Expansion section."
+      "next_action": "Merged into combined.jsonl (8,207 rows); consumed by the master combine step below."
+    },
+    {
+      "path": "data/processed/t1_1_kepler_master_combined.jsonl",
+      "kind": "processed_snippet_corpus",
+      "status": "built",
+      "git_policy": "ignored",
+      "last_known": {
+        "build_command": "cat data/processed/t1_1_kepler_snippets/combined.jsonl data/processed/t1_1_kepler_dr24_expansion_snippets/combined.jsonl > data/processed/t1_1_kepler_master_combined.jsonl",
+        "rows": 15649,
+        "component_rows": {"koi_based": 7442, "dr24_expansion": 8207},
+        "verified_on": "2026-07-04"
+      },
+      "validation_gate": "Row count verified = sum of component corpora (7442 + 8207 = 15649).",
+      "next_action": "Source input to Skills/build_cnn_training_data.py; retain until splits are rebuilt under a materially different plan."
+    },
+    {
+      "path": "data/t1_1_kepler_master_cnn_splits/",
+      "kind": "cnn_split",
+      "status": "local_validated",
+      "git_policy": "ignored",
+      "last_known": {
+        "source_corpus": "data/processed/t1_1_kepler_master_combined.jsonl",
+        "split_source": "predefined",
+        "total_examples": 15649,
+        "train": 10800,
+        "val": 2393,
+        "test": 2456,
+        "train_negative": 8442,
+        "train_positive": 2358,
+        "val_negative": 1875,
+        "val_positive": 518,
+        "test_negative": 1919,
+        "test_positive": 537,
+        "overall_positive_rate_pct": 21.8,
+        "validator_status": "PASS",
+        "validator_errors": 0,
+        "validator_warnings": 0,
+        "verified_on": "2026-07-04"
+      },
+      "validation_gate": "Skills/cnn_split_validator.py data/t1_1_kepler_master_cnn_splits reported PASS on 2026-07-04.",
+      "next_action": "Consumed by checkpoints/cnn_t1_1_kepler_master/; retain for reproducibility."
     },
     {
       "path": "logs/t1_1_kepler_processing.sqlite3",
