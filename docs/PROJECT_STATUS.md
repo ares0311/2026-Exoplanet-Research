@@ -98,20 +98,19 @@ without relying on chat context or local terminal output.
 - The project reset on 2026-07-01 wholly adopts
   `docs/exoplanet_exomoon_dataset_handoff.md` as the active path to a trained
   model.
-- The next production work is source-contract-first data/ML hardening:
-  provider schema verification, immutable source snapshots, training
-  manifests, leakage-safe splits, bounded storage, and a checkpoint that passes
-  the documented held-out gates.
-- Source verification, storage estimates, source snapshots, and the
-  leakage-safe Kepler manifest are now complete. `metadata/t1_1_kepler_training_manifest.jsonl`
-  has 7,454 KOI rows across 6,515 KIC target groups with no cross-split target
-  leakage. The first bounded Kepler processing batch live-smoked successfully
-  on the user's Mac: 25 targets, 26 snippets written, 0 failed rows, SQLite
-  summary `done|25|26|0`, raw scratch directory `0B` after cleanup. Next work
-  is continuing the resumable bounded processing pass, then building validated
-  splits for training after enough real snippets accumulate.
-- Do not repeat old C1-C19/C20-style retraining without first satisfying the
-  handoff brief requirements.
+- Source-contract-first data/ML hardening is complete enough to produce a
+  passing checkpoint: provider schemas were verified, source snapshots and
+  manifests were committed, leakage-safe splits were enforced, storage remained
+  bounded, and the master Kepler corpus trained successfully.
+- `checkpoints/cnn_t1_1_kepler_master/best.pt` is the current promotion
+  candidate. It passed held-out gates with raw test AUC 0.9572, calibrated F1
+  0.8347, Brier 0.0580, ECE 0.0142, and temperature T=1.0.
+- The active blocker is no longer data acquisition or another training loop.
+  It is explicit human promotion approval plus a promotion package containing
+  selected model artifacts, model card/registry metadata, reproducibility
+  manifest, and updated local-artifact/data-selection ledgers.
+- Do not repeat old C1-C19/C20-style retraining or Kepler batch processing
+  unless a named promotion validation gate fails.
 - Do not use synthetic examples as supervised training positives in this phase;
   synthetics remain CI/background fixtures only.
 - Any local long-running command must be resumable, print progress/ETA, use

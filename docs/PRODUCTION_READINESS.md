@@ -1,6 +1,6 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-07-03 (project reset: run006/run008 candidate review is historical; active production path wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` to close T1-1 with verified data sources, leakage-safe training manifests, and a production-gated trained model; source-contract examples now use case-insensitive TAP schema table-name matching after the live CUMULATIVE table-name bug; the bounded Kepler-first processing batch tool is built, live-smoked sequentially at 25 and 250 targets, and fixed after a live `--workers 6` crash caused by an unsafe Lightkurve `download_all()` call (version 0.2.17); a supplementary pipeline-correctness fix wired real TIC catalog stellar/contamination parameters into `run_pipeline()` — see T1-0 notes below)
+Last reviewed: 2026-07-08 (project reset: run006/run008 candidate review is historical; active production path wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` and the Astrometrics master/data-selection/storage policy docs. The master-corpus Kepler CNN checkpoint has passed held-out gates; the current T1-1 blocker is production promotion/registration with explicit human approval, model/reproducibility metadata, and policy-compliant data-selection/storage records.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
 Test baseline: 2,519 default tests passing, 2 integration_live deselected
@@ -14,17 +14,18 @@ Test baseline: 2,519 default tests passing, 2 integration_live deselected
 | `--scorer bayesian` | **PRODUCTION READY** | None — default mode, zero external dependencies |
 | `--scorer xgboost` | **PRODUCTION READY** | None — trained on 7,586 Kepler KOIs, AUC=0.992 |
 | `--scorer ensemble` | **PRODUCTION READY** | None — conservative XGBoost+Bayesian blend when CNN absent |
-| `--scorer cnn` | **NOT READY** | T1-1: no trained checkpoint has passed held-out performance and calibration gates |
-| `--scorer full-ensemble` | **NOT READY** | T1-1: no production-approved CNN checkpoint |
+| `--scorer cnn` | **PROMOTION PENDING** | T1-1: master-corpus checkpoint passed gates but is not yet human-approved, registered, or committed under `models/` |
+| `--scorer full-ensemble` | **PROMOTION PENDING** | T1-1/T1-2: depends on the approved CNN artifact plus subsequent stacking calibration |
 
 The system is safe to deploy now for Bayesian and XGBoost scoring modes. The
-CNN label gate is open, but all evaluated CNN checkpoints remain rejected; they
-must not be copied into `models/`, registered, or used for production scoring.
-The active production blocker is now T1-1, and the authorized path is the
-source-contract-first dataset/model plan in
-`docs/exoplanet_exomoon_dataset_handoff.md`.
+master-corpus Kepler CNN checkpoint has passed held-out gates, but it must not
+be copied into `models/`, registered, or used for production scoring until the
+human explicitly approves promotion and the promotion PR includes the model
+artifact, reproducibility manifest, registry/model-card metadata, and updated
+local-artifact/data-selection ledgers. The active production blocker remains
+T1-1, now narrowed to promotion rather than more exploratory training.
 
-Version note: 0.2.25 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.26 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -93,7 +94,11 @@ every row collapsed into one fake group and the new 0.2.24 check (correctly)
 raised on the resulting cross-split conflict. Fixed by recognizing `group_key`
 and falling back to `target_id`; this bug pre-dated 0.2.24 and would have
 silently corrupted the split under the old random-grouping logic instead of
-erroring.
+erroring. 0.2.26 adds the verified Kepler DR24 TCE expansion manifest builder
+after live schema/label checks showed `Q1_Q17_DR24_TCE.av_training_set` has
+real labels while the newer DR25 TCE label columns are empty; the expansion was
+later fully processed and produced the master corpus used by the current
+passing CNN.
 
 ---
 
@@ -119,9 +124,9 @@ erroring.
 
 ### T1-1: Production Tier 2 CNN Checkpoint
 
-- **What is missing**: A CNN checkpoint that passes held-out performance and calibration gates
-- **Gate status**: **OPEN** — Kepler pretraining, TESS split generation, and two Kepler->TESS fine-tunes are locally complete; both fine-tuned checkpoints failed held-out production gates and must not be promoted
-- **Current priority**: **ACTIVE / HIGHEST PRIORITY** — close this through the source-contract-first dataset/model plan in `docs/exoplanet_exomoon_dataset_handoff.md`, not by repeating old C1-C19/C20 patterns
+- **What is missing**: Human-approved promotion of the passing master-corpus CNN checkpoint into a registered production artifact
+- **Gate status**: **PROMOTION PENDING** — `checkpoints/cnn_t1_1_kepler_master/best.pt` passed held-out gates (raw test AUC 0.9572, calibrated F1 0.8347, Brier 0.0580, ECE 0.0142, T=1.0), but it remains ignored local state and must not be production-used until explicitly approved and committed with promotion metadata
+- **Current priority**: **ACTIVE / HIGHEST PRIORITY** — prepare the policy-compliant promotion package; do not restart old C1-C19/C20 experiments or new data pulls unless a named promotion gate fails
 - **Active source contract**: Verify every public data source before use; discover schemas from primary services; preserve immutable source snapshots and enough metadata to redownload raw files after cleanup; use leakage-safe manifests/splits; keep storage bounded; use no synthetic examples for supervised model training in this phase; do not use Kaggle mirrors or unverified pretrained weights when primary NASA/MAST sources are available.
 - **Source-contract verification tool (2026-07-02)**: `Skills/verify_dataset_sources.py` implements the "Resource Access Contract" and "Minimum access smoke test" from `docs/exoplanet_exomoon_dataset_handoff.md` exactly — queries `TAP_SCHEMA.columns` for `cumulative` and `toi` before trusting any column name (never infers a renamed column), fetches sample rows from both tables plus the ExoFOP public TOI CSV, and confirms Lightkurve can find both a Kepler and a TESS light curve for one real target pulled from those rows. Fails closed with a specific reason at the first broken step.
 - **First live run found a real bug, fixed same-day (2026-07-02)**: `cumulative` schema check failed with zero missing... zero *available* columns and no error, while `toi` passed. Root cause, confirmed via direct `curl` against `TAP_SCHEMA.tables` (not guessed): the archive registers the table as `"CUMULATIVE"` (upper case); `TAP_SCHEMA.columns.table_name` is an exact-match string column, not a resolved SQL identifier, so `= 'cumulative'` matched nothing. `toi` happened to be registered lower case. Fixed by querying `UPPER(table_name) = UPPER('...')` instead of exact match — general fix, not a per-table hardcode; user re-verified the fixed query live via `curl` and got a real 2,366-byte column list back. `FROM cumulative`/`FROM toi` (the actual row-fetch queries) were not affected — those are ordinary SQL identifiers and this codebase already queries them lower case successfully elsewhere (`Skills/fetch_nea_koi_lc_index.py`).

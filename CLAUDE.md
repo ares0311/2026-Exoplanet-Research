@@ -15,6 +15,9 @@ Every session must begin by reading:
 3. `docs/DISCOVERY_RUNBOOK.md`
 4. `docs/exoplanet_exomoon_dataset_handoff.md`
 5. `docs/exoplanet_detection_research_brief.md` (skim the satellite table and AI methods section)
+6. `docs/astrometrics_coding_agents_master_guide.md`
+7. `docs/astrometrics_data_selection_policy.md`
+8. `docs/astrometrics_external_and_cloud_storage_policy.md`
 
 Before proposing or executing any task you must:
 1. Name the highest-priority unresolved Tier 1 gap from `docs/PRODUCTION_READINESS.md`.
@@ -247,6 +250,27 @@ choose local worker defaults, keep at least two CPU cores free for interactive
 work, and keep live external-service jobs polite and lower-concurrency. Never
 hardcode Apple-only assumptions into scientific scoring, classification, or
 pathway logic; expose system-specific behavior through config or CLI flags.
+
+### Astrometrics Data And Storage Policy — MANDATORY
+
+The three Astrometrics policy docs in `docs/` are production directives:
+
+- `docs/astrometrics_coding_agents_master_guide.md`
+- `docs/astrometrics_data_selection_policy.md`
+- `docs/astrometrics_external_and_cloud_storage_policy.md`
+
+Before changing datasets, training sets, live-search targets, model promotion
+artifacts, storage layout, cloud/external-drive behavior, or large-download
+recipes, apply these policies. Data roles must stay separated
+(`training`, `validation`, `calibration`, `frozen_eval`, `live_search`,
+`followup_live_search`); data-selection decisions must be recorded in
+`data_selection/data_selection_decision_log.md`; public raw archives should be
+bounded re-downloadable cache unless pinned by policy; manifests, ledgers,
+configs, reports, model cards, calibration/eval artifacts, and candidate
+evidence are the durable truth. The 4TB external SSD is the normal large local
+workspace when available, while Dropbox-style sync must not be treated as the
+authoritative dataset layer for raw archives, batch caches, model artifacts, or
+candidate evidence ledgers.
 
 ### Git-Add-Safe Artifact Policy — MANDATORY
 
@@ -601,8 +625,8 @@ New `RawDiagnostics` fields: `oot_scatter_sigma`, `sector_depths`, `sector_depth
 
 ## CLI Version Flag and Meta Output (Milestone 12f)
 
-- `exo --version` / `exo -V` — prints the installed `exo-toolkit` package version (currently `0.2.13`)
-- fallback version `0.2.13` in `src/exo_toolkit/__init__.py` is used only if source-tree and installed package metadata are unavailable
+- `exo --version` / `exo -V` — prints the installed `exo-toolkit` package version (currently `0.2.26`)
+- fallback version `0.2.26` in `src/exo_toolkit/__init__.py` is used only if source-tree and installed package metadata are unavailable
 - Each output row gains a `"features"` dict, a raw `"diagnostics"` dict, a `"fetch_provenance"` dict, plus a `"meta"` dict: `toolkit_version`, `run_at`, `scorer`, `git_commit`, `features_available`, `features_missing`
 - `_git_commit_short()` reads `git rev-parse --short HEAD`; returns `None` on failure
 
@@ -1390,9 +1414,9 @@ rows, SQLite summary `done|25|26|0`, raw scratch directory `0B` after cleanup.
 **Live scanner fix (PR #143, 2026-06-28):** **MERGED** — live one-target smoke on `main` verified that ExoFOP SSL loading, Python 3.14 helper imports, bounded TIC target selection, and no-light-curve `no_data` classification work. Do not re-debug the pre-PR #143 pasted failures.
 
 **Immediate next actions (in priority order):**
-1. **[AGENT]** Keep the GitHub-visible artifact ledger current after each ignored local processing run; verify `git add --dry-run .` remains empty for generated payloads.
-2. **[HUMAN]** After the ledger PR is merged, run the next bounded continuation from `main`: `git pull origin main` then `caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250` (use 100 if a smaller step is preferred).
-3. **[AGENT]** Review the pasted summary and SQLite counts. If failure rate stays low and raw scratch remains empty, continue scaling bounded Kepler processing until the manifest is complete.
+1. **[AGENT]** Prepare the promotion package for `checkpoints/cnn_t1_1_kepler_master/best.pt`: model card, reproducibility manifest, registry metadata, local-artifact ledger updates, and exact `git add -f` scope. Do not copy the checkpoint into `models/` until explicit human promotion approval is recorded.
+2. **[HUMAN]** Decide whether to approve promotion of the master-corpus checkpoint. It is the recommended candidate because it strictly supersedes the earlier passing Kepler checkpoint on AUC, F1, Brier, and ECE.
+3. **[AGENT]** After approval, promote only the approved model artifacts and validate scorer loading/evaluation paths from `main`.
 
 #### CNN candidate history (what has been tried — do not repeat)
 
@@ -1431,7 +1455,7 @@ rows, SQLite summary `done|25|26|0`, raw scratch directory `0B` after cleanup.
 
 #### CNN production runbook
 
-Use `docs/CNN_PRODUCTION_RUNBOOK.md` for authoritative copy-paste workflow. **Step C is complete: `checkpoints/cnn_t1_1_kepler/best.pt` passed the production gates** (raw test AUC 0.9252, calibrated F1 0.8281, temperature T=1.0 — no calibration degradation) — the first checkpoint in the full C1-C19 + T1-1 history to do so. Promotion to `models/` requires explicit human approval, not yet granted. Separately, the Kepler DR24 TCE corpus expansion (`metadata/t1_1_kepler_dr24_expansion_manifest.jsonl`, 4,760 new targets) has been built live and fully processed (6 shards × 6 workers, 100% in one pass, 8,207 snippets, 6 failures) — next `[HUMAN]` action is to combine with the existing corpus and rebuild CNN splits, see `docs/CNN_PRODUCTION_RUNBOOK.md`'s "Kepler Corpus Expansion" section for the exact commands. Note: the human's real standing shard/worker cadence for `process_t1_kepler_batch.py` is **6 shards × 6 workers** (36 total concurrent connections) — this project's own earlier changelog entries mislabeled every historical live run as `--workers 4`; that has been corrected throughout `AGENTS.md`/`docs/PRODUCTION_READINESS.md`/`docs/CNN_PRODUCTION_RUNBOOK.md`. Do not recommend a lower worker/shard count without new evidence it's necessary.
+Use `docs/CNN_PRODUCTION_RUNBOOK.md` for authoritative copy-paste workflow. **Step C is superseded by the master-corpus checkpoint:** `checkpoints/cnn_t1_1_kepler_master/best.pt` passed the production gates with raw test AUC 0.9572, calibrated F1 0.8347, Brier 0.0580, ECE 0.0142, and temperature T=1.0. It strictly beats `checkpoints/cnn_t1_1_kepler/` on every metric and is the current promotion candidate. Promotion to `models/` requires explicit human approval, not yet granted. Note: the human's real standing shard/worker cadence for `process_t1_kepler_batch.py` is **6 shards × 6 workers** (36 total concurrent connections) — this project's own earlier changelog entries mislabeled historical live runs as `--workers 4`; that has been corrected throughout `AGENTS.md`/`docs/PRODUCTION_READINESS.md`/`docs/CNN_PRODUCTION_RUNBOOK.md`. Do not recommend a lower worker/shard count without new evidence it's necessary.
 
 The accepted `train_cnn.py` flags are `--split-dir`, `--checkpoint-dir`, and `--pretrained-checkpoint`.
 The evaluator flag is `--output-calibration` (not `--calibration-output`).
