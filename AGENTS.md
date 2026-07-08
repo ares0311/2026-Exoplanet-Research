@@ -14,6 +14,9 @@ Every session must begin by reading:
 3. `docs/DISCOVERY_RUNBOOK.md`
 4. `docs/exoplanet_exomoon_dataset_handoff.md`
 5. `docs/exoplanet_detection_research_brief.md` (skim satellite table + AI methods)
+6. `docs/astrometrics_coding_agents_master_guide.md`
+7. `docs/astrometrics_data_selection_policy.md`
+8. `docs/astrometrics_external_and_cloud_storage_policy.md`
 
 Before proposing or executing any task you must:
 1. Name the highest-priority unresolved Tier 1 gap from `docs/PRODUCTION_READINESS.md`.
@@ -80,6 +83,8 @@ When the user must take an action to unblock a gap:
 
 **Dataset handoff brief wired (2026-07-01):** `docs/exoplanet_exomoon_dataset_handoff.md` is now required reading and the authoritative data/ML strategy. Core rules: no guessed schemas/URLs/columns, no synthetic training data for this phase, no Kaggle mirrors when primary NASA/MAST sources are available, no unverified pretrained weights, no bulk archive downloads without storage estimates and human approval, and preserve enough metadata to redownload raw files after cleanup.
 
+**Astrometrics policy docs wired (2026-07-08):** The master guide, data-selection policy, and external/cloud-storage policy in `docs/` are now required reading. Apply them to T1-1 work: separate training/validation/calibration/frozen-eval/live-search roles, record data decisions in `data_selection/data_selection_decision_log.md`, keep raw public archives as bounded re-downloadable cache rather than permanent Dropbox-synced truth, preserve manifests/ledgers/model cards, and use the 4TB external SSD as the normal large local workspace when available.
+
 **Historical discovery work:** JWST integration A1-A3, K2 TAP fixes, and TESS target restructuring B1-B4 are merged. Run006/run008 evidence remains useful as live-pipeline evidence but is no longer the main production blocker.
 
 | Item | State |
@@ -94,7 +99,7 @@ When the user must take an action to unblock a gap:
 | K2 overlap corpus (`data/tess_k2_overlap_snippets.jsonl`) | **COMPLETE** — 2,086 snippets (2026-06-27) |
 | Dataset/model-training handoff brief | **ACTIVE CONTRACT** — `docs/exoplanet_exomoon_dataset_handoff.md` |
 
-**The active gap is T1-1: Production CNN / trained model checkpoint (AUC ≥ 0.85, F1 ≥ 0.80). CNN/model work is unpaused, but it must follow the dataset handoff brief rather than repeating the rejected C1-C19/C20 patterns.**
+**The active gap remains T1-1, but the shape changed on 2026-07-04:** the master-corpus Kepler CNN checkpoint passed the held-out gates (AUC 0.9572, calibrated F1 0.8347). The current production blocker is promotion/registration of that checkpoint into `models/` with explicit human approval, a reproducibility manifest, model card/registry metadata, and policy-compliant data-selection/storage records. Do not restart old CNN experiments unless a named gate shows the promoted model is insufficient.
 
 ### What was done in the previous sessions (2026-06-21 – 2026-06-26)
 

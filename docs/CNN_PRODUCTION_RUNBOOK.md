@@ -249,11 +249,12 @@ Continue bounded invocations until the manifest reaches 100%.
    to the older checkpoint's 0.9186, no regression.
 5. ✅ **DONE (2026-07-04).** Evaluate against the production gates (raw AUC
    ≥ 0.85, calibrated F1 ≥ 0.80, temperature scaling must not worsen
-   Brier/ECE) with `Skills/evaluate_cnn_checkpoint.py`. Result: raw test
-   AUC=0.9252, calibrated F1=0.8281, temperature T=1.0 (no calibration
-   change, since none was needed). **`Flag: PASS`** -- the first checkpoint
-   in the full C1-C19 + T1-1 history to clear both gates.
-6. A passing checkpoint still requires explicit human approval before
+   Brier/ECE) with `Skills/evaluate_cnn_checkpoint.py`. The first Kepler
+   checkpoint passed, then the DR24-expanded master checkpoint strictly
+   superseded it: `checkpoints/cnn_t1_1_kepler_master/best.pt` reached raw
+   test AUC=0.9572, calibrated F1=0.8347, Brier=0.0580, ECE=0.0142, and
+   temperature T=1.0. **`Flag: PASS`**.
+6. The master checkpoint still requires explicit human approval before
    promotion to `models/`. **Not yet granted** as of this writing.
 
 ## Kepler Corpus Expansion (DR24 TCE, optional, does not block the above)
@@ -288,21 +289,15 @@ completed in a single pass -- 4,760/4,760 processed (100%), 8,207 snippets
 written, 6 rows failed, ~1.21s/target combined. No further processing runs
 needed.
 
-**Next `[HUMAN]` action** -- combine with the existing corpus and rebuild CNN splits:
+✅ **DONE (2026-07-04).** Master combine, split validation, training, and
+evaluation completed. The master corpus has 15,649 total rows (7,442 KOI-based
++ 8,207 DR24 expansion), `data/t1_1_kepler_master_cnn_splits/` validated PASS
+with `split_source: predefined`, and `checkpoints/cnn_t1_1_kepler_master/best.pt`
+is the current promotion candidate.
 
-```bash
-git switch main
-git pull --ff-only origin main
-cat data/processed/t1_1_kepler_dr24_expansion_snippets/kepler_snippets.shard*of6.jsonl > data/processed/t1_1_kepler_dr24_expansion_snippets/combined.jsonl
-cat data/processed/t1_1_kepler_snippets/combined.jsonl data/processed/t1_1_kepler_dr24_expansion_snippets/combined.jsonl > data/processed/t1_1_kepler_master_combined.jsonl
-.venv/bin/python Skills/build_cnn_training_data.py data/processed/t1_1_kepler_master_combined.jsonl --output-dir data/t1_1_kepler_master_cnn_splits
-.venv/bin/python Skills/cnn_split_validator.py data/t1_1_kepler_master_cnn_splits
-```
-
-Expect 8,207 combined expansion rows and 15,649 total master rows (7,442 +
-8,207). Confirm `Split source: predefined` and validator `PASS` before
-training a new checkpoint from this larger, more realistically-imbalanced
-corpus.
+**Next `[HUMAN]` action** -- decide whether to approve promotion of
+`checkpoints/cnn_t1_1_kepler_master/best.pt` to `models/`. Do not rerun the
+combine/split/train commands unless a named promotion validation step fails.
 
 ## Step 0: Sync And Verify
 
