@@ -1,0 +1,16 @@
+{
+  "method": "temperature",
+  "temperature": 1.0,
+  "n_val_samples": 2393,
+  "fitted_at": "2026-07-04T22:45:32.305902+00:00",
+  "gate_auc": 0.85,
+  "gate_f1": 0.8,
+  "test_auc_raw": 0.957211,
+  "test_f1_raw": 0.834688,
+  "test_brier_raw": 0.05797,
+  "test_ece_raw": 0.014241,
+  "test_f1_cal": 0.834688,
+  "test_brier_cal": 0.05797,
+  "test_ece_cal": 0.014241,
+  "flag": "OK"
+}

@@ -1,9 +1,15 @@
 {
   "schema_version": 1,
   "model_id": "benchmark_cnn_v1",
-  "status": "promotion_candidate_not_yet_production",
+  "status": "promoted_production_benchmark",
   "production_gap": "T1-1: Production Tier 2 CNN checkpoint",
-  "human_approval_required_before_artifact_promotion": true,
+  "human_approval_required_before_artifact_promotion": false,
+  "human_approval": {
+    "approved": true,
+    "approved_at": "2026-07-09",
+    "approved_checkpoint_sha256": "f29e6891c255289fa1e2eddad1fb6ca131c063cf11c24b8113e0e29d049441c5",
+    "approved_model_id": "benchmark_cnn_v1"
+  },
   "source_contract": {
     "primary_policy_docs": [
       "docs/exoplanet_exomoon_dataset_handoff.md",
@@ -19,7 +25,8 @@
       "path": "checkpoints/cnn_t1_1_kepler_master/best.pt",
       "sha256": "f29e6891c255289fa1e2eddad1fb6ca131c063cf11c24b8113e0e29d049441c5",
       "size_bytes_observed": 1744777,
-      "git_policy": "ignored_until_human_approved_promotion"
+      "promoted_path": "models/cnn/benchmark_cnn_v1/best.pt",
+      "git_policy": "force_added_production_artifact_after_human_approval"
     },
     "calibration": {
       "path": "checkpoints/cnn_t1_1_kepler_master/calibration.json",

@@ -102,16 +102,13 @@ without relying on chat context or local terminal output.
   passing checkpoint: provider schemas were verified, source snapshots and
   manifests were committed, leakage-safe splits were enforced, storage remained
   bounded, and the master Kepler corpus trained successfully.
-- `checkpoints/cnn_t1_1_kepler_master/best.pt` is the current promotion
-  candidate. It passed held-out gates with raw test AUC 0.9572, calibrated F1
-  0.8347, Brier 0.0580, ECE 0.0142, and temperature T=1.0.
-- The active blocker is no longer data acquisition or another training loop.
-  The new Astrometrics policy docs make promotion a staged evidence package:
-  promotion tooling must accept the current temperature-scaling calibration
-  schema, the model card and reproducibility manifest must be written, data
-  roles must be recorded in `data_selection/data_role_registry.yaml`, storage
-  and retention must stay ledgered, and the checkpoint must be designated as a
-  frozen benchmark before any selected artifact is copied into `models/`.
+- `checkpoints/cnn_t1_1_kepler_master/best.pt` is promoted as
+  `benchmark_cnn_v1` under `models/cnn/benchmark_cnn_v1/` after explicit human
+  approval on 2026-07-09. It passed held-out gates with raw test AUC 0.9572,
+  calibrated F1 0.8347, Brier 0.0580, ECE 0.0142, and temperature T=1.0.
+- The active blocker is no longer data acquisition, another training loop, or
+  checkpoint promotion. The next production gap is T1-2 stacking calibration
+  after the promotion PR is merged and CI-clean.
 - Do not repeat old C1-C19/C20-style retraining or Kepler batch processing
   unless a named promotion validation gate fails.
 - Do not use synthetic examples as supervised training positives in this phase;
@@ -214,21 +211,23 @@ evidence without explicit human approval, and do not use it to block T1-1.
 ## Next Actions
 
 1. Promotion tooling compatibility is complete: `Skills/promote_cnn_checkpoint.py`
-   now verifies the current `method: temperature` calibration JSON produced by
-   `Skills/evaluate_cnn_checkpoint.py`, preserves legacy Platt support, and
-   prints the required intentional `git add -f` checkpoint staging step.
-2. The evidence package is now reviewable on GitHub:
+   verifies the current `method: temperature` calibration JSON produced by
+   `Skills/evaluate_cnn_checkpoint.py`, preserves legacy Platt support, accepts
+   explicit `--model-id`, and prints the required intentional `git add -f`
+   checkpoint staging step.
+2. The evidence package is on GitHub:
    `models/benchmark_cnn_v1/MODEL_CARD.md`,
    `models/benchmark_cnn_v1/REPRODUCIBILITY_MANIFEST.json`, and
-   `data_selection/data_role_registry.yaml` record the selected local artifact
-   scope, exact SHA-256 hashes, data roles, limitations, and future `git add -f`
-   requirement.
-3. Ask for explicit human promotion approval only after this evidence package is
-   committed, CI-clean, and reviewable on GitHub.
-4. After approval, copy only the selected checkpoint/calibration/manifest
-   artifacts into `models/`, update `models/registry.json`, validate, PR, and
-   merge.
-5. After T1-1 is resolved, start T1-2 stacking calibration on a held-out
+   `data_selection/data_role_registry.yaml` record the selected artifact scope,
+   exact SHA-256 hashes, data roles, limitations, and `git add -f` requirement.
+3. Human promotion approval was granted on 2026-07-09 for checkpoint SHA
+   `f29e6891c255289fa1e2eddad1fb6ca131c063cf11c24b8113e0e29d049441c5` as
+   `benchmark_cnn_v1`.
+4. Selected checkpoint/calibration/config/metrics/manifest artifacts are copied
+   into `models/cnn/benchmark_cnn_v1/`, and `models/registry.json` registers
+   `benchmark_cnn_v1`.
+5. After this promotion PR merges and post-merge CI is clean, start T1-2
+   stacking calibration on a held-out
    calibration set; do not tune full-ensemble weights before the CNN artifact
    exists.
 

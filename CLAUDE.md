@@ -629,8 +629,8 @@ New `RawDiagnostics` fields: `oot_scatter_sigma`, `sector_depths`, `sector_depth
 
 ## CLI Version Flag and Meta Output (Milestone 12f)
 
-- `exo --version` / `exo -V` — prints the installed `exo-toolkit` package version (currently `0.2.26`)
-- fallback version `0.2.26` in `src/exo_toolkit/__init__.py` is used only if source-tree and installed package metadata are unavailable
+- `exo --version` / `exo -V` — prints the installed `exo-toolkit` package version (currently `0.2.27`)
+- fallback version `0.2.27` in `src/exo_toolkit/__init__.py` is used only if source-tree and installed package metadata are unavailable
 - Each output row gains a `"features"` dict, a raw `"diagnostics"` dict, a `"fetch_provenance"` dict, plus a `"meta"` dict: `toolkit_version`, `run_at`, `scorer`, `git_commit`, `features_available`, `features_missing`
 - `_git_commit_short()` reads `git rev-parse --short HEAD`; returns `None` on failure
 
@@ -1417,14 +1417,14 @@ rows, SQLite summary `done|25|26|0`, raw scratch directory `0B` after cleanup.
 
 **Live scanner fix (PR #143, 2026-06-28):** **MERGED** — live one-target smoke on `main` verified that ExoFOP SSL loading, Python 3.14 helper imports, bounded TIC target selection, and no-light-curve `no_data` classification work. Do not re-debug the pre-PR #143 pasted failures.
 
-**Immediate next actions (binding T1-1 roadmap after the new policy docs):**
+**Immediate next actions (binding roadmap after T1-1 promotion):**
 1. **[AGENT COMPLETE]** Promotion tooling now accepts `method: temperature` calibration JSON from `Skills/evaluate_cnn_checkpoint.py`, preserves legacy Platt support, and prints the required intentional `git add -f` checkpoint staging step.
-2. **[AGENT COMPLETE]** Evidence package for `checkpoints/cnn_t1_1_kepler_master/best.pt` is now reviewable: `models/benchmark_cnn_v1/MODEL_CARD.md`, `models/benchmark_cnn_v1/REPRODUCIBILITY_MANIFEST.json`, and `data_selection/data_role_registry.yaml` record exact checkpoint/calibration hashes, source/split/config links, local-artifact scope, limitations, and future `git add -f` scope. Do not copy the checkpoint into `models/` yet.
+2. **[AGENT COMPLETE]** Evidence package for `checkpoints/cnn_t1_1_kepler_master/best.pt` is committed: `models/benchmark_cnn_v1/MODEL_CARD.md`, `models/benchmark_cnn_v1/REPRODUCIBILITY_MANIFEST.json`, and `data_selection/data_role_registry.yaml` record exact checkpoint/calibration hashes, source/split/config links, local-artifact scope, limitations, and `git add -f` scope.
 3. **[AGENT COMPLETE]** Data-role and retention records now make training, validation, calibration, frozen-eval, storage, and re-download policy visible to GitHub-only agents.
 4. **[AGENT COMPLETE]** The architecture/data/preprocessing bundle is designated as the frozen `benchmark_cnn_v1` measuring stick; after promotion, do not casually tune this checkpoint family.
-5. **[HUMAN NEXT]** Decide whether to approve promotion only after the readiness package PR is committed, CI-clean, and reviewable. The master checkpoint is the recommended candidate because it strictly supersedes the earlier passing Kepler checkpoint on AUC, F1, Brier, and ECE.
-6. **[AGENT AFTER APPROVAL]** If human approval is granted, copy only the approved checkpoint/calibration/manifest artifacts into `models/`, update `models/registry.json`, validate, open PR, wait for CI, merge, and sync `main`.
-7. **[AGENT AFTER T1-1]** After T1-1 is resolved, start T1-2 stacking calibration on a held-out calibration set; do not tune full-ensemble weights against training or frozen-eval data.
+5. **[HUMAN COMPLETE]** Human approved promotion of checkpoint SHA `f29e6891c255289fa1e2eddad1fb6ca131c063cf11c24b8113e0e29d049441c5` as `benchmark_cnn_v1` on 2026-07-09.
+6. **[AGENT COMPLETE]** Selected checkpoint/calibration/config/metrics/manifest artifacts are copied into `models/cnn/benchmark_cnn_v1/`, and `models/registry.json` registers `benchmark_cnn_v1`.
+7. **[AGENT NEXT]** After the promotion PR is merged and CI-clean, start T1-2 stacking calibration on a held-out calibration set; do not tune full-ensemble weights against training or frozen-eval data.
 
 #### CNN candidate history (what has been tried — do not repeat)
 
@@ -1463,7 +1463,7 @@ rows, SQLite summary `done|25|26|0`, raw scratch directory `0B` after cleanup.
 
 #### CNN production runbook
 
-Use `docs/CNN_PRODUCTION_RUNBOOK.md` for authoritative copy-paste workflow. **Step C is superseded by the master-corpus checkpoint:** `checkpoints/cnn_t1_1_kepler_master/best.pt` passed the production gates with raw test AUC 0.9572, calibrated F1 0.8347, Brier 0.0580, ECE 0.0142, and temperature T=1.0. It strictly beats `checkpoints/cnn_t1_1_kepler/` on every metric and is the current promotion candidate. Promotion to `models/` requires the new policy readiness package first and explicit human approval second; neither has completed yet. Note: the human's real standing shard/worker cadence for `process_t1_kepler_batch.py` is **6 shards × 6 workers** (36 total concurrent connections) — this project's own earlier changelog entries mislabeled historical live runs as `--workers 4`; that has been corrected throughout `AGENTS.md`/`docs/PRODUCTION_READINESS.md`/`docs/CNN_PRODUCTION_RUNBOOK.md`. Do not recommend a lower worker/shard count without new evidence it's necessary.
+Use `docs/CNN_PRODUCTION_RUNBOOK.md` for authoritative copy-paste workflow. **Step C is superseded by the master-corpus checkpoint:** `checkpoints/cnn_t1_1_kepler_master/best.pt` passed the production gates with raw test AUC 0.9572, calibrated F1 0.8347, Brier 0.0580, ECE 0.0142, and temperature T=1.0. It strictly beats `checkpoints/cnn_t1_1_kepler/` on every metric and is promoted as `benchmark_cnn_v1` under `models/cnn/benchmark_cnn_v1/` after explicit human approval. Note: the human's real standing shard/worker cadence for `process_t1_kepler_batch.py` is **6 shards × 6 workers** (36 total concurrent connections) — this project's own earlier changelog entries mislabeled historical live runs as `--workers 4`; that has been corrected throughout `AGENTS.md`/`docs/PRODUCTION_READINESS.md`/`docs/CNN_PRODUCTION_RUNBOOK.md`. Do not recommend a lower worker/shard count without new evidence it's necessary.
 
 The accepted `train_cnn.py` flags are `--split-dir`, `--checkpoint-dir`, and `--pretrained-checkpoint`.
 The evaluator flag is `--output-calibration` (not `--calibration-output`).
