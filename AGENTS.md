@@ -103,12 +103,12 @@ When the user must take an action to unblock a gap:
 
 **Binding T1-1 roadmap after the new policy docs:**
 1. **[AGENT COMPLETE] Promotion tooling compatibility:** `Skills/promote_cnn_checkpoint.py` accepts the current `method: temperature` calibration JSON from `Skills/evaluate_cnn_checkpoint.py`, preserves legacy Platt support, and prints the intentional `git add -f` checkpoint staging step required by the Git-Add-Safe Artifact Policy.
-2. **[AGENT NEXT] Model evidence package:** add a model card, reproducibility manifest, exact checkpoint/calibration SHA-256 references, source/split/config links, runtime/Python/PyTorch/MPS notes, and explicit limitations.
-3. **[AGENT] Data-role and storage records:** add or update `data_selection/data_role_registry.yaml`, `data_selection/data_selection_decision_log.md`, `docs/LOCAL_ARTIFACT_LEDGER.md`, and `artifacts/manifests/local_artifacts.json` so training, validation, calibration, frozen-eval, storage, retention, and re-download policy are visible from GitHub.
-4. **[AGENT] Benchmark designation:** mark the promoted architecture/data/preprocessing bundle as the frozen `benchmark_cnn_v1` measuring stick; after promotion, do not casually tune this checkpoint family.
-5. **[HUMAN] Promotion approval:** only after the readiness package is committed and reviewable, ask the human to explicitly approve promotion of `checkpoints/cnn_t1_1_kepler_master/best.pt`.
-6. **[AGENT] Artifact promotion after approval:** copy only the selected checkpoint/calibration/manifest artifacts into `models/`, update `models/registry.json`, document the required `git add -f` exception, validate, open PR, wait for CI, merge, and sync `main`.
-7. **[AGENT] Post-T1-1 work:** only after CNN promotion is complete, start T1-2 stacking calibration on a held-out calibration set; do not tune full-ensemble weights against training or frozen-eval data.
+2. **[AGENT COMPLETE] Model evidence package:** `models/benchmark_cnn_v1/MODEL_CARD.md` and `models/benchmark_cnn_v1/REPRODUCIBILITY_MANIFEST.json` record the selected local checkpoint, calibration/config/metrics hashes, source/split/config links, runtime/Python/PyTorch/MPS assumptions, limitations, and exact future `git add -f` scope.
+3. **[AGENT COMPLETE] Data-role and storage records:** `data_selection/data_role_registry.yaml`, `data_selection/data_selection_decision_log.md`, `docs/LOCAL_ARTIFACT_LEDGER.md`, and `artifacts/manifests/local_artifacts.json` make training, validation, calibration, frozen-eval, storage, retention, and re-download policy visible from GitHub.
+4. **[AGENT COMPLETE] Benchmark designation:** the promoted architecture/data/preprocessing bundle is designated as the frozen `benchmark_cnn_v1` measuring stick; after promotion, do not casually tune this checkpoint family.
+5. **[HUMAN NEXT] Promotion approval:** only after the readiness package is committed and CI-clean, ask the human to explicitly approve promotion of `checkpoints/cnn_t1_1_kepler_master/best.pt`.
+6. **[AGENT AFTER APPROVAL] Artifact promotion:** copy only the selected checkpoint/calibration/manifest artifacts into `models/`, update `models/registry.json`, document the required `git add -f` exception, validate, open PR, wait for CI, merge, and sync `main`.
+7. **[AGENT AFTER T1-1] Post-T1-1 work:** only after CNN promotion is complete, start T1-2 stacking calibration on a held-out calibration set; do not tune full-ensemble weights against training or frozen-eval data.
 
 ### What was done in the previous sessions (2026-06-21 – 2026-06-26)
 

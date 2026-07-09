@@ -309,8 +309,8 @@ These are enforced in code and must never be bypassed:
 | Leakage-safe training manifest and cleanup path | **Complete** — `metadata/t1_1_kepler_training_manifest.jsonl` and `metadata/t1_1_kepler_manifest_summary.json` are committed with 0 leakage errors | Agent |
 | Bounded Kepler-first processing batch | **Complete, not yet run live** — `Skills/process_t1_kepler_batch.py` is built and unit-tested (27 offline tests); needs one bounded live run (`--max-targets 25`) on the operator's Mac to verify against real Kepler data before scaling up | Agent built it; **Human** runs the first live batch |
 | CNN production training run | Build/train/evaluate only after the source contract, manifests, and local artifact ledger are updated; use the local M4 Max GPU path by default | Agent + human approval for long local runs |
-| CNN promotion readiness package | Fix temperature-calibration promotion tooling, write model card, reproducibility manifest, data-role registry, benchmark designation, storage/retention ledger updates, and exact selected artifact scope | Agent |
-| CNN production promotion | After the readiness package is committed and reviewed, copy/register/commit only the human-approved checkpoint artifacts that already passed held-out gates | Agent + human approval |
+| CNN promotion readiness package | **Complete in current readiness-package PR** — temperature-calibration promotion tooling, model card, reproducibility manifest, data-role registry, benchmark designation, storage/retention ledger updates, and exact selected artifact scope are now GitHub-visible | Agent |
+| CNN production promotion | After the readiness package is committed, CI-clean, and reviewed, copy/register/commit only the human-approved checkpoint artifacts that already passed held-out gates | Agent + human approval |
 | Stacking weight calibration | Tune blend weights on held-out calibration set | Agent after T1-1 resolved |
 
 ---

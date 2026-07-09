@@ -1419,12 +1419,12 @@ rows, SQLite summary `done|25|26|0`, raw scratch directory `0B` after cleanup.
 
 **Immediate next actions (binding T1-1 roadmap after the new policy docs):**
 1. **[AGENT COMPLETE]** Promotion tooling now accepts `method: temperature` calibration JSON from `Skills/evaluate_cnn_checkpoint.py`, preserves legacy Platt support, and prints the required intentional `git add -f` checkpoint staging step.
-2. **[AGENT NEXT]** Prepare the evidence package for `checkpoints/cnn_t1_1_kepler_master/best.pt`: model card, reproducibility manifest, registry metadata plan, exact checkpoint/calibration hashes, source/split/config links, local-artifact ledger updates, and exact future `git add -f` scope. Do not copy the checkpoint into `models/` yet.
-3. **[AGENT]** Add or update `data_selection/data_role_registry.yaml` and related decision/retention records so training, validation, calibration, frozen-eval, storage, and re-download policy are visible to GitHub-only agents.
-4. **[AGENT]** Mark the promoted architecture/data/preprocessing bundle as the frozen `benchmark_cnn_v1` measuring stick; after promotion, do not casually tune this checkpoint family.
-5. **[HUMAN]** Decide whether to approve promotion only after the readiness package is committed and reviewable. The master checkpoint is the recommended candidate because it strictly supersedes the earlier passing Kepler checkpoint on AUC, F1, Brier, and ECE.
-6. **[AGENT]** After approval, promote only the approved model artifacts, update `models/registry.json`, validate scorer loading/evaluation paths from `main`, open PR, wait for CI, merge, and sync.
-7. **[AGENT]** After T1-1 is resolved, start T1-2 stacking calibration on a held-out calibration set; do not tune full-ensemble weights against training or frozen-eval data.
+2. **[AGENT COMPLETE]** Evidence package for `checkpoints/cnn_t1_1_kepler_master/best.pt` is now reviewable: `models/benchmark_cnn_v1/MODEL_CARD.md`, `models/benchmark_cnn_v1/REPRODUCIBILITY_MANIFEST.json`, and `data_selection/data_role_registry.yaml` record exact checkpoint/calibration hashes, source/split/config links, local-artifact scope, limitations, and future `git add -f` scope. Do not copy the checkpoint into `models/` yet.
+3. **[AGENT COMPLETE]** Data-role and retention records now make training, validation, calibration, frozen-eval, storage, and re-download policy visible to GitHub-only agents.
+4. **[AGENT COMPLETE]** The architecture/data/preprocessing bundle is designated as the frozen `benchmark_cnn_v1` measuring stick; after promotion, do not casually tune this checkpoint family.
+5. **[HUMAN NEXT]** Decide whether to approve promotion only after the readiness package PR is committed, CI-clean, and reviewable. The master checkpoint is the recommended candidate because it strictly supersedes the earlier passing Kepler checkpoint on AUC, F1, Brier, and ECE.
+6. **[AGENT AFTER APPROVAL]** If human approval is granted, copy only the approved checkpoint/calibration/manifest artifacts into `models/`, update `models/registry.json`, validate, open PR, wait for CI, merge, and sync `main`.
+7. **[AGENT AFTER T1-1]** After T1-1 is resolved, start T1-2 stacking calibration on a held-out calibration set; do not tune full-ensemble weights against training or frozen-eval data.
 
 #### CNN candidate history (what has been tried — do not repeat)
 

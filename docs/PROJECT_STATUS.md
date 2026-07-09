@@ -217,17 +217,18 @@ evidence without explicit human approval, and do not use it to block T1-1.
    now verifies the current `method: temperature` calibration JSON produced by
    `Skills/evaluate_cnn_checkpoint.py`, preserves legacy Platt support, and
    prints the required intentional `git add -f` checkpoint staging step.
-2. Add the model card, reproducibility manifest, and data-role registry entries
-   required by the new Astrometrics master/data-selection/storage policies.
-3. Update the local artifact ledger and readiness docs with the exact selected
-   artifact scope and the future `git add -f` exception required by the
-   defensive `.gitignore` rules.
-4. Ask for explicit human promotion approval only after the evidence package is
-   committed and reviewable on GitHub.
-5. After approval, copy only the selected checkpoint/calibration/manifest
+2. The evidence package is now reviewable on GitHub:
+   `models/benchmark_cnn_v1/MODEL_CARD.md`,
+   `models/benchmark_cnn_v1/REPRODUCIBILITY_MANIFEST.json`, and
+   `data_selection/data_role_registry.yaml` record the selected local artifact
+   scope, exact SHA-256 hashes, data roles, limitations, and future `git add -f`
+   requirement.
+3. Ask for explicit human promotion approval only after this evidence package is
+   committed, CI-clean, and reviewable on GitHub.
+4. After approval, copy only the selected checkpoint/calibration/manifest
    artifacts into `models/`, update `models/registry.json`, validate, PR, and
    merge.
-6. After T1-1 is resolved, start T1-2 stacking calibration on a held-out
+5. After T1-1 is resolved, start T1-2 stacking calibration on a held-out
    calibration set; do not tune full-ensemble weights before the CNN artifact
    exists.
 
