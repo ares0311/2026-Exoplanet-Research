@@ -1,0 +1,104 @@
+schema_version: 1
+last_updated: 2026-07-09
+project: 2026 Exoplanet Research
+policy_sources:
+  - docs/astrometrics_data_selection_policy.md
+  - docs/astrometrics_coding_agents_master_guide.md
+  - docs/astrometrics_external_and_cloud_storage_policy.md
+
+datasets:
+  - dataset_id: t1_1_kepler_master_train
+    role: training
+    project: 2026 Exoplanet Research
+    source: NASA Exoplanet Archive KOI cumulative table plus Q1_Q17_DR24_TCE expansion, converted to folded Kepler snippets
+    allowed_uses:
+      - Fit benchmark_cnn_v1 model parameters
+      - Reproduce the selected master checkpoint training run
+    forbidden_uses:
+      - Tune final thresholds
+      - Report blind-search discoveries
+      - Promote live-search candidates
+    split_group_keys:
+      - Kepler target group / KIC-level grouping via predefined manifest split
+    manifest_path: data/t1_1_kepler_master_cnn_splits/manifest.json
+    local_artifact_paths:
+      - data/processed/t1_1_kepler_master_combined.jsonl
+      - data/t1_1_kepler_master_cnn_splits/train.json
+    notes: Train split has 10800 examples, negative=8442, positive=2358. Local split files are ignored; committed manifests and ledgers preserve provenance.
+
+  - dataset_id: t1_1_kepler_master_validation
+    role: validation
+    project: 2026 Exoplanet Research
+    source: Same master Kepler corpus, predefined validation split
+    allowed_uses:
+      - Select best epoch by validation AUC
+      - Fit temperature scaling calibration parameter
+      - Early stopping and learning-rate scheduling
+    forbidden_uses:
+      - Final held-out performance claim
+      - Blind-search discovery claim
+      - Full-ensemble stacking calibration after CNN promotion
+    split_group_keys:
+      - Kepler target group / KIC-level grouping via predefined manifest split
+    manifest_path: data/t1_1_kepler_master_cnn_splits/manifest.json
+    local_artifact_paths:
+      - data/t1_1_kepler_master_cnn_splits/val.json
+      - checkpoints/cnn_t1_1_kepler_master/calibration.json
+    notes: Validation split has 2393 examples, negative=1875, positive=518. Temperature scaling selected T=1.0.
+
+  - dataset_id: t1_1_kepler_master_calibration
+    role: calibration
+    project: 2026 Exoplanet Research
+    source: Validation split from the master Kepler corpus
+    allowed_uses:
+      - Fit temperature scaling for benchmark_cnn_v1
+      - Check that calibration does not worsen Brier score or ECE
+    forbidden_uses:
+      - Train model weights
+      - Report final held-out metrics
+      - Tune future full-ensemble stacking weights
+    split_group_keys:
+      - Kepler target group / KIC-level grouping via predefined manifest split
+    manifest_path: data/t1_1_kepler_master_cnn_splits/manifest.json
+    local_artifact_paths:
+      - checkpoints/cnn_t1_1_kepler_master/calibration.json
+    notes: This calibration role is intentionally narrow. T1-2 still needs a separate held-out calibration plan for stacker weights after CNN promotion.
+
+  - dataset_id: t1_1_kepler_master_frozen_eval
+    role: frozen_eval
+    project: 2026 Exoplanet Research
+    source: Predefined test split from the master Kepler corpus
+    allowed_uses:
+      - One-time benchmark_cnn_v1 promotion gate report
+      - Regression comparison against future model families
+    forbidden_uses:
+      - Training
+      - Epoch selection
+      - Threshold tuning
+      - Stacking weight calibration
+      - Blind-search discovery claims
+    split_group_keys:
+      - Kepler target group / KIC-level grouping via predefined manifest split
+    manifest_path: data/t1_1_kepler_master_cnn_splits/manifest.json
+    local_artifact_paths:
+      - data/t1_1_kepler_master_cnn_splits/test.json
+      - checkpoints/cnn_t1_1_kepler_master/calibration.json
+    notes: Frozen eval split has 2456 examples, negative=1919, positive=537. Held-out gate result is raw AUC=0.957211 and calibrated F1=0.834688.
+
+  - dataset_id: historical_run006_run008_discovery_evidence
+    role: live_search
+    project: 2026 Exoplanet Research
+    source: Historical QLP live scanner logs retained in local logs/
+    allowed_uses:
+      - Scanner provenance and future forensic review if explicitly requested
+    forbidden_uses:
+      - CNN training
+      - CNN calibration
+      - CNN frozen evaluation
+      - Production gate closure for T1-1
+    split_group_keys: []
+    manifest_path: docs/LOCAL_ARTIFACT_LEDGER.md
+    local_artifact_paths:
+      - logs/discovery_run_006_qlp_progress_safe.json
+      - logs/discovery_run_008_targeted_qlp_stitch_safe.json
+    notes: Historical only. The active production path is the dataset/model-training plan, not the old run006/run008 loop.
