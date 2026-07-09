@@ -72,7 +72,7 @@
 - [x] T1-1 source-contract reset — verified public NASA/MAST sources, committed source snapshots, leakage-safe manifests, bounded raw-FITS cache policy, and storage estimates
 - [x] Master Kepler corpus and checkpoint — trained `checkpoints/cnn_t1_1_kepler_master/best.pt` from the combined KOI+DR24 corpus; held-out gates passed with raw test AUC 0.9572, calibrated F1 0.8347, Brier 0.0580, ECE 0.0142, and T=1.0
 - [ ] Production Tier 2 promotion readiness — complete the new Astrometrics-policy evidence package before copying any checkpoint into `models/`
-  - Fix promotion tooling to accept the current temperature-scaling calibration JSON, not only legacy Platt fields
+  - [x] Fix promotion tooling to accept the current temperature-scaling calibration JSON, not only legacy Platt fields, and print the required intentional checkpoint `git add -f`
   - Add a model card for the master checkpoint
   - Add a reproducibility manifest linking source snapshots, manifests, splits, config, calibration, metrics, SHA-256, runtime, and MPS/Python assumptions
   - Add `data_selection/data_role_registry.yaml` for training, validation, calibration, and frozen-eval roles

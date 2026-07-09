@@ -17,7 +17,9 @@ Exit codes: 0 = promoted, 1 = gates not met / file missing.
 Public API
 ----------
 PromotionResult(model_id, sha256, auc, f1, brier, ece, platt_a, platt_b,
-                registry_path, manifest_path, promoted_at, flag)
+                registry_path, manifest_path, promoted_at, flag,
+                calibration_method, temperature, checkpoint_path,
+                calibration_path)
 promote_cnn_checkpoint(checkpoint_path, calibration_path, registry_path, *,
                        manifest_path) -> PromotionResult
 format_promotion_result(result) -> str
@@ -56,6 +58,10 @@ class PromotionResult:
     manifest_path: str
     promoted_at: str
     flag: str  # "PROMOTED" | "GATES_NOT_MET" | "MISSING_FILE" | "ALREADY_REGISTERED"
+    calibration_method: str | None = None
+    temperature: float | None = None
+    checkpoint_path: str | None = None
+    calibration_path: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -95,6 +101,34 @@ def _finite_metric(cal: dict, key: str) -> float | None:
     return metric if math.isfinite(metric) else None
 
 
+def _calibration_parameters(
+    cal: dict,
+) -> tuple[str | None, float | None, float | None, float | None]:
+    """Return method, temperature, Platt A, and Platt B when schema is valid."""
+    method_raw = cal.get("method")
+    method = str(method_raw).lower() if method_raw is not None else ""
+    temperature = _finite_metric(cal, "temperature")
+    platt_a = _finite_metric(cal, "platt_a")
+    platt_b = _finite_metric(cal, "platt_b")
+
+    if method == "temperature":
+        if temperature is not None:
+            return method, temperature, None, None
+        return None, None, None, None
+    if method == "platt":
+        if platt_a is not None and platt_b is not None:
+            return method, None, platt_a, platt_b
+        return None, None, None, None
+
+    # Backward-compatible inference for older calibration JSON written before
+    # the method field was standardized.
+    if temperature is not None:
+        return "temperature", temperature, None, None
+    if platt_a is not None and platt_b is not None:
+        return "platt", None, platt_a, platt_b
+    return None, None, None, None
+
+
 def _calibration_passes_gates(cal: dict) -> bool:
     """Independently verify calibration JSON satisfies CNN promotion gates."""
     if cal.get("flag") != "OK":
@@ -105,10 +139,9 @@ def _calibration_passes_gates(cal: dict) -> bool:
     ece_cal = _finite_metric(cal, "test_ece_cal")
     brier_raw = _finite_metric(cal, "test_brier_raw")
     ece_raw = _finite_metric(cal, "test_ece_raw")
-    platt_a = _finite_metric(cal, "platt_a")
-    platt_b = _finite_metric(cal, "platt_b")
     gate_auc = _finite_metric(cal, "gate_auc")
     gate_f1 = _finite_metric(cal, "gate_f1")
+    method, temperature, platt_a, platt_b = _calibration_parameters(cal)
     if None in (
         auc,
         f1,
@@ -116,11 +149,14 @@ def _calibration_passes_gates(cal: dict) -> bool:
         ece_cal,
         brier_raw,
         ece_raw,
-        platt_a,
-        platt_b,
         gate_auc,
         gate_f1,
+        method,
     ):
+        return False
+    if method == "temperature" and temperature is None:
+        return False
+    if method == "platt" and (platt_a is None or platt_b is None):
         return False
     return (
         auc >= gate_auc
@@ -185,6 +221,10 @@ def promote_cnn_checkpoint(
                 manifest_path=str(manifest_path),
                 promoted_at=promoted_at,
                 flag="MISSING_FILE",
+                calibration_method=None,
+                temperature=None,
+                checkpoint_path=str(checkpoint_path),
+                calibration_path=str(calibration_path),
             )
 
     # Read calibration JSON
@@ -204,9 +244,14 @@ def promote_cnn_checkpoint(
             manifest_path=str(manifest_path),
             promoted_at=promoted_at,
             flag="MISSING_FILE",
+            calibration_method=None,
+            temperature=None,
+            checkpoint_path=str(checkpoint_path),
+            calibration_path=str(calibration_path),
         )
 
     # Verify evaluation passed and independently re-check gate metrics.
+    method, temperature, platt_a, platt_b = _calibration_parameters(cal)
     if not _calibration_passes_gates(cal):
         return PromotionResult(
             model_id="",
@@ -215,24 +260,30 @@ def promote_cnn_checkpoint(
             f1=cal.get("test_f1_cal"),
             brier=cal.get("test_brier_cal"),
             ece=cal.get("test_ece_cal"),
-            platt_a=cal.get("platt_a"),
-            platt_b=cal.get("platt_b"),
+            platt_a=platt_a,
+            platt_b=platt_b,
             registry_path=str(registry_path),
             manifest_path=str(manifest_path),
             promoted_at=promoted_at,
             flag="GATES_NOT_MET",
+            calibration_method=method,
+            temperature=temperature,
+            checkpoint_path=str(checkpoint_path),
+            calibration_path=str(calibration_path),
         )
 
     auc = cal.get("test_auc_raw")
     f1 = cal.get("test_f1_cal")
     brier = cal.get("test_brier_cal")
     ece = cal.get("test_ece_cal")
-    platt_a = cal.get("platt_a")
-    platt_b = cal.get("platt_b")
 
     # Compute SHA-256
     sha256 = _sha256_file(checkpoint_path)
     model_id = f"cnn_{sha256[:12]}"
+    if method == "temperature":
+        calibration_note = f"temperature={temperature}"
+    else:
+        calibration_note = f"Platt A={platt_a} B={platt_b}"
 
     # Register in model registry
     try:
@@ -254,7 +305,7 @@ def promote_cnn_checkpoint(
             registered_at=promoted_at,
             notes=(
                 f"Production-promoted CNN. test_auc={auc}, test_f1_cal={f1}, "
-                f"Platt A={platt_a} B={platt_b}. SHA-256={sha256}"
+                f"{method} calibration ({calibration_note}). SHA-256={sha256}"
             ),
         )
         registry_result = register(registry_path, entry)
@@ -275,6 +326,10 @@ def promote_cnn_checkpoint(
             manifest_path=str(manifest_path),
             promoted_at=promoted_at,
             flag="ALREADY_REGISTERED",
+            calibration_method=method,
+            temperature=temperature,
+            checkpoint_path=str(checkpoint_path),
+            calibration_path=str(calibration_path),
         )
 
     # Write promotion manifest
@@ -288,6 +343,8 @@ def promote_cnn_checkpoint(
         "test_f1_cal": f1,
         "test_brier_cal": brier,
         "test_ece_cal": ece,
+        "calibration_method": method,
+        "temperature": temperature,
         "platt_a": platt_a,
         "platt_b": platt_b,
         "gate_auc": cal.get("gate_auc"),
@@ -310,6 +367,10 @@ def promote_cnn_checkpoint(
         manifest_path=str(manifest_path),
         promoted_at=promoted_at,
         flag="PROMOTED",
+        calibration_method=method,
+        temperature=temperature,
+        checkpoint_path=str(checkpoint_path),
+        calibration_path=str(calibration_path),
     )
 
 
@@ -329,7 +390,11 @@ def format_promotion_result(result: PromotionResult) -> str:
         f"- Test F1 (cal): {result.f1}",
         f"- Test Brier (cal): {result.brier}",
         f"- Test ECE (cal): {result.ece}",
+        f"- Calibration method: {result.calibration_method}",
+        f"- Temperature: {result.temperature}",
         f"- Platt A={result.platt_a}, B={result.platt_b}",
+        f"- Checkpoint: {result.checkpoint_path}",
+        f"- Calibration: {result.calibration_path}",
         f"- Manifest: {result.manifest_path}",
         f"- Registry: {result.registry_path}",
     ]
@@ -350,7 +415,9 @@ def format_promotion_result(result: PromotionResult) -> str:
             f"**Test F1 (cal)**: {result.f1}  "
             f"**Test Brier**: {result.brier}  "
             f"**Test ECE**: {result.ece}",
-            f"- **Platt calibration**: A={result.platt_a}, B={result.platt_b}",
+            f"- **Calibration**: method={result.calibration_method}, "
+            f"temperature={result.temperature}, "
+            f"Platt A={result.platt_a}, B={result.platt_b}",
             f"- **Manifest**: `{result.manifest_path}`",
             "- **Promotion gate**: AUC ≥ 0.85 ✓  Calibrated F1 ≥ 0.80 ✓",
             "```",
@@ -358,8 +425,9 @@ def format_promotion_result(result: PromotionResult) -> str:
             "### Git commit recipe",
             "```bash",
             "git pull origin main",
-            f"git add {result.manifest_path} models/registry.json "
-            "models/cnn/calibration.json",
+            f"git add {result.manifest_path} {result.calibration_path} "
+            f"{result.registry_path}",
+            f"git add -f {result.checkpoint_path}",
             'git commit -m "Promote CNN checkpoint — T1-1 production gate passed"',
             "git push -u origin HEAD",
             "```",
