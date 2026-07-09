@@ -749,8 +749,31 @@ The calibration non-regression check trivially passes. This means the remaining 
 
 Do not copy checkpoint artifacts into `models/` or update `models/registry.json`
 until the evaluation passes all gates and the human explicitly approves
-promotion. The agent performs the promotion branch, docs update, validation, and
-GitHub merge after that approval. Because local CNN model paths are ignored to
-make `git add .` safe, approved promotion may require an intentional
-`git add -f` for the selected checkpoint artifacts; document that exception in
-the promotion PR.
+promotion.
+
+The new Astrometrics policy docs add a mandatory readiness package before the
+approval request. Complete and commit these items first:
+
+1. Update promotion tooling so it validates the current
+   `method: temperature` calibration JSON produced by
+   `Skills/evaluate_cnn_checkpoint.py`; do not require legacy Platt-only
+   `platt_a`/`platt_b` fields for a temperature-calibrated checkpoint.
+2. Write a model card for the selected checkpoint.
+3. Write a reproducibility manifest linking the source snapshots, training
+   manifests, processed split paths, training config, calibration JSON, metrics,
+   SHA-256, Python/PyTorch versions, and MPS/system assumptions.
+4. Add or update `data_selection/data_role_registry.yaml` so the training,
+   validation, calibration, and frozen-eval roles are explicit and separated.
+5. Update `docs/LOCAL_ARTIFACT_LEDGER.md` and
+   `artifacts/manifests/local_artifacts.json` with selected artifact scope and
+   retention policy.
+6. Designate the promoted CNN as the frozen `benchmark_cnn_v1` measuring stick;
+   do not keep casually tuning this checkpoint family after promotion.
+
+After the readiness package is on GitHub, ask the human for explicit promotion
+approval. If approved, the agent performs the promotion branch, copies only the
+selected checkpoint/calibration/manifest artifacts, updates `models/registry.json`,
+runs validation, opens the PR, and merges after CI passes. Because local CNN
+model paths are ignored to make `git add .` safe, approved promotion may require
+an intentional `git add -f` for the selected checkpoint artifacts; document that
+exception in the promotion PR.

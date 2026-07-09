@@ -99,7 +99,16 @@ When the user must take an action to unblock a gap:
 | K2 overlap corpus (`data/tess_k2_overlap_snippets.jsonl`) | **COMPLETE** — 2,086 snippets (2026-06-27) |
 | Dataset/model-training handoff brief | **ACTIVE CONTRACT** — `docs/exoplanet_exomoon_dataset_handoff.md` |
 
-**The active gap remains T1-1, but the shape changed on 2026-07-04:** the master-corpus Kepler CNN checkpoint passed the held-out gates (AUC 0.9572, calibrated F1 0.8347). The current production blocker is promotion/registration of that checkpoint into `models/` with explicit human approval, a reproducibility manifest, model card/registry metadata, and policy-compliant data-selection/storage records. Do not restart old CNN experiments unless a named gate shows the promoted model is insufficient.
+**The active gap remains T1-1, but the shape changed on 2026-07-08:** the master-corpus Kepler CNN checkpoint passed the held-out gates (AUC 0.9572, calibrated F1 0.8347), but the new Astrometrics policy docs make promotion a staged evidence workflow. The current production blocker is the **promotion readiness package**, not another training run and not immediate artifact copying. Do not restart old CNN experiments unless a named promotion validation gate fails, and do not copy checkpoint artifacts into `models/` until the readiness package is committed and the human explicitly approves promotion.
+
+**Binding T1-1 roadmap after the new policy docs:**
+1. **[AGENT] Promotion tooling compatibility:** update promotion tooling/tests so a passing checkpoint with `method: temperature` calibration JSON from `Skills/evaluate_cnn_checkpoint.py` is valid; do not require legacy Platt-only `platt_a`/`platt_b` fields.
+2. **[AGENT] Model evidence package:** add a model card, reproducibility manifest, exact checkpoint/calibration SHA-256 references, source/split/config links, runtime/Python/PyTorch/MPS notes, and explicit limitations.
+3. **[AGENT] Data-role and storage records:** add or update `data_selection/data_role_registry.yaml`, `data_selection/data_selection_decision_log.md`, `docs/LOCAL_ARTIFACT_LEDGER.md`, and `artifacts/manifests/local_artifacts.json` so training, validation, calibration, frozen-eval, storage, retention, and re-download policy are visible from GitHub.
+4. **[AGENT] Benchmark designation:** mark the promoted architecture/data/preprocessing bundle as the frozen `benchmark_cnn_v1` measuring stick; after promotion, do not casually tune this checkpoint family.
+5. **[HUMAN] Promotion approval:** only after the readiness package is committed and reviewable, ask the human to explicitly approve promotion of `checkpoints/cnn_t1_1_kepler_master/best.pt`.
+6. **[AGENT] Artifact promotion after approval:** copy only the selected checkpoint/calibration/manifest artifacts into `models/`, update `models/registry.json`, document the required `git add -f` exception, validate, open PR, wait for CI, merge, and sync `main`.
+7. **[AGENT] Post-T1-1 work:** only after CNN promotion is complete, start T1-2 stacking calibration on a held-out calibration set; do not tune full-ensemble weights against training or frozen-eval data.
 
 ### What was done in the previous sessions (2026-06-21 – 2026-06-26)
 
