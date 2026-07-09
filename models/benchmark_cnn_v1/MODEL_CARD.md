@@ -2,16 +2,17 @@
 
 ## Status
 
-`benchmark_cnn_v1` is the proposed frozen CNN benchmark for the T1-1 exoplanet
-classifier path. It is not yet a production scorer artifact. The selected local
-checkpoint has passed the documented held-out gates, but promotion to
-`models/` still requires explicit human approval.
+`benchmark_cnn_v1` is the frozen CNN benchmark for the T1-1 exoplanet
+classifier path. The selected checkpoint passed the documented held-out gates,
+received explicit human approval on 2026-07-09, and is promoted under
+`models/cnn/benchmark_cnn_v1/`.
 
 ## Candidate Artifact
 
 | Field | Value |
 |---|---|
-| Local checkpoint | `checkpoints/cnn_t1_1_kepler_master/best.pt` |
+| Source checkpoint | `checkpoints/cnn_t1_1_kepler_master/best.pt` |
+| Promoted checkpoint | `models/cnn/benchmark_cnn_v1/best.pt` |
 | Checkpoint SHA-256 | `f29e6891c255289fa1e2eddad1fb6ca131c063cf11c24b8113e0e29d049441c5` |
 | Local calibration | `checkpoints/cnn_t1_1_kepler_master/calibration.json` |
 | Calibration SHA-256 | `357bab520edc183ea5917dee7561525a55c5f0f71ca399ad4acbf501ecc96c0d` |
@@ -23,9 +24,8 @@ checkpoint has passed the documented held-out gates, but promotion to
 | Metrics file | `checkpoints/cnn_t1_1_kepler_master/metrics.json` |
 | Metrics SHA-256 | `1056fad21a6155924e5b6613610862b7aeb484c317ef223d1343e634bf21908a` |
 
-The checkpoint file remains ignored local state until the human explicitly
-approves promotion. The later promotion PR must intentionally stage the approved
-checkpoint with `git add -f`.
+The promoted checkpoint remains under a normally ignored model path and must be
+intentionally staged with `git add -f` in the promotion PR.
 
 ## Intended Use
 
@@ -117,8 +117,8 @@ not degrade Brier score or ECE.
 
 ## Promotion Scope
 
-After human approval, the promotion PR should copy and intentionally stage only
-the selected production artifacts, not the whole checkpoint directory:
+The promotion PR copies and intentionally stages only the selected production
+artifacts, not the whole checkpoint directory:
 
 ```bash
 git add models/benchmark_cnn_v1/MODEL_CARD.md \

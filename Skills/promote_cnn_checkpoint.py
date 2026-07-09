@@ -21,7 +21,7 @@ PromotionResult(model_id, sha256, auc, f1, brier, ece, platt_a, platt_b,
                 calibration_method, temperature, checkpoint_path,
                 calibration_path)
 promote_cnn_checkpoint(checkpoint_path, calibration_path, registry_path, *,
-                       manifest_path) -> PromotionResult
+                       manifest_path, model_id) -> PromotionResult
 format_promotion_result(result) -> str
 """
 from __future__ import annotations
@@ -177,6 +177,7 @@ def promote_cnn_checkpoint(
     registry_path: Path,
     *,
     manifest_path: Path | None = None,
+    model_id: str | None = None,
 ) -> PromotionResult:
     """Register a validated CNN checkpoint and write a promotion manifest.
 
@@ -191,6 +192,8 @@ def promote_cnn_checkpoint(
         registry_path: Path to ``models/registry.json``.
         manifest_path: Where to write the promotion manifest JSON. Defaults to
             ``<checkpoint_dir>/promotion_manifest.json``.
+        model_id: Optional explicit registry/model identifier. Defaults to
+            ``cnn_<checkpoint_sha12>`` for backward compatibility.
 
     Returns:
         :class:`PromotionResult` with all promotion details and flag.
@@ -279,7 +282,27 @@ def promote_cnn_checkpoint(
 
     # Compute SHA-256
     sha256 = _sha256_file(checkpoint_path)
-    model_id = f"cnn_{sha256[:12]}"
+    model_id = model_id or f"cnn_{sha256[:12]}"
+    if not model_id.strip():
+        return PromotionResult(
+            model_id="",
+            sha256=sha256,
+            auc=auc,
+            f1=f1,
+            brier=brier,
+            ece=ece,
+            platt_a=platt_a,
+            platt_b=platt_b,
+            registry_path=str(registry_path),
+            manifest_path=str(manifest_path),
+            promoted_at=promoted_at,
+            flag="GATES_NOT_MET",
+            calibration_method=method,
+            temperature=temperature,
+            checkpoint_path=str(checkpoint_path),
+            calibration_path=str(calibration_path),
+        )
+    model_id = model_id.strip()
     if method == "temperature":
         calibration_note = f"temperature={temperature}"
     else:
@@ -464,6 +487,11 @@ def _main() -> None:
         "--registry", type=Path, default=Path("models/registry.json")
     )
     parser.add_argument("--manifest", type=Path, default=None)
+    parser.add_argument(
+        "--model-id",
+        default=None,
+        help="Explicit model/registry identifier; defaults to cnn_<sha12>.",
+    )
     args = parser.parse_args()
 
     result = promote_cnn_checkpoint(
@@ -471,6 +499,7 @@ def _main() -> None:
         args.calibration,
         args.registry,
         manifest_path=args.manifest,
+        model_id=args.model_id,
     )
     print(format_promotion_result(result))
     sys.exit(0 if result.flag in ("PROMOTED", "ALREADY_REGISTERED") else 1)

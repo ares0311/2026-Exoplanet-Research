@@ -1,0 +1,19 @@
+{
+  "model_id": "benchmark_cnn_v1",
+  "model_type": "cnn",
+  "checkpoint_path": "models/cnn/benchmark_cnn_v1/best.pt",
+  "calibration_path": "models/cnn/benchmark_cnn_v1/calibration.json",
+  "sha256": "f29e6891c255289fa1e2eddad1fb6ca131c063cf11c24b8113e0e29d049441c5",
+  "test_auc_raw": 0.957211,
+  "test_f1_cal": 0.834688,
+  "test_brier_cal": 0.05797,
+  "test_ece_cal": 0.014241,
+  "calibration_method": "temperature",
+  "temperature": 1.0,
+  "platt_a": null,
+  "platt_b": null,
+  "gate_auc": 0.85,
+  "gate_f1": 0.8,
+  "promoted_at": "2026-07-09T17:42:09.185159+00:00",
+  "flag": "PROMOTED"
+}

@@ -244,6 +244,31 @@ class TestPromoteCnnCheckpoint:
         )
         assert result.model_id.startswith("cnn_")
 
+    def test_explicit_model_id_is_preserved_in_registry_and_manifest(
+        self, tmp_path: Path
+    ) -> None:
+        ckpt = tmp_path / "best.pt"
+        _write_checkpoint(ckpt)
+        cal = tmp_path / "calibration.json"
+        _write_temperature_calibration(cal)
+        reg = tmp_path / "registry.json"
+        manifest = tmp_path / "promotion_manifest.json"
+
+        result = promote_cnn_checkpoint(
+            ckpt,
+            cal,
+            reg,
+            manifest_path=manifest,
+            model_id="benchmark_cnn_v1",
+        )
+
+        assert result.flag == "PROMOTED"
+        assert result.model_id == "benchmark_cnn_v1"
+        registry = json.loads(reg.read_text())
+        assert registry[0]["model_id"] == "benchmark_cnn_v1"
+        promoted = json.loads(manifest.read_text())
+        assert promoted["model_id"] == "benchmark_cnn_v1"
+
     def test_sha256_is_hex_64_chars(self, tmp_path: Path) -> None:
         ckpt = tmp_path / "best.pt"
         _write_checkpoint(ckpt)
