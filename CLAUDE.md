@@ -292,9 +292,13 @@ approval state, and exact next commands. Do not leave artifact truth only in
 chat context, terminal output, or local files.
 
 A production-approved CNN checkpoint is the only CNN artifact class that may be
-promoted from ignored local state into `models/`, and only after evaluator PASS
-plus explicit human approval. Because CNN model paths are ignored defensively,
-promotion may require a documented `git add -f`.
+promoted from ignored local state into `models/`, and only after evaluator PASS,
+a committed promotion readiness package, and explicit human approval. The
+readiness package must include temperature-calibration-aware promotion tooling,
+a model card, reproducibility manifest, data-role registry, storage/retention
+ledger updates, exact selected artifact scope, and frozen benchmark designation.
+Because CNN model paths are ignored defensively, promotion may require a
+documented `git add -f`.
 
 ---
 
@@ -1413,10 +1417,14 @@ rows, SQLite summary `done|25|26|0`, raw scratch directory `0B` after cleanup.
 
 **Live scanner fix (PR #143, 2026-06-28):** **MERGED** — live one-target smoke on `main` verified that ExoFOP SSL loading, Python 3.14 helper imports, bounded TIC target selection, and no-light-curve `no_data` classification work. Do not re-debug the pre-PR #143 pasted failures.
 
-**Immediate next actions (in priority order):**
-1. **[AGENT]** Prepare the promotion package for `checkpoints/cnn_t1_1_kepler_master/best.pt`: model card, reproducibility manifest, registry metadata, local-artifact ledger updates, and exact `git add -f` scope. Do not copy the checkpoint into `models/` until explicit human promotion approval is recorded.
-2. **[HUMAN]** Decide whether to approve promotion of the master-corpus checkpoint. It is the recommended candidate because it strictly supersedes the earlier passing Kepler checkpoint on AUC, F1, Brier, and ECE.
-3. **[AGENT]** After approval, promote only the approved model artifacts and validate scorer loading/evaluation paths from `main`.
+**Immediate next actions (binding T1-1 roadmap after the new policy docs):**
+1. **[AGENT]** Fix promotion tooling and tests so `method: temperature` calibration JSON from `Skills/evaluate_cnn_checkpoint.py` is accepted; do not require legacy Platt-only `platt_a`/`platt_b` fields.
+2. **[AGENT]** Prepare the evidence package for `checkpoints/cnn_t1_1_kepler_master/best.pt`: model card, reproducibility manifest, registry metadata plan, exact checkpoint/calibration hashes, source/split/config links, local-artifact ledger updates, and exact future `git add -f` scope. Do not copy the checkpoint into `models/` yet.
+3. **[AGENT]** Add or update `data_selection/data_role_registry.yaml` and related decision/retention records so training, validation, calibration, frozen-eval, storage, and re-download policy are visible to GitHub-only agents.
+4. **[AGENT]** Mark the promoted architecture/data/preprocessing bundle as the frozen `benchmark_cnn_v1` measuring stick; after promotion, do not casually tune this checkpoint family.
+5. **[HUMAN]** Decide whether to approve promotion only after the readiness package is committed and reviewable. The master checkpoint is the recommended candidate because it strictly supersedes the earlier passing Kepler checkpoint on AUC, F1, Brier, and ECE.
+6. **[AGENT]** After approval, promote only the approved model artifacts, update `models/registry.json`, validate scorer loading/evaluation paths from `main`, open PR, wait for CI, merge, and sync.
+7. **[AGENT]** After T1-1 is resolved, start T1-2 stacking calibration on a held-out calibration set; do not tune full-ensemble weights against training or frozen-eval data.
 
 #### CNN candidate history (what has been tried — do not repeat)
 
@@ -1455,7 +1463,7 @@ rows, SQLite summary `done|25|26|0`, raw scratch directory `0B` after cleanup.
 
 #### CNN production runbook
 
-Use `docs/CNN_PRODUCTION_RUNBOOK.md` for authoritative copy-paste workflow. **Step C is superseded by the master-corpus checkpoint:** `checkpoints/cnn_t1_1_kepler_master/best.pt` passed the production gates with raw test AUC 0.9572, calibrated F1 0.8347, Brier 0.0580, ECE 0.0142, and temperature T=1.0. It strictly beats `checkpoints/cnn_t1_1_kepler/` on every metric and is the current promotion candidate. Promotion to `models/` requires explicit human approval, not yet granted. Note: the human's real standing shard/worker cadence for `process_t1_kepler_batch.py` is **6 shards × 6 workers** (36 total concurrent connections) — this project's own earlier changelog entries mislabeled historical live runs as `--workers 4`; that has been corrected throughout `AGENTS.md`/`docs/PRODUCTION_READINESS.md`/`docs/CNN_PRODUCTION_RUNBOOK.md`. Do not recommend a lower worker/shard count without new evidence it's necessary.
+Use `docs/CNN_PRODUCTION_RUNBOOK.md` for authoritative copy-paste workflow. **Step C is superseded by the master-corpus checkpoint:** `checkpoints/cnn_t1_1_kepler_master/best.pt` passed the production gates with raw test AUC 0.9572, calibrated F1 0.8347, Brier 0.0580, ECE 0.0142, and temperature T=1.0. It strictly beats `checkpoints/cnn_t1_1_kepler/` on every metric and is the current promotion candidate. Promotion to `models/` requires the new policy readiness package first and explicit human approval second; neither has completed yet. Note: the human's real standing shard/worker cadence for `process_t1_kepler_batch.py` is **6 shards × 6 workers** (36 total concurrent connections) — this project's own earlier changelog entries mislabeled historical live runs as `--workers 4`; that has been corrected throughout `AGENTS.md`/`docs/PRODUCTION_READINESS.md`/`docs/CNN_PRODUCTION_RUNBOOK.md`. Do not recommend a lower worker/shard count without new evidence it's necessary.
 
 The accepted `train_cnn.py` flags are `--split-dir`, `--checkpoint-dir`, and `--pretrained-checkpoint`.
 The evaluator flag is `--output-calibration` (not `--calibration-output`).

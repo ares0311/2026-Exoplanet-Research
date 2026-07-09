@@ -2,7 +2,7 @@
 
 ## Status: Active Development
 ## Phase: Dataset/Model Training Reset — production checkpoint path
-## Last Updated: 2026-07-02
+## Last Updated: 2026-07-08
 
 ---
 
@@ -106,9 +106,12 @@ without relying on chat context or local terminal output.
   candidate. It passed held-out gates with raw test AUC 0.9572, calibrated F1
   0.8347, Brier 0.0580, ECE 0.0142, and temperature T=1.0.
 - The active blocker is no longer data acquisition or another training loop.
-  It is explicit human promotion approval plus a promotion package containing
-  selected model artifacts, model card/registry metadata, reproducibility
-  manifest, and updated local-artifact/data-selection ledgers.
+  The new Astrometrics policy docs make promotion a staged evidence package:
+  promotion tooling must accept the current temperature-scaling calibration
+  schema, the model card and reproducibility manifest must be written, data
+  roles must be recorded in `data_selection/data_role_registry.yaml`, storage
+  and retention must stay ledgered, and the checkpoint must be designated as a
+  frozen benchmark before any selected artifact is copied into `models/`.
 - Do not repeat old C1-C19/C20-style retraining or Kepler batch processing
   unless a named promotion validation gate fails.
 - Do not use synthetic examples as supervised training positives in this phase;
@@ -210,17 +213,22 @@ evidence without explicit human approval, and do not use it to block T1-1.
 
 ## Next Actions
 
-1. Design or verify the leakage-safe training manifest and cleanup path from `docs/exoplanet_exomoon_dataset_handoff.md` now that source access and storage/source snapshot planning have passed.
-   - The TAP schema examples must use `UPPER(table_name) = UPPER('<table>')`;
-     the live NASA Exoplanet Archive stores at least `CUMULATIVE` in upper
-     case inside `TAP_SCHEMA.columns.table_name`.
-2. Update source snapshots/manifests and the local artifact ledger so GitHub-only agents can see expected paths, hashes, counts, and next commands.
-3. Build or adjust leakage-safe training manifests/splits by target/system before any model run.
-4. Ask the human to run only commands whose schemas, URLs, worker counts, resume behavior, output, and Mac/MPS compliance were verified.
-5. Promote nothing unless a future evaluator run reports `Flag: PASS`, raw test
-   AUC is at least 0.85, calibrated test F1 is at least 0.80, calibrated
-   Brier/ECE are no worse than raw, and the human explicitly approves
-   promotion.
+1. Update `Skills/promote_cnn_checkpoint.py` and its tests so promotion verifies
+   the current `method: temperature` calibration JSON produced by
+   `Skills/evaluate_cnn_checkpoint.py`; legacy Platt-only assumptions are stale.
+2. Add the model card, reproducibility manifest, and data-role registry entries
+   required by the new Astrometrics master/data-selection/storage policies.
+3. Update the local artifact ledger and readiness docs with the exact selected
+   artifact scope and the future `git add -f` exception required by the
+   defensive `.gitignore` rules.
+4. Ask for explicit human promotion approval only after the evidence package is
+   committed and reviewable on GitHub.
+5. After approval, copy only the selected checkpoint/calibration/manifest
+   artifacts into `models/`, update `models/registry.json`, validate, PR, and
+   merge.
+6. After T1-1 is resolved, start T1-2 stacking calibration on a held-out
+   calibration set; do not tune full-ensemble weights before the CNN artifact
+   exists.
 
 Remote sync note: local `main` is synced with `origin/main` as of the latest
 handoff.
