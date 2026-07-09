@@ -540,6 +540,17 @@ Before writing code, recover project context from committed files. Read:
 
 Do not rely on chat context, memory, or prior conversation history as the source of truth.
 
+## MCP Server Usage
+
+When configured and available in the agent's environment, prefer these MCP servers over guessing or ad hoc web search:
+
+- **GitHub MCP** — issues, PRs, remote branches, repo metadata, commit/PR review, PR notes and links, branch health.
+- **Context7 MCP** — current library/framework/API/CLI documentation (`resolve-library-id` then `query-docs`). Use instead of relying on training-data knowledge, since library versions and APIs change.
+- **arXiv MCP** — preprint lookup, paper search, and research context for exoplanet/exomoon detection methods.
+- **NASA ADS MCP** — astronomy/astrophysics literature search, bibcodes, citations, references, author metrics, and BibTeX export.
+
+These are general-purpose research/collaboration tools, separate from this repo's project-scoped MCP servers (`exo_project_files`, `exo_git_read`, `exo_guard` — see `CLAUDE.md` "Project-Scoped MCP Servers"), which remain the sandboxed, offline-by-default servers for reading repo files, safe git inspection, and fixed validation commands. Availability of the general-purpose servers above is environment-dependent — check before assuming they're present, and fall back to `WebSearch`/`WebFetch` or manual `gh`/`git` commands if not.
+
 ## Multi-Agent Continuity
 
 Multiple agents may work on this project across separate sessions, branches, and chat threads. Repository documentation is the continuity mechanism.
