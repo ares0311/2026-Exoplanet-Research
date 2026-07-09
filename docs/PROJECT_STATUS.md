@@ -213,9 +213,10 @@ evidence without explicit human approval, and do not use it to block T1-1.
 
 ## Next Actions
 
-1. Update `Skills/promote_cnn_checkpoint.py` and its tests so promotion verifies
-   the current `method: temperature` calibration JSON produced by
-   `Skills/evaluate_cnn_checkpoint.py`; legacy Platt-only assumptions are stale.
+1. Promotion tooling compatibility is complete: `Skills/promote_cnn_checkpoint.py`
+   now verifies the current `method: temperature` calibration JSON produced by
+   `Skills/evaluate_cnn_checkpoint.py`, preserves legacy Platt support, and
+   prints the required intentional `git add -f` checkpoint staging step.
 2. Add the model card, reproducibility manifest, and data-role registry entries
    required by the new Astrometrics master/data-selection/storage policies.
 3. Update the local artifact ledger and readiness docs with the exact selected
