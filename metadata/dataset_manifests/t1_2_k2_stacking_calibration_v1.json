@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "dataset_id": "t1_2_k2_stacking_calibration_v1",
+  "project": "2026 Exoplanet Research",
+  "role": "calibration",
+  "source_name": "NASA Exoplanet Archive K2 planets and candidates table",
+  "source_url": "https://exoplanetarchive.ipac.caltech.edu/TAP/sync",
+  "instrument": "Kepler photometer (K2 mission)",
+  "target_ids": {
+    "namespace": "EPIC",
+    "count": 596,
+    "selection": "Seeded held-out sample of confirmed and false-positive K2 targets, disjoint from Kepler-prime training namespaces"
+  },
+  "time_range": {
+    "status": "deferred",
+    "reason": "The catalog manifest records ephemerides; campaign-specific observing ranges are resolved from native K2 products"
+  },
+  "cadence": {
+    "status": "known",
+    "value": "Native K2 light-curve cadence selected by the production fetch path"
+  },
+  "band_or_frequency": "Kepler optical bandpass, approximately 420-900 nm",
+  "data_product_type": "Held-out stacking-calibration target and ephemeris row manifest (JSONL)",
+  "acquired_at": "2026-07-10T00:31:09Z",
+  "local_path": "metadata/t1_2_k2_calibration_manifest.jsonl",
+  "sha256": "e1361b4f3029c230b6fdd2c0818b013d575cceb5d93731c216bc05fb9e4a0392",
+  "license": "NASA/IPAC public archive data; acknowledge NASA Exoplanet Archive and K2 mission",
+  "label_source": "NASA Exoplanet Archive k2pandc disposition",
+  "label_confidence": "authoritative",
+  "preprocessing_version": "t1-2-k2-calibration-manifest-v1",
+  "known_caveats": [
+    "Cross-mission K2 calibration measures transfer behavior, not same-domain Kepler-prime CNN performance",
+    "Eight targets later lacked usable fetched snippets; the source selection manifest intentionally retains them"
+  ],
+  "row_count": 596,
+  "group_count": 596
+}

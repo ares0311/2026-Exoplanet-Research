@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "dataset_id": "t1_1_kepler_dr24_training_v1",
+  "project": "2026 Exoplanet Research",
+  "role": "training",
+  "source_name": "NASA Exoplanet Archive Q1-Q17 DR24 TCE table",
+  "source_url": "https://exoplanetarchive.ipac.caltech.edu/TAP/sync",
+  "instrument": "Kepler photometer",
+  "target_ids": {
+    "namespace": "KIC",
+    "count": 4760,
+    "selection": "New labeled DR24 TCE target groups disjoint from the KOI training manifest"
+  },
+  "time_range": {
+    "status": "deferred",
+    "reason": "The catalog manifest selects targets and ephemerides; per-product observing ranges are resolved from MAST during bounded processing"
+  },
+  "cadence": {
+    "status": "known",
+    "value": "Kepler long cadence, 1800 seconds"
+  },
+  "band_or_frequency": "Kepler optical bandpass, approximately 420-900 nm",
+  "data_product_type": "Robovetter-labeled transit ephemeris and leakage-safe split row manifest (JSONL)",
+  "acquired_at": "2026-07-04T00:00:00Z",
+  "local_path": "metadata/t1_1_kepler_dr24_expansion_manifest.jsonl",
+  "sha256": "302a56f8447766555b8711ae6fe73af75e214087643380afcaeb3fe9f7686b01",
+  "license": "NASA/IPAC public archive data; acknowledge NASA Exoplanet Archive and Kepler mission",
+  "label_source": "Kepler DR24 autovetter training-set labels (PC, AFP, NTP); ambiguous UNK excluded",
+  "label_confidence": "authoritative",
+  "preprocessing_version": "t1-1-kepler-dr24-tce-expansion-v1",
+  "known_caveats": [
+    "Labels are Kepler robovetter training classes rather than external planet confirmations",
+    "The class distribution is substantially more imbalanced than the KOI manifest"
+  ],
+  "row_count": 8213,
+  "group_count": 4760
+}

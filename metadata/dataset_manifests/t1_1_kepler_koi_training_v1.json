@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "dataset_id": "t1_1_kepler_koi_training_v1",
+  "project": "2026 Exoplanet Research",
+  "role": "training",
+  "source_name": "NASA Exoplanet Archive Kepler KOI cumulative table",
+  "source_url": "https://exoplanetarchive.ipac.caltech.edu/TAP/sync",
+  "instrument": "Kepler photometer",
+  "target_ids": {
+    "namespace": "KIC",
+    "count": 6515,
+    "selection": "Leakage-safe labeled KOI target groups recorded in the referenced row manifest"
+  },
+  "time_range": {
+    "status": "deferred",
+    "reason": "The catalog manifest selects targets and ephemerides; per-product observing ranges are resolved from MAST during bounded processing"
+  },
+  "cadence": {
+    "status": "known",
+    "value": "Kepler long cadence, 1800 seconds"
+  },
+  "band_or_frequency": "Kepler optical bandpass, approximately 420-900 nm",
+  "data_product_type": "Labeled transit ephemeris and leakage-safe split row manifest (JSONL)",
+  "acquired_at": "2026-07-02T08:20:18Z",
+  "local_path": "metadata/t1_1_kepler_training_manifest.jsonl",
+  "sha256": "e737817322e827fc7a7a3c315a24ea0ef03447a9acd3be6170f0e75f68e8dd7f",
+  "license": "NASA/IPAC public archive data; acknowledge NASA Exoplanet Archive and Kepler mission",
+  "label_source": "NASA Exoplanet Archive DR25 KOI disposition",
+  "label_confidence": "authoritative",
+  "preprocessing_version": "t1-1-kepler-manifest-v1",
+  "known_caveats": [
+    "Candidate status is not treated as confirmed without its recorded disposition",
+    "Raw FITS are bounded re-downloadable cache and are not represented by this committed file"
+  ],
+  "row_count": 7454,
+  "group_count": 6515
+}

@@ -21,6 +21,9 @@ datasets:
     split_group_keys:
       - Kepler target group / KIC-level grouping via predefined manifest split
     manifest_path: data/t1_1_kepler_master_cnn_splits/manifest.json
+    dataset_manifest_paths:
+      - metadata/dataset_manifests/t1_1_kepler_koi_training_v1.json
+      - metadata/dataset_manifests/t1_1_kepler_dr24_training_v1.json
     local_artifact_paths:
       - data/processed/t1_1_kepler_master_combined.jsonl
       - data/t1_1_kepler_master_cnn_splits/train.json
@@ -41,6 +44,9 @@ datasets:
     split_group_keys:
       - Kepler target group / KIC-level grouping via predefined manifest split
     manifest_path: data/t1_1_kepler_master_cnn_splits/manifest.json
+    dataset_manifest_paths:
+      - metadata/dataset_manifests/t1_1_kepler_koi_training_v1.json
+      - metadata/dataset_manifests/t1_1_kepler_dr24_training_v1.json
     local_artifact_paths:
       - data/t1_1_kepler_master_cnn_splits/val.json
       - checkpoints/cnn_t1_1_kepler_master/calibration.json
@@ -60,6 +66,9 @@ datasets:
     split_group_keys:
       - Kepler target group / KIC-level grouping via predefined manifest split
     manifest_path: data/t1_1_kepler_master_cnn_splits/manifest.json
+    dataset_manifest_paths:
+      - metadata/dataset_manifests/t1_1_kepler_koi_training_v1.json
+      - metadata/dataset_manifests/t1_1_kepler_dr24_training_v1.json
     local_artifact_paths:
       - checkpoints/cnn_t1_1_kepler_master/calibration.json
     notes: This calibration role is intentionally narrow. T1-2 still needs a separate held-out calibration plan for stacker weights after CNN promotion.
@@ -80,6 +89,9 @@ datasets:
     split_group_keys:
       - Kepler target group / KIC-level grouping via predefined manifest split
     manifest_path: data/t1_1_kepler_master_cnn_splits/manifest.json
+    dataset_manifest_paths:
+      - metadata/dataset_manifests/t1_1_kepler_koi_training_v1.json
+      - metadata/dataset_manifests/t1_1_kepler_dr24_training_v1.json
     local_artifact_paths:
       - data/t1_1_kepler_master_cnn_splits/test.json
       - checkpoints/cnn_t1_1_kepler_master/calibration.json
@@ -118,6 +130,8 @@ datasets:
     split_group_keys:
       - K2 EPIC target (one calibration row per star; k2:epic:<id> group keys, disjoint from the kepler:kic:<id> namespace used by T1-1 by construction)
     manifest_path: metadata/t1_2_k2_calibration_manifest.jsonl
+    dataset_manifest_paths:
+      - metadata/dataset_manifests/t1_2_k2_stacking_calibration_v1.json
     local_artifact_paths:
       - data/t1_2_k2_calibration_snippets.jsonl
       - metadata/t1_2_k2_calibration_partial_predictions.jsonl

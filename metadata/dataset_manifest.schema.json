@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ares0311/2026-Exoplanet-Research/blob/main/metadata/dataset_manifest.schema.json",
+  "title": "Astrometrics Exoplanet Dataset Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {"enum": ["known", "not_applicable", "deferred"]},
+        "value": {"type": ["string", "null"]},
+        "reason": {"type": ["string", "null"]}
+      },
+      "required": ["status"]
+    },
+    "targetCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "namespace": {"type": "string", "minLength": 1},
+        "count": {"type": "integer", "minimum": 1},
+        "selection": {"type": "string", "minLength": 1}
+      },
+      "required": ["namespace", "count", "selection"]
+    }
+  },
+  "properties": {
+    "schema_version": {"const": 1},
+    "dataset_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$"},
+    "project": {"const": "2026 Exoplanet Research"},
+    "role": {"enum": ["training", "validation", "calibration", "frozen_eval", "live_search", "followup_live_search"]},
+    "source_name": {"type": "string", "minLength": 1},
+    "source_url": {"type": "string", "minLength": 1},
+    "instrument": {"type": "string", "minLength": 1},
+    "target_ids": {"$ref": "#/$defs/targetCoverage"},
+    "time_range": {"$ref": "#/$defs/coverage"},
+    "cadence": {"$ref": "#/$defs/coverage"},
+    "band_or_frequency": {"type": "string", "minLength": 1},
+    "data_product_type": {"type": "string", "minLength": 1},
+    "acquired_at": {"type": "string", "format": "date-time"},
+    "local_path": {"type": "string", "minLength": 1},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "license": {"type": "string", "minLength": 1},
+    "label_source": {"type": "string", "minLength": 1},
+    "label_confidence": {"enum": ["authoritative", "published_review", "mixed", "unlabeled"]},
+    "preprocessing_version": {"type": "string", "minLength": 1},
+    "known_caveats": {"type": "array", "items": {"type": "string"}},
+    "row_count": {"type": "integer", "minimum": 1},
+    "group_count": {"type": "integer", "minimum": 1}
+  },
+  "required": [
+    "schema_version", "dataset_id", "project", "role", "source_name",
+    "source_url", "instrument", "target_ids", "time_range", "cadence",
+    "band_or_frequency", "data_product_type", "acquired_at", "local_path",
+    "sha256", "license", "label_source", "label_confidence",
+    "preprocessing_version", "known_caveats", "row_count", "group_count"
+  ]
+}

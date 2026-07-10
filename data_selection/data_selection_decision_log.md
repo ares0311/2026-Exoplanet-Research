@@ -1,5 +1,35 @@
 # Data Selection Decision Log
 
+## 2026-07-10 — Versioned dataset-manifest contract
+
+**Repo:** 2026 Exoplanet Research
+**Data:** Existing committed Kepler KOI, Kepler DR24 TCE, and held-out K2
+stacking-calibration row manifests
+**Role:** Training and calibration, unchanged from the existing data-role
+registry
+**Training priority score:** Not applicable; no new dataset is acquired
+**Live search priority score:** Not applicable; no live-search data is selected
+**Why this data:** These are the production model's actual source manifests and
+therefore the first artifacts that must satisfy the Astrometrics master guide's
+stable dataset ID, provenance, checksum, role, label-source, and caveat
+contract.
+**Why not alternatives:** TESS and JWST do not yet have equivalent committed
+row-level production manifests in this repository; inventing placeholder
+artifacts would weaken provenance. The contract is mission-neutral and will be
+required when those manifests are created.
+**Leakage risks:** None added. Existing target-group splits and role
+restrictions are preserved; the dataset manifests describe rather than alter
+membership.
+**Manifest:** `metadata/dataset_manifests/*.json`, validated against
+`metadata/dataset_manifest.schema.json` and the Pydantic contract in
+`src/exo_toolkit/dataset_manifest.py`.
+**Expected scientific or model-hardening value:** Every canonical eval,
+injection-recovery package, model run, and candidate ledger record can now cite
+a stable dataset ID whose local artifact is checksum-verified and whose role
+and limitations are explicit.
+
+---
+
 This log satisfies `docs/astrometrics_data_selection_policy.md` for production-relevant dataset choices. Keep entries concise, source-contract-based, and tied to committed manifests or run reports.
 
 ## 2026-07-08 Decision
