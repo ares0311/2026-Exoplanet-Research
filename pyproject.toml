@@ -56,7 +56,7 @@ dev = [
 ]
 
 [project.scripts]
-exo = "exo_toolkit.cli:app"
+exo = "exo_toolkit.cli:cli_entry"
 
 [tool.setuptools.packages.find]
 where = ["src"]

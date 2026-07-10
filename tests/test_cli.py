@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 from typer.testing import CliRunner
 
-from exo_toolkit.cli import app, run_pipeline
+from exo_toolkit.cli import app, cli_entry, run_pipeline
 from exo_toolkit.features import RawDiagnostics
 from exo_toolkit.fetch import FetchProvenance
 from exo_toolkit.schemas import (
@@ -1468,3 +1468,61 @@ class TestCalibrationIntegration:
             )
         assert result == []
         mock_apply.assert_not_called()
+
+
+class TestCliEntry:
+    """Regression coverage for the exo_toolkit.cli:cli_entry console-script
+    entry point (pyproject.toml's `exo` script). Without this dispatch, the
+    Typer `app` -- which only implements the `exo <TARGET-ID>` scan command
+    -- silently misparses a background-automation subcommand name like
+    `background-run-once` as a scan TARGET_ID instead of routing to `main()`.
+    """
+
+    def test_background_subcommand_routes_to_argparse_main(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "sys.argv", ["exo", "background-run-once", "--dry-run"]
+        )
+        with (
+            patch("exo_toolkit.cli.main", return_value=0) as mock_main,
+            patch("exo_toolkit.cli.app") as mock_app,
+            pytest.raises(SystemExit) as excinfo,
+        ):
+            cli_entry()
+        mock_main.assert_called_once_with(["background-run-once", "--dry-run"])
+        mock_app.assert_not_called()
+        assert excinfo.value.code == 0
+
+    def test_run_summary_subcommand_routes_to_argparse_main(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("sys.argv", ["exo", "run-summary"])
+        with (
+            patch("exo_toolkit.cli.main", return_value=0) as mock_main,
+            patch("exo_toolkit.cli.app") as mock_app,
+            pytest.raises(SystemExit),
+        ):
+            cli_entry()
+        mock_main.assert_called_once_with(["run-summary"])
+        mock_app.assert_not_called()
+
+    def test_target_id_routes_to_typer_app(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("sys.argv", ["exo", "TIC 150428135"])
+        with (
+            patch("exo_toolkit.cli.main") as mock_main,
+            patch("exo_toolkit.cli.app") as mock_app,
+        ):
+            cli_entry()
+        mock_main.assert_not_called()
+        mock_app.assert_called_once_with()
+
+    def test_no_args_routes_to_typer_app(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("sys.argv", ["exo"])
+        with (
+            patch("exo_toolkit.cli.main") as mock_main,
+            patch("exo_toolkit.cli.app") as mock_app,
+        ):
+            cli_entry()
+        mock_main.assert_not_called()
+        mock_app.assert_called_once_with()

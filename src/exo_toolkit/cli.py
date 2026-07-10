@@ -23,7 +23,8 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
-from collections.abc import Sequence
+import sys
+from collections.abc import Callable, Sequence
 from dataclasses import asdict, is_dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -802,11 +803,15 @@ def _cmd_validation_summary(args: argparse.Namespace) -> int:
     return EXIT_SUCCESS
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="exo")
-    subparsers = parser.add_subparsers(dest="command", required=True)
+def _background_command_handlers() -> dict[str, Callable[[argparse.Namespace], int]]:
+    """Registry of background-automation subcommand names to handlers.
 
-    commands = {
+    This is the single source of truth for which subcommand names are
+    argparse-only (implemented by ``main()``/``build_parser()`` below, not by
+    the Typer ``app``) so ``cli_entry()`` can route each console-script
+    invocation to the right parser without duplicating this list.
+    """
+    return {
         "config-summary": _cmd_config_summary,
         "fixture-summary": _cmd_fixture_summary,
         "target-priority-summary": _cmd_target_priority_summary,
@@ -825,6 +830,13 @@ def build_parser() -> argparse.ArgumentParser:
         "scheduler-notification-summary": _cmd_scheduler_notification_summary,
         "validation-summary": _cmd_validation_summary,
     }
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="exo")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    commands = _background_command_handlers()
     for name, handler in commands.items():
         command_parser = subparsers.add_parser(name)
         command_parser.add_argument(
@@ -878,6 +890,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     handler = args.handler
     return int(handler(args))
+
+
+def cli_entry() -> None:
+    """Console-script entry point registered as ``exo`` in ``pyproject.toml``.
+
+    Dispatches to the argparse background-automation subcommands (e.g.
+    ``exo background-run-once --dry-run``, ``exo run-summary``) when the
+    first argument names one of them, otherwise falls through to the Typer
+    transit-scan command (``exo <TARGET-ID>``). Without this dispatch, the
+    Typer ``app`` -- which only implements the scan command -- would
+    silently misparse a subcommand name like ``background-run-once`` as a
+    scan TARGET_ID instead of routing to ``main()``.
+    """
+    argv = sys.argv[1:]
+    if argv and argv[0] in _background_command_handlers():
+        raise SystemExit(main(argv))
+    app()
 
 
 if __name__ == "__main__":

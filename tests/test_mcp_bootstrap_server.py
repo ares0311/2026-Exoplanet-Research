@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
-from mcp_bootstrap_server import handle_request, is_allowed_project_path, project_root
+from mcp_bootstrap_server import _exo_command, handle_request, is_allowed_project_path, project_root
 
 
 def test_project_root_defaults_to_repository() -> None:
@@ -81,6 +81,27 @@ def test_exo_guard_tool_list_is_fixed() -> None:
         "run_summary",
         "sqlite_integrity",
     }
+
+
+def test_background_subcommands_use_module_invocation_not_bare_exo() -> None:
+    # Regression test: background-run-once/run-summary/sqlite-integrity are
+    # only implemented by exo_toolkit.cli's argparse main(), never by the
+    # Typer `app` registered as the `exo` console script. A bare `exo` on
+    # PATH would silently misparse the subcommand name as a scan TARGET_ID
+    # instead of running the intended subcommand (see docs/PRODUCTION_READINESS.md
+    # T1-2-adjacent Pre-Deployment Compliance Checklist and docs/SCHEDULER.md,
+    # which documents the module-invocation form as the correct one).
+    command = _exo_command("background-run-once", "--dry-run")
+    assert command[1:] == ("-m", "exo_toolkit.cli", "background-run-once", "--dry-run")
+    assert not command[0].endswith("/exo")
+
+    command = _exo_command("run-summary")
+    assert command[1:] == ("-m", "exo_toolkit.cli", "run-summary")
+    assert not command[0].endswith("/exo")
+
+    command = _exo_command("sqlite-integrity")
+    assert command[1:] == ("-m", "exo_toolkit.cli", "sqlite-integrity")
+    assert not command[0].endswith("/exo")
 
 
 def test_unknown_tool_returns_error() -> None:
