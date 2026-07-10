@@ -1,9 +1,9 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-07-09 (project reset: run006/run008 candidate review is historical; active production path wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` and the Astrometrics master/data-selection/storage policy docs. The master-corpus Kepler CNN checkpoint passed held-out gates and was human-approved for promotion as `benchmark_cnn_v1`; the current Tier 1 blocker moves to T1-2 stacking calibration after the promotion PR is merged and CI-clean.)
+Last reviewed: 2026-07-10 (T1-2 in progress: held-out K2 calibration manifest, catalog-only Bayesian+XGBoost scoring, and the native K2 snippet fetcher are built and committed; the remaining step is a human-run live snippet fetch, then final stacking-weight calibration. The master-corpus Kepler CNN checkpoint passed held-out gates and was human-approved for promotion as `benchmark_cnn_v1`.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 2,519 default tests passing, 2 integration_live deselected
+Test baseline: 2,565 default tests passing, 2 integration_live deselected
 
 ---
 
@@ -23,7 +23,7 @@ master-corpus Kepler CNN checkpoint has also been promoted as the frozen
 ensemble production remains blocked on T1-2 stacking calibration; do not tune
 stacking weights against training or frozen-eval data.
 
-Version note: 0.2.27 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.28 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -98,6 +98,12 @@ real labels while the newer DR25 TCE label columns are empty; the expansion was
 later fully processed and produced the master corpus used by the current
 passing CNN. 0.2.27 promotes the human-approved `benchmark_cnn_v1` CNN
 checkpoint and registers the selected production artifacts under `models/`.
+0.2.28 builds the T1-2 held-out K2 calibration manifest, catalog-only
+Bayesian+XGBoost scoring, and the native K2 snippet fetcher (see T1-2 below);
+it also fixes two real unit bugs found live while building that manifest — a
+double-counted BJD offset in `Skills/fetch_tess_k2_overlap_snippets.py` and a
+wrong days-vs-hours assumption for `pl_trandur` — neither of which affected
+any promoted model.
 
 ---
 
@@ -213,10 +219,14 @@ checkpoint and registers the selected production artifacts under `models/`.
 
 ### T1-2: Stacking Tier 3 Production Weight Calibration
 
-- **What is missing**: Held-out calibration set to tune XGBoost/CNN/Bayesian blend weights
-- **Root cause**: Blocked by T1-1 — CNN output required before weight calibration is meaningful
+- **What is missing**: Native K2 light-curve snippets for the held-out calibration set (bounded live fetch, human-run) and the final `calibrate_stacking_weights.py` pass once they exist
 - **Current state**: Conservative fallback weights in place (XGBoost 0.35 + CNN 0.35 + Bayesian 0.30); when CNN is absent, blend falls back to XGBoost 0.538 + Bayesian 0.462
-- **Gate**: ~500 labeled held-out examples after T1-1 is resolved
+- **Gate**: ~500 labeled held-out examples — **satisfied**: 596 rows (356 CONFIRMED / 240 FALSE POSITIVE) selected 2026-07-10
+- **Held-out calibration set built (2026-07-10)**: `benchmark_cnn_v1` and `models/xgboost_koi.json` were both trained/split entirely from Kepler prime-mission KIC targets, and the existing training/validation/frozen-eval roles in `data_selection/data_role_registry.yaml` explicitly forbid reuse for stacking calibration. `Skills/build_t1_2_k2_calibration_manifest.py` builds a genuinely disjoint calibration set from the NASA Exoplanet Archive K2 planets-and-candidates table (`k2pandc`) — a different EPIC target catalog observed during different campaigns/sky fields than Kepler prime, so `k2:epic:<id>` group keys can never collide with the `kepler:kic:<id>` namespace. Live-verified 2,261 usable CONFIRMED/FALSE POSITIVE rows; committed manifest at `metadata/t1_2_k2_calibration_manifest.jsonl` (596 rows, seed 42, all available false positives plus a seeded sample of confirmed rows).
+- **Two real unit bugs found and fixed while building this manifest (2026-07-10)**: (1) `pl_tranmid` is already full BJD_TDB — a pre-existing script, `Skills/fetch_tess_k2_overlap_snippets.py`, wrongly assumed BKJD and added the 2454833-day offset a second time, corrupting the phase-fold epoch of every one of its 2,086 already-fetched TESS-domain K2-overlap snippets (`data/tess_k2_overlap_snippets.jsonl`, local-only, not yet used in any trained model — no promoted checkpoint is affected, but this file must be re-fetched before any future C20-style TESS combined-corpus attempt). Both the existing script and the new manifest builder are fixed and regression-tested. (2) `pl_trandur` is empirically already in hours despite its own `tap_schema.columns` metadata claiming days — confirmed by cross-checking published transit durations for K2-18 b and K2-3 b. See `data_selection/data_selection_decision_log.md`'s 2026-07-10 entry for full detail.
+- **Catalog-only scoring complete (2026-07-10)**: `Skills/score_t1_2_k2_calibration.py` maps each manifest row's k2pandc columns into `CandidateFeatures` using the exact same transform (`Skills/build_training_data.py`'s `row_to_features`) the XGBoost KOI model was trained with, then scores every row with both `models/xgboost_koi.json` and the Bayesian log-score model — no light curve required for these two tiers. Ran live on the full 596-row manifest; xgb_prob correctly discriminates in the right direction (mean 0.077 for label=1 vs 0.002 for label=0). Output: `metadata/t1_2_k2_calibration_partial_predictions.jsonl` (cnn_prob still `null` pending the snippet fetch below).
+- **Native K2 snippet fetcher built, not yet run live (2026-07-10)**: `Skills/fetch_t1_2_k2_calibration_snippets.py` fetches the **native K2** light curve (mission="K2", not TESS) for each manifest EPIC target via `exo_toolkit.fetch.fetch_lightcurve()` (the same production, cache-repair-aware, retry-aware path used by `process_t1_kepler_batch.py` — not the older, concurrency-unsafe `download_all()` pattern), phase-folds at the manifest's period/epoch, and writes 201-bin normalised snippets with resume, terminal-failure logging, bounded `--workers`, ETA console output, and Run Report Policy integration. 8 offline tests pass. **Next `[HUMAN]` action**: run it live (~600 targets, much smaller than the 6,515-target Kepler batch) to produce `data/t1_2_k2_calibration_snippets.jsonl`.
+- **Remaining steps to close T1-2**: (1) human runs the snippet fetcher live; (2) merge `cnn_prob` into the partial predictions using `CnnScorer.from_checkpoint("models/cnn/benchmark_cnn_v1/best.pt")` against the fetched snippets; (3) run `Skills/calibrate_stacking_weights.py` on the completed predictions to produce `models/stacking_weights.json`; (4) update `StackingScorer`'s default weights per that tool's printed recipe and commit through the normal branch/PR/CI cycle.
 
 ---
 

@@ -1,0 +1,17 @@
+{
+  "created_at_utc": "2026-07-10T00:31:09Z",
+  "flag": "OK",
+  "label_counts": {
+    "0": 240,
+    "1": 356
+  },
+  "leakage_errors": [],
+  "manifest_version": "t1-2-k2-calibration-manifest-v1",
+  "n_available_confirmed": 356,
+  "n_available_false_positive": 240,
+  "n_duplicate_epic_source_rows": 1665,
+  "next_action": "Build native K2 light-curve snippets for these EPIC targets (fetch_t1_2_k2_calibration_snippets.py), then score with score_t1_2_k2_calibration.py and feed the result into calibrate_stacking_weights.py.",
+  "row_count": 596,
+  "sample_size_requested": 600,
+  "seed": 42
+}

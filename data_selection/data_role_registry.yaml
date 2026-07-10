@@ -1,5 +1,5 @@
 schema_version: 1
-last_updated: 2026-07-09
+last_updated: 2026-07-10
 project: 2026 Exoplanet Research
 policy_sources:
   - docs/astrometrics_data_selection_policy.md
@@ -102,3 +102,41 @@ datasets:
       - logs/discovery_run_006_qlp_progress_safe.json
       - logs/discovery_run_008_targeted_qlp_stitch_safe.json
     notes: Historical only. The active production path is the dataset/model-training plan, not the old run006/run008 loop.
+
+  - dataset_id: t1_2_k2pandc_calibration
+    role: calibration
+    project: 2026 Exoplanet Research
+    source: NASA Exoplanet Archive K2 planets-and-candidates table (k2pandc), native K2 light curves
+    allowed_uses:
+      - Score with the already-trained xgboost_koi.json and benchmark_cnn_v1 scorers plus the Bayesian log-score model
+      - Grid-search Tier-3 stacking blend weights (ensemble_weight_optimizer.py / calibrate_stacking_weights.py) for T1-2
+    forbidden_uses:
+      - Train XGBoost or CNN model weights
+      - Report a final held-out performance claim for benchmark_cnn_v1 (that role belongs to t1_1_kepler_master_frozen_eval)
+      - Reuse these same EPIC targets as a future T1-1-style Kepler/K2 CNN training-corpus expansion (would create a train/calibration overlap once consumed here)
+      - Blind-search discovery claims
+    split_group_keys:
+      - K2 EPIC target (one calibration row per star; k2:epic:<id> group keys, disjoint from the kepler:kic:<id> namespace used by T1-1 by construction)
+    manifest_path: metadata/t1_2_k2_calibration_manifest.jsonl
+    local_artifact_paths:
+      - data/t1_2_k2_calibration_snippets.jsonl
+      - metadata/t1_2_k2_calibration_partial_predictions.jsonl
+    notes: >
+      596 rows (356 CONFIRMED / 240 FALSE POSITIVE) selected 2026-07-10 from
+      2,261 live-verified usable k2pandc rows; disjoint EPIC namespace from
+      the Kepler KIC-based T1-1 training/validation/frozen-eval splits, so it
+      carries zero group-level leakage risk against benchmark_cnn_v1 or
+      xgboost_koi.json by construction. Bayesian and XGBoost scores are
+      already computed catalog-only (metadata/t1_2_k2_calibration_partial_predictions.jsonl);
+      the CNN score requires a bounded live fetch of native K2 light curves
+      (fetch_t1_2_k2_calibration_snippets.py, human-run on the operator's Mac)
+      before calibrate_stacking_weights.py can produce final T1-2 weights.
+      Two real unit bugs were found and fixed while building this dataset:
+      (1) k2pandc's pl_tranmid is already full BJD_TDB, not BKJD as an
+      existing script (fetch_tess_k2_overlap_snippets.py) assumed -- that
+      script's already-fetched data/tess_k2_overlap_snippets.jsonl (2,086
+      snippets, TESS-domain, unrelated to this calibration set) has a
+      corrupted phase-fold epoch and must be re-fetched before any future
+      use; (2) k2pandc's pl_trandur is empirically in hours despite its own
+      tap_schema.columns metadata claiming days (cross-checked against
+      published K2-18 b and K2-3 b transit durations).
