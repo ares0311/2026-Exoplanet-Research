@@ -25,7 +25,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.28 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.30 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -124,6 +124,13 @@ CNN=0.7458/XGBoost=0.9575/Bayesian=0.8656 standalone AUC), and wires the
 calibrated weights into `cli.py`'s `full-ensemble` blend and
 `StackingScorer`'s defaults, replacing the old uncalibrated 0.35/0.35/0.30
 guess.
+0.2.30 begins the next Astrometrics master-guide production phase with a
+versioned, mission-neutral dataset-manifest contract: committed JSON Schema and
+frozen Pydantic models, stable dataset IDs for the actual Kepler/K2 production
+sources, fail-closed repository-path and SHA-256 validation, a reusable CLI,
+and explicit links from the data-role registry. TESS/JWST must use the same
+contract when their first row-level production manifests are created; no
+placeholder datasets are fabricated.
 
 ---
 

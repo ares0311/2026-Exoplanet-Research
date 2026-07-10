@@ -8,10 +8,12 @@ by itself satisfy a master-guide evidence requirement.
 
 ## Current Master-Guide Alignment — Production Priority Order
 
-1. **Phase 1 — validated manifest contract:** dataset-specific Kepler/K2
-   manifests exist, but the shared manifest schema, validator, stable manifest
-   IDs, and run-to-manifest references required by the master guide are not yet
-   complete across Kepler/TESS/JWST.
+1. **Phase 1 — validated manifest contract (IN PROGRESS):** version 0.2.30 adds
+   the shared schema, frozen Pydantic contract, fail-closed checksum/path
+   validator, stable dataset IDs, and data-role-registry links for the committed
+   Kepler/K2 production datasets. Require the same contract when the first TESS
+   or JWST row-level production manifest is created; do not invent placeholder
+   datasets merely to claim mission coverage.
 2. **Phase 1 — reproducible candidate ledger:** `Skills/candidate_database.py`
    provides a basic SQLite history, but it does not yet carry the master-guide
    provenance fields (`source_dataset_id`, raw URI, preprocessing/generator
