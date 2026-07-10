@@ -74,6 +74,27 @@ app = typer.Typer(
 _VALID_SCORERS = ("bayesian", "xgboost", "ensemble", "cnn", "full-ensemble")
 CNN_SNIPPET_BINS = 201
 
+# Calibrated 2026-07-10 via Skills/calibrate_stacking_weights.py on the T1-2
+# held-out K2 calibration set (588 examples, AUC-maximising grid search,
+# best AUC 0.9576) -- see docs/PRODUCTION_READINESS.md T1-2 and
+# data_selection/data_selection_decision_log.md for the recorded decision.
+#
+# Important scope caveat: this measured the CNN *cross-mission*
+# (benchmark_cnn_v1 is trained exclusively on Kepler prime-mission targets;
+# K2 was deliberately chosen as the calibration domain because it is
+# leakage-safe from that training data, not because it is the CNN's native
+# domain). It is not a same-domain (Kepler-trained CNN scoring real Kepler
+# targets) measurement -- that would need its own dedicated held-out Kepler
+# set, which does not yet exist. Applying FULL_ENSEMBLE_CNN_WEIGHT globally
+# is a deliberate conservative choice: it may underweight the CNN for a
+# genuine same-domain Kepler scan (where the checkpoint's own frozen-eval
+# AUC of 0.9572 suggests real skill), but that undercounting has no
+# calibration evidence backing a higher number either, and this project
+# prefers conservative defaults over optimistic ones without direct
+# evidence (see CLAUDE.md's Scientific Guardrails).
+FULL_ENSEMBLE_XGB_WEIGHT = 0.95
+FULL_ENSEMBLE_CNN_WEIGHT = 0.00
+
 
 def _version_callback(value: bool) -> None:
     if value:
@@ -437,8 +458,10 @@ def run_pipeline(
             row["cnn_planet_probability"] = cnn_prob
             if scorer == "full-ensemble":
                 xgb_p = row.get("xgb_planet_probability", posterior.planet_candidate)
-                cnn_weight = 0.35 if cnn_probability_status == "computed" else 0.0
-                xgb_weight = 0.35
+                cnn_weight = (
+                    FULL_ENSEMBLE_CNN_WEIGHT if cnn_probability_status == "computed" else 0.0
+                )
+                xgb_weight = FULL_ENSEMBLE_XGB_WEIGHT
                 bayes_weight = 1.0 - xgb_weight - cnn_weight
                 row["full_ensemble_planet_probability"] = (
                     xgb_weight * xgb_p

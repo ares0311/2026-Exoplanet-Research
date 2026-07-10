@@ -718,7 +718,7 @@
     {
       "path": "data/t1_2_k2_calibration_snippets.jsonl",
       "kind": "held_out_calibration_corpus",
-      "status": "pending_live_fetch",
+      "status": "complete",
       "git_policy": "ignored",
       "last_known": {
         "strategy": "Native K2 (mission=K2, not TESS) light curves for the T1-2 held-out stacking-calibration manifest, folded at k2pandc period/epoch",
@@ -729,10 +729,13 @@
         "failures_sidecar": "data/t1_2_k2_calibration_snippets.jsonl.failures.jsonl",
         "built_at": "2026-07-10",
         "offline_tests_passing": 13,
-        "shard_support_added": "2026-07-10 (--shard-index/--shard-count, partitions by epic_id % shard_count)"
+        "shard_support_added": "2026-07-10 (--shard-index/--shard-count, partitions by epic_id % shard_count)",
+        "live_fetch_completed_at": "2026-07-10",
+        "live_fetch_result": "4 shards x 6 workers, 596/596 processed (142/132/168/154 per shard), 588 written, 8 terminal failures, ~3.5 min combined wall-clock; concatenated to data/t1_2_k2_calibration_snippets.jsonl (588 lines, zero duplicate EPIC IDs, zero non-finite flux)",
+        "downstream_use": "Scored with benchmark_cnn_v1 via Skills/merge_t1_2_k2_cnn_predictions.py -> metadata/t1_2_k2_calibration_completed_predictions.jsonl (committed) -> Skills/calibrate_stacking_weights.py -> models/stacking_weights.json (committed)"
       },
-      "validation_gate": "Fetcher built and offline-tested; not yet run live.",
-      "next_action": "[HUMAN] Single tab (596 targets, expected well under an hour): caffeinate -dims .venv/bin/python Skills/fetch_t1_2_k2_calibration_snippets.py --manifest metadata/t1_2_k2_calibration_manifest.jsonl --output data/t1_2_k2_calibration_snippets.jsonl --workers 4 -- OR for faster completion across N free tabs, run the same command with --workers 6 --shard-index i --shard-count N (i=0..N-1) in each tab, then concatenate the shardIofN output/failure files."
+      "validation_gate": "Live fetch complete, validated, and consumed by the T1-2 stacking calibration pipeline. See docs/PRODUCTION_READINESS.md T1-2 for the CnnScorer sys.path bug found and fixed while first using this corpus.",
+      "next_action": "None -- T1-2 complete. Re-fetch only if the manifest changes or the corpus needs auditing."
     },
     {
       "path": "data/tess_c20_combined_snippets.jsonl",

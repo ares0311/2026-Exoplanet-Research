@@ -277,3 +277,156 @@ class TestCnnScorerInStacking:
 
         s = StackingScorer(xgb_weight=0.35, cnn_weight=0.35)
         assert s.cnn_weight == pytest.approx(0.35)
+
+
+# ---------------------------------------------------------------------------
+# Regression: repo root must be reachable on sys.path for Skills.* imports
+# ---------------------------------------------------------------------------
+#
+# A real incident (2026-07-10): invoking a Skills/*.py script directly as
+# `python Skills/foo.py` makes Python auto-prepend only the script's own
+# containing directory (Skills/) to sys.path -- not the repo root. Since
+# CnnScorer._ensure_model()/_load() do the absolute import
+# `import_module("Skills.cnn_inference_batcher")`, that import silently
+# raised ModuleNotFoundError under this exact invocation shape, and the
+# broad `except Exception` swallowed it -- every prediction fell back to
+# the neutral 0.5 with no error, warning, or other signal. This corrupted
+# an entire 588-row T1-2 K2 stacking-calibration batch (constant cnn_prob)
+# before a manual sanity check caught it. See docs/PRODUCTION_READINESS.md
+# T1-2 for the full incident record.
+
+
+class TestEnsureRepoRootOnSysPath:
+    def test_inserts_repo_root_when_missing(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import sys
+
+        import exo_toolkit.ml.cnn_scorer as cnn_scorer_module
+
+        repo_root = str(Path(cnn_scorer_module.__file__).resolve().parents[3])
+        fake_path = [p for p in sys.path if p != repo_root]
+        monkeypatch.setattr(sys, "path", fake_path)
+
+        assert repo_root not in sys.path
+        cnn_scorer_module._ensure_repo_root_on_sys_path()
+        assert repo_root in sys.path
+
+    def test_idempotent_when_already_present(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import sys
+
+        import exo_toolkit.ml.cnn_scorer as cnn_scorer_module
+
+        repo_root = str(Path(cnn_scorer_module.__file__).resolve().parents[3])
+        monkeypatch.setattr(sys, "path", [repo_root, *sys.path])
+        before = list(sys.path)
+
+        cnn_scorer_module._ensure_repo_root_on_sys_path()
+
+        assert sys.path.count(repo_root) == before.count(repo_root)
+
+    def test_ensure_model_loads_even_when_repo_root_missing_from_sys_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Reproduces the real 2026-07-10 incident and proves the fix."""
+        import sys
+        from types import SimpleNamespace
+
+        import exo_toolkit.ml.cnn_scorer as cnn_scorer_module
+
+        repo_root = str(Path(cnn_scorer_module.__file__).resolve().parents[3])
+        monkeypatch.setattr(sys, "path", [p for p in sys.path if p != repo_root])
+        assert repo_root not in sys.path
+
+        checkpoint = tmp_path / "best.pt"
+        checkpoint.write_bytes(b"state-dict")
+        loaded_model = object()
+        real_import_module = cnn_scorer_module.import_module
+
+        def fake_import_module(name: str):
+            if name == "Skills.cnn_inference_batcher":
+                return SimpleNamespace(
+                    _load_torch_model=lambda path: (
+                        loaded_model,
+                        SimpleNamespace(n_bins=201),
+                    )
+                )
+            return real_import_module(name)
+
+        monkeypatch.setattr(cnn_scorer_module, "import_module", fake_import_module)
+
+        scorer = CnnScorer.from_checkpoint(checkpoint)
+
+        assert scorer.is_available
+        assert scorer._model is loaded_model
+
+
+class TestEnsureModelWarnings:
+    def test_warns_when_skills_package_unimportable(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import exo_toolkit.ml.cnn_scorer as cnn_scorer_module
+
+        checkpoint = tmp_path / "best.pt"
+        checkpoint.write_bytes(b"state-dict")
+
+        def raising_import(name: str):
+            if name == "Skills.cnn_inference_batcher":
+                raise ModuleNotFoundError("No module named 'Skills'")
+            raise AssertionError(f"unexpected import: {name}")
+
+        monkeypatch.setattr(cnn_scorer_module, "import_module", raising_import)
+
+        with pytest.warns(RuntimeWarning, match="could not import Skills"):
+            scorer = CnnScorer.from_checkpoint(checkpoint)
+
+        assert scorer.is_available is False
+
+    def test_warns_on_genuine_checkpoint_load_failure(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from types import SimpleNamespace
+
+        import exo_toolkit.ml.cnn_scorer as cnn_scorer_module
+
+        checkpoint = tmp_path / "best.pt"
+        checkpoint.write_bytes(b"state-dict")
+
+        def raise_value_error(path):
+            raise ValueError("architecture mismatch")
+
+        batcher = SimpleNamespace(_load_torch_model=raise_value_error)
+        monkeypatch.setattr(
+            cnn_scorer_module,
+            "import_module",
+            lambda name: batcher if name == "Skills.cnn_inference_batcher" else None,
+        )
+
+        with pytest.warns(RuntimeWarning, match="failed to load checkpoint"):
+            scorer = CnnScorer.from_checkpoint(checkpoint)
+
+        assert scorer.is_available is False
+
+    def test_silent_when_pytorch_not_installed(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, recwarn: pytest.WarningsRecorder
+    ) -> None:
+        """The documented 'PyTorch is optional' case must stay silent."""
+        from types import SimpleNamespace
+
+        import exo_toolkit.ml.cnn_scorer as cnn_scorer_module
+
+        checkpoint = tmp_path / "best.pt"
+        checkpoint.write_bytes(b"state-dict")
+
+        def raise_import_error(path):
+            raise ImportError("No module named 'torch'")
+
+        batcher = SimpleNamespace(_load_torch_model=raise_import_error)
+        monkeypatch.setattr(
+            cnn_scorer_module,
+            "import_module",
+            lambda name: batcher if name == "Skills.cnn_inference_batcher" else None,
+        )
+
+        scorer = CnnScorer.from_checkpoint(checkpoint)
+
+        assert scorer.is_available is False
+        assert len(recwarn) == 0

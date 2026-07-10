@@ -92,6 +92,21 @@ class TestLoadPredictionsJsonl:
         labels, _, _, _ = load_predictions_jsonl(p)
         assert len(labels) == 1
 
+    def test_skips_rows_with_null_score(self, tmp_path: Path) -> None:
+        p = tmp_path / "pred.jsonl"
+        p.write_text(
+            "".join(
+                json.dumps(r) + "\n"
+                for r in [
+                    {"label": 1, "cnn_prob": 0.8, "xgb_prob": 0.7, "bayes_prob": 0.6},
+                    {"label": 0, "cnn_prob": None, "xgb_prob": 0.2, "bayes_prob": 0.1},
+                ]
+            )
+        )
+        labels, xgb, cnn, bayes = load_predictions_jsonl(p)
+        assert len(labels) == 1
+        assert labels == [1]
+
 
 # ---------------------------------------------------------------------------
 # extract_from_pipeline_output

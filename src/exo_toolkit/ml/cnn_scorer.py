@@ -20,10 +20,35 @@ Public API
 """
 from __future__ import annotations
 
+import sys
+import warnings
 from collections.abc import Callable
 from importlib import import_module
 from pathlib import Path
 from typing import Any
+
+
+def _ensure_repo_root_on_sys_path() -> None:
+    """Insert the repo root onto ``sys.path`` if it is not already there.
+
+    ``Skills.cnn_inference_batcher`` / ``Skills.cnn_calibrator`` are absolute
+    imports that require the repo root itself (not just ``src/``) on
+    ``sys.path``. A caller script that is invoked directly as
+    ``python Skills/foo.py`` only gets its own containing directory
+    (``Skills/``) auto-prepended by Python -- not the repo root -- so without
+    this, ``import_module("Skills....")`` silently raises
+    ``ModuleNotFoundError``, which the broad ``except Exception`` below
+    swallows: every CNN score then falls back to the neutral 0.5 with no
+    error, warning, or other indication anything went wrong. This is not
+    hypothetical: it produced flat 0.5 ``cnn_prob`` values across an entire
+    588-row T1-2 K2 calibration batch, which fed a bogus CNN=0.000 stacking
+    weight into an AUC-maximizing grid search before being caught by a
+    manual sanity check. See ``docs/PRODUCTION_READINESS.md`` T1-2 for the
+    incident record.
+    """
+    repo_root = str(Path(__file__).resolve().parents[3])
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
 
 
 class CnnScorer:
@@ -67,6 +92,7 @@ class CnnScorer:
 
         if self._calibration_path is not None and self._calibration_path.exists():
             try:
+                _ensure_repo_root_on_sys_path()
                 calibrator = import_module("Skills.cnn_calibrator")
                 calibration = calibrator.load_cnn_calibration(self._calibration_path)
                 if calibration.flag == "OK":
@@ -79,19 +105,49 @@ class CnnScorer:
             return
         if self._checkpoint_path is None:
             return
+        _ensure_repo_root_on_sys_path()
         try:
             batcher = import_module("Skills.cnn_inference_batcher")
+        except Exception as exc:  # noqa: BLE001
+            # Skills is a required project module, not an optional dependency
+            # like PyTorch -- unlike the ImportError case below, this should
+            # never happen and always deserves a warning.
+            self._model = None
+            self._available = False
+            warnings.warn(
+                f"CnnScorer could not import Skills.cnn_inference_batcher "
+                f"({type(exc).__name__}: {exc}); every prediction will silently "
+                "fall back to the neutral 0.5. Check that the repo root is on "
+                "sys.path.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            return
+        try:
             self._model, config = batcher._load_torch_model(self._checkpoint_path)
             if self._training_mission is None:
                 self._training_mission = getattr(config, "training_mission", None)
-        except Exception:  # noqa: BLE001
+        except ImportError:
+            # PyTorch itself is not installed -- documented, expected, silent
+            # (see module docstring: "PyTorch is optional").
             self._model = None
             self._available = False
+        except Exception as exc:  # noqa: BLE001
+            self._model = None
+            self._available = False
+            warnings.warn(
+                f"CnnScorer failed to load checkpoint {self._checkpoint_path} "
+                f"({type(exc).__name__}: {exc}); every prediction will silently "
+                "fall back to the neutral 0.5.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
 
     def _apply_calibration(self, p: float) -> float:
         if self._calibration is None:
             return p
         try:
+            _ensure_repo_root_on_sys_path()
             calibrator = import_module("Skills.cnn_calibrator")
             return float(calibrator.apply_cnn_calibration(p, self._calibration))
         except Exception:  # noqa: BLE001
