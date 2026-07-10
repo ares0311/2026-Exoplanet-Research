@@ -46,6 +46,36 @@ def _write_calibration(
     }))
 
 
+def _write_temperature_calibration(
+    path: Path,
+    *,
+    flag: str = "OK",
+    temperature: float = 1.0,
+    auc: float = 0.957211,
+    f1: float = 0.834688,
+    brier_raw: float = 0.05797,
+    brier_cal: float = 0.05797,
+    ece_raw: float = 0.014241,
+    ece_cal: float = 0.014241,
+) -> None:
+    path.write_text(json.dumps({
+        "method": "temperature",
+        "temperature": temperature,
+        "n_val_samples": 2393,
+        "fitted_at": "2026-07-04T22:45:32.305902+00:00",
+        "gate_auc": 0.85,
+        "gate_f1": 0.80,
+        "test_auc_raw": auc,
+        "test_f1_raw": f1,
+        "test_brier_raw": brier_raw,
+        "test_ece_raw": ece_raw,
+        "test_f1_cal": f1,
+        "test_brier_cal": brier_cal,
+        "test_ece_cal": ece_cal,
+        "flag": flag,
+    }))
+
+
 def _write_checkpoint(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(b"fake-checkpoint-data-for-testing")
@@ -176,6 +206,34 @@ class TestPromoteCnnCheckpoint:
         )
         assert result.flag == "PROMOTED"
 
+    def test_temperature_calibration_promotes_without_platt_fields(
+        self, tmp_path: Path
+    ) -> None:
+        ckpt = tmp_path / "best.pt"
+        _write_checkpoint(ckpt)
+        cal = tmp_path / "calibration.json"
+        _write_temperature_calibration(cal)
+        result = promote_cnn_checkpoint(ckpt, cal, tmp_path / "registry.json")
+        assert result.flag == "PROMOTED"
+        assert result.calibration_method == "temperature"
+        assert result.temperature == pytest.approx(1.0)
+        assert result.platt_a is None
+        assert result.platt_b is None
+
+    def test_temperature_method_requires_finite_temperature(
+        self, tmp_path: Path
+    ) -> None:
+        ckpt = tmp_path / "best.pt"
+        _write_checkpoint(ckpt)
+        cal = tmp_path / "calibration.json"
+        _write_temperature_calibration(cal)
+        payload = json.loads(cal.read_text())
+        del payload["temperature"]
+        cal.write_text(json.dumps(payload))
+        result = promote_cnn_checkpoint(ckpt, cal, tmp_path / "registry.json")
+        assert result.flag == "GATES_NOT_MET"
+        assert not (tmp_path / "registry.json").exists()
+
     def test_model_id_starts_with_cnn(self, tmp_path: Path) -> None:
         ckpt = tmp_path / "best.pt"
         _write_checkpoint(ckpt)
@@ -185,6 +243,31 @@ class TestPromoteCnnCheckpoint:
             ckpt, cal, tmp_path / "registry.json"
         )
         assert result.model_id.startswith("cnn_")
+
+    def test_explicit_model_id_is_preserved_in_registry_and_manifest(
+        self, tmp_path: Path
+    ) -> None:
+        ckpt = tmp_path / "best.pt"
+        _write_checkpoint(ckpt)
+        cal = tmp_path / "calibration.json"
+        _write_temperature_calibration(cal)
+        reg = tmp_path / "registry.json"
+        manifest = tmp_path / "promotion_manifest.json"
+
+        result = promote_cnn_checkpoint(
+            ckpt,
+            cal,
+            reg,
+            manifest_path=manifest,
+            model_id="benchmark_cnn_v1",
+        )
+
+        assert result.flag == "PROMOTED"
+        assert result.model_id == "benchmark_cnn_v1"
+        registry = json.loads(reg.read_text())
+        assert registry[0]["model_id"] == "benchmark_cnn_v1"
+        promoted = json.loads(manifest.read_text())
+        assert promoted["model_id"] == "benchmark_cnn_v1"
 
     def test_sha256_is_hex_64_chars(self, tmp_path: Path) -> None:
         ckpt = tmp_path / "best.pt"
@@ -232,6 +315,23 @@ class TestPromoteCnnCheckpoint:
         assert m["flag"] == "PROMOTED"
         assert "sha256" in m
 
+    def test_temperature_manifest_records_calibration_schema(
+        self, tmp_path: Path
+    ) -> None:
+        ckpt = tmp_path / "best.pt"
+        _write_checkpoint(ckpt)
+        cal = tmp_path / "calibration.json"
+        _write_temperature_calibration(cal, temperature=1.25)
+        manifest = tmp_path / "manifest.json"
+        promote_cnn_checkpoint(
+            ckpt, cal, tmp_path / "registry.json", manifest_path=manifest
+        )
+        m = json.loads(manifest.read_text())
+        assert m["calibration_method"] == "temperature"
+        assert m["temperature"] == pytest.approx(1.25)
+        assert m["platt_a"] is None
+        assert m["platt_b"] is None
+
     def test_default_manifest_path(self, tmp_path: Path) -> None:
         ckpt = tmp_path / "cnn" / "best.pt"
         _write_checkpoint(ckpt)
@@ -268,6 +368,30 @@ class TestFormatPromotionResult:
         assert result.sha256 in text
         assert "PRODUCTION_READINESS" in text
         assert "git commit" in text
+
+    def test_format_promoted_commit_recipe_force_adds_checkpoint(
+        self, tmp_path: Path
+    ) -> None:
+        ckpt = tmp_path / "models" / "cnn" / "best.pt"
+        _write_checkpoint(ckpt)
+        cal = tmp_path / "models" / "cnn" / "calibration.json"
+        _write_calibration(cal)
+        result = promote_cnn_checkpoint(ckpt, cal, tmp_path / "models" / "registry.json")
+        text = format_promotion_result(result)
+        assert f"git add -f {ckpt}" in text
+        assert f"git add {result.manifest_path} {cal}" in text
+
+    def test_format_temperature_promotion_contains_temperature(
+        self, tmp_path: Path
+    ) -> None:
+        ckpt = tmp_path / "best.pt"
+        _write_checkpoint(ckpt)
+        cal = tmp_path / "calibration.json"
+        _write_temperature_calibration(cal, temperature=1.0)
+        result = promote_cnn_checkpoint(ckpt, cal, tmp_path / "registry.json")
+        text = format_promotion_result(result)
+        assert "Calibration method: temperature" in text
+        assert "Temperature: 1.0" in text
 
     def test_format_missing_file(self) -> None:
         result = PromotionResult(

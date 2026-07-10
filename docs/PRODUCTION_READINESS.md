@@ -1,6 +1,6 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-07-03 (project reset: run006/run008 candidate review is historical; active production path wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` to close T1-1 with verified data sources, leakage-safe training manifests, and a production-gated trained model; source-contract examples now use case-insensitive TAP schema table-name matching after the live CUMULATIVE table-name bug; the bounded Kepler-first processing batch tool is built, live-smoked sequentially at 25 and 250 targets, and fixed after a live `--workers 6` crash caused by an unsafe Lightkurve `download_all()` call (version 0.2.17); a supplementary pipeline-correctness fix wired real TIC catalog stellar/contamination parameters into `run_pipeline()` — see T1-0 notes below)
+Last reviewed: 2026-07-09 (project reset: run006/run008 candidate review is historical; active production path wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` and the Astrometrics master/data-selection/storage policy docs. The master-corpus Kepler CNN checkpoint passed held-out gates and was human-approved for promotion as `benchmark_cnn_v1`; the current Tier 1 blocker moves to T1-2 stacking calibration after the promotion PR is merged and CI-clean.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
 Test baseline: 2,519 default tests passing, 2 integration_live deselected
@@ -14,17 +14,16 @@ Test baseline: 2,519 default tests passing, 2 integration_live deselected
 | `--scorer bayesian` | **PRODUCTION READY** | None — default mode, zero external dependencies |
 | `--scorer xgboost` | **PRODUCTION READY** | None — trained on 7,586 Kepler KOIs, AUC=0.992 |
 | `--scorer ensemble` | **PRODUCTION READY** | None — conservative XGBoost+Bayesian blend when CNN absent |
-| `--scorer cnn` | **NOT READY** | T1-1: no trained checkpoint has passed held-out performance and calibration gates |
-| `--scorer full-ensemble` | **NOT READY** | T1-1: no production-approved CNN checkpoint |
+| `--scorer cnn` | **PRODUCTION BENCHMARK PROMOTED** | `benchmark_cnn_v1` registered and promoted; Kepler-domain limitations still apply |
+| `--scorer full-ensemble` | **PROMOTION PENDING** | T1-2: depends on subsequent stacking calibration using the promoted CNN artifact |
 
 The system is safe to deploy now for Bayesian and XGBoost scoring modes. The
-CNN label gate is open, but all evaluated CNN checkpoints remain rejected; they
-must not be copied into `models/`, registered, or used for production scoring.
-The active production blocker is now T1-1, and the authorized path is the
-source-contract-first dataset/model plan in
-`docs/exoplanet_exomoon_dataset_handoff.md`.
+master-corpus Kepler CNN checkpoint has also been promoted as the frozen
+`benchmark_cnn_v1` Kepler-domain CNN benchmark after human approval. Full
+ensemble production remains blocked on T1-2 stacking calibration; do not tune
+stacking weights against training or frozen-eval data.
 
-Version note: 0.2.25 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.27 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -93,7 +92,12 @@ every row collapsed into one fake group and the new 0.2.24 check (correctly)
 raised on the resulting cross-split conflict. Fixed by recognizing `group_key`
 and falling back to `target_id`; this bug pre-dated 0.2.24 and would have
 silently corrupted the split under the old random-grouping logic instead of
-erroring.
+erroring. 0.2.26 adds the verified Kepler DR24 TCE expansion manifest builder
+after live schema/label checks showed `Q1_Q17_DR24_TCE.av_training_set` has
+real labels while the newer DR25 TCE label columns are empty; the expansion was
+later fully processed and produced the master corpus used by the current
+passing CNN. 0.2.27 promotes the human-approved `benchmark_cnn_v1` CNN
+checkpoint and registers the selected production artifacts under `models/`.
 
 ---
 
@@ -119,10 +123,11 @@ erroring.
 
 ### T1-1: Production Tier 2 CNN Checkpoint
 
-- **What is missing**: A CNN checkpoint that passes held-out performance and calibration gates
-- **Gate status**: **OPEN** — Kepler pretraining, TESS split generation, and two Kepler->TESS fine-tunes are locally complete; both fine-tuned checkpoints failed held-out production gates and must not be promoted
-- **Current priority**: **ACTIVE / HIGHEST PRIORITY** — close this through the source-contract-first dataset/model plan in `docs/exoplanet_exomoon_dataset_handoff.md`, not by repeating old C1-C19/C20 patterns
+- **Status**: **COMPLETE / PROMOTED** — human approved promotion on 2026-07-09, and selected artifacts are registered as `benchmark_cnn_v1`
+- **Gate status**: **PASS** — `models/cnn/benchmark_cnn_v1/best.pt` has SHA-256 `f29e6891c255289fa1e2eddad1fb6ca131c063cf11c24b8113e0e29d049441c5`; raw test AUC 0.9572, calibrated F1 0.8347, Brier 0.0580, ECE 0.0142, T=1.0
+- **Current priority**: **T1-2 NEXT** — use the promoted CNN artifact for stacking calibration only after this promotion PR is merged and CI-clean; do not restart old C1-C19/C20 experiments or new data pulls unless a named validation gate fails
 - **Active source contract**: Verify every public data source before use; discover schemas from primary services; preserve immutable source snapshots and enough metadata to redownload raw files after cleanup; use leakage-safe manifests/splits; keep storage bounded; use no synthetic examples for supervised model training in this phase; do not use Kaggle mirrors or unverified pretrained weights when primary NASA/MAST sources are available.
+- **Astrometrics policy gates for promotion**: complete. The promotion includes temperature-calibration-aware promotion tooling, model card, reproducibility manifest, data-role registry, storage/retention ledger updates, exact selected artifact scope, frozen `benchmark_cnn_v1` designation, and explicit human approval.
 - **Source-contract verification tool (2026-07-02)**: `Skills/verify_dataset_sources.py` implements the "Resource Access Contract" and "Minimum access smoke test" from `docs/exoplanet_exomoon_dataset_handoff.md` exactly — queries `TAP_SCHEMA.columns` for `cumulative` and `toi` before trusting any column name (never infers a renamed column), fetches sample rows from both tables plus the ExoFOP public TOI CSV, and confirms Lightkurve can find both a Kepler and a TESS light curve for one real target pulled from those rows. Fails closed with a specific reason at the first broken step.
 - **First live run found a real bug, fixed same-day (2026-07-02)**: `cumulative` schema check failed with zero missing... zero *available* columns and no error, while `toi` passed. Root cause, confirmed via direct `curl` against `TAP_SCHEMA.tables` (not guessed): the archive registers the table as `"CUMULATIVE"` (upper case); `TAP_SCHEMA.columns.table_name` is an exact-match string column, not a resolved SQL identifier, so `= 'cumulative'` matched nothing. `toi` happened to be registered lower case. Fixed by querying `UPPER(table_name) = UPPER('...')` instead of exact match — general fix, not a per-table hardcode; user re-verified the fixed query live via `curl` and got a real 2,366-byte column list back. `FROM cumulative`/`FROM toi` (the actual row-fetch queries) were not affected — those are ordinary SQL identifiers and this codebase already queries them lower case successfully elsewhere (`Skills/fetch_nea_koi_lc_index.py`).
 - **Full source smoke PASS (2026-07-02)**: the exact verifier ran end-to-end from the project `.venv` and returned `Overall: PASS`: 5 KOI rows, 5 TOI rows, 8,064 ExoFOP public TOI CSV rows, sample KIC `10797460` with 17 Kepler light-curve search results, and sample TIC `182943944` with 21 TESS light-curve search results. The source-access blocker is cleared.
@@ -142,7 +147,7 @@ erroring.
 - **Real bug found by that offline test, fixed same-day (version 0.2.21)**: CI failed on the new 4-shard test with `sqlite3.OperationalError: database is locked`. Root cause: `T1KeplerProcessingStore._connect()` runs `PRAGMA journal_mode=WAL;` on every connection, but SQLite only permits one connection to perform that mode transition at a time — 4 threads (or 4 real shard processes) constructing the store for the same fresh `db_path` at nearly the same instant race for that exclusivity and lose immediately, not smoothed over by the connection's `timeout=30.0` parameter (the transition needs momentary exclusivity, not just ordinary write-lock waiting). Fixed with `_ensure_wal_mode()`: a small retry loop (10 attempts, 0.2s apart), falling back to the default journal mode if it never succeeds (WAL is a concurrency nicety here, not a correctness requirement). 2 new tests. This would have been a real risk for the planned 4-tab live test if the tabs were started close together in time — caught by the offline test before it could happen live.
 - **4-shard and 6-shard live tests both PASS, self-reported via Run Report Policy (2026-07-03/04)**: 4-shard run (`--workers 6` each — 24 total concurrent connections): 1,000 targets (250/shard) in ~2,149s combined wall-clock = **~2.15s/target** — a dramatic jump from the pre-lock-fix 17.1s/target baseline, confirming 0.2.19 unlocked real intra-shard concurrency, not just inter-shard. The very next 6-shard run (`--workers 6` each — 36 total concurrent connections): 1,500 targets (250/shard, 1 row failure) in ~3,161s = **~2.11s/target** — essentially flat versus the 4-shard run. Per the Measure-then-scale cadence, this flat result is the stop signal: **24-36 total concurrent connections (4-6 shards × 6 workers each) is the practical ceiling for this workload**; this is the human's real standing cadence, not a conservative default — do not recommend fewer shards/workers than this without new evidence it's necessary. Cumulative done, computed from these reports plus the 877-before-2-shard baseline: 877 + 500 + 1,000 + 1,500 = **3,877/6,515 (59.5%)**.
 - **DR24 TCE expansion manifest fully processed in one pass, self-reported (2026-07-04)**: the human ran 6 shards × 6 workers (36 total connections) against the new 4,760-target expansion manifest and it completed entirely in a single invocation (no repeat runs needed): 4,760/4,760 targets processed (100%), 8,207 snippets written, 6 rows failed (99.93% row success). Combined wall-clock ~5,768s (96 min, bounded by the slowest shard) = **~1.21s/target** — faster than the corrected 6-shard KOI rate above, consistent with the 6×6 cadence being solid on this workload rather than something to second-guess.
-- **Master-corpus Kepler CNN checkpoint is the new best, PASSED production gates (2026-07-04)**: the new DR24 snippets were merged with the existing corpus (7,442 + 8,207 = 15,649 rows, cross-checked exactly) and CNN splits rebuilt (`data/t1_1_kepler_master_cnn_splits/`, validator PASS, train/val/test = 10,800/2,393/2,456, ~21.8% positive overall — noticeably more class-imbalanced than the original ~37%). `checkpoints/cnn_t1_1_kepler_master/best.pt` trained from scratch on this larger corpus and **strictly superseded `checkpoints/cnn_t1_1_kepler/` on every metric** despite the harder class balance: raw test AUC 0.9572 (vs 0.9252), calibrated F1 0.8347 (vs 0.8281), Brier 0.0580 (vs 0.1052, nearly halved), ECE 0.0142 (vs 0.0441, nearly a third), temperature T=1.0. `Flag: PASS`. Promotion to `models/` requires explicit human approval, not yet granted.
+- **Master-corpus Kepler CNN checkpoint is promoted as `benchmark_cnn_v1` (2026-07-09)**: the new DR24 snippets were merged with the existing corpus (7,442 + 8,207 = 15,649 rows, cross-checked exactly) and CNN splits rebuilt (`data/t1_1_kepler_master_cnn_splits/`, validator PASS, train/val/test = 10,800/2,393/2,456, ~21.8% positive overall — noticeably more class-imbalanced than the original ~37%). `checkpoints/cnn_t1_1_kepler_master/best.pt` trained from scratch on this larger corpus and **strictly superseded `checkpoints/cnn_t1_1_kepler/` on every metric** despite the harder class balance: raw test AUC 0.9572 (vs 0.9252), calibrated F1 0.8347 (vs 0.8281), Brier 0.0580 (vs 0.1052, nearly halved), ECE 0.0142 (vs 0.0441, nearly a third), temperature T=1.0. `Flag: PASS`. Human approved promotion on 2026-07-09; selected artifacts are under `models/cnn/benchmark_cnn_v1/` and registered in `models/registry.json`.
 - **Kepler/TESS label-source completeness investigation (2026-07-05)**: the human directly challenged whether all labeled Kepler/TESS data had been found, then dropped `docs/seti_labeled_hit_data_research.md` — a research note whose "Comprehensive Protocol" section is a reusable TAP-schema-based discovery + VizieR/literature-audit methodology, now wired into `CLAUDE.md`'s new Label-Source Discovery Protocol as a standing directive (the note's SETI/Breakthrough Listen section is a separate calibration track with its own "no usable per-hit labeled table found" conclusion, unrelated to T1-1). Running the protocol's broader table-discovery query (not just `%tce%`) surfaced the full `_KOI` table family and `k2pandc`, but confirmed no additional new usable Kepler data exists beyond what is already in use — DR25's ~6,382 kepids not in DR24 mostly have no usable label anywhere, and the 535 that do were already captured by the KOI-based manifest independent of any TCE table. For TESS, three real leads were found but remain open/unresolved: the TEV TCE catalog's data API was not located (JS SPA), Planet Hunters TESS/NotPlaNET (`github.com/vtardugno/TESS-CNN`) has real human-vetted labels confirmed not publicly downloadable (contact-only), and the very recent T16 Planet Hunt paper (arXiv:2604.18579, ~11,554 candidates) has an unverified data-availability statement (arXiv/IOPscience blocked automated fetches). No new usable data resulted from this investigation itself.
 - **Cross-mission CNN scoring guard added (version 0.2.27, 2026-07-05)**: before promoting `checkpoints/cnn_t1_1_kepler_master/`, the human asked for the code to be hardened against misuse first — a live grep confirmed zero mission-aware gating existed anywhere in the CNN scoring path. `CnnTrainingConfig` gains an optional `training_mission` field (backward compatible with pre-existing `config.json` files, which load it as `None`); `train_cnn.py --mission TESS|Kepler|K2|JWST` stamps it; `CnnScorer.training_mission` exposes it (read from the checkpoint's sibling config, with an explicit override for retrofitting legacy checkpoints). `run_pipeline()`/`exo scan` now refuse by default to apply a CNN checkpoint to a mission it wasn't declared trained on — including checkpoints with an undeclared/`None` mission — raising a clear error; `allow_cross_mission_cnn=True` / `--allow-cross-mission-cnn` is the explicit override for deliberate out-of-domain testing. 18 new tests; full 2,544-test suite re-run clean with zero regressions.
 - **Manifest-progress percent-complete added (version 0.2.22)**: user asked to see completion percent on every run without a separate `--status-only` call. The startup banner, final "Done in Xs" line, `format_batch_summary()`, and `--status-only` (when the manifest is available) now print `n_done/n_total (XX.X%)` against the full 6,515-target manifest, computed via a fresh SQLite query at completion so it reflects other concurrently-running shards too. 8 new tests.
@@ -304,8 +309,9 @@ These are enforced in code and must never be bypassed:
 | Leakage-safe training manifest and cleanup path | **Complete** — `metadata/t1_1_kepler_training_manifest.jsonl` and `metadata/t1_1_kepler_manifest_summary.json` are committed with 0 leakage errors | Agent |
 | Bounded Kepler-first processing batch | **Complete, not yet run live** — `Skills/process_t1_kepler_batch.py` is built and unit-tested (27 offline tests); needs one bounded live run (`--max-targets 25`) on the operator's Mac to verify against real Kepler data before scaling up | Agent built it; **Human** runs the first live batch |
 | CNN production training run | Build/train/evaluate only after the source contract, manifests, and local artifact ledger are updated; use the local M4 Max GPU path by default | Agent + human approval for long local runs |
-| CNN production promotion | Validate, calibrate, register, and commit only a future checkpoint that passes held-out gates | Agent + human approval |
-| Stacking weight calibration | Tune blend weights on held-out calibration set | Agent after T1-1 resolved |
+| CNN promotion readiness package | **Complete** — temperature-calibration promotion tooling, model card, reproducibility manifest, data-role registry, benchmark designation, storage/retention ledger updates, and exact selected artifact scope are GitHub-visible | Agent |
+| CNN production promotion | **Complete in promotion PR** — human approved checkpoint SHA `f29e6891c255289fa1e2eddad1fb6ca131c063cf11c24b8113e0e29d049441c5`; selected artifacts are copied to `models/cnn/benchmark_cnn_v1/` and registered in `models/registry.json` | Agent + human approval |
+| Stacking weight calibration | Tune blend weights on held-out calibration set | Agent after promotion PR merges cleanly |
 
 ---
 
@@ -313,7 +319,7 @@ These are enforced in code and must never be bypassed:
 
 Any plan proposed in a session must:
 
-1. Name the highest-priority unresolved Tier 1 gap (currently **T1-1: Production Tier 2 CNN Checkpoint**)
+1. Name the highest-priority unresolved Tier 1 gap (currently **T1-2: stacking calibration after `benchmark_cnn_v1` promotion**)
 2. Show how each proposed step closes or directly unblocks that gap — or explicitly justify why it is Tier 2 work
 3. Include outside blockers as explicit named steps with responsible party
 4. Never propose log modules, schemas, or scaffolding unless they directly unblock a named gap

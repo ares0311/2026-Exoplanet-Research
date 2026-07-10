@@ -2,7 +2,7 @@
 
 ## Status: Active Development
 ## Phase: Dataset/Model Training Reset — production checkpoint path
-## Last Updated: 2026-07-02
+## Last Updated: 2026-07-08
 
 ---
 
@@ -98,20 +98,19 @@ without relying on chat context or local terminal output.
 - The project reset on 2026-07-01 wholly adopts
   `docs/exoplanet_exomoon_dataset_handoff.md` as the active path to a trained
   model.
-- The next production work is source-contract-first data/ML hardening:
-  provider schema verification, immutable source snapshots, training
-  manifests, leakage-safe splits, bounded storage, and a checkpoint that passes
-  the documented held-out gates.
-- Source verification, storage estimates, source snapshots, and the
-  leakage-safe Kepler manifest are now complete. `metadata/t1_1_kepler_training_manifest.jsonl`
-  has 7,454 KOI rows across 6,515 KIC target groups with no cross-split target
-  leakage. The first bounded Kepler processing batch live-smoked successfully
-  on the user's Mac: 25 targets, 26 snippets written, 0 failed rows, SQLite
-  summary `done|25|26|0`, raw scratch directory `0B` after cleanup. Next work
-  is continuing the resumable bounded processing pass, then building validated
-  splits for training after enough real snippets accumulate.
-- Do not repeat old C1-C19/C20-style retraining without first satisfying the
-  handoff brief requirements.
+- Source-contract-first data/ML hardening is complete enough to produce a
+  passing checkpoint: provider schemas were verified, source snapshots and
+  manifests were committed, leakage-safe splits were enforced, storage remained
+  bounded, and the master Kepler corpus trained successfully.
+- `checkpoints/cnn_t1_1_kepler_master/best.pt` is promoted as
+  `benchmark_cnn_v1` under `models/cnn/benchmark_cnn_v1/` after explicit human
+  approval on 2026-07-09. It passed held-out gates with raw test AUC 0.9572,
+  calibrated F1 0.8347, Brier 0.0580, ECE 0.0142, and temperature T=1.0.
+- The active blocker is no longer data acquisition, another training loop, or
+  checkpoint promotion. The next production gap is T1-2 stacking calibration
+  after the promotion PR is merged and CI-clean.
+- Do not repeat old C1-C19/C20-style retraining or Kepler batch processing
+  unless a named promotion validation gate fails.
 - Do not use synthetic examples as supervised training positives in this phase;
   synthetics remain CI/background fixtures only.
 - Any local long-running command must be resumable, print progress/ETA, use
@@ -211,17 +210,26 @@ evidence without explicit human approval, and do not use it to block T1-1.
 
 ## Next Actions
 
-1. Design or verify the leakage-safe training manifest and cleanup path from `docs/exoplanet_exomoon_dataset_handoff.md` now that source access and storage/source snapshot planning have passed.
-   - The TAP schema examples must use `UPPER(table_name) = UPPER('<table>')`;
-     the live NASA Exoplanet Archive stores at least `CUMULATIVE` in upper
-     case inside `TAP_SCHEMA.columns.table_name`.
-2. Update source snapshots/manifests and the local artifact ledger so GitHub-only agents can see expected paths, hashes, counts, and next commands.
-3. Build or adjust leakage-safe training manifests/splits by target/system before any model run.
-4. Ask the human to run only commands whose schemas, URLs, worker counts, resume behavior, output, and Mac/MPS compliance were verified.
-5. Promote nothing unless a future evaluator run reports `Flag: PASS`, raw test
-   AUC is at least 0.85, calibrated test F1 is at least 0.80, calibrated
-   Brier/ECE are no worse than raw, and the human explicitly approves
-   promotion.
+1. Promotion tooling compatibility is complete: `Skills/promote_cnn_checkpoint.py`
+   verifies the current `method: temperature` calibration JSON produced by
+   `Skills/evaluate_cnn_checkpoint.py`, preserves legacy Platt support, accepts
+   explicit `--model-id`, and prints the required intentional `git add -f`
+   checkpoint staging step.
+2. The evidence package is on GitHub:
+   `models/benchmark_cnn_v1/MODEL_CARD.md`,
+   `models/benchmark_cnn_v1/REPRODUCIBILITY_MANIFEST.json`, and
+   `data_selection/data_role_registry.yaml` record the selected artifact scope,
+   exact SHA-256 hashes, data roles, limitations, and `git add -f` requirement.
+3. Human promotion approval was granted on 2026-07-09 for checkpoint SHA
+   `f29e6891c255289fa1e2eddad1fb6ca131c063cf11c24b8113e0e29d049441c5` as
+   `benchmark_cnn_v1`.
+4. Selected checkpoint/calibration/config/metrics/manifest artifacts are copied
+   into `models/cnn/benchmark_cnn_v1/`, and `models/registry.json` registers
+   `benchmark_cnn_v1`.
+5. After this promotion PR merges and post-merge CI is clean, start T1-2
+   stacking calibration on a held-out
+   calibration set; do not tune full-ensemble weights before the CNN artifact
+   exists.
 
 Remote sync note: local `main` is synced with `origin/main` as of the latest
 handoff.

@@ -15,6 +15,9 @@ Every session must begin by reading:
 3. `docs/DISCOVERY_RUNBOOK.md`
 4. `docs/exoplanet_exomoon_dataset_handoff.md`
 5. `docs/exoplanet_detection_research_brief.md` (skim the satellite table and AI methods section)
+6. `docs/astrometrics_coding_agents_master_guide.md`
+7. `docs/astrometrics_data_selection_policy.md`
+8. `docs/astrometrics_external_and_cloud_storage_policy.md`
 
 Before proposing or executing any task you must:
 1. Name the highest-priority unresolved Tier 1 gap from `docs/PRODUCTION_READINESS.md`.
@@ -248,6 +251,27 @@ work, and keep live external-service jobs polite and lower-concurrency. Never
 hardcode Apple-only assumptions into scientific scoring, classification, or
 pathway logic; expose system-specific behavior through config or CLI flags.
 
+### Astrometrics Data And Storage Policy — MANDATORY
+
+The three Astrometrics policy docs in `docs/` are production directives:
+
+- `docs/astrometrics_coding_agents_master_guide.md`
+- `docs/astrometrics_data_selection_policy.md`
+- `docs/astrometrics_external_and_cloud_storage_policy.md`
+
+Before changing datasets, training sets, live-search targets, model promotion
+artifacts, storage layout, cloud/external-drive behavior, or large-download
+recipes, apply these policies. Data roles must stay separated
+(`training`, `validation`, `calibration`, `frozen_eval`, `live_search`,
+`followup_live_search`); data-selection decisions must be recorded in
+`data_selection/data_selection_decision_log.md`; public raw archives should be
+bounded re-downloadable cache unless pinned by policy; manifests, ledgers,
+configs, reports, model cards, calibration/eval artifacts, and candidate
+evidence are the durable truth. The 4TB external SSD is the normal large local
+workspace when available, while Dropbox-style sync must not be treated as the
+authoritative dataset layer for raw archives, batch caches, model artifacts, or
+candidate evidence ledgers.
+
 ### Git-Add-Safe Artifact Policy — MANDATORY
 
 The standard operator cadence is `git add .`. The repository must make that
@@ -268,9 +292,13 @@ approval state, and exact next commands. Do not leave artifact truth only in
 chat context, terminal output, or local files.
 
 A production-approved CNN checkpoint is the only CNN artifact class that may be
-promoted from ignored local state into `models/`, and only after evaluator PASS
-plus explicit human approval. Because CNN model paths are ignored defensively,
-promotion may require a documented `git add -f`.
+promoted from ignored local state into `models/`, and only after evaluator PASS,
+a committed promotion readiness package, and explicit human approval. The
+readiness package must include temperature-calibration-aware promotion tooling,
+a model card, reproducibility manifest, data-role registry, storage/retention
+ledger updates, exact selected artifact scope, and frozen benchmark designation.
+Because CNN model paths are ignored defensively, promotion may require a
+documented `git add -f`.
 
 ---
 
@@ -601,8 +629,8 @@ New `RawDiagnostics` fields: `oot_scatter_sigma`, `sector_depths`, `sector_depth
 
 ## CLI Version Flag and Meta Output (Milestone 12f)
 
-- `exo --version` / `exo -V` — prints the installed `exo-toolkit` package version (currently `0.2.13`)
-- fallback version `0.2.13` in `src/exo_toolkit/__init__.py` is used only if source-tree and installed package metadata are unavailable
+- `exo --version` / `exo -V` — prints the installed `exo-toolkit` package version (currently `0.2.27`)
+- fallback version `0.2.27` in `src/exo_toolkit/__init__.py` is used only if source-tree and installed package metadata are unavailable
 - Each output row gains a `"features"` dict, a raw `"diagnostics"` dict, a `"fetch_provenance"` dict, plus a `"meta"` dict: `toolkit_version`, `run_at`, `scorer`, `git_commit`, `features_available`, `features_missing`
 - `_git_commit_short()` reads `git rev-parse --short HEAD`; returns `None` on failure
 
@@ -1389,10 +1417,14 @@ rows, SQLite summary `done|25|26|0`, raw scratch directory `0B` after cleanup.
 
 **Live scanner fix (PR #143, 2026-06-28):** **MERGED** — live one-target smoke on `main` verified that ExoFOP SSL loading, Python 3.14 helper imports, bounded TIC target selection, and no-light-curve `no_data` classification work. Do not re-debug the pre-PR #143 pasted failures.
 
-**Immediate next actions (in priority order):**
-1. **[AGENT]** Keep the GitHub-visible artifact ledger current after each ignored local processing run; verify `git add --dry-run .` remains empty for generated payloads.
-2. **[HUMAN]** After the ledger PR is merged, run the next bounded continuation from `main`: `git pull origin main` then `caffeinate -i .venv/bin/python Skills/process_t1_kepler_batch.py --max-targets 250` (use 100 if a smaller step is preferred).
-3. **[AGENT]** Review the pasted summary and SQLite counts. If failure rate stays low and raw scratch remains empty, continue scaling bounded Kepler processing until the manifest is complete.
+**Immediate next actions (binding roadmap after T1-1 promotion):**
+1. **[AGENT COMPLETE]** Promotion tooling now accepts `method: temperature` calibration JSON from `Skills/evaluate_cnn_checkpoint.py`, preserves legacy Platt support, and prints the required intentional `git add -f` checkpoint staging step.
+2. **[AGENT COMPLETE]** Evidence package for `checkpoints/cnn_t1_1_kepler_master/best.pt` is committed: `models/benchmark_cnn_v1/MODEL_CARD.md`, `models/benchmark_cnn_v1/REPRODUCIBILITY_MANIFEST.json`, and `data_selection/data_role_registry.yaml` record exact checkpoint/calibration hashes, source/split/config links, local-artifact scope, limitations, and `git add -f` scope.
+3. **[AGENT COMPLETE]** Data-role and retention records now make training, validation, calibration, frozen-eval, storage, and re-download policy visible to GitHub-only agents.
+4. **[AGENT COMPLETE]** The architecture/data/preprocessing bundle is designated as the frozen `benchmark_cnn_v1` measuring stick; after promotion, do not casually tune this checkpoint family.
+5. **[HUMAN COMPLETE]** Human approved promotion of checkpoint SHA `f29e6891c255289fa1e2eddad1fb6ca131c063cf11c24b8113e0e29d049441c5` as `benchmark_cnn_v1` on 2026-07-09.
+6. **[AGENT COMPLETE]** Selected checkpoint/calibration/config/metrics/manifest artifacts are copied into `models/cnn/benchmark_cnn_v1/`, and `models/registry.json` registers `benchmark_cnn_v1`.
+7. **[AGENT NEXT]** After the promotion PR is merged and CI-clean, start T1-2 stacking calibration on a held-out calibration set; do not tune full-ensemble weights against training or frozen-eval data.
 
 #### CNN candidate history (what has been tried — do not repeat)
 
@@ -1431,7 +1463,7 @@ rows, SQLite summary `done|25|26|0`, raw scratch directory `0B` after cleanup.
 
 #### CNN production runbook
 
-Use `docs/CNN_PRODUCTION_RUNBOOK.md` for authoritative copy-paste workflow. **`checkpoints/cnn_t1_1_kepler_master/best.pt` (trained on the merged KOI + DR24 TCE corpus, 15,649 examples) is the current best Kepler CNN checkpoint** — raw test AUC 0.9572, calibrated F1 0.8347, T=1.0, strictly superseding the earlier `cnn_t1_1_kepler` checkpoint on every metric. This is Kepler-approved by the human for `models/` promotion. Note the human's real standing shard/worker cadence for `process_t1_kepler_batch.py` is **6 shards × 6 workers** (36 total concurrent connections) — this project's own earlier changelog entries mislabeled every historical live run as `--workers 4`; corrected throughout `AGENTS.md`/`docs/PRODUCTION_READINESS.md`/`docs/CNN_PRODUCTION_RUNBOOK.md`.
+Use `docs/CNN_PRODUCTION_RUNBOOK.md` for authoritative copy-paste workflow. **Step C is superseded by the master-corpus checkpoint:** `checkpoints/cnn_t1_1_kepler_master/best.pt` passed the production gates with raw test AUC 0.9572, calibrated F1 0.8347, Brier 0.0580, ECE 0.0142, and temperature T=1.0. It strictly beats `checkpoints/cnn_t1_1_kepler/` on every metric and is promoted as `benchmark_cnn_v1` under `models/cnn/benchmark_cnn_v1/` after explicit human approval. Note: the human's real standing shard/worker cadence for `process_t1_kepler_batch.py` is **6 shards × 6 workers** (36 total concurrent connections) — this project's own earlier changelog entries mislabeled historical live runs as `--workers 4`; that has been corrected throughout `AGENTS.md`/`docs/PRODUCTION_READINESS.md`/`docs/CNN_PRODUCTION_RUNBOOK.md`. Do not recommend a lower worker/shard count without new evidence it's necessary.
 
 **Cross-mission CNN scoring guard (added when promoting the Kepler checkpoint):** every trained checkpoint should declare which mission it was trained on via `train_cnn.py --mission TESS|Kepler|K2|JWST`, stamped into the saved `config.json`'s `training_mission` field. `run_pipeline()`/`exo scan` **refuses by default** to apply a CNN checkpoint whose declared (or undeclared) mission doesn't match the scan's `--mission`, since Kepler↔TESS CNN transfer has repeatedly failed this project's production gates even after deliberate fine-tuning (see the C11-C19 history above). The override is `allow_cross_mission_cnn=True` / `--allow-cross-mission-cnn`, intended only for deliberate out-of-domain testing, not routine use. Checkpoints trained before this field existed have `training_mission=None` and are blocked by the same guard unless explicitly patched or the override is passed.
 

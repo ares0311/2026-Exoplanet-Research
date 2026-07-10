@@ -1,0 +1,12 @@
+[
+  {
+    "model_id": "benchmark_cnn_v1",
+    "model_type": "cnn",
+    "model_path": "models/cnn/benchmark_cnn_v1/best.pt",
+    "auc": 0.957211,
+    "brier": 0.05797,
+    "n_train": null,
+    "registered_at": "2026-07-09T17:42:09.185159+00:00",
+    "notes": "Production-promoted CNN. test_auc=0.957211, test_f1_cal=0.834688, temperature calibration (temperature=1.0). SHA-256=f29e6891c255289fa1e2eddad1fb6ca131c063cf11c24b8113e0e29d049441c5"
+  }
+]

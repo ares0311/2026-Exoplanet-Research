@@ -69,10 +69,17 @@
 - [x] Offline CNN split validation (`Skills/cnn_split_validator.py`, 15 tests)
 - [x] Tier 2 scaffolding — CNN scorer wrapper, training loop, checkpoint/calibration helpers, phase-folded snippet wiring, and `cnn/full-ensemble` CLI modes
 - [x] First Tier 2 candidate — trained and evaluated on the deterministic seed-42 split; rejected because held-out AUC was 0.7404 and calibration worsened Brier/ECE
-- [ ] Production Tier 2 checkpoint — rebuild the invalid zero-epoch corpus, create a fresh grouped promotion split, improve generalization without tuning against the sealed holdout, and pass all promotion gates
-  - Architecture spec: `docs/CNN_SPEC.md`
-  - Authoritative blocker and rejected checkpoint hash: `docs/PRODUCTION_READINESS.md`
-  - The rejected checkpoint remains local under ignored `checkpoints/`; no artifact from that run is registered
+- [x] T1-1 source-contract reset — verified public NASA/MAST sources, committed source snapshots, leakage-safe manifests, bounded raw-FITS cache policy, and storage estimates
+- [x] Master Kepler corpus and checkpoint — trained `checkpoints/cnn_t1_1_kepler_master/best.pt` from the combined KOI+DR24 corpus; held-out gates passed with raw test AUC 0.9572, calibrated F1 0.8347, Brier 0.0580, ECE 0.0142, and T=1.0
+- [x] Production Tier 2 promotion readiness — complete the new Astrometrics-policy evidence package before copying any checkpoint into `models/`
+  - [x] Fix promotion tooling to accept the current temperature-scaling calibration JSON, not only legacy Platt fields, and print the required intentional checkpoint `git add -f`
+  - [x] Add a model card for the master checkpoint
+  - [x] Add a reproducibility manifest linking source snapshots, manifests, splits, config, calibration, metrics, SHA-256, runtime, and MPS/Python assumptions
+  - [x] Add `data_selection/data_role_registry.yaml` for training, validation, calibration, and frozen-eval roles
+  - [x] Mark the promoted architecture/data/preprocessing combination as the frozen `benchmark_cnn_v1` measuring stick
+  - Preserve raw FITS as re-downloadable cache only; commit only selected production artifacts after explicit human approval
+- [x] Human-approved CNN artifact promotion — approved on 2026-07-09; `benchmark_cnn_v1` is registered under `models/registry.json` and selected artifacts are promoted under `models/cnn/benchmark_cnn_v1/`
+- [ ] T1-2 stacking calibration — tune full-ensemble weights only after the promoted CNN artifact is merged and CI-clean; do not tune on training or frozen-eval data
 
 ---
 
@@ -202,7 +209,7 @@
 
 ## Future
 
-- [ ] Train, calibrate, and register a production Tier 2 CNN checkpoint once the TESS label threshold is met (5,000+ CP labels)
+- [ ] Calibrate full-ensemble weights only after the CNN checkpoint is promoted and a held-out calibration set is available; do not tune stacking weights on training or frozen-eval data.
 
 ---
 

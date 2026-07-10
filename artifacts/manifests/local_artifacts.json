@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "last_updated": "2026-07-04",
-  "production_gap": "T1-1: Production Tier 2 CNN / trained model checkpoint active under docs/exoplanet_exomoon_dataset_handoff.md; T1-0 run006/run008 evidence historical",
+  "last_updated": "2026-07-09",
+  "production_gap": "T1-1: Production Tier 2 CNN checkpoint under docs/exoplanet_exomoon_dataset_handoff.md is promoted as benchmark_cnn_v1 after explicit human approval; next Tier 1 gap is T1-2 stacking calibration after promotion PR merge/CI; T1-0 run006/run008 evidence historical",
   "policy": {
     "standard_operator_cadence": "git add .",
     "git_add_dot_must_be_safe": true,
@@ -1198,7 +1198,7 @@
     {
       "path": "checkpoints/cnn_t1_1_kepler_master/",
       "kind": "checkpoint_dir",
-      "status": "passed_gates_best_to_date_awaiting_promotion_approval",
+      "status": "promoted_as_benchmark_cnn_v1",
       "git_policy": "ignored",
       "last_known": {
         "checkpoint": "checkpoints/cnn_t1_1_kepler_master/best.pt",
@@ -1227,12 +1227,25 @@
         "calibrated_test_brier": 0.0580,
         "calibrated_test_ece": 0.0142,
         "evaluator_flag": "PASS",
+        "checkpoint_sha256": "f29e6891c255289fa1e2eddad1fb6ca131c063cf11c24b8113e0e29d049441c5",
+        "calibration_sha256": "357bab520edc183ea5917dee7561525a55c5f0f71ca399ad4acbf501ecc96c0d",
+        "config_sha256": "6a7593a7133eb6d02845d259ef6a5420249e8588644cbecd8bf901ba198abd2e",
+        "metrics_sha256": "1056fad21a6155924e5b6613610862b7aeb484c317ef223d1343e634bf21908a",
+        "readiness_package": [
+          "models/benchmark_cnn_v1/MODEL_CARD.md",
+          "models/benchmark_cnn_v1/REPRODUCIBILITY_MANIFEST.json",
+          "data_selection/data_role_registry.yaml"
+        ],
         "comparison_to_prior_checkpoint": "strictly better than checkpoints/cnn_t1_1_kepler/ on every metric (AUC +0.032, F1 +0.007, Brier nearly halved, ECE nearly a third) despite a notably more class-imbalanced training corpus (~22% positive vs ~37%) -- more data outweighed the harder class balance",
-        "notes": "Best Kepler CNN checkpoint in the project's history to date.",
+        "promoted_model_id": "benchmark_cnn_v1",
+        "promoted_path": "models/cnn/benchmark_cnn_v1/best.pt",
+        "promoted_on": "2026-07-09",
+        "human_approved": true,
+        "notes": "Best Kepler CNN checkpoint in the project's history to date; promoted as the frozen benchmark CNN artifact.",
         "verified_on": "2026-07-04"
       },
-      "validation_gate": "Evaluator PASS confirmed; promotion to models/ additionally requires explicit human approval per the Git-Add-Safe Artifact Policy -- not yet granted.",
-      "next_action": "[HUMAN] Confirm whether to approve promotion to models/ now (recommended over the superseded cnn_t1_1_kepler)."
+      "validation_gate": "Evaluator PASS confirmed, evidence package committed, and explicit human approval granted.",
+      "next_action": "Retain local source checkpoint for reproducibility; use promoted models/cnn/benchmark_cnn_v1/ for T1-2 stacking calibration after the promotion PR merges cleanly."
     },
     {
       "path": "metadata/t1_1_kepler_dr24_expansion_manifest.jsonl",
@@ -1375,12 +1388,31 @@
       "next_action": "No action needed; do not manually populate."
     },
     {
-      "path": "models/cnn*/",
+      "path": "models/cnn/benchmark_cnn_v1/",
       "kind": "promotion_target",
-      "status": "no_production_approved_cnn",
-      "git_policy": "ignored_until_explicit_promotion",
+      "status": "promoted_production_benchmark",
+      "git_policy": "force_added_selected_artifacts_after_human_approval",
+      "last_known": {
+        "model_id": "benchmark_cnn_v1",
+        "checkpoint": "models/cnn/benchmark_cnn_v1/best.pt",
+        "checkpoint_sha256": "f29e6891c255289fa1e2eddad1fb6ca131c063cf11c24b8113e0e29d049441c5",
+        "calibration": "models/cnn/benchmark_cnn_v1/calibration.json",
+        "config": "models/cnn/benchmark_cnn_v1/config.json",
+        "metrics": "models/cnn/benchmark_cnn_v1/metrics.json",
+        "promotion_manifest": "models/cnn/benchmark_cnn_v1/promotion_manifest.json",
+        "registry": "models/registry.json",
+        "human_approved_on": "2026-07-09"
+      },
       "validation_gate": "Raw held-out AUC >= 0.85, calibrated F1 >= 0.80, and calibration must not worsen Brier/ECE.",
-      "next_action": "Force-add only after evaluator PASS and explicit human approval."
+      "next_action": "Treat as frozen benchmark; do not overwrite casually. Future CNN families must compare against this artifact."
+    },
+    {
+      "path": "models/cnn*/",
+      "kind": "promotion_target_guardrail",
+      "status": "ignored_except_approved_promotions",
+      "git_policy": "ignored_by_default",
+      "validation_gate": "Raw held-out AUC >= 0.85, calibrated F1 >= 0.80, calibration must not worsen Brier/ECE, evidence package must be committed, and explicit human approval is required.",
+      "next_action": "Force-add future checkpoint artifacts only after evaluator PASS, evidence package, and explicit human approval."
     },
     {
       "path": "logs/*.sqlite*",
