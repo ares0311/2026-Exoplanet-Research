@@ -49,6 +49,10 @@ class TestCnnScorerUnavailable:
         s = CnnScorer.unavailable()
         assert s.checkpoint_path is None
 
+    def test_training_mission_none(self) -> None:
+        s = CnnScorer.unavailable()
+        assert s.training_mission is None
+
 
 # ---------------------------------------------------------------------------
 # CnnScorer with model_fn (no PyTorch required)
@@ -91,6 +95,14 @@ class TestCnnScorerWithModelFn:
     def test_result_is_float(self) -> None:
         s = CnnScorer(model_fn=_dummy_model_fn)
         assert isinstance(s.predict_proba(_snippet()), float)
+
+    def test_model_fn_scorer_training_mission_none_by_default(self) -> None:
+        s = CnnScorer(model_fn=_dummy_model_fn)
+        assert s.training_mission is None
+
+    def test_model_fn_scorer_training_mission_explicit_override(self) -> None:
+        s = CnnScorer(model_fn=_dummy_model_fn, training_mission="TESS")
+        assert s.training_mission == "TESS"
 
 
 # ---------------------------------------------------------------------------
@@ -148,6 +160,79 @@ class TestCnnScorerFromCheckpoint:
 
         assert scorer.is_available
         assert scorer._model is loaded_model
+
+    def test_training_mission_loaded_from_checkpoint_config(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        from types import SimpleNamespace
+
+        import exo_toolkit.ml.cnn_scorer as cnn_scorer_module
+
+        checkpoint = tmp_path / "best.pt"
+        checkpoint.write_bytes(b"state-dict")
+        batcher = SimpleNamespace(
+            _load_torch_model=lambda path: (
+                object(),
+                SimpleNamespace(n_bins=201, training_mission="Kepler"),
+            )
+        )
+        monkeypatch.setattr(
+            cnn_scorer_module,
+            "import_module",
+            lambda name: batcher if name == "Skills.cnn_inference_batcher" else None,
+        )
+
+        scorer = CnnScorer.from_checkpoint(checkpoint)
+
+        assert scorer.training_mission == "Kepler"
+
+    def test_training_mission_none_when_config_lacks_field(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        """A checkpoint trained before training_mission existed must still load."""
+        from types import SimpleNamespace
+
+        import exo_toolkit.ml.cnn_scorer as cnn_scorer_module
+
+        checkpoint = tmp_path / "best.pt"
+        checkpoint.write_bytes(b"state-dict")
+        batcher = SimpleNamespace(
+            _load_torch_model=lambda path: (object(), SimpleNamespace(n_bins=201))
+        )
+        monkeypatch.setattr(
+            cnn_scorer_module,
+            "import_module",
+            lambda name: batcher if name == "Skills.cnn_inference_batcher" else None,
+        )
+
+        scorer = CnnScorer.from_checkpoint(checkpoint)
+
+        assert scorer.training_mission is None
+
+    def test_from_checkpoint_training_mission_override_takes_precedence(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        from types import SimpleNamespace
+
+        import exo_toolkit.ml.cnn_scorer as cnn_scorer_module
+
+        checkpoint = tmp_path / "best.pt"
+        checkpoint.write_bytes(b"state-dict")
+        batcher = SimpleNamespace(
+            _load_torch_model=lambda path: (
+                object(),
+                SimpleNamespace(n_bins=201, training_mission="Kepler"),
+            )
+        )
+        monkeypatch.setattr(
+            cnn_scorer_module,
+            "import_module",
+            lambda name: batcher if name == "Skills.cnn_inference_batcher" else None,
+        )
+
+        scorer = CnnScorer.from_checkpoint(checkpoint, training_mission="TESS")
+
+        assert scorer.training_mission == "TESS"
 
 
 # ---------------------------------------------------------------------------

@@ -703,6 +703,20 @@ def _cli(argv: list[str] | None = None) -> int:
         "--pretrained-checkpoint", type=Path, default=None, metavar="PT",
         help="Load conv weights from this checkpoint before training (transfer learning).",
     )
+    parser.add_argument(
+        "--mission",
+        choices=("TESS", "Kepler", "K2", "JWST"),
+        default=None,
+        help=(
+            "Mission this training corpus is drawn from. Stamped into the saved "
+            "config.json as training_mission so CnnScorer/run_pipeline can refuse "
+            "to apply this checkpoint to a different mission's candidates by "
+            "default (cross-mission CNN transfer has repeatedly failed production "
+            "gates in this project's history). Strongly recommended for every "
+            "training run; omitting it leaves the checkpoint's mission undeclared, "
+            "which the scoring guard also treats as unsafe by default."
+        ),
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -711,7 +725,13 @@ def _cli(argv: list[str] | None = None) -> int:
         from cnn_training_config import default_config, load_config
 
     cfg = load_config(args.config) if args.config else default_config()
-    if args.seed is not None or args.device is not None or args.batch_size is not None:
+    overrides_requested = (
+        args.seed is not None
+        or args.device is not None
+        or args.batch_size is not None
+        or args.mission is not None
+    )
+    if overrides_requested:
         import dataclasses
         overrides = {}
         if args.seed is not None:
@@ -720,6 +740,8 @@ def _cli(argv: list[str] | None = None) -> int:
             overrides["device"] = args.device
         if args.batch_size is not None:
             overrides["batch_size"] = args.batch_size
+        if args.mission is not None:
+            overrides["training_mission"] = args.mission
         cfg = dataclasses.replace(cfg, **overrides)
     result = train_cnn(
         args.split_dir,

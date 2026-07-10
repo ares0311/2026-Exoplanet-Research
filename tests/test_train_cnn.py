@@ -16,6 +16,7 @@ from Skills.train_cnn import (
     CnnTrainingResult,
     EpochRecord,
     _augment_training_batch,
+    _cli,
     _compute_auc,
     _load_split,
     _resolve_torch_device,
@@ -231,6 +232,87 @@ class TestTrainCnn:
         assert completed.returncode == 1
         assert "ModuleNotFoundError" not in completed.stderr
         assert "Flag:" in completed.stdout
+
+    def test_mission_override_accepted_by_cli(self, tmp_path: Path) -> None:
+        script = Path(__file__).parents[1] / "Skills" / "train_cnn.py"
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(script),
+                "--split-dir",
+                str(tmp_path / "missing"),
+                "--checkpoint-dir",
+                str(tmp_path / "checkpoints"),
+                "--mission",
+                "Kepler",
+            ],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert completed.returncode == 1
+        assert "ModuleNotFoundError" not in completed.stderr
+        assert "Flag:" in completed.stdout
+
+    def test_mission_override_rejects_invalid_choice(self, tmp_path: Path) -> None:
+        script = Path(__file__).parents[1] / "Skills" / "train_cnn.py"
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(script),
+                "--split-dir",
+                str(tmp_path / "missing"),
+                "--checkpoint-dir",
+                str(tmp_path / "checkpoints"),
+                "--mission",
+                "Mars",
+            ],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert completed.returncode == 2  # argparse invalid choice
+        assert "invalid choice" in completed.stderr
+
+    def test_mission_override_stamps_config_passed_to_train_cnn(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        """The --mission flag must actually reach the config train_cnn() receives."""
+        captured: dict[str, object] = {}
+
+        def _fake_train_cnn(split_dir, config, *, checkpoint_dir, pretrained_checkpoint=None):
+            captured["config"] = config
+            return CnnTrainingResult(
+                best_epoch=0,
+                best_val_loss=0.0,
+                best_val_auc=0.0,
+                train_history=(),
+                checkpoint_path=str(checkpoint_dir / "best.pt"),
+                config_path=str(checkpoint_dir / "config.json"),
+                n_train=0,
+                n_val=0,
+                n_positive=0,
+                n_negative=0,
+                flag="OK",
+            )
+
+        monkeypatch.setattr("Skills.train_cnn.train_cnn", _fake_train_cnn)
+
+        exit_code = _cli(
+            [
+                "--split-dir",
+                str(tmp_path / "missing"),
+                "--checkpoint-dir",
+                str(tmp_path / "checkpoints"),
+                "--mission",
+                "Kepler",
+            ]
+        )
+
+        assert exit_code == 0
+        assert captured["config"].training_mission == "Kepler"
 
     def test_missing_split_dir_returns_invalid(self) -> None:
         cfg = default_config()
