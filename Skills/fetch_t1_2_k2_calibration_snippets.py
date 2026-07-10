@@ -33,13 +33,39 @@ long-running-process policy):
         --output data/t1_2_k2_calibration_snippets.jsonl \\
         --workers 4
 
+Also supports process-level sharding (``--shard-index``/``--shard-count``),
+mirroring ``process_t1_kepler_batch.py``'s pattern, for running several
+console tabs concurrently against disjoint target sets. Every concurrently
+running tab must share the same ``--shard-count`` (each tab passes its own
+unique ``--shard-index`` from ``0`` to ``shard_count - 1``). Partitioning is
+by ``epic_id % shard_count``, which is disjoint across shards, so no two
+tabs ever touch the same target. Each shard writes to its own auto-suffixed
+output file (and failure log) -- never share one ``--output`` path across
+concurrent processes (concurrent appends to one file are not guaranteed
+atomic); concatenate the shard files afterward.
+
+Example -- 4 terminals, 6 workers each:
+    # Terminal 1
+    caffeinate -dims .venv/bin/python Skills/fetch_t1_2_k2_calibration_snippets.py \\
+        --workers 6 --shard-index 0 --shard-count 4
+    # Terminal 2
+    caffeinate -dims .venv/bin/python Skills/fetch_t1_2_k2_calibration_snippets.py \\
+        --workers 6 --shard-index 1 --shard-count 4
+    # Terminal 3
+    caffeinate -dims .venv/bin/python Skills/fetch_t1_2_k2_calibration_snippets.py \\
+        --workers 6 --shard-index 2 --shard-count 4
+    # Terminal 4
+    caffeinate -dims .venv/bin/python Skills/fetch_t1_2_k2_calibration_snippets.py \\
+        --workers 6 --shard-index 3 --shard-count 4
+
 Public API
 ----------
 K2CalibrationSnippetResult(epic_id, label, flux, period_days, epoch_bjd, n_bins, flag)
 build_k2_calibration_snippet(row, *, n_bins, lc_fetcher) -> K2CalibrationSnippetResult
+shard_output_path(output_path, shard_index, shard_count) -> Path
 build_k2_calibration_snippets(manifest_path, *, output_path, n_bins, workers,
                               max_errors, lc_fetcher, failure_log_path,
-                              retry_failures) -> int
+                              retry_failures, shard_index, shard_count) -> int
 """
 from __future__ import annotations
 
@@ -333,6 +359,26 @@ def _default_failure_log_path(output_path: Path) -> Path:
     return output_path.with_suffix(output_path.suffix + ".failures.jsonl")
 
 
+def shard_output_path(output_path: Path, shard_index: int, shard_count: int) -> Path:
+    """Return *output_path* unchanged for ``shard_count == 1``, else suffixed.
+
+    Concurrent shard processes must never append to the same output file
+    (JSON lines here carry a 201-value flux array, long enough that
+    concurrent appends are not guaranteed atomic), so when sharding is
+    active the filename gets an explicit ``.shardIofN`` marker inserted
+    before the suffix, e.g. ``snippets.jsonl`` -> ``snippets.shard0of4.jsonl``.
+    This mirrors ``process_t1_kepler_batch.py``'s ``shard_output_path`` and
+    is automatic (not left to the operator) so concurrent tabs can never
+    accidentally collide on the same output path.
+    """
+    output_path = Path(output_path)
+    if shard_count <= 1:
+        return output_path
+    return output_path.with_name(
+        f"{output_path.stem}.shard{shard_index}of{shard_count}{output_path.suffix}"
+    )
+
+
 def build_k2_calibration_snippets(
     manifest_path: Path,
     *,
@@ -344,28 +390,45 @@ def build_k2_calibration_snippets(
     failure_log_path: Path | None = None,
     retry_failures: bool = False,
     commit_report: bool = True,
+    shard_index: int = 0,
+    shard_count: int = 1,
 ) -> int:
     """Fetch and fold native K2 snippets for every manifest row, with resume.
 
     Args:
         manifest_path: Path to ``t1_2_k2_calibration_manifest.jsonl``.
-        output_path: Where to append successful snippet JSONL rows.
+        output_path: Where to append successful snippet JSONL rows. When
+            ``shard_count > 1`` this is passed through
+            :func:`shard_output_path` first, so each shard writes its own file.
         n_bins: Phase bins per snippet.
         workers: Bounded thread-pool concurrency (default 1, sequential).
         max_errors: Stop early after this many consecutive non-OK results.
         lc_fetcher: Injectable per-EPIC fetcher (for tests).
         failure_log_path: Where to append terminal-failure records. Defaults
-            to ``<output_path>.failures.jsonl``.
+            to ``<output_path>.failures.jsonl`` (post-sharding).
         retry_failures: If True, re-attempt rows already recorded as
             terminal failures instead of skipping them.
         commit_report: If True, write and commit a run report on completion
             (set False in tests).
+        shard_index: This process's shard index in ``[0, shard_count)``. Every
+            concurrently running process must use the same ``shard_count``
+            with a distinct ``shard_index`` -- partitioning is by
+            ``epic_id % shard_count``, which is disjoint across shards, so no
+            two shards ever touch the same target. Default ``0`` with
+            ``shard_count=1`` (no sharding) reproduces the exact prior
+            single-process behavior.
+        shard_count: Total number of concurrently running shard processes.
+            ``1`` (the default) disables sharding entirely.
 
     Returns:
         Number of snippets successfully written this run.
     """
     manifest_path = Path(manifest_path)
-    output_path = Path(output_path)
+    shard_count = max(1, int(shard_count))
+    shard_index = int(shard_index)
+    if not 0 <= shard_index < shard_count:
+        raise ValueError(f"shard_index must be in [0, {shard_count}), got {shard_index}")
+    output_path = shard_output_path(Path(output_path), shard_index, shard_count)
     failure_path = failure_log_path or _default_failure_log_path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     failure_path.parent.mkdir(parents=True, exist_ok=True)
@@ -375,6 +438,8 @@ def build_k2_calibration_snippets(
         for line in manifest_path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
+    if shard_count > 1:
+        rows = [row for row in rows if int(row["epic_id"]) % shard_count == shard_index]
 
     done_keys = _completed_keys(output_path)
     failed_keys = set() if retry_failures else _terminal_failure_keys(failure_path)
@@ -386,10 +451,12 @@ def build_k2_calibration_snippets(
     started_at = datetime.now(UTC).isoformat()
     start = time.monotonic()
     total = len(pending)
+    shard_note = f", shard={shard_index}/{shard_count}" if shard_count > 1 else ""
     _safe_print(
         f"T1-2 K2 native calibration snippet fetch: {total} pending "
-        f"({len(rows)} total, {len(done_keys)} done, {len(failed_keys)} "
-        f"terminal failures skipped)"
+        f"({len(rows)} in this shard's partition, {len(done_keys)} done, "
+        f"{len(failed_keys)} terminal failures skipped{shard_note})  "
+        f"output={output_path}"
     )
 
     n_written = 0
@@ -461,6 +528,8 @@ def build_k2_calibration_snippets(
             items_written=n_written,
             items_failed=n_failed,
             output_paths=(str(output_path),),
+            shard_index=shard_index,
+            shard_count=shard_count,
             items_done_total=len(done_keys) + n_written,
             items_total=len(rows),
             percent_done=(
@@ -469,7 +538,11 @@ def build_k2_calibration_snippets(
                 else None
             ),
         )
-        report_path = report_path_for("fetch_t1_2_k2_calibration_snippets")
+        report_path = report_path_for(
+            "fetch_t1_2_k2_calibration_snippets",
+            shard_index=shard_index,
+            shard_count=shard_count,
+        )
         run_and_commit_report(report, report_path)
 
     return n_written
@@ -499,6 +572,28 @@ def _cli(argv: list[str] | None = None) -> int:
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--max-errors", type=int, default=25)
     parser.add_argument("--retry-failures", action="store_true")
+    parser.add_argument(
+        "--shard-index",
+        type=int,
+        default=0,
+        help=(
+            "This process's shard index in [0, --shard-count), for running many "
+            "console tabs concurrently against disjoint target sets. All "
+            "concurrently running tabs must share --shard-count, each with its "
+            "own unique --shard-index (default: 0)."
+        ),
+    )
+    parser.add_argument(
+        "--shard-count",
+        type=int,
+        default=1,
+        help=(
+            "Total number of concurrently running shard processes. 1 (default) "
+            "disables sharding. Partitioning is epic_id %% shard_count, so "
+            "shards never touch the same target; each shard's output file is "
+            "auto-suffixed (see shard_output_path)."
+        ),
+    )
     args = parser.parse_args(argv)
 
     build_k2_calibration_snippets(
@@ -508,6 +603,8 @@ def _cli(argv: list[str] | None = None) -> int:
         workers=args.workers,
         max_errors=args.max_errors,
         retry_failures=args.retry_failures,
+        shard_index=args.shard_index,
+        shard_count=args.shard_count,
     )
     return 0
 
