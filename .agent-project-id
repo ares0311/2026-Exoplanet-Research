@@ -1,0 +1,4 @@
+PROJECT_ID=2026 Exoplanet Research
+EXPECTED_REPO_BASENAME=2026 Exoplanet Research
+AGENT_ROLE=Exoplanet agent
+DO_NOT_OPERATE_IF_REPO_DIFFERS=true
