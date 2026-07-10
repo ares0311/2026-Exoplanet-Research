@@ -696,7 +696,7 @@
     {
       "path": "data/tess_k2_overlap_snippets.jsonl",
       "kind": "source_corpus_expansion",
-      "status": "complete",
+      "status": "invalid_needs_refetch",
       "git_policy": "ignored",
       "last_known": {
         "strategy": "K2 EPIC KOI confirmed planets/FPs with TESS re-observations folded at K2 ephemerides",
@@ -708,10 +708,30 @@
         "total_elapsed_seconds": 2531,
         "completed_at": "2026-06-27",
         "fetch_script": "Skills/fetch_tess_k2_overlap_snippets.py",
-        "failures_sidecar": "data/tess_k2_overlap_snippets.jsonl.failures.jsonl"
+        "failures_sidecar": "data/tess_k2_overlap_snippets.jsonl.failures.jsonl",
+        "invalidated_at": "2026-07-10",
+        "bug": "fetch_tess_k2_overlap_snippets.py assumed k2pandc's pl_tranmid was BKJD and added the 2454833-day offset a second time; pl_tranmid is already full BJD (confirmed live 2026-07-10), so every snippet's phase-fold epoch was corrupted. Fixed same day; no promoted model trained on this data."
       },
-      "validation_gate": "Corpus present; use only through a dataset-brief-driven manifest/split plan with leakage checks.",
-      "next_action": "Retain as a possible model-training input; do NOT build old C20 unchanged."
+      "validation_gate": "INVALID as written. Re-fetch with the fixed script before any use.",
+      "next_action": "Re-run Skills/fetch_tess_k2_overlap_snippets.py (bug fixed 2026-07-10) before considering this corpus for any future model-training input."
+    },
+    {
+      "path": "data/t1_2_k2_calibration_snippets.jsonl",
+      "kind": "held_out_calibration_corpus",
+      "status": "pending_live_fetch",
+      "git_policy": "ignored",
+      "last_known": {
+        "strategy": "Native K2 (mission=K2, not TESS) light curves for the T1-2 held-out stacking-calibration manifest, folded at k2pandc period/epoch",
+        "data_source": "NASA Exoplanet Archive K2 planet catalog (k2pandc) via TAP; MAST via lightkurve fetch_lightcurve(mission='K2')",
+        "manifest_path": "metadata/t1_2_k2_calibration_manifest.jsonl",
+        "manifest_rows": 596,
+        "fetch_script": "Skills/fetch_t1_2_k2_calibration_snippets.py",
+        "failures_sidecar": "data/t1_2_k2_calibration_snippets.jsonl.failures.jsonl",
+        "built_at": "2026-07-10",
+        "offline_tests_passing": 8
+      },
+      "validation_gate": "Fetcher built and offline-tested; not yet run live.",
+      "next_action": "[HUMAN] Run: caffeinate -dims .venv/bin/python Skills/fetch_t1_2_k2_calibration_snippets.py --manifest metadata/t1_2_k2_calibration_manifest.jsonl --output data/t1_2_k2_calibration_snippets.jsonl --workers 4"
     },
     {
       "path": "data/tess_c20_combined_snippets.jsonl",

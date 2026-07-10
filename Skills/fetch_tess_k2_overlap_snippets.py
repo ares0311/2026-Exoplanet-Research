@@ -6,9 +6,12 @@ the TESS training corpus when Kepler and TESS-only corpora are insufficient to
 push CNN AUC past the 0.85 production gate.
 
 The K2 planet catalog (k2pandc) ephemerides (period and epoch) are used to
-phase-fold the TESS light curves.  K2 epochs are in BKJD (BJD − 2454833.0),
-the same convention as Kepler.  TESS light curve timestamps (BTJD = BJD − 2457000)
-are converted to full BJD before folding.
+phase-fold the TESS light curves.  ``pl_tranmid`` is already full BJD_TDB --
+verified live via ``tap_schema.columns`` plus the raw value's magnitude
+(~2457000+, matching the K2 mission era), unlike Kepler's ``koi_time0bk``,
+which genuinely is BKJD (BJD - 2454833). Do not add a BKJD offset to this
+column.  TESS light curve timestamps (BTJD = BJD - 2457000) are converted to
+full BJD before folding.
 
 Output format matches ``data/tess_snippets_v2.jsonl``::
 
@@ -41,7 +44,7 @@ After download, merge with the existing TESS corpus and rebuild splits:
 
 Public API
 ----------
-K2Row(epic_id, disposition, period_days, epoch_bkjd)
+K2Row(epic_id, disposition, period_days, epoch_bjd)
 K2SnippetResult(epic_id, label, flux, period_days, epoch_bjd, n_bins, flag)
 fetch_k2_table(url) -> list[K2Row]
 build_k2_tess_snippet(row, *, n_bins, lc_fetcher) -> K2SnippetResult
@@ -72,7 +75,6 @@ from urllib.request import urlopen
 # Prevent indefinite hangs when WiFi drops mid-download.
 socket.setdefaulttimeout(120)
 
-_K2_BJD_OFFSET = 2454833.0   # K2 epoch (BKJD) = BJD − 2454833
 _TESS_BJD_OFFSET = 2457000.0  # TESS BTJD = BJD − 2457000
 
 _K2_TAP_BASE = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
@@ -122,7 +124,7 @@ class K2Row:
     epic_id: int
     disposition: str    # "CONFIRMED" or "FALSE POSITIVE"
     period_days: float
-    epoch_bkjd: float   # BJD − 2454833
+    epoch_bjd: float    # Already full BJD_TDB; do not add a BKJD offset
 
 
 @dataclass(frozen=True)
@@ -297,12 +299,12 @@ def fetch_k2_table(url: str | None = None) -> list[K2Row]:
             epic_id = int(float(raw_epic))
             disposition = str(rec[col["disposition"]]).strip().upper()
             period = float(rec[col["period"]])
-            epoch_bkjd = float(rec[col["epoch"]])
+            epoch_bjd = float(rec[col["epoch"]])
         except (KeyError, TypeError, ValueError):
             continue
         if not math.isfinite(period) or period <= 0:
             continue
-        if not math.isfinite(epoch_bkjd):
+        if not math.isfinite(epoch_bjd):
             continue
         if disposition not in {"CONFIRMED", "FALSE POSITIVE"}:
             continue
@@ -310,7 +312,7 @@ def fetch_k2_table(url: str | None = None) -> list[K2Row]:
             epic_id=epic_id,
             disposition=disposition,
             period_days=period,
-            epoch_bkjd=epoch_bkjd,
+            epoch_bjd=epoch_bjd,
         ))
     return rows
 
@@ -384,7 +386,7 @@ def build_k2_tess_snippet(
     """Build a single phase-folded TESS snippet for a K2 planet using its K2 ephemeris.
 
     Args:
-        row: K2 record with period and epoch in BKJD.
+        row: K2 record with period (days) and epoch (already full BJD_TDB).
         n_bins: Number of phase bins for the output snippet.
         lc_fetcher: Injectable fetcher returning (time_bjd, flux) or None.
 
@@ -392,7 +394,7 @@ def build_k2_tess_snippet(
         :class:`K2SnippetResult` with flag "OK" on success.
     """
     label = 1 if row.disposition == "CONFIRMED" else 0
-    epoch_bjd = row.epoch_bkjd + _K2_BJD_OFFSET
+    epoch_bjd = row.epoch_bjd
 
     fetcher = lc_fetcher or _default_lc_fetcher
     try:
@@ -412,7 +414,7 @@ def build_k2_tess_snippet(
 
 def _missing_light_curve_result(row: K2Row, *, n_bins: int) -> K2SnippetResult:
     label = 1 if row.disposition == "CONFIRMED" else 0
-    epoch_bjd = row.epoch_bkjd + _K2_BJD_OFFSET
+    epoch_bjd = row.epoch_bjd
     try:
         import lightkurve  # noqa: F401
     except ImportError:
@@ -435,7 +437,7 @@ def _build_k2_tess_snippet_from_raw(
     n_bins: int,
 ) -> K2SnippetResult:
     label = 1 if row.disposition == "CONFIRMED" else 0
-    epoch_bjd = row.epoch_bkjd + _K2_BJD_OFFSET
+    epoch_bjd = row.epoch_bjd
 
     time_bjd, flux = raw
     finite_pairs = [
@@ -476,7 +478,7 @@ def _process_epic_group(
 ) -> list[K2SnippetResult]:
     """Fetch one TESS light curve for an EPIC star and fold each K2 planet locally."""
     first = group_rows[0]
-    first_epoch_bjd = first.epoch_bkjd + _K2_BJD_OFFSET
+    first_epoch_bjd = first.epoch_bjd
     fetcher = lc_fetcher or _default_lc_fetcher
     try:
         raw = fetcher(first.epic_id, first.period_days, first_epoch_bjd)
@@ -487,7 +489,7 @@ def _process_epic_group(
                 label=1 if row.disposition == "CONFIRMED" else 0,
                 flux=(),
                 period_days=row.period_days,
-                epoch_bjd=row.epoch_bkjd + _K2_BJD_OFFSET,
+                epoch_bjd=row.epoch_bjd,
                 n_bins=n_bins,
                 flag=f"ERROR:{exc}",
             )
@@ -716,7 +718,7 @@ def build_k2_tess_snippets(
                         label=1 if row.disposition == "CONFIRMED" else 0,
                         flux=(),
                         period_days=row.period_days,
-                        epoch_bjd=row.epoch_bkjd + _K2_BJD_OFFSET,
+                        epoch_bjd=row.epoch_bjd,
                         n_bins=n_bins,
                         flag=f"ERROR:{exc}",
                     )
