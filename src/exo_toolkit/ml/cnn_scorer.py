@@ -16,6 +16,7 @@ Public API
     .from_checkpoint(path, *, calibration_path) (classmethod)
     .is_available → bool
     .checkpoint_path → Path | None
+    .training_mission → str | None
 """
 from __future__ import annotations
 
@@ -46,6 +47,7 @@ class CnnScorer:
         *,
         calibration_path: Path | None = None,
         model_fn: Callable[[list[float]], float] | None = None,
+        training_mission: str | None = None,
     ) -> None:
         self._checkpoint_path = checkpoint_path
         self._calibration_path = calibration_path
@@ -53,6 +55,7 @@ class CnnScorer:
         self._model: Any = None
         self._calibration: Any = None
         self._available: bool = False
+        self._training_mission: str | None = training_mission
         self._load()
 
     def _load(self) -> None:
@@ -78,7 +81,9 @@ class CnnScorer:
             return
         try:
             batcher = import_module("Skills.cnn_inference_batcher")
-            self._model, _config = batcher._load_torch_model(self._checkpoint_path)
+            self._model, config = batcher._load_torch_model(self._checkpoint_path)
+            if self._training_mission is None:
+                self._training_mission = getattr(config, "training_mission", None)
         except Exception:  # noqa: BLE001
             self._model = None
             self._available = False
@@ -105,6 +110,18 @@ class CnnScorer:
     def checkpoint_path(self) -> Path | None:
         """Path to the loaded checkpoint file."""
         return self._checkpoint_path
+
+    @property
+    def training_mission(self) -> str | None:
+        """Mission this checkpoint was trained on (``"TESS"``/``"Kepler"``/``"K2"``/
+        ``"JWST"``), or ``None`` if undeclared (e.g. a checkpoint trained before
+        ``training_mission`` existed, or a ``model_fn``-based test double).
+
+        Loaded from the sibling ``config.json``'s ``training_mission`` field the
+        first time the model is loaded; an explicit constructor value always
+        takes precedence.
+        """
+        return self._training_mission
 
     # ------------------------------------------------------------------
     # Prediction
@@ -175,18 +192,26 @@ class CnnScorer:
         path: str | Path,
         *,
         calibration_path: str | Path | None = None,
+        training_mission: str | None = None,
     ) -> CnnScorer:
         """Load a ``CnnScorer`` from a saved checkpoint.
 
         Args:
             path: Path to the ``.pt`` checkpoint file.
             calibration_path: Optional path to a Platt calibration JSON.
+            training_mission: Explicit mission override, taking precedence over
+                whatever (if anything) the sibling ``config.json`` declares.
+                Intended only for deliberately re-declaring the mission of a
+                checkpoint trained before ``training_mission`` existed; do not
+                use this to paper over the cross-mission scoring guard in
+                ``run_pipeline`` — that has its own explicit
+                ``allow_cross_mission_cnn`` escape hatch for that purpose.
 
         Returns:
             A :class:`CnnScorer` ready for prediction.
         """
         cal = Path(calibration_path) if calibration_path is not None else None
-        return cls(Path(path), calibration_path=cal)
+        return cls(Path(path), calibration_path=cal, training_mission=training_mission)
 
     @classmethod
     def unavailable(cls) -> CnnScorer:

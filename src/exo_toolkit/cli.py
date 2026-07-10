@@ -209,6 +209,7 @@ def run_pipeline(
     model_path: Path | None = None,
     cnn_checkpoint_path: Path | None = None,
     calibration_path: Path | None = None,
+    allow_cross_mission_cnn: bool = False,
     fetch_fn: Any = None,
     clean_fn: Any = None,
     stellar_params_fn: Any = None,
@@ -232,6 +233,12 @@ def run_pipeline(
             written by :func:`~exo_toolkit.calibration.save_calibration`.
             When provided, each output row gains a ``"calibrated_posterior"``
             key with probabilities adjusted by the fitted calibration model.
+        allow_cross_mission_cnn: When ``scorer`` is ``"cnn"``/``"full-ensemble"``,
+            a CNN checkpoint whose declared ``training_mission`` (or lack
+            thereof) does not match ``mission`` is refused by default — Kepler↔
+            TESS CNN transfer has repeatedly failed this project's production
+            gates even after deliberate fine-tuning. Set ``True`` only to
+            deliberately test a checkpoint out-of-domain.
         fetch_fn: Optional callable replacing ``fetch_lightcurve`` (for tests).
         clean_fn: Optional callable replacing ``clean_lightcurve`` (for tests).
         stellar_params_fn: Optional callable replacing ``fetch_tic_stellar_params``
@@ -245,7 +252,9 @@ def run_pipeline(
 
     Raises:
         ValueError: If ``scorer`` is ``"xgboost"`` or ``"ensemble"`` but
-            ``model_path`` is ``None``.
+            ``model_path`` is ``None``. Also if ``scorer`` is ``"cnn"``/
+            ``"full-ensemble"`` and the checkpoint's declared training mission
+            does not match ``mission``, unless ``allow_cross_mission_cnn=True``.
     """
     if scorer not in _VALID_SCORERS:
         raise ValueError(f"scorer must be one of {_VALID_SCORERS}, got {scorer!r}")
@@ -273,6 +282,24 @@ def run_pipeline(
             )
         from exo_toolkit.ml.cnn_scorer import CnnScorer
         cnn_scorer = CnnScorer.from_checkpoint(cnn_checkpoint_path)
+
+        if cnn_scorer.is_available and not allow_cross_mission_cnn:
+            training_mission = cnn_scorer.training_mission
+            if training_mission != mission:
+                declared = (
+                    "an undeclared mission"
+                    if training_mission is None
+                    else f"mission={training_mission!r}"
+                )
+                raise ValueError(
+                    f"Refusing to apply CNN checkpoint {cnn_checkpoint_path} "
+                    f"(trained on {declared}) to a mission={mission!r} scan. "
+                    "Cross-mission CNN scoring is blocked by default because "
+                    "Kepler<->TESS transfer has repeatedly failed this project's "
+                    "production gates, even after deliberate fine-tuning. Pass "
+                    "allow_cross_mission_cnn=True (--allow-cross-mission-cnn on "
+                    "the CLI) only to deliberately test out-of-domain performance."
+                )
 
     calibration_result = None
     if calibration_path is not None:
@@ -513,6 +540,15 @@ def scan(
         "--cnn-checkpoint",
         help="Path to CNN .pt checkpoint (required for cnn/full-ensemble scorers)",
     ),
+    allow_cross_mission_cnn: bool = typer.Option(
+        False,
+        "--allow-cross-mission-cnn",
+        help=(
+            "Allow a CNN checkpoint to score a different mission than it was "
+            "trained on (refused by default; cross-mission transfer has "
+            "repeatedly failed production gates in this project)"
+        ),
+    ),
     output: Path | None = typer.Option(
         None, "--output", "-o", help="Write JSON results to this file"
     ),
@@ -578,6 +614,7 @@ def scan(
             scorer=scorer,
             model_path=model_path,
             cnn_checkpoint_path=cnn_checkpoint_path,
+            allow_cross_mission_cnn=allow_cross_mission_cnn,
         )
     except Exception as exc:  # noqa: BLE001
         typer.echo(f"Pipeline error: {exc}", err=True)

@@ -9,7 +9,8 @@ Public API
 ConvLayerSpec(out_channels, kernel_size, pool_size)
 CnnTrainingConfig(n_bins, conv_layers, dense_units, dropout_rate,
                   dense_dropout_rates, optimizer, learning_rate, batch_size, max_epochs,
-                  early_stopping_patience, device, augment, seed, checkpoint_dir)
+                  early_stopping_patience, device, augment, seed, checkpoint_dir,
+                  training_mission=None)
 CnnConfigValidation(ok, errors)
 default_config() -> CnnTrainingConfig
 load_config(path) -> CnnTrainingConfig
@@ -70,6 +71,10 @@ class CnnTrainingConfig:
     seed: int
     checkpoint_dir: str
     freeze_conv_epochs: int
+    training_mission: str | None = None
+
+
+_VALID_MISSIONS = ("TESS", "Kepler", "K2", "JWST")
 
 
 @dataclass(frozen=True)
@@ -169,6 +174,7 @@ def _config_to_dict(config: CnnTrainingConfig) -> dict:
         "seed": config.seed,
         "checkpoint_dir": config.checkpoint_dir,
         "freeze_conv_epochs": config.freeze_conv_epochs,
+        "training_mission": config.training_mission,
     }
 
 
@@ -219,6 +225,7 @@ def _config_from_dict(d: dict) -> CnnTrainingConfig:
         seed=int(d["seed"]),
         checkpoint_dir=str(d["checkpoint_dir"]),
         freeze_conv_epochs=int(d.get("freeze_conv_epochs", 0)),
+        training_mission=d.get("training_mission"),
     )
 
 
@@ -355,6 +362,11 @@ def validate_config(config: CnnTrainingConfig) -> CnnConfigValidation:
         errors.append("augmentation_shift_bins must be >= 0")
     if config.freeze_conv_epochs < 0:
         errors.append("freeze_conv_epochs must be >= 0")
+    if config.training_mission is not None and config.training_mission not in _VALID_MISSIONS:
+        errors.append(
+            f"training_mission must be one of {_VALID_MISSIONS} or None, "
+            f"got {config.training_mission!r}"
+        )
     for i, cl in enumerate(config.conv_layers):
         if cl.kernel_size % 2 == 0:
             errors.append(
@@ -414,6 +426,7 @@ def format_config(config: CnnTrainingConfig) -> str:
         f"- seed: {config.seed}",
         f"- checkpoint_dir: {config.checkpoint_dir}",
         f"- freeze_conv_epochs: {config.freeze_conv_epochs}",
+        f"- training_mission: {config.training_mission}",
     ]
     return "\n".join(lines) + "\n"
 

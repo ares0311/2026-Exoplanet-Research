@@ -57,6 +57,10 @@ class TestDefaultConfig:
         assert cfg.use_batch_norm is False
         assert cfg.device == "auto"
 
+    def test_training_mission_defaults_to_none(self) -> None:
+        cfg = default_config()
+        assert cfg.training_mission is None
+
 
 class TestValidateConfig:
     def test_valid_default_ok(self) -> None:
@@ -133,6 +137,24 @@ class TestValidateConfig:
         assert result.ok is False
         assert any("device" in e for e in result.errors)
 
+    def test_training_mission_none_is_valid(self) -> None:
+        result = validate_config(default_config())
+        assert result.ok is True
+
+    def test_training_mission_accepts_each_valid_mission(self) -> None:
+        import dataclasses
+        for mission in ("TESS", "Kepler", "K2", "JWST"):
+            cfg = dataclasses.replace(default_config(), training_mission=mission)
+            result = validate_config(cfg)
+            assert result.ok is True, f"{mission} should be valid: {result.errors}"
+
+    def test_training_mission_rejects_invalid_value(self) -> None:
+        import dataclasses
+        cfg = dataclasses.replace(default_config(), training_mission="Mars")
+        result = validate_config(cfg)
+        assert result.ok is False
+        assert any("training_mission" in e for e in result.errors)
+
 
 class TestSerialisation:
     def test_round_trip(self) -> None:
@@ -156,6 +178,22 @@ class TestSerialisation:
             path = Path(tmpdir) / "subdir" / "nested" / "config.json"
             save_config(cfg, path)
             assert path.exists()
+
+    def test_round_trip_preserves_training_mission(self) -> None:
+        import dataclasses
+        cfg = dataclasses.replace(default_config(), training_mission="Kepler")
+        d = _config_to_dict(cfg)
+        assert d["training_mission"] == "Kepler"
+        cfg2 = _config_from_dict(d)
+        assert cfg2.training_mission == "Kepler"
+
+    def test_load_config_defaults_training_mission_to_none_when_absent(self) -> None:
+        """Old config.json files predating training_mission must still load cleanly."""
+        cfg = default_config()
+        d = _config_to_dict(cfg)
+        del d["training_mission"]
+        cfg2 = _config_from_dict(d)
+        assert cfg2.training_mission is None
 
     def test_json_has_expected_keys(self) -> None:
         cfg = default_config()
