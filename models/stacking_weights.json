@@ -1,0 +1,12 @@
+{
+  "w_xgb": 0.95,
+  "w_cnn": 0.0,
+  "w_bayes": 0.05,
+  "best_auc": 0.957647,
+  "n_samples": 588,
+  "n_positive": 356,
+  "n_negative": 232,
+  "grid_step": 0.05,
+  "calibrated_at": "2026-07-10T08:34:31.589335+00:00",
+  "flag": "OK"
+}

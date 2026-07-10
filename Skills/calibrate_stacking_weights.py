@@ -78,16 +78,21 @@ def load_predictions_jsonl(
     """Load predictions from a JSONL file.
 
     Each line must be a JSON object with keys ``label``, ``cnn_prob``,
-    ``xgb_prob``, and ``bayes_prob``.
+    ``xgb_prob``, and ``bayes_prob``. A row whose score keys are present but
+    ``null`` (e.g. a target a snippet fetcher could not fetch, so a merge
+    step like ``merge_t1_2_k2_cnn_predictions.py`` left ``cnn_prob`` unset)
+    is skipped rather than crashing — three-tier calibration has nothing to
+    do with an incomplete row.
 
     Args:
         path: Path to the JSONL file.
 
     Returns:
-        Tuple of (labels, xgb_probs, cnn_probs, bayes_probs).
+        Tuple of (labels, xgb_probs, cnn_probs, bayes_probs) for rows with
+        all four values present and non-null.
 
     Raises:
-        ValueError: If required keys are missing from any record.
+        ValueError: If a required key is missing entirely from any record.
     """
     labels: list[int] = []
     xgb_probs: list[float] = []
@@ -101,6 +106,8 @@ def load_predictions_jsonl(
         for key in ("label", "cnn_prob", "xgb_prob", "bayes_prob"):
             if key not in rec:
                 raise ValueError(f"Line {i+1}: missing key '{key}'")
+        if any(rec[key] is None for key in ("cnn_prob", "xgb_prob", "bayes_prob")):
+            continue
         labels.append(int(rec["label"]))
         xgb_probs.append(float(rec["xgb_prob"]))
         cnn_probs.append(float(rec["cnn_prob"]))

@@ -945,9 +945,56 @@ class TestScorerOption:
                 stellar_params_fn=lambda *_: {},
             )
 
-        expected = 0.35 * 0.8 + 0.65 * posterior.planet_candidate
+        expected = 0.95 * 0.8 + 0.05 * posterior.planet_candidate
         assert result[0]["full_ensemble_planet_probability"] == pytest.approx(expected)
         mock_cnn.predict_proba.assert_not_called()
+
+    def test_run_pipeline_full_ensemble_uses_calibrated_weights_when_cnn_computed(
+        self, tmp_path: Path
+    ) -> None:
+        """Calibrated 2026-07-10 (T1-2): xgb=0.95, cnn=0.00, bayes=0.05 even
+        when the CNN successfully produces a probability -- see
+        FULL_ENSEMBLE_XGB_WEIGHT/FULL_ENSEMBLE_CNN_WEIGHT in cli.py."""
+        lc = _mock_transit_lc()
+        signal = _make_signal()
+        posterior = _uniform_posterior()
+        scores = _make_scores()
+        mock_xgb = MagicMock()
+        mock_xgb.predict_proba.return_value = 0.8
+        mock_cnn = MagicMock()
+        mock_cnn.is_available = True
+        mock_cnn.checkpoint_path = tmp_path / "cnn.pt"
+        mock_cnn.training_mission = "TESS"
+        mock_cnn.predict_proba.return_value = 0.9
+
+        with (
+            patch("exo_toolkit.cli.search_lightcurve", return_value=[signal]),
+            patch(
+                "exo_toolkit.cli.vet_signal",
+                return_value=MagicMock(features=CandidateFeatures()),
+            ),
+            patch("exo_toolkit.cli.score_candidate", return_value=(posterior, scores)),
+            patch(
+                "exo_toolkit.cli.classify_submission_pathway",
+                return_value="planet_hunters_discussion",
+            ),
+            patch("exo_toolkit.ml.xgboost_scorer.XGBoostScorer.load", return_value=mock_xgb),
+            patch("exo_toolkit.ml.cnn_scorer.CnnScorer.from_checkpoint", return_value=mock_cnn),
+        ):
+            result = run_pipeline(
+                "TIC 0",
+                "TESS",
+                scorer="full-ensemble",
+                model_path=tmp_path / "model.json",
+                cnn_checkpoint_path=tmp_path / "cnn.pt",
+                fetch_fn=lambda *_: _make_fetch_result(lc),
+                clean_fn=lambda *_: MagicMock(light_curve=lc),
+                stellar_params_fn=lambda *_: {},
+            )
+
+        assert result[0]["meta"]["cnn"]["probability_status"] == "computed"
+        expected = 0.95 * 0.8 + 0.00 * 0.9 + 0.05 * posterior.planet_candidate
+        assert result[0]["full_ensemble_planet_probability"] == pytest.approx(expected)
 
     def test_run_pipeline_cnn_blocks_cross_mission_by_default(self, tmp_path: Path) -> None:
         lc = _mock_transit_lc()

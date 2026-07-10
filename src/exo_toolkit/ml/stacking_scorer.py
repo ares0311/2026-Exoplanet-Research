@@ -5,7 +5,17 @@ Blends up to three probability sources:
 - CNN (phase-folded flux) — Tier 2
 - Bayesian log-score model — fallback
 
-Weights default to 0.35/0.35/0.30 (XGBoost/CNN/Bayesian) per CNN_SPEC.md.
+Weights default to 0.95/0.00/0.05 (XGBoost/CNN/Bayesian), calibrated
+2026-07-10 via ``Skills/calibrate_stacking_weights.py`` on the T1-2 held-out
+K2 calibration set (588 examples, best AUC 0.9576). This measured the CNN
+*cross-mission* (the Kepler-trained ``benchmark_cnn_v1`` scoring K2 targets,
+chosen specifically because K2 is leakage-safe from Kepler training data) --
+it is a deliberately conservative default, not evidence that this CNN lacks
+skill in its native Kepler domain (its own frozen-eval AUC is 0.9572). See
+``docs/PRODUCTION_READINESS.md`` T1-2 and
+``data_selection/data_selection_decision_log.md`` for the full rationale.
+Prior to this calibration the defaults were an uncalibrated 0.35/0.35/0.30
+guess from CNN_SPEC.md.
 Falls back gracefully to Bayesian-only when no models are loaded.
 
 Public API
@@ -203,8 +213,8 @@ class StackingScorer:
         xgb_path: str | Path,
         cnn_path: str | Path,
         *,
-        xgb_weight: float = 0.35,
-        cnn_weight: float = 0.35,
+        xgb_weight: float = 0.95,
+        cnn_weight: float = 0.00,
         cnn_calibration_path: str | Path | None = None,
     ) -> StackingScorer:
         """Load both XGBoost and CNN scorers.
@@ -212,8 +222,11 @@ class StackingScorer:
         Args:
             xgb_path: Path to the XGBoostScorer metadata JSON.
             cnn_path: Path to the CNN ``.pt`` checkpoint.
-            xgb_weight: XGBoost blend weight (default: 0.35).
-            cnn_weight: CNN blend weight (default: 0.35).
+            xgb_weight: XGBoost blend weight (default: 0.95, calibrated
+                2026-07-10 -- see module docstring).
+            cnn_weight: CNN blend weight (default: 0.00, calibrated
+                2026-07-10 -- see module docstring for the cross-mission
+                scope caveat).
             cnn_calibration_path: Optional Platt calibration JSON for the CNN.
 
         Returns:

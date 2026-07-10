@@ -121,8 +121,102 @@ Storage and retention:
   phase-folded snippet JSONL is retained locally.
 
 Current status:
-- Manifest and catalog-only (Bayesian + XGBoost) scoring are complete and
-  committed.
-- `[HUMAN NEXT]`: run `Skills/fetch_t1_2_k2_calibration_snippets.py` live to
-  fetch native K2 snippets, then fill in `cnn_prob` and run
-  `Skills/calibrate_stacking_weights.py` to produce final T1-2 weights.
+- **COMPLETE (2026-07-10)** — manifest, catalog-only scoring, live snippet
+  fetch (588/596), CNN merge, and stacking calibration all done; calibrated
+  weights are wired into production. See the 2026-07-10 "CNN merge and
+  stacking calibration" entry below for the cross-mission decision record.
+
+## 2026-07-10 Decision: T1-2 CNN Merge and Stacking Calibration (Cross-Mission Use)
+
+Decision: Score the 588 fetched K2 calibration snippets with the Kepler-trained
+`benchmark_cnn_v1` checkpoint (via `Skills/merge_t1_2_k2_cnn_predictions.py`),
+explicitly declaring and logging this as a cross-mission application, then
+apply the resulting calibrated stacking weights globally in
+`cli.py`'s `full-ensemble` blend and `StackingScorer`'s defaults.
+
+Rationale:
+- `benchmark_cnn_v1` is trained exclusively on Kepler prime-mission targets.
+  Scoring K2 targets with it is a real cross-mission application of the
+  same kind the cross-mission scoring guard (PR #193, merged the same day)
+  was built to catch — but `CnnScorer.from_checkpoint()` (used here) is not
+  subject to that guard, which only gates `run_pipeline()`/`exo scan`.
+- This is not a misuse of the guard's intent: T1-2's whole purpose is to
+  *measure* real held-out CNN performance so the stacking calibrator can
+  down-weight it appropriately if it does not transfer — exactly the
+  "deliberate out-of-domain testing" case the guard's own
+  `allow_cross_mission_cnn` escape hatch exists for. K2 was chosen for this
+  calibration set specifically because it is leakage-safe from Kepler
+  training data (see the 2026-07-10 Decision above) — not because it is
+  the CNN's native domain.
+- The measurement (after the sys.path bug below was fixed) found an
+  AUC-maximising grid search over 588 held-out examples gives the CNN an
+  optimal weight of **0.00** (XGBoost=0.95, Bayesian=0.05, best AUC 0.9576).
+  This is **not** evidence the CNN carries no cross-mission signal -- its
+  standalone AUC on this same held-out set is 0.7458, well above chance,
+  consistent with its native-Kepler-domain frozen-eval AUC of 0.9572. The
+  zero weight instead reflects that XGBoost alone already achieves 0.9575
+  AUC on this catalog-derived set -- essentially the same as the full
+  blend's 0.9576 -- so a coarse (0.05-step) pure-AUC grid search has no
+  incentive to dilute an already-near-ceiling tabular classifier with a
+  weaker (if real) flux-based signal. Whether CNN-derived features would
+  earn nonzero weight under a different objective (e.g. one that also
+  rewards calibration or robustness, not just AUC) is untested.
+- Applying these weights **globally** (not conditioned on
+  `cnn_scorer.training_mission == mission`) was a deliberate choice, made
+  after explicit consideration of the alternative (keep the old 0.35/0.35
+  weights for genuine same-domain Kepler scans). The old weights were never
+  themselves calibrated -- they were an uncalibrated guess from
+  `CNN_SPEC.md` -- so preserving them for the untested same-domain case is
+  not "more correct," just differently untested. The cross-mission guard
+  already blocks the CNN by default for any mismatched mission, so the only
+  scenario where the global constant applies without an explicit
+  `--allow-cross-mission-cnn` override is genuine same-domain Kepler
+  scoring -- a narrower, secondary use case (TESS is this project's primary
+  discovery target) for which conservative defaults are preferred per
+  `CLAUDE.md`'s Scientific Guardrails.
+
+Rejected alternative:
+- Mission-conditional blending (new calibrated weights only when
+  cross-mission, old 0.35/0.35 preserved for matched-mission Kepler scans):
+  rejected because it adds real complexity to a scoring hot path to protect
+  a case with zero calibration evidence backing either number, and because
+  a genuine same-domain stacking calibration would require its own
+  dedicated held-out Kepler set (distinct from the existing
+  training/validation/frozen-eval roles) -- out of scope unless explicitly
+  requested as future work.
+
+Bug found and fixed in the process: `calibrate_stacking_weights.py`'s
+`load_predictions_jsonl()` called `float(rec["cnn_prob"])` unconditionally,
+which would raise `TypeError` on any row with a null `cnn_prob` (e.g. an
+EPIC target whose snippet fetch failed). Fixed with a defensive skip in the
+loader itself, plus `merge_t1_2_k2_cnn_predictions.py`'s own
+`filter_complete_rows()` as defense-in-depth so the on-disk completed-
+predictions artifact never contains a null `cnn_prob` row in the first
+place.
+
+SEVERE bug found and fixed in the process: the first live run of
+`merge_t1_2_k2_cnn_predictions.py` produced `cnn_prob=0.5` for all 588 rows
+-- a flat constant, not real predictions -- with zero error or warning.
+Root cause: `CnnScorer._ensure_model()` does the absolute import
+`import_module("Skills.cnn_inference_batcher")`, which needs the repo root
+(not just `src/`) on `sys.path`. Running a `Skills/*.py` script directly
+(`python Skills/foo.py`, this project's standard invocation pattern) only
+gets the script's own containing directory auto-prepended by Python, never
+the repo root, so the import silently raised `ModuleNotFoundError`, caught
+by a bare `except Exception`. Every prediction thereafter returned the
+neutral fallback with no indication anything was wrong -- and the resulting
+bogus `calibrate_stacking_weights.py` run happened to land on the exact
+same `CNN=0.000` weight as the corrected re-run, which is precisely what
+made this dangerous: a coincidentally-plausible wrong answer, only caught
+by manually checking that `cnn_prob` had exactly one distinct value across
+all 588 rows. Fixed with a new `_ensure_repo_root_on_sys_path()` helper in
+`src/exo_toolkit/ml/cnn_scorer.py` (idempotent, called before every
+`Skills.` import site) plus a `RuntimeWarning` on any genuine load failure
+that is not the documented "PyTorch not installed" case. 9 new regression
+tests, including one that reproduces the exact incident. See
+`docs/PRODUCTION_READINESS.md` T1-2 for the full record.
+
+Future work (not requested, recorded for a future agent): a genuine
+same-domain stacking calibration for Kepler-mission `full-ensemble` scoring
+would need a fresh, dedicated held-out Kepler set not already claimed by
+`data_role_registry.yaml`'s training/validation/frozen-eval roles.
