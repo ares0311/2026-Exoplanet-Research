@@ -13,6 +13,7 @@ from fetch_t1_2_k2_calibration_snippets import (  # noqa: E402
     _KEPLER_BJD_OFFSET,
     build_k2_calibration_snippet,
     build_k2_calibration_snippets,
+    shard_output_path,
 )
 
 
@@ -195,3 +196,85 @@ def test_build_k2_calibration_snippets_stops_early_on_max_errors(tmp_path: Path)
     failure_path = tmp_path / "snippets.jsonl.failures.jsonl"
     failure_lines = failure_path.read_text(encoding="utf-8").splitlines()
     assert len(failure_lines) == 2
+
+
+def test_shard_output_path_unchanged_for_single_shard(tmp_path: Path) -> None:
+    output_path = tmp_path / "snippets.jsonl"
+    assert shard_output_path(output_path, 0, 1) == output_path
+
+
+def test_shard_output_path_suffixed_for_multiple_shards(tmp_path: Path) -> None:
+    output_path = tmp_path / "snippets.jsonl"
+    assert shard_output_path(output_path, 2, 4) == tmp_path / "snippets.shard2of4.jsonl"
+
+
+def test_build_k2_calibration_snippets_shard_rejects_out_of_range_index(
+    tmp_path: Path,
+) -> None:
+    manifest_path = tmp_path / "manifest.jsonl"
+    manifest_path.write_text(json.dumps(_sample_row(epic_id=1)) + "\n", encoding="utf-8")
+    try:
+        build_k2_calibration_snippets(
+            manifest_path,
+            output_path=tmp_path / "snippets.jsonl",
+            lc_fetcher=_synthetic_transit_fetcher,
+            shard_index=4,
+            shard_count=4,
+            commit_report=False,
+        )
+    except ValueError as exc:
+        assert "shard_index" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for out-of-range shard_index")
+
+
+def test_build_k2_calibration_snippets_shards_never_collide(tmp_path: Path) -> None:
+    """Four shards partitioning one manifest must cover every row exactly once."""
+    manifest_path = tmp_path / "manifest.jsonl"
+    rows = [_sample_row(epic_id=i, label=i % 2) for i in range(1, 41)]
+    manifest_path.write_text(
+        "".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8"
+    )
+    shard_count = 4
+    output_path = tmp_path / "snippets.jsonl"
+
+    total_written = 0
+    written_epic_ids: list[int] = []
+    output_paths_seen: set[Path] = set()
+    for shard_index in range(shard_count):
+        n_written = build_k2_calibration_snippets(
+            manifest_path,
+            output_path=output_path,
+            lc_fetcher=_synthetic_transit_fetcher,
+            shard_index=shard_index,
+            shard_count=shard_count,
+            commit_report=False,
+        )
+        total_written += n_written
+        shard_path = shard_output_path(output_path, shard_index, shard_count)
+        output_paths_seen.add(shard_path)
+        for line in shard_path.read_text(encoding="utf-8").splitlines():
+            written_epic_ids.append(json.loads(line)["epic_id"])
+
+    # Every shard wrote its own file -- no two shards ever shared one output path.
+    assert len(output_paths_seen) == shard_count
+    # Every manifest row was processed exactly once, across all shards combined.
+    assert total_written == len(rows)
+    assert sorted(written_epic_ids) == sorted(r["epic_id"] for r in rows)
+
+
+def test_build_k2_calibration_snippets_shard_note_in_progress_message(
+    tmp_path: Path, capsys
+) -> None:
+    manifest_path = tmp_path / "manifest.jsonl"
+    manifest_path.write_text(json.dumps(_sample_row(epic_id=1)) + "\n", encoding="utf-8")
+    build_k2_calibration_snippets(
+        manifest_path,
+        output_path=tmp_path / "snippets.jsonl",
+        lc_fetcher=_synthetic_transit_fetcher,
+        shard_index=1,
+        shard_count=4,
+        commit_report=False,
+    )
+    captured = capsys.readouterr()
+    assert "shard=1/4" in captured.out
