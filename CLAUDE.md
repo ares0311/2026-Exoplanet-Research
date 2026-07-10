@@ -5,7 +5,7 @@ It contains the architecture, module map, and current-state facts a coding
 agent needs to work productively without re-reading every document.
 
 **All binding operating rules and directives live in `AGENTS.md`** — the
-PRIMARY DIRECTIVE, the gap-gate process, prohibited work, the PLAN/DO
+PRIMARY DIRECTIVE, the production-priority process, prohibited work, the PLAN/DO
 workflow, branch naming, sync policy, caffeinate policy, console-output/ETA
 policy, Run Report Policy, parallelism-first policy, Python environment
 policy, system-profile optimization, Astrometrics data/storage policy,

@@ -3,7 +3,7 @@
 Last reviewed: 2026-07-10 (T1-2 COMPLETE: held-out K2 calibration set built, native snippets fetched live via 4-way sharding, CNN predictions merged, stacking weights calibrated (XGBoost=0.95/CNN=0.00/Bayesian=0.05), and wired into production. The master-corpus Kepler CNN checkpoint passed held-out gates and was human-approved for promotion as `benchmark_cnn_v1`. No Tier 1 gaps remain open.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 2,565 default tests passing, 2 integration_live deselected
+Test baseline: 2,611 default tests passing, 2 integration_live deselected (2026-07-10)
 
 ---
 
@@ -308,15 +308,17 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 
 Run these before any live deployment or public announcement:
 
-- [ ] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures
-- [ ] `.venv/bin/ruff check .` — no lint errors
-- [ ] `.venv/bin/python -m mypy src` — no type errors
-- [ ] `exo background-run-once --dry-run` — no config errors
-- [ ] `.venv/bin/python Skills/tier2_progress_reporter.py` — confirm CNN gate status documented
-- [ ] Verify `configs/background_search_v0.json` fingerprint matches expected value
-- [ ] Verify `models/xgboost_koi.json` and `models/xgboost_koi_meta.json` exist for XGBoost scorer
-- [ ] Run `exo <known-confirmed-TOI-TIC-ID> --scorer bayesian` — verify FPP < 0.5
-- [ ] Run `exo <known-FP-TIC-ID> --scorer bayesian` — verify FPP > 0.5
+- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-10: 2,611 passed, 2 deselected)
+- [x] `.venv/bin/ruff check .` — no lint errors (2026-07-10: clean)
+- [x] `.venv/bin/python -m mypy src` — no type errors (2026-07-10: clean, 28 source files)
+- [x] `exo background-run-once --dry-run` — no config errors (2026-07-10: installed entry point exercised successfully; dry run wrote no ledger/outcome data)
+- [ ] `.venv/bin/python Skills/tier2_progress_reporter.py` — confirm CNN gate status documented (not run standalone this session; already extensively documented above under T1-1/T1-2 — treat as satisfied by existing narrative unless a fresh printout is specifically wanted)
+- [x] Verify `configs/background_search_v0.json` fingerprint matches expected value (2026-07-10: `exo sqlite-integrity` returned `ok: true` and `missing_config_fingerprint_count: 0`)
+- [x] Verify `models/xgboost_koi.json` and `models/xgboost_koi.xgb.json` exist for XGBoost scorer (stale `xgboost_koi_meta.json` name corrected 2026-07-10 — the actual companion-file convention is `.xgb.json`, see `src/exo_toolkit/ml/xgboost_scorer.py`; both files confirmed present 2026-07-10)
+- [ ] Run `exo <known-confirmed-TOI-TIC-ID> --scorer bayesian` — verify FPP < 0.5 (not run this session — needs a live MAST fetch; TIC 150428135 / TOI-700 is this project's own standard confirmed-planet example, see `notebooks/pipeline_demo.ipynb`)
+- [ ] Run `exo <known-FP-TIC-ID> --scorer bayesian` — verify FPP > 0.5 (not run this session — no project-vetted known-FP TIC ID was found on hand; pick one from a live TOI-catalog query via `Skills/toi_checker.py` rather than guessing a disposition from memory)
+
+**2026-07-10 CLI routing bug found and fixed while running this checklist**: `exo background-run-once --dry-run`, `exo run-summary`, and `exo sqlite-integrity` — the exact invocations this checklist and `AGENTS.md`/`CLAUDE.md` document — did not work as documented. Root cause: `pyproject.toml`'s `[project.scripts]` registered `exo` to `exo_toolkit.cli:app`, a Typer app that only implements the `exo <TARGET-ID>` transit-scan command; the 17 background-automation subcommands are implemented separately by `exo_toolkit.cli`'s argparse `main()`/`build_parser()`, which was never wired to the installed console script at all (only reachable via `python -m exo_toolkit.cli <subcommand>`, the form `docs/SCHEDULER.md` correctly documents for cron/systemd). Invoking `exo background-run-once` therefore silently misparsed `"background-run-once"` as a scan TARGET_ID and failed with a Typer usage error, not a config error. Fixed: `src/exo_toolkit/cli.py` gains `cli_entry()`, a small dispatcher that routes to `main()` when the first argument names a background subcommand (`_background_command_handlers()` is now the single source of truth for that name list, shared with `build_parser()`) and falls through to the Typer `app` otherwise; `pyproject.toml`'s `exo` script now points to `exo_toolkit.cli:cli_entry`. `Skills/mcp_bootstrap_server.py`'s `_exo_command()` helper had the same bug from the other direction (it preferred a bare `exo` found on PATH over the module-invocation form for these same three subcommands) and is fixed the same way. 5 new regression tests (`TestCliEntry` in `tests/test_cli.py`, `test_background_subcommands_use_module_invocation_not_bare_exo` in `tests/test_mcp_bootstrap_server.py`); full suite re-run clean (2,611 passed). The editable install was resynchronized in the repository `.venv`, and all three installed entry-point commands now run successfully; `sqlite-integrity` reports `ok: true`.
 
 ---
 
@@ -354,8 +356,8 @@ These are enforced in code and must never be bypassed:
 
 Any plan proposed in a session must:
 
-1. Name the highest-priority unresolved Tier 1 gap (currently **none — T1-0, T1-1, and T1-2 are all complete as of 2026-07-10**; any new plan must either find/justify a new Tier 1 gap or work from Tier 2)
-2. Show how each proposed step closes or directly unblocks that gap — or explicitly justify why it is Tier 2 work
+1. Identify the highest-impact unresolved production blocker, failing readiness check, roadmap item, defect, or validation need (Tier 1 and Tier 2 are priority signals, not an authorization whitelist)
+2. Show how each proposed step materially closes, unblocks, or improves a concrete production outcome
 3. Include outside blockers as explicit named steps with responsible party
-4. Never propose log modules, schemas, or scaffolding unless they directly unblock a named gap
+4. Never propose log modules, schemas, or scaffolding without a concrete production need
 5. Never repeat work listed under "What Is Complete" above

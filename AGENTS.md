@@ -24,20 +24,30 @@ Every session must begin by reading:
 8. `docs/astrometrics_external_and_cloud_storage_policy.md`
 
 Before proposing or executing any task you must:
-1. Name the highest-priority unresolved Tier 1 gap from `docs/PRODUCTION_READINESS.md`.
-2. State explicitly how the proposed work closes or directly unblocks that gap.
-3. If the proposed work does not close or unblock a named gap in `docs/PRODUCTION_READINESS.md`, **do not do it**.
+1. Read the current state and roadmap in `docs/PRODUCTION_READINESS.md`,
+   `docs/ROADMAP.md`, and the relevant runbook rather than relying on a stale
+   numbered-gap summary.
+2. Choose the highest-impact safe task that materially advances the project
+   toward live production. Prefer, in order: an unresolved production blocker;
+   a failing pre-deployment check or production defect; an unfinished roadmap
+   item; then the highest-value validation, reliability, operability, or
+   deployment-readiness improvement supported by current evidence.
+3. State explicitly what production outcome the task closes, unblocks, or
+   measurably improves. If it does none of those things, **do not do it**.
 
-If no Tier 1 gap is open (check `docs/PRODUCTION_READINESS.md` fresh — do not
-assume), fall back to a named Tier 2 gap using the same test, and state
-explicitly that you did so.
+Tier 1 and Tier 2 gaps are priority signals, not an authorization whitelist.
+When every named gap is closed but the project is not live in production, do
+not stop: inspect readiness checks, roadmap state, real operator workflows,
+open defects, and deployment evidence, then continue with the most impactful
+production-advancing task. Add or update roadmap/readiness tracking when the
+existing documents do not represent a newly discovered blocker or defect.
 
 ### Prohibited work
 
-- Adding Skills, modules, schemas, or scaffolding that do not directly close a named Tier 1 or Tier 2 gap.
+- Adding Skills, modules, schemas, or scaffolding that do not materially advance a concrete production outcome.
 - Repeating work already listed under "What Is Complete" in `docs/PRODUCTION_READINESS.md`.
-- Writing "the next N utility scripts" when those scripts do not unblock a named gap.
-- Treating "Apply All System Directives" as permission to add more code — it means read the gap list and work the highest-priority gap only.
+- Writing "the next N utility scripts" without a concrete production need.
+- Treating "Apply All System Directives" as permission to add undirected code — it means assess current readiness and work the highest-impact production task.
 - Running `exo background-run-once` expecting to discover new planets — background automation scans **7 static fixture targets** (3 known planets + 4 synthetics) and is a CI validation tool, not a discovery engine. See `docs/DISCOVERY_RUNBOOK.md §Background Automation`.
 - Continuing the run006/run008 candidate-review loop as the primary production path. Those scans are historical evidence; the active production path is the dataset/model-training plan in `docs/exoplanet_exomoon_dataset_handoff.md`.
 - Proposing ad hoc CNN retraining against the old rejected corpora without first satisfying the dataset/source-contract requirements in `docs/exoplanet_exomoon_dataset_handoff.md`.
@@ -45,15 +55,15 @@ explicitly that you did so.
 ### When the user says "Apply All System Directives"
 
 1. Read `AGENTS.md` and `docs/PRODUCTION_READINESS.md`.
-2. State the current Tier 1 and Tier 2 gaps in priority order.
-3. For planning: propose tasks in priority order where **every task closes or unblocks a named gap**. Stop when gap-closing tasks run out — do not pad the list with non-gap work. Tasks may be agent-led (code) or human-led (data collection, API keys, expert review, network access) — both are valid plan items. Label each task clearly: **[AGENT]** or **[HUMAN]**.
+2. State the current production state, unresolved blockers/checks, and roadmap items in priority order.
+3. For planning: propose tasks in impact order where **every task materially advances production**. Do not pad the list with speculative work. Tasks may be agent-led (code) or human-led (data collection, API keys, expert review, network access) — both are valid plan items. Label each task clearly: **[AGENT]** or **[HUMAN]**.
 4. For each task, identify external dependencies (API keys, network access, GPU, human reviewer) and surface them as explicit questions before the DO phase.
-5. Do not propose or execute work that does not close a named gap.
+5. Do not propose or execute work without a concrete production outcome.
 
 ### Two-phase workflow: PLAN then DO
 
 **PLAN phase** ("plan the next N tasks"):
-- List all gap-closing tasks in priority order, labeled **[AGENT]** or **[HUMAN]**.
+- List all production-advancing tasks in priority order, labeled **[AGENT]** or **[HUMAN]**.
 - For every **[HUMAN]** task, provide exact step-by-step instructions so the human can act independently.
 - Ask all questions about external dependencies upfront.
 - Do not execute anything.
@@ -70,7 +80,7 @@ explicitly that you did so.
 
 ### Outside blockers are not code problems
 
-If the highest-priority Tier 1 gap is blocked by a human action (data collection, network access, API key, expert review), state the gap, name the blocker, and **immediately provide a complete step-by-step recipe** assuming the user has zero background knowledge of the specific task. Do not ask "do you want the commands?" — give them.
+If the highest-priority production task is blocked by a human action (data collection, network access, API key, expert review), state the outcome, name the blocker, and **immediately provide a complete step-by-step recipe** assuming the user has zero background knowledge of the specific task. Do not ask "do you want the commands?" — give them.
 
 ### Human-blocker recipe format
 
@@ -565,12 +575,16 @@ Do not rely on chat context, memory, or prior conversation history as the source
 
 ---
 
-## Current Gap Status
+## Current Production Status
 
 **No Tier 1 gaps are open as of 2026-07-10** (T1-0/T1-1/T1-2 all complete —
 T1-1's `benchmark_cnn_v1` CNN checkpoint is promoted, T1-2's stacking
 calibration is wired into production). Tier 2 is closed: T2-1 complete,
 T2-2/T2-3 permanently out of scope (DECISION-013).
+
+Closed numbered gaps do not mean the project is live or that work should stop.
+Continue from the pre-deployment checklist, roadmap, open production defects,
+and real workflow validation using the PRIMARY DIRECTIVE's impact ordering.
 
 The full handoff narrative, version-by-version changelog, CNN candidate
 history (C1–C19), and corpus/checkpoint status is **not repeated here** — it
@@ -580,6 +594,6 @@ Local artifact/corpus/checkpoint file-by-file status:
 `docs/LOCAL_ARTIFACT_LEDGER.md`. Per-Skill historical changelog (Milestones
 12–30, archival only): `docs/MILESTONE_HISTORY.md`.
 
-Before starting any new task, re-check `docs/PRODUCTION_READINESS.md` for the
-current gap list per the PRIMARY DIRECTIVE above — do not assume the gap
-status noted here is still current by the time you read it.
+Before starting any new task, re-check `docs/PRODUCTION_READINESS.md`,
+`docs/ROADMAP.md`, and relevant runbooks per the PRIMARY DIRECTIVE above — do
+not assume the status noted here is still current by the time you read it.

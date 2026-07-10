@@ -1,5 +1,37 @@
 # ROADMAP
 
+This roadmap is the executable, repo-specific projection of
+`docs/astrometrics_coding_agents_master_guide.md`. The master guide controls
+strategic phase ordering; this file records what this repository has actually
+implemented and the remaining production work. A utility's existence does not
+by itself satisfy a master-guide evidence requirement.
+
+## Current Master-Guide Alignment — Production Priority Order
+
+1. **Phase 1 — validated manifest contract:** dataset-specific Kepler/K2
+   manifests exist, but the shared manifest schema, validator, stable manifest
+   IDs, and run-to-manifest references required by the master guide are not yet
+   complete across Kepler/TESS/JWST.
+2. **Phase 1 — reproducible candidate ledger:** `Skills/candidate_database.py`
+   provides a basic SQLite history, but it does not yet carry the master-guide
+   provenance fields (`source_dataset_id`, raw URI, preprocessing/generator
+   versions and parameters, model versions/scores, injection context, review
+   state, and regeneration command) or receive every production candidate.
+3. **Phase 1 — canonical regression evals:** no committed sample-level suite
+   yet covers confirmed planets, known false positives, and injected controls
+   with before/after pipeline comparisons.
+4. **Phase 2 — production sensitivity evidence:** generic BLS transit
+   injection-recovery tooling exists, but committed recovery curves and
+   sensitivity context tied to the production pipeline and
+   `benchmark_cnn_v1` promotion package do not. Tooling-complete is not
+   evidence-complete.
+5. **Phase 2 — calibrated candidate context:** extend production outputs with
+   calibration dataset IDs, score quantiles, threshold versions, and empirical
+   false-discovery context after the canonical eval and sensitivity sets exist.
+6. **Phase 3 only after 1–5:** benchmark self-supervised light-curve embeddings
+   against BLS/tabular/`benchmark_cnn_v1`; do not start frontier representation
+   work while Phase 1–2 evidence gaps remain.
+
 ## Milestone 1 — Scoring and Classification Engine ✓ COMPLETE
 
 - [x] `schemas.py` — typed Pydantic data contracts
@@ -49,15 +81,18 @@
 
 ---
 
-## Milestone 6 — Injection-Recovery ✓ COMPLETE
+## Milestone 6 — Injection-Recovery Tooling ✓ COMPLETE
 
 - [x] `Skills/injection_recovery.py` — inject synthetic box transits, recover via BLS
 - [x] Measures recovery rate by radius, period, noise level
 - [x] 25 tests in `tests/test_injection_recovery.py`
+- [ ] Produce and commit production-pipeline recovery curves on real-background
+  canonical cases, with manifest IDs and explicit linkage to the frozen
+  `benchmark_cnn_v1` evidence package (master-guide Phase 2 requirement)
 
 ---
 
-## Milestone 7 — ML Ensemble Scorer ✓ COMPLETE (production CNN model gated)
+## Milestone 7 — ML Ensemble Scorer ✓ COMPLETE
 
 - [x] Tier 1 — XGBoost on tabular features (`ml/xgboost_scorer.py`, 45 tests)
 - [x] Tier 3 — Stacking scorer blending XGBoost + CNN + Bayesian (`ml/stacking_scorer.py`, 22 tests)
@@ -79,7 +114,7 @@
   - [x] Mark the promoted architecture/data/preprocessing combination as the frozen `benchmark_cnn_v1` measuring stick
   - Preserve raw FITS as re-downloadable cache only; commit only selected production artifacts after explicit human approval
 - [x] Human-approved CNN artifact promotion — approved on 2026-07-09; `benchmark_cnn_v1` is registered under `models/registry.json` and selected artifacts are promoted under `models/cnn/benchmark_cnn_v1/`
-- [ ] T1-2 stacking calibration — tune full-ensemble weights only after the promoted CNN artifact is merged and CI-clean; do not tune on training or frozen-eval data
+- [x] T1-2 stacking calibration — completed 2026-07-10 on 588 held-out K2 examples; calibrated weights (XGBoost=0.95/CNN=0.00/Bayesian=0.05) are wired into production
 
 ---
 

@@ -166,9 +166,14 @@ def _ruff_command() -> tuple[str, ...]:
 
 
 def _exo_command(*args: str) -> tuple[str, ...]:
-    found = shutil.which("exo")
-    if found is not None:
-        return (found, *args)
+    # background-run-once/run-summary/sqlite-integrity are only implemented by
+    # exo_toolkit.cli's argparse main()/build_parser(); the `exo` console
+    # script (exo_toolkit.cli:app, a Typer app) only implements the
+    # `exo <TARGET-ID>` transit-scan command and has no knowledge of these
+    # subcommands at all. Routing through a bare `exo` found on PATH silently
+    # misparses the subcommand name as a scan TARGET_ID instead of failing
+    # loudly, so this must always use the module-invocation form -- the same
+    # form docs/SCHEDULER.md documents for cron/systemd use.
     return (_venv_python(), "-m", "exo_toolkit.cli", *args)
 
 
