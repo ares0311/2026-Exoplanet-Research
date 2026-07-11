@@ -175,3 +175,16 @@ def test_cli_writes_outputs(tmp_path):
     assert code == 0
     assert md.exists()
     assert json.loads(js.read_text())["gate_passed"] is True
+
+
+def test_count_overrides_support_committed_production_evidence(tmp_path):
+    status = build_tier2_status(
+        checkpoint_path=_make_checkpoint(tmp_path),
+        calibration_path=_make_calibration(tmp_path),
+        registry_path=_make_registry(tmp_path),
+        n_labels_override=15_649,
+        n_snippets_override=15_649,
+    )
+    assert status.flag == "READY"
+    assert status.n_labels == 15_649
+    assert status.n_snippets == 15_649
