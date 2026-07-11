@@ -49,6 +49,8 @@ data/*.pkl
 data/*.pickle
 data/*.json
 data/*.jsonl
+data/*.sqlite
+data/*.sqlite3
 data/*_splits/
 data/new_tess_targets.txt
 

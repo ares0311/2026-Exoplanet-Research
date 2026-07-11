@@ -196,3 +196,40 @@ class TestCandidateDatabase:
             pytest.raises(ValidationError),
         ):
             db.insert_provenanced(record)
+
+    def test_provenanced_target_ids_are_dataset_scoped(self, tmp_path: Path) -> None:
+        with CandidateDatabase(tmp_path / "c.sqlite3") as db:
+            db.insert_provenanced(_provenanced(target_id="TIC 1"))
+            db.insert_provenanced(
+                _provenanced(
+                    candidate_id="TESS-TIC2-5d",
+                    target_id="TIC 2",
+                    source_dataset_id="other_live_v1",
+                )
+            )
+
+            assert db.provenanced_target_ids("canonical_tess_eval_v1") == {
+                "TIC 1"
+            }
+
+    def test_preprocessing_failure_remains_retryable(self, tmp_path: Path) -> None:
+        with CandidateDatabase(tmp_path / "c.sqlite3") as db:
+            db.insert_provenanced(
+                _provenanced(review_status="preprocessing_failure")
+            )
+
+            assert db.provenanced_target_ids("canonical_tess_eval_v1") == {
+                "TIC 1"
+            }
+            assert not db.completed_provenanced_target_ids(
+                "canonical_tess_eval_v1"
+            )
+
+    def test_many_insert_validates_all_before_writing(self, tmp_path: Path) -> None:
+        good = _provenanced(candidate_id="good")
+        bad = _provenanced(candidate_id="bad")
+        bad.pop("source_dataset_id")
+        with CandidateDatabase(tmp_path / "c.sqlite3") as db:
+            with pytest.raises(ValidationError):
+                db.insert_provenanced_many([good, bad])
+            assert db.provenanced_count() == 0

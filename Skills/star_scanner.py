@@ -1,11 +1,14 @@
 """Optimal star selection and background scanning for exoplanet transit search.
 
-Two operating modes:
+Four operating modes:
 
   1. **Single-target** (``--target <TIC_ID>``): analyse one star, log result.
   2. **Background scan** (default): query the TESS Input Catalog for
      high-priority uncharacterised stars, rank them, and scan in order until
      stopped (Ctrl-C) or ``--max-stars`` is reached.
+  3. **Prepare only** (``--prepare-only``): freeze metadata and manifests.
+  4. **Prepared execution** (``--execute-prepared-batch``): scan only the
+     immutable queue and write schema-v2 candidate-ledger outcomes.
 
 Stars already in the TESS TOI disposition list (known objects being actively
 followed up) and stars already present in the scan log are skipped
@@ -41,6 +44,7 @@ import threading
 import time
 import urllib.request
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -49,12 +53,16 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 
+from exo_toolkit import __version__  # noqa: E402
+from exo_toolkit.candidate_ledger import CandidateLedgerRecord  # noqa: E402
 from exo_toolkit.cli import run_pipeline  # noqa: E402
 from exo_toolkit.dataset_manifest import (  # noqa: E402
     DatasetManifest,
+    load_dataset_manifest,
     sha256_file,
     validate_dataset_manifest,
 )
+from Skills.candidate_database import CandidateDatabase  # noqa: E402
 from Skills.run_report import (  # noqa: E402
     DEFAULT_REPORT_DIR,
     RunReport,
@@ -1046,6 +1054,219 @@ def prepare_live_search_snapshot(
     }
 
 
+@dataclass(frozen=True)
+class PreparedLiveSearchBundle:
+    """Validated immutable live-search membership and raw-product scope."""
+
+    dataset_id: str
+    batch_id: str
+    targets: tuple[dict[str, Any], ...]
+
+
+def _shard_scoped_path(path: Path, shard_index: int, shard_count: int) -> Path:
+    """Return a collision-free per-shard path when process sharding is active."""
+    if shard_count <= 1:
+        return path
+    return path.with_name(f"{path.stem}.shard{shard_index}of{shard_count}{path.suffix}")
+
+
+def load_prepared_live_search_bundle(
+    *,
+    dataset_manifest_path: Path,
+    batch_manifest_path: Path,
+    repo_root: Path,
+) -> PreparedLiveSearchBundle:
+    """Load and cross-check the frozen queue, manifest, and product inventory."""
+    root = repo_root.resolve()
+    validation = validate_dataset_manifest(dataset_manifest_path, repo_root=root)
+    if not validation.ok:
+        raise RuntimeError(
+            "Live-search dataset manifest failed validation: "
+            + "; ".join(validation.errors)
+        )
+    manifest = load_dataset_manifest(dataset_manifest_path)
+    if manifest.role != "live_search":
+        raise RuntimeError(f"Dataset role must be live_search, got {manifest.role}")
+
+    try:
+        batch = json.loads(batch_manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"Cannot read batch manifest {batch_manifest_path}") from exc
+    snapshot = batch.get("target_queue_snapshot", {})
+    if batch.get("role") != "live_search" or batch.get("batch_id") != manifest.dataset_id:
+        raise RuntimeError("Batch identity/role does not match the dataset manifest")
+    if snapshot.get("path") != manifest.local_path or snapshot.get("sha256") != manifest.sha256:
+        raise RuntimeError("Batch snapshot path/checksum does not match DatasetManifest")
+
+    queue_path = (root / manifest.local_path).resolve()
+    try:
+        queue_path.relative_to(root)
+    except ValueError as exc:
+        raise RuntimeError("Prepared queue escapes the repository root") from exc
+    with queue_path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    if len(rows) != manifest.row_count or not rows:
+        raise RuntimeError("Prepared queue row count does not match DatasetManifest")
+
+    inventory: dict[str, tuple[str, ...]] = {}
+    for item in batch.get("product_inventory", []):
+        target_id = str(item.get("target_id", ""))
+        if not target_id or target_id in inventory:
+            raise RuntimeError("Batch product inventory has a missing/duplicate target")
+        products = item.get("products", [])
+        uris = tuple(str(product.get("uri", "")) for product in products)
+        if not uris or any(not uri for uri in uris):
+            raise RuntimeError(f"Batch target {target_id} has incomplete raw URIs")
+        if any(int(product.get("size_bytes") or 0) <= 0 for product in products):
+            raise RuntimeError(f"Batch target {target_id} has invalid product sizes")
+        inventory[target_id] = uris
+
+    targets: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for row in rows:
+        target_id = str(row.get("target_id", ""))
+        if row.get("status") != "queued" or target_id in seen:
+            raise RuntimeError("Prepared queue contains a non-queued or duplicate target")
+        try:
+            tic_id = int(target_id.removeprefix("TIC "))
+            priority = float(row["total_priority"])
+        except (TypeError, ValueError, KeyError) as exc:
+            raise RuntimeError(f"Invalid prepared target row: {target_id!r}") from exc
+        if target_id not in inventory:
+            raise RuntimeError(f"Prepared target {target_id} has no product inventory")
+        seen.add(target_id)
+        targets.append(
+            {
+                "tic_id": tic_id,
+                "target_id": target_id,
+                "priority": priority,
+                "raw_uris": inventory[target_id],
+            }
+        )
+    if seen != set(inventory):
+        raise RuntimeError("Queue membership and product inventory targets differ")
+    if int(batch.get("query", {}).get("target_count", -1)) != len(targets):
+        raise RuntimeError("Batch target count does not match queue membership")
+    return PreparedLiveSearchBundle(
+        dataset_id=manifest.dataset_id,
+        batch_id=str(batch["batch_id"]),
+        targets=tuple(targets),
+    )
+
+
+def _time_window(provenance: dict[str, Any]) -> str:
+    values = tuple(int(value) for value in provenance.get("sectors_or_quarters", ()))
+    if not values:
+        raise RuntimeError("Fetch provenance has no sectors/quarters")
+    return "sectors " + ",".join(str(value) for value in values)
+
+
+def _ledger_record_for_outcome(
+    *,
+    target: dict[str, Any],
+    source_dataset_id: str,
+    row: dict[str, Any] | None,
+    pipeline_context: dict[str, Any],
+    min_snr: float,
+    max_peaks: int,
+    max_period_grid_points: int | None,
+    scorer: str,
+    pipeline: str,
+    exptime: str,
+    model_path: Path | None,
+    failure_message: str | None = None,
+) -> CandidateLedgerRecord:
+    """Build one schema-v2 record after verifying fetched products exactly."""
+    provenance = (
+        row.get("fetch_provenance", {})
+        if row is not None
+        else pipeline_context.get("fetch_provenance", {})
+    )
+    fetched_uris = tuple(str(uri) for uri in provenance.get("raw_uris", ()))
+    expected_uris = tuple(str(uri) for uri in target["raw_uris"])
+    if fetched_uris != expected_uris:
+        raise RuntimeError(
+            f"Fetched product URIs for {target['target_id']} differ from frozen inventory"
+        )
+    generator_params: dict[str, Any] = {
+        "period_min_days": 0.5,
+        "period_max_days": 500.0,
+        "duration_min_hours": 0.5,
+        "duration_max_hours": 12.0,
+        "n_durations": 20,
+        "min_snr": min_snr,
+        "max_peaks": max_peaks,
+        "max_period_grid_points": max_period_grid_points,
+        "pipeline": pipeline,
+        "exptime": exptime,
+    }
+    target_id = str(target["target_id"])
+    if row is None:
+        candidate_id = f"{target_id.replace(' ', '_')}_null"
+        model_scores: dict[str, float | None] = {}
+        calibrated_scores: dict[str, float | None] = {}
+        review_status = "preprocessing_failure" if failure_message else "unreviewed"
+        review_notes = failure_message or "No BLS signal exceeded the configured gate"
+    else:
+        candidate_id = str(row["candidate_id"])
+        posterior = row.get("posterior", {})
+        scores = row.get("scores", {})
+        model_scores = {
+            **{f"posterior_{key}": value for key, value in posterior.items()},
+            **{str(key): value for key, value in scores.items()},
+        }
+        for key in (
+            "xgb_planet_probability",
+            "ensemble_planet_probability",
+            "cnn_planet_probability",
+            "full_ensemble_planet_probability",
+        ):
+            if key in row:
+                model_scores[key] = row[key]
+        calibrated_scores = {
+            str(key): value for key, value in row.get("calibrated_posterior", {}).items()
+        }
+        review_status = "unreviewed"
+        review_notes = ""
+    model_versions = {"exo_toolkit": __version__, "scorer": scorer}
+    if model_path is not None:
+        model_versions["model_path"] = str(model_path)
+        model_versions["model_sha256"] = sha256_file(model_path)
+    regeneration_command = (
+        f"caffeinate -i .venv/bin/python Skills/star_scanner.py --target "
+        f"{int(target['tic_id'])} --mission TESS --pipeline {pipeline} "
+        f"--exptime {exptime} --min-snr {min_snr} --max-peaks {max_peaks} "
+        f"--max-period-grid-points {max_period_grid_points or 0} --scorer {scorer}"
+    )
+    if model_path is not None:
+        regeneration_command += f" --model-path {model_path}"
+    return CandidateLedgerRecord(
+        schema_version=2,
+        candidate_id=candidate_id,
+        source_dataset_id=source_dataset_id,
+        target_id=target_id,
+        mission="TESS",
+        time_window=_time_window(provenance),
+        raw_uris=fetched_uris,
+        preprocess_version=str(
+            pipeline_context.get(
+                "preprocess_version", f"exo-toolkit-{__version__}:clean_lightcurve"
+            )
+        ),
+        candidate_generator="astropy.timeseries.BoxLeastSquares",
+        candidate_generator_params=generator_params,
+        model_versions=model_versions,
+        model_scores=model_scores,
+        calibrated_scores=calibrated_scores,
+        score_quantiles={},
+        injection_context={"status": "not_injected", "source_role": "live_search"},
+        nearest_known_artifacts=(),
+        review_status=review_status,
+        review_notes=review_notes,
+        regeneration_command=regeneration_command,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Single-star scan
 # ---------------------------------------------------------------------------
@@ -1064,6 +1285,7 @@ def scan_star(
     pipeline: str | None = None,
     exptime: str | None = None,
     priority: float | None = None,
+    capture_ledger_context: bool = False,
 ) -> dict[str, Any]:
     """Run the full pipeline on one star and optionally persist the result.
 
@@ -1079,6 +1301,8 @@ def scan_star(
         pipeline: Optional MAST pipeline/author override.
         exptime: Optional MAST exposure hint.
         priority: Pre-computed priority score to store in the log entry.
+        capture_ledger_context: Preserve full pipeline rows and fetch provenance
+            for immediate schema-v2 ledger insertion by the prepared-batch path.
 
     Returns:
         Dict with keys: ``status``, ``n_signals``, ``best_period_days``,
@@ -1107,6 +1331,7 @@ def scan_star(
         "error_message": None,
     }
 
+    pipeline_context: dict[str, Any] = {}
     try:
         rows = run_pipeline(
             target_id,
@@ -1118,11 +1343,15 @@ def scan_star(
             model_path=model_path,
             pipeline=pipeline,
             exptime=exptime,
+            run_context=pipeline_context if capture_ledger_context else None,
         )
     except Exception as exc:  # noqa: BLE001
         message = str(exc)
         result["status"] = "no_data" if _is_no_data_error(message) else "error"
         result["error_message"] = message
+        if capture_ledger_context:
+            result["_ledger_rows"] = []
+            result["_pipeline_context"] = pipeline_context
         if log is not None:
             log.record(tic_id, result["status"], result)
         return result
@@ -1144,6 +1373,10 @@ def scan_star(
         result["best_duration_hours"] = best.get("duration_hours")
         result["best_transit_count"] = best.get("transit_count")
         result["provenance_score"] = best.get("provenance_score")
+
+    if capture_ledger_context:
+        result["_ledger_rows"] = rows
+        result["_pipeline_context"] = pipeline_context
 
     if log is not None:
         log.record(tic_id, result["status"], result)
@@ -1226,6 +1459,159 @@ def run_target_scan(
         flush=True,
     )
     return result
+
+
+def run_prepared_live_search(
+    bundle: PreparedLiveSearchBundle,
+    *,
+    log_path: Path,
+    candidate_db_path: Path,
+    workers: int = 6,
+    request_delay: float = 0.5,
+    min_snr: float = 5.0,
+    max_peaks: int = 5,
+    max_period_grid_points: int | None = 20_000,
+    scorer: str = "bayesian",
+    model_path: Path | None = None,
+    pipeline: str = "QLP",
+    exptime: str = "long",
+    shard_index: int = 0,
+    shard_count: int = 1,
+) -> dict[str, Any]:
+    """Execute one collision-free shard and append every outcome to ledger v2."""
+    if shard_count < 1 or not 0 <= shard_index < shard_count:
+        raise ValueError("shard_index must be in [0, shard_count)")
+    scoped_log = _shard_scoped_path(log_path, shard_index, shard_count)
+    scoped_db = _shard_scoped_path(candidate_db_path, shard_index, shard_count)
+    shard_targets = [
+        target
+        for target in bundle.targets
+        if int(target["tic_id"]) % shard_count == shard_index
+    ]
+    log = ScanLog(scoped_log)
+    with CandidateDatabase(scoped_db) as database:
+        completed_targets = database.completed_provenanced_target_ids(
+            bundle.dataset_id
+        )
+        targets = [
+            target
+            for target in shard_targets
+            if target["target_id"] not in completed_targets
+        ]
+        print(
+            f"Prepared live search {bundle.dataset_id}: shard "
+            f"{shard_index}/{shard_count}, {len(targets)}/{len(shard_targets)} pending, "
+            f"workers={min(max(1, workers), max(1, len(targets)))}",
+            flush=True,
+        )
+        if not targets:
+            return {
+                "mode": "prepared_scan",
+                "items_processed": 0,
+                "items_written": 0,
+                "items_failed": 0,
+                "output_paths": (str(scoped_log), str(scoped_db)),
+            }
+
+        started = time.monotonic()
+        limiter = _StartRateLimiter(request_delay)
+        worker_count = min(max(1, workers), len(targets))
+        n_done = 0
+        n_failed = 0
+        n_written = 0
+
+        def scan_target(target: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+            limiter.wait()
+            result = scan_star(
+                int(target["tic_id"]),
+                mission="TESS",
+                min_snr=min_snr,
+                max_peaks=max_peaks,
+                max_period_grid_points=max_period_grid_points,
+                scorer=scorer,
+                model_path=model_path,
+                pipeline=pipeline,
+                exptime=exptime,
+                priority=float(target["priority"]),
+                capture_ledger_context=True,
+            )
+            return target, result
+
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            futures = [executor.submit(scan_target, target) for target in targets]
+            for future in as_completed(futures):
+                target, result = future.result()
+                rows = list(result.pop("_ledger_rows", []))
+                pipeline_context = dict(result.pop("_pipeline_context", {}))
+                records: list[CandidateLedgerRecord] = []
+                try:
+                    if rows:
+                        records = [
+                            _ledger_record_for_outcome(
+                                target=target,
+                                source_dataset_id=bundle.dataset_id,
+                                row=row,
+                                pipeline_context=pipeline_context,
+                                min_snr=min_snr,
+                                max_peaks=max_peaks,
+                                max_period_grid_points=max_period_grid_points,
+                                scorer=scorer,
+                                pipeline=pipeline,
+                                exptime=exptime,
+                                model_path=model_path,
+                            )
+                            for row in rows
+                        ]
+                    elif pipeline_context.get("fetch_provenance"):
+                        records = [
+                            _ledger_record_for_outcome(
+                                target=target,
+                                source_dataset_id=bundle.dataset_id,
+                                row=None,
+                                pipeline_context=pipeline_context,
+                                min_snr=min_snr,
+                                max_peaks=max_peaks,
+                                max_period_grid_points=max_period_grid_points,
+                                scorer=scorer,
+                                pipeline=pipeline,
+                                exptime=exptime,
+                                model_path=model_path,
+                                failure_message=(
+                                    str(result["error_message"])
+                                    if result["status"] == "error"
+                                    else None
+                                ),
+                            )
+                        ]
+                    else:
+                        raise RuntimeError(
+                            "No exact fetch provenance was available for ledger insertion"
+                        )
+                    database.insert_provenanced_many(records)
+                except Exception as exc:  # noqa: BLE001
+                    result["status"] = "error"
+                    result["error_message"] = f"Candidate-ledger write refused: {exc}"
+                    records = []
+
+                log.record(int(target["tic_id"]), result["status"], result)
+                n_done += 1
+                n_written += len(records)
+                if result["status"] == "error":
+                    n_failed += 1
+                print(
+                    f"  [{n_done}/{len(targets)}] {target['target_id']} "
+                    f"{_status_text(result)} ledger_rows={len(records)} "
+                    f"{_progress_suffix(n_done, len(targets), started)}",
+                    flush=True,
+                )
+
+    return {
+        "mode": "prepared_scan",
+        "items_processed": n_done,
+        "items_written": n_written,
+        "items_failed": n_failed,
+        "output_paths": (str(scoped_log), str(scoped_db)),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1513,6 +1899,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "before any light-curve download"
         ),
     )
+    mode.add_argument(
+        "--execute-prepared-batch",
+        action="store_true",
+        help="Scan only the frozen manifest queue and write candidate-ledger v2",
+    )
     p.add_argument(
         "--log", default="logs/scan_log.json",
         help="Path to scan log JSON (default: logs/scan_log.json)",
@@ -1572,6 +1963,24 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Validated live-search DatasetManifest JSON",
     )
     p.add_argument(
+        "--candidate-db-path",
+        type=Path,
+        default=Path("data/candidates.sqlite3"),
+        help="Schema-v2 candidate ledger SQLite path",
+    )
+    p.add_argument(
+        "--shard-index",
+        type=int,
+        default=0,
+        help="Prepared-batch process shard index (default: 0)",
+    )
+    p.add_argument(
+        "--shard-count",
+        type=int,
+        default=1,
+        help="Prepared-batch process shard count (default: 1)",
+    )
+    p.add_argument(
         "--replace-preparation",
         action="store_true",
         help="Explicitly replace preparation artifacts with the same versioned paths",
@@ -1600,6 +2009,8 @@ def _write_run_report(
     output_paths: tuple[str, ...],
     report_dir: Path,
     notes: str = "",
+    shard_index: int | None = None,
+    shard_count: int | None = None,
     git_run_fn: Any = None,
 ) -> None:
     """Append and safely publish one star-scanner completion report."""
@@ -1614,8 +2025,15 @@ def _write_run_report(
         items_failed=items_failed,
         output_paths=output_paths,
         notes=notes,
+        shard_index=shard_index,
+        shard_count=shard_count,
     )
-    path = report_path_for("star_scanner", report_dir=report_dir)
+    path = report_path_for(
+        "star_scanner",
+        shard_index=shard_index,
+        shard_count=shard_count,
+        report_dir=report_dir,
+    )
     kwargs: dict[str, Any] = {}
     if git_run_fn is not None:
         kwargs["run_fn"] = git_run_fn
@@ -1648,6 +2066,49 @@ def main(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
         print(f"  No data           : {_s['no_data']:,}")
         print(f"  Errors            : {_s['error']:,}")
         return 0
+
+    if args.execute_prepared_batch:
+        started_at = datetime.now(UTC).isoformat()
+        started = time.monotonic()
+        bundle = load_prepared_live_search_bundle(
+            dataset_manifest_path=Path(args.dataset_manifest_path),
+            batch_manifest_path=Path(args.batch_manifest_path),
+            repo_root=_REPO_ROOT,
+        )
+        summary = run_prepared_live_search(
+            bundle,
+            log_path=_log_path,
+            candidate_db_path=args.candidate_db_path,
+            workers=args.workers,
+            request_delay=args.request_delay,
+            min_snr=args.min_snr,
+            max_peaks=args.max_peaks,
+            max_period_grid_points=args.max_period_grid_points,
+            scorer=args.scorer,
+            model_path=_model_path,
+            pipeline=args.pipeline,
+            exptime=args.exptime,
+            shard_index=args.shard_index,
+            shard_count=args.shard_count,
+        )
+        if not args.no_git_report:
+            _write_run_report(
+                started_at=started_at,
+                elapsed_seconds=time.monotonic() - started,
+                items_processed=int(summary["items_processed"]),
+                items_written=int(summary["items_written"]),
+                items_failed=int(summary["items_failed"]),
+                output_paths=tuple(summary["output_paths"]),
+                report_dir=args.report_dir,
+                notes=(
+                    f"prepared batch {bundle.dataset_id}; shard "
+                    f"{args.shard_index}/{args.shard_count}"
+                ),
+                shard_index=args.shard_index,
+                shard_count=args.shard_count,
+                git_run_fn=git_run_fn,
+            )
+        return 0 if int(summary["items_failed"]) == 0 else 2
 
     if args.target:
         started_at = datetime.now(UTC).isoformat()

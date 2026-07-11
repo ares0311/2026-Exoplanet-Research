@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "last_updated": "2026-07-09",
-  "production_gap": "T1-1: Production Tier 2 CNN checkpoint under docs/exoplanet_exomoon_dataset_handoff.md is promoted as benchmark_cnn_v1 after explicit human approval; next Tier 1 gap is T1-2 stacking calibration after promotion PR merge/CI; T1-0 run006/run008 evidence historical",
+  "last_updated": "2026-07-11",
+  "production_gap": "Tier 1 and Tier 2 deployment gates are closed; Phase 1 candidate-ledger code is wired to tess_live_search_v1 and awaits the operator-coordinated three-shard live evidence run",
   "policy": {
     "standard_operator_cadence": "git add .",
     "git_add_dot_must_be_safe": true,
@@ -1564,6 +1564,22 @@
       },
       "validation_gate": "Raw FITS may be deleted only after processed snippets validate, manifest flag is OK, runtime SQLite has no incomplete active targets, and the operator confirms failed raw FITS are not needed for debugging.",
       "next_action": "Cleanup contract for Skills/process_t1_kepler_batch.py below"
+    },
+    {
+      "path": "data/tess_live_search_v1.shard*of3.sqlite3",
+      "kind": "candidate_ledger_sqlite",
+      "status": "expected_not_yet_run",
+      "git_policy": "ignored",
+      "last_known": {
+        "source_dataset_id": "tess_live_search_v1",
+        "expected_targets": 18,
+        "shard_count": 3,
+        "workers_per_shard": 6,
+        "estimated_raw_download_gb": 0.04565088,
+        "verified_on": "2026-07-11"
+      },
+      "validation_gate": "Every row must use schema v2, exact fetched URIs matching the frozen product inventory, and source_dataset_id=tess_live_search_v1.",
+      "next_action": "Run only after explicit cross-terminal coordination using docs/DISCOVERY_RUNBOOK.md; the measured modulo split is 7/4/7 targets. Stop on URI mismatch, ledger refusal, throttling, or rate regression."
     },
     {
       "path": "reports/",

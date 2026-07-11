@@ -27,6 +27,7 @@ def test_git_add_dot_ignores_local_artifact_classes() -> None:
         "data/kepler_cnn_splits/train.json",
         "data/tess_cnn_splits/manifest.json",
         "data/processed/tess_cnn_seed42/train.json",
+        "data/tess_live_search_v1.shard0of3.sqlite3",
         "checkpoints/cnn_kepler_pretrain/best.pt",
         "checkpoints/cnn_tess_finetuned/training.log",
         "models/cnn/best.pt",
@@ -72,9 +73,9 @@ def test_local_artifact_manifest_matches_human_ledger() -> None:
 
     assert manifest["policy"]["git_add_dot_must_be_safe"] is True
     assert manifest["policy"]["github_visible_ledger_required"] is True
-    assert manifest["production_gap"].startswith("T1-1: Production Tier 2 CNN")
-    assert "docs/exoplanet_exomoon_dataset_handoff.md" in manifest["production_gap"]
-    assert "run006/run008 evidence historical" in manifest["production_gap"]
+    assert "deployment gates are closed" in manifest["production_gap"]
+    assert "tess_live_search_v1" in manifest["production_gap"]
+    assert "three-shard live evidence run" in manifest["production_gap"]
     assert "docs/exoplanet_exomoon_dataset_handoff.md" in ledger
 
     artifact_paths = {artifact["path"] for artifact in manifest["artifacts"]}
@@ -89,6 +90,7 @@ def test_local_artifact_manifest_matches_human_ledger() -> None:
         "logs/discovery_filtered_001.json",
         "models/cnn*/",
         "logs/*.sqlite*",
+        "data/tess_live_search_v1.shard*of3.sqlite3",
         "reports/",
     }
     assert required_paths <= artifact_paths

@@ -62,6 +62,7 @@ def _make_provenance(
     cadence_seconds: float = 120.0,
     sectors: tuple[int, ...] = (1, 2, 3),
     pipeline: str = "SPOC",
+    raw_uris: tuple[str, ...] = (),
 ) -> FetchProvenance:
     return FetchProvenance(
         target_id="TIC 0",
@@ -73,6 +74,7 @@ def _make_provenance(
         n_cadences=1000,
         time_baseline_days=81.0,
         fetched_at="2026-01-01T00:00:00+00:00",
+        raw_uris=raw_uris,
     )
 
 
@@ -146,6 +148,25 @@ class TestRunPipeline:
                 stellar_params_fn=lambda *_: {},
             )
         assert isinstance(result, list)
+
+    def test_run_context_preserves_provenance_for_null_result(self) -> None:
+        lc = _mock_lc()
+        context: dict[str, Any] = {}
+        with patch("exo_toolkit.cli.search_lightcurve", return_value=[]):
+            result = run_pipeline(
+                "TIC 0",
+                "TESS",
+                fetch_fn=lambda *_args, **_kwargs: _make_fetch_result(
+                    lc, raw_uris=("mast:a", "mast:b")
+                ),
+                clean_fn=self._patched_clean(lc),
+                stellar_params_fn=lambda *_: {},
+                run_context=context,
+            )
+
+        assert result == []
+        assert context["fetch_provenance"]["raw_uris"] == ["mast:a", "mast:b"]
+        assert context["preprocess_version"].endswith(":clean_lightcurve")
 
     def test_empty_when_no_signals(self) -> None:
         lc = _mock_lc()
