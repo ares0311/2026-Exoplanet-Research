@@ -19,14 +19,22 @@ def _matches_period(observed: float, expected: float, tolerance: float) -> bool:
 def evaluate_case(case: dict[str, Any], rows: list[dict[str, Any]]) -> dict[str, Any]:
     expected = [float(value) for value in case["expected_period_days"]]
     tolerance = float(case["period_relative_tolerance"])
-    observed = [
-        {
-            "candidate_id": row.get("candidate_id"),
-            "period_days": row.get("period_days"),
-            "fpp": row.get("scores", {}).get("false_positive_probability"),
-        }
-        for row in rows
-    ]
+    probability_field = case.get("planet_probability_field")
+    observed: list[dict[str, Any]] = []
+    for row in rows:
+        if probability_field:
+            probability = row.get(probability_field)
+            fpp = 1.0 - float(probability) if isinstance(probability, (int, float)) else None
+        else:
+            fpp = row.get("scores", {}).get("false_positive_probability")
+        observed.append(
+            {
+                "candidate_id": row.get("candidate_id"),
+                "period_days": row.get("period_days"),
+                "fpp": fpp,
+                "planet_probability_field": probability_field or "bayesian_posterior",
+            }
+        )
     matching = [
         item
         for item in observed
