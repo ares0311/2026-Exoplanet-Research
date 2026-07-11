@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS candidate_ledger (
     mission                     TEXT NOT NULL,
     time_window                 TEXT NOT NULL,
     raw_uri                     TEXT NOT NULL,
+    raw_uris                    TEXT NOT NULL DEFAULT '[]',
     preprocess_version          TEXT NOT NULL,
     candidate_generator         TEXT NOT NULL,
     candidate_generator_params  TEXT NOT NULL,
@@ -90,6 +91,13 @@ class CandidateDatabase:
         self._conn = sqlite3.connect(str(self._path))
         self._conn.row_factory = sqlite3.Row
         self._conn.executescript(_DDL)
+        columns = {
+            str(row[1]) for row in self._conn.execute("PRAGMA table_info(candidate_ledger)")
+        }
+        if "raw_uris" not in columns:
+            self._conn.execute(
+                "ALTER TABLE candidate_ledger ADD COLUMN raw_uris TEXT NOT NULL DEFAULT '[]'"
+            )
         self._conn.commit()
 
     # ------------------------------------------------------------------
@@ -148,6 +156,10 @@ class CandidateDatabase:
             else CandidateLedgerRecord.model_validate(record)
         )
         data = validated.model_dump(mode="json")
+        if data["raw_uri"] is None and data["raw_uris"]:
+            # Keep the legacy singular column populated for SQLite databases
+            # created before schema v2 while preserving the complete URI set.
+            data["raw_uri"] = data["raw_uris"][0]
         json_fields = (
             "candidate_generator_params",
             "model_versions",
@@ -156,6 +168,7 @@ class CandidateDatabase:
             "score_quantiles",
             "injection_context",
             "nearest_known_artifacts",
+            "raw_uris",
         )
         for field in json_fields:
             data[field] = json.dumps(data[field], sort_keys=True)
@@ -183,6 +196,7 @@ class CandidateDatabase:
             "score_quantiles",
             "injection_context",
             "nearest_known_artifacts",
+            "raw_uris",
         )
         results: list[CandidateLedgerRecord] = []
         for row in rows:

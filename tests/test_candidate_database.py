@@ -7,6 +7,8 @@ import pytest
 from pydantic import ValidationError
 from Skills.candidate_database import CandidateDatabase
 
+from exo_toolkit.candidate_ledger import CandidateLedgerRecord
+
 
 def _row(**kw: object) -> dict:
     base = {
@@ -159,6 +161,30 @@ class TestCandidateDatabase:
                 "unreviewed",
                 "follow_up_worthy",
             ]
+
+    def test_schema_v2_round_trips_multiple_raw_product_uris(
+        self, tmp_path: Path
+    ) -> None:
+        record = _provenanced(
+            schema_version=2,
+            raw_uri=None,
+            raw_uris=("mast:TESS/product-a.fits", "mast:TESS/product-b.fits"),
+        )
+        with CandidateDatabase(tmp_path / "c.sqlite3") as db:
+            db.insert_provenanced(record)
+            restored = db.candidate_history("TESS-TIC1-5d")[0]
+
+        assert restored.schema_version == 2
+        assert restored.raw_uris == (
+            "mast:TESS/product-a.fits",
+            "mast:TESS/product-b.fits",
+        )
+
+    def test_schema_v2_rejects_missing_raw_product_uris(self) -> None:
+        with pytest.raises(ValidationError, match="raw_uris"):
+            CandidateLedgerRecord.model_validate(
+                _provenanced(schema_version=2, raw_uri=None, raw_uris=())
+            )
 
     def test_provenanced_insert_rejects_missing_dataset_id(
         self, tmp_path: Path
