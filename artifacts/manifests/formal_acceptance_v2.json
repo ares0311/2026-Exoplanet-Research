@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "suite_id": "formal_acceptance_v2",
+  "toolkit_version": "0.2.33",
+  "git_commit": "bb5c82fa4cae001ea8c00b87f394a1ff46286053",
+  "evaluated_at": "2026-07-11T07:06:29.969321+00:00",
+  "status": "PASS",
+  "cases": [
+    {
+      "case_id": "confirmed_pi_mensae_c",
+      "kind": "confirmed",
+      "target_id": "TIC 261136679",
+      "catalog_disposition": "known planet benchmark",
+      "expected_period_days": [
+        6.2679
+      ],
+      "period_relative_tolerance": 0.02,
+      "command": "caffeinate -i .venv/bin/exo 'TIC 261136679' --mission TESS --pipeline SPOC --exptime short --scorer ensemble --model-path models/xgboost_koi.json --max-peaks 3 --max-period-grid-points 20000 --output /private/tmp/formal_acceptance_pi_mensae_ensemble.json",
+      "result_path": "/private/tmp/formal_acceptance_pi_mensae_ensemble.json",
+      "observed": [
+        {
+          "candidate_id": "TIC_261136679_s01",
+          "period_days": 6.267620729813179,
+          "fpp": 0.4404785001825209,
+          "planet_probability_field": "ensemble_planet_probability"
+        },
+        {
+          "candidate_id": "TIC_261136679_s02",
+          "period_days": 147.15751055907933,
+          "fpp": 0.14117458347839507,
+          "planet_probability_field": "ensemble_planet_probability"
+        },
+        {
+          "candidate_id": "TIC_261136679_s03",
+          "period_days": 344.9292859606761,
+          "fpp": 0.1856224991528337,
+          "planet_probability_field": "ensemble_planet_probability"
+        }
+      ],
+      "matching_catalog_ephemeris": [
+        {
+          "candidate_id": "TIC_261136679_s01",
+          "period_days": 6.267620729813179,
+          "fpp": 0.4404785001825209,
+          "planet_probability_field": "ensemble_planet_probability"
+        }
+      ],
+      "passed": true,
+      "reasons": []
+    },
+    {
+      "case_id": "false_positive_toi_146_01",
+      "kind": "false_positive",
+      "target_id": "TIC 355636844",
+      "catalog_disposition": "FP",
+      "expected_period_days": [
+        6.30556
+      ],
+      "period_relative_tolerance": 0.02,
+      "command": "caffeinate -i .venv/bin/exo 'TIC 355636844' --mission TESS --pipeline SPOC --exptime short --scorer ensemble --model-path models/xgboost_koi.json --max-peaks 3 --max-period-grid-points 20000 --output /private/tmp/formal_acceptance_toi146_fp_ensemble.json",
+      "result_path": "/private/tmp/formal_acceptance_toi146_fp_ensemble.json",
+      "observed": [],
+      "matching_catalog_ephemeris": [],
+      "passed": true,
+      "reasons": [
+        "no_signal_above_detection_threshold"
+      ]
+    }
+  ]
+}

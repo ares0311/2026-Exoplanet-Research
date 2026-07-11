@@ -292,6 +292,20 @@ by itself satisfy a master-guide evidence requirement.
 
 ---
 
+## Milestone 20 — Slick Animated Command-Line UI
+
+Unlocked by the formal production-ensemble acceptance PASS in version 0.2.33.
+This milestone improves operator clarity without changing scientific scoring,
+thresholds, or classifications.
+
+- [ ] Add a polished terminal presentation for Fetch → Clean → Search → Vet → Score → Classify, with animated progress and useful elapsed-time/ETA status
+- [ ] Preserve stable machine-readable JSON output, exit codes, redirected output, and non-TTY/CI behavior
+- [ ] Provide an explicit `--no-animation`/reduced-motion path and graceful interruption/error rendering
+- [ ] Add terminal-width, TTY/non-TTY, failure-path, and interruption regression tests
+- [ ] Document the interactive and automation-safe CLI modes
+
+---
+
 ## Decision Tree (current implementation)
 
 ```

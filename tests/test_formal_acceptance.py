@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from Skills.formal_acceptance import evaluate_case
 
 
@@ -41,3 +42,13 @@ def test_false_positive_accepts_clean_rejection() -> None:
 def test_false_positive_detected_ephemeris_requires_high_fpp() -> None:
     assert evaluate_case(_case("false_positive"), [_row(10.1, 0.8)])["passed"]
     assert not evaluate_case(_case("false_positive"), [_row(10.1, 0.2)])["passed"]
+
+
+def test_named_planet_probability_field_is_converted_to_fpp() -> None:
+    case = _case("confirmed")
+    case["planet_probability_field"] = "ensemble_planet_probability"
+    row = _row(10.1, 0.9)
+    row["ensemble_planet_probability"] = 0.8
+    result = evaluate_case(case, [row])
+    assert result["passed"]
+    assert result["observed"][0]["fpp"] == pytest.approx(0.2)

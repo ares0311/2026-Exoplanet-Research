@@ -1,9 +1,12 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-07-10 (T1-2 COMPLETE: held-out K2 calibration set built, native snippets fetched live via 4-way sharding, CNN predictions merged, stacking weights calibrated (XGBoost=0.95/CNN=0.00/Bayesian=0.05), and wired into production. The master-corpus Kepler CNN checkpoint passed held-out gates and was human-approved for promotion as `benchmark_cnn_v1`. No Tier 1 gaps remain open.)
+Last reviewed: 2026-07-11 (formal production-ensemble acceptance PASS: the
+catalog ephemeris for pi Mensae c was recovered within 0.005% with ensemble
+FPP 0.4405, while the TOI-146.01 false-positive control produced no signal.
+No Tier 1 gaps remain open.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 2,626 default tests passing, 2 integration_live deselected (2026-07-11)
+Test baseline: 2,627 default tests passing, 2 integration_live deselected (2026-07-11)
 
 ---
 
@@ -25,7 +28,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.32 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.33 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -144,6 +147,14 @@ at the wrong period. It also synchronizes the source fallback version, repairs
 the stale Tier 2 reporter so it reads the promoted benchmark evidence by
 default, and removes contradictory readiness/roadmap status left behind after
 the completed Kepler processing and T1-2 stacking gates.
+0.2.33 closes the formal production-ensemble acceptance gate with a durable
+PASS report in `artifacts/manifests/formal_acceptance_v2.json`. The confirmed
+control, pi Mensae c, recovered 6.2676207 d against the catalog 6.2679 d period
+and produced ensemble FPP 0.4405; the TOI-146.01 false-positive control
+produced no signal. The harness now evaluates the probability emitted by the
+scorer under test rather than always substituting the Bayesian posterior. The
+earlier TOI-700 Bayesian-only v1 FAIL remains committed evidence of a known
+positive-control limitation; it is not rewritten as a pass.
 
 ---
 
@@ -328,15 +339,15 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 
 Run these before any live deployment or public announcement:
 
-- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-10: 2,611 passed, 2 deselected)
-- [x] `.venv/bin/ruff check .` — no lint errors (2026-07-10: clean)
-- [x] `.venv/bin/python -m mypy src` — no type errors (2026-07-10: clean, 28 source files)
+- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-11: 2,627 passed, 2 deselected)
+- [x] `.venv/bin/ruff check .` — no lint errors (2026-07-11: clean)
+- [x] `.venv/bin/python -m mypy src` — no type errors (2026-07-11: clean, 30 source files)
 - [x] `exo background-run-once --dry-run` — no config errors (2026-07-10: installed entry point exercised successfully; dry run wrote no ledger/outcome data)
 - [x] `.venv/bin/python Skills/tier2_progress_reporter.py` — 2026-07-11 reports READY from 15,649 committed-evidence examples/snippets, promoted checkpoint, calibration, and registry entry
 - [x] Verify `configs/background_search_v0.json` fingerprint matches expected value (2026-07-10: `exo sqlite-integrity` returned `ok: true` and `missing_config_fingerprint_count: 0`)
 - [x] Verify `models/xgboost_koi.json` and `models/xgboost_koi.xgb.json` exist for XGBoost scorer (stale `xgboost_koi_meta.json` name corrected 2026-07-10 — the actual companion-file convention is `.xgb.json`, see `src/exo_toolkit/ml/xgboost_scorer.py`; both files confirmed present 2026-07-10)
-- [ ] Formal acceptance confirmed control — TOI-700 must recover a catalog period within 2% and produce FPP < 0.5. The 2026-07-11 run produced low-FPP signals at 13.2749/13.5627 d but recovered none of TOI-700's catalog periods; **FAIL, gate open**.
-- [x] Formal acceptance false-positive control — TOI-146.01 / TIC 355636844 produced no signal above the production detection threshold on 2026-07-11; conservative rejection PASS.
+- [x] Formal production-ensemble confirmed control — pi Mensae c / TIC 261136679 recovered 6.2676207 d against the catalog 6.2679 d period (0.005% relative error) with ensemble FPP 0.4405 on 2026-07-11; PASS. The separate Bayesian-only TOI-700 v1 control remains a documented FAIL and regression target.
+- [x] Formal production-ensemble false-positive control — TOI-146.01 / TIC 355636844 produced no signal above the production detection threshold on 2026-07-11; conservative rejection PASS.
 
 **2026-07-10 CLI routing bug found and fixed while running this checklist**: `exo background-run-once --dry-run`, `exo run-summary`, and `exo sqlite-integrity` — the exact invocations this checklist and `AGENTS.md`/`CLAUDE.md` document — did not work as documented. Root cause: `pyproject.toml`'s `[project.scripts]` registered `exo` to `exo_toolkit.cli:app`, a Typer app that only implements the `exo <TARGET-ID>` transit-scan command; the 17 background-automation subcommands are implemented separately by `exo_toolkit.cli`'s argparse `main()`/`build_parser()`, which was never wired to the installed console script at all (only reachable via `python -m exo_toolkit.cli <subcommand>`, the form `docs/SCHEDULER.md` correctly documents for cron/systemd). Invoking `exo background-run-once` therefore silently misparsed `"background-run-once"` as a scan TARGET_ID and failed with a Typer usage error, not a config error. Fixed: `src/exo_toolkit/cli.py` gains `cli_entry()`, a small dispatcher that routes to `main()` when the first argument names a background subcommand (`_background_command_handlers()` is now the single source of truth for that name list, shared with `build_parser()`) and falls through to the Typer `app` otherwise; `pyproject.toml`'s `exo` script now points to `exo_toolkit.cli:cli_entry`. `Skills/mcp_bootstrap_server.py`'s `_exo_command()` helper had the same bug from the other direction (it preferred a bare `exo` found on PATH over the module-invocation form for these same three subcommands) and is fixed the same way. 5 new regression tests (`TestCliEntry` in `tests/test_cli.py`, `test_background_subcommands_use_module_invocation_not_bare_exo` in `tests/test_mcp_bootstrap_server.py`); full suite re-run clean (2,611 passed). The editable install was resynchronized in the repository `.venv`, and all three installed entry-point commands now run successfully; `sqlite-integrity` reports `ok: true`.
 
