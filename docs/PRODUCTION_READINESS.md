@@ -3,7 +3,7 @@
 Last reviewed: 2026-07-10 (T1-2 COMPLETE: held-out K2 calibration set built, native snippets fetched live via 4-way sharding, CNN predictions merged, stacking weights calibrated (XGBoost=0.95/CNN=0.00/Bayesian=0.05), and wired into production. The master-corpus Kepler CNN checkpoint passed held-out gates and was human-approved for promotion as `benchmark_cnn_v1`. No Tier 1 gaps remain open.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 2,611 default tests passing, 2 integration_live deselected (2026-07-10)
+Test baseline: 2,626 default tests passing, 2 integration_live deselected (2026-07-11)
 
 ---
 
@@ -25,7 +25,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.31 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.32 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -138,6 +138,12 @@ regeneration provenance, generator/model/calibration/injection context, and
 structured human-review state. Production scan-path wiring remains the next
 ledger task; until then, the old table must not be mistaken for the complete
 scientific ledger.
+0.2.32 adds the formal production-acceptance harness and records the first
+catalog-backed TESS control run as FAIL rather than accepting low-FPP signals
+at the wrong period. It also synchronizes the source fallback version, repairs
+the stale Tier 2 reporter so it reads the promoted benchmark evidence by
+default, and removes contradictory readiness/roadmap status left behind after
+the completed Kepler processing and T1-2 stacking gates.
 
 ---
 
@@ -308,12 +314,12 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Bayesian log-score model (6 hypotheses, 35+ feature functions) | ✅ |
 | XGBoost Tier 1 scorer + Kepler training pipeline | ✅ |
 | Stacking Tier 3 scorer (conservative fallback) | ✅ |
-| CNN Tier 2 scaffolding (training loop, checkpoint, calibration) | ✅ (gated) |
+| CNN Tier 2 benchmark (training loop, promoted checkpoint, calibration) | ✅ promoted as `benchmark_cnn_v1` |
 | CLI: `exo <TIC-ID>` + all `background-*` subcommands | ✅ |
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
 | 82 production-critical Skills/ | ✅ |
-| 2,519 default tests, ruff clean, mypy clean | ✅ |
+| 2,626 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -326,11 +332,11 @@ Run these before any live deployment or public announcement:
 - [x] `.venv/bin/ruff check .` — no lint errors (2026-07-10: clean)
 - [x] `.venv/bin/python -m mypy src` — no type errors (2026-07-10: clean, 28 source files)
 - [x] `exo background-run-once --dry-run` — no config errors (2026-07-10: installed entry point exercised successfully; dry run wrote no ledger/outcome data)
-- [ ] `.venv/bin/python Skills/tier2_progress_reporter.py` — confirm CNN gate status documented (not run standalone this session; already extensively documented above under T1-1/T1-2 — treat as satisfied by existing narrative unless a fresh printout is specifically wanted)
+- [x] `.venv/bin/python Skills/tier2_progress_reporter.py` — 2026-07-11 reports READY from 15,649 committed-evidence examples/snippets, promoted checkpoint, calibration, and registry entry
 - [x] Verify `configs/background_search_v0.json` fingerprint matches expected value (2026-07-10: `exo sqlite-integrity` returned `ok: true` and `missing_config_fingerprint_count: 0`)
 - [x] Verify `models/xgboost_koi.json` and `models/xgboost_koi.xgb.json` exist for XGBoost scorer (stale `xgboost_koi_meta.json` name corrected 2026-07-10 — the actual companion-file convention is `.xgb.json`, see `src/exo_toolkit/ml/xgboost_scorer.py`; both files confirmed present 2026-07-10)
-- [ ] Run `exo <known-confirmed-TOI-TIC-ID> --scorer bayesian` — verify FPP < 0.5 (not run this session — needs a live MAST fetch; TIC 150428135 / TOI-700 is this project's own standard confirmed-planet example, see `notebooks/pipeline_demo.ipynb`)
-- [ ] Run `exo <known-FP-TIC-ID> --scorer bayesian` — verify FPP > 0.5 (not run this session — no project-vetted known-FP TIC ID was found on hand; pick one from a live TOI-catalog query via `Skills/toi_checker.py` rather than guessing a disposition from memory)
+- [ ] Formal acceptance confirmed control — TOI-700 must recover a catalog period within 2% and produce FPP < 0.5. The 2026-07-11 run produced low-FPP signals at 13.2749/13.5627 d but recovered none of TOI-700's catalog periods; **FAIL, gate open**.
+- [x] Formal acceptance false-positive control — TOI-146.01 / TIC 355636844 produced no signal above the production detection threshold on 2026-07-11; conservative rejection PASS.
 
 **2026-07-10 CLI routing bug found and fixed while running this checklist**: `exo background-run-once --dry-run`, `exo run-summary`, and `exo sqlite-integrity` — the exact invocations this checklist and `AGENTS.md`/`CLAUDE.md` document — did not work as documented. Root cause: `pyproject.toml`'s `[project.scripts]` registered `exo` to `exo_toolkit.cli:app`, a Typer app that only implements the `exo <TARGET-ID>` transit-scan command; the 17 background-automation subcommands are implemented separately by `exo_toolkit.cli`'s argparse `main()`/`build_parser()`, which was never wired to the installed console script at all (only reachable via `python -m exo_toolkit.cli <subcommand>`, the form `docs/SCHEDULER.md` correctly documents for cron/systemd). Invoking `exo background-run-once` therefore silently misparsed `"background-run-once"` as a scan TARGET_ID and failed with a Typer usage error, not a config error. Fixed: `src/exo_toolkit/cli.py` gains `cli_entry()`, a small dispatcher that routes to `main()` when the first argument names a background subcommand (`_background_command_handlers()` is now the single source of truth for that name list, shared with `build_parser()`) and falls through to the Typer `app` otherwise; `pyproject.toml`'s `exo` script now points to `exo_toolkit.cli:cli_entry`. `Skills/mcp_bootstrap_server.py`'s `_exo_command()` helper had the same bug from the other direction (it preferred a bare `exo` found on PATH over the module-invocation form for these same three subcommands) and is fixed the same way. 5 new regression tests (`TestCliEntry` in `tests/test_cli.py`, `test_background_subcommands_use_module_invocation_not_bare_exo` in `tests/test_mcp_bootstrap_server.py`); full suite re-run clean (2,611 passed). The editable install was resynchronized in the repository `.venv`, and all three installed entry-point commands now run successfully; `sqlite-integrity` reports `ok: true`.
 
@@ -358,7 +364,7 @@ These are enforced in code and must never be bypassed:
 | Source-access smoke test | **Complete** — `Skills/verify_dataset_sources.py` passed end-to-end on 2026-07-02 with TAP schemas/rows, ExoFOP CSV, and Lightkurve Kepler/TESS searches verified | Agent |
 | Storage/runtime/source snapshot plan | **Complete** — live sample metadata estimates are committed under `metadata/`; combined Kepler-long-cadence plus TESS estimate is 92,093,823,360 bytes under the 100 GiB cap | Agent |
 | Leakage-safe training manifest and cleanup path | **Complete** — `metadata/t1_1_kepler_training_manifest.jsonl` and `metadata/t1_1_kepler_manifest_summary.json` are committed with 0 leakage errors | Agent |
-| Bounded Kepler-first processing batch | **Complete, not yet run live** — `Skills/process_t1_kepler_batch.py` is built and unit-tested (27 offline tests); needs one bounded live run (`--max-targets 25`) on the operator's Mac to verify against real Kepler data before scaling up | Agent built it; **Human** runs the first live batch |
+| Bounded Kepler-first processing batch | **Complete and exhausted live** — committed run-report ledgers sum to all 6,515 target groups processed; the master corpus and promoted checkpoint were built from the validated outputs | Agent + human live runs complete |
 | CNN production training run | Build/train/evaluate only after the source contract, manifests, and local artifact ledger are updated; use the local M4 Max GPU path by default | Agent + human approval for long local runs |
 | CNN promotion readiness package | **Complete** — temperature-calibration promotion tooling, model card, reproducibility manifest, data-role registry, benchmark designation, storage/retention ledger updates, and exact selected artifact scope are GitHub-visible | Agent |
 | CNN production promotion | **Complete in promotion PR** — human approved checkpoint SHA `f29e6891c255289fa1e2eddad1fb6ca131c063cf11c24b8113e0e29d049441c5`; selected artifacts are copied to `models/cnn/benchmark_cnn_v1/` and registered in `models/registry.json` | Agent + human approval |

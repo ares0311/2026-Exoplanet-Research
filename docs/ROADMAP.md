@@ -8,13 +8,13 @@ by itself satisfy a master-guide evidence requirement.
 
 ## Current Master-Guide Alignment — Production Priority Order
 
-1. **Phase 1 — validated manifest contract (IN PROGRESS):** version 0.2.30 adds
+1. **Phase 1 — validated manifest contract (CONTRACT COMPLETE):** version 0.2.30 adds
    the shared schema, frozen Pydantic contract, fail-closed checksum/path
    validator, stable dataset IDs, and data-role-registry links for the committed
    Kepler/K2 production datasets. Require the same contract when the first TESS
    or JWST row-level production manifest is created; do not invent placeholder
    datasets merely to claim mission coverage.
-2. **Phase 1 — reproducible candidate ledger (IN PROGRESS):** version 0.2.31
+2. **Phase 1 — reproducible candidate ledger (CONTRACT COMPLETE / WIRING OPEN):** version 0.2.31
    adds a strict, mission-neutral, append-only provenance contract and SQLite
    table carrying the master-guide fields (`source_dataset_id`, raw URI,
    preprocessing/generator versions and parameters, model versions/scores,
@@ -248,7 +248,7 @@ by itself satisfy a master-guide evidence requirement.
 
 ## Future
 
-- [ ] Calibrate full-ensemble weights only after the CNN checkpoint is promoted and a held-out calibration set is available; do not tune stacking weights on training or frozen-eval data.
+- [x] Calibrate full-ensemble weights on a held-out set after CNN promotion — completed 2026-07-10 on 588 K2 examples; production weights are XGBoost=0.95, CNN=0.00, Bayesian=0.05.
 
 ---
 

@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "suite_id": "formal_acceptance_v1",
+  "toolkit_version": "0.2.32",
+  "git_commit": "f9385cd95c93ae2af2f158e12b7f67b843aeafb3",
+  "evaluated_at": "2026-07-11T01:24:35.595233+00:00",
+  "status": "FAIL",
+  "cases": [
+    {
+      "case_id": "confirmed_toi_700",
+      "kind": "confirmed",
+      "target_id": "TIC 150428135",
+      "catalog_disposition": "CP",
+      "expected_period_days": [
+        9.97727296315733,
+        16.0511059784547,
+        27.8096897573547,
+        37.4236838274161
+      ],
+      "period_relative_tolerance": 0.02,
+      "command": "caffeinate -i .venv/bin/exo 'TIC 150428135' --mission TESS --pipeline SPOC --exptime short --scorer bayesian --max-peaks 3 --max-period-grid-points 20000 --output /private/tmp/formal_acceptance_toi700_spoc_short.json",
+      "result_path": "/private/tmp/formal_acceptance_toi700_spoc_short.json",
+      "observed": [
+        {
+          "candidate_id": "TIC_150428135_s01",
+          "period_days": 13.274876703417787,
+          "fpp": 0.40972720263266116
+        },
+        {
+          "candidate_id": "TIC_150428135_s02",
+          "period_days": 13.562671491602252,
+          "fpp": 0.4558938134163262
+        },
+        {
+          "candidate_id": "TIC_150428135_s03",
+          "period_days": 13.274876703417787,
+          "fpp": 0.46862545058734983
+        }
+      ],
+      "matching_catalog_ephemeris": [],
+      "passed": false,
+      "reasons": [
+        "no_catalog_ephemeris_recovered"
+      ]
+    },
+    {
+      "case_id": "false_positive_toi_146_01",
+      "kind": "false_positive",
+      "target_id": "TIC 355636844",
+      "catalog_disposition": "FP",
+      "expected_period_days": [
+        6.30556
+      ],
+      "period_relative_tolerance": 0.02,
+      "command": "caffeinate -i .venv/bin/exo 'TIC 355636844' --mission TESS --pipeline SPOC --exptime short --scorer bayesian --max-peaks 3 --max-period-grid-points 20000 --output /private/tmp/formal_acceptance_toi146_fp_spoc_short.json",
+      "result_path": "/private/tmp/formal_acceptance_toi146_fp_spoc_short.json",
+      "observed": [],
+      "matching_catalog_ephemeris": [],
+      "passed": true,
+      "reasons": [
+        "no_signal_above_detection_threshold"
+      ]
+    }
+  ]
+}
