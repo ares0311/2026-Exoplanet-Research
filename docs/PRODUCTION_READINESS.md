@@ -25,7 +25,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.30 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.31 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -131,6 +131,13 @@ sources, fail-closed repository-path and SHA-256 validation, a reusable CLI,
 and explicit links from the data-role registry. TESS/JWST must use the same
 contract when their first row-level production manifests are created; no
 placeholder datasets are fabricated.
+0.2.31 adds the Astrometrics master-guide candidate-ledger contract without
+breaking the legacy convenience database: strict mission-neutral Pydantic
+records, an append-only SQLite table, stable source-dataset IDs, raw and
+regeneration provenance, generator/model/calibration/injection context, and
+structured human-review state. Production scan-path wiring remains the next
+ledger task; until then, the old table must not be mistaken for the complete
+scientific ledger.
 
 ---
 

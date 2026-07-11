@@ -17,10 +17,13 @@ CandidateDatabase(db_path) — open/create the DB
 from __future__ import annotations
 
 import csv
+import json
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from exo_toolkit.candidate_ledger import CandidateLedgerRecord
 
 _DDL = """
 CREATE TABLE IF NOT EXISTS candidates (
@@ -38,6 +41,34 @@ CREATE TABLE IF NOT EXISTS candidates (
     meta            TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_tic ON candidates(tic_id);
+CREATE TABLE IF NOT EXISTS candidate_ledger (
+    id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+    schema_version              INTEGER NOT NULL,
+    candidate_id                TEXT NOT NULL,
+    project                     TEXT NOT NULL,
+    source_dataset_id           TEXT NOT NULL,
+    target_id                   TEXT NOT NULL,
+    mission                     TEXT NOT NULL,
+    time_window                 TEXT NOT NULL,
+    raw_uri                     TEXT NOT NULL,
+    preprocess_version          TEXT NOT NULL,
+    candidate_generator         TEXT NOT NULL,
+    candidate_generator_params  TEXT NOT NULL,
+    model_versions              TEXT NOT NULL,
+    model_scores                TEXT NOT NULL,
+    calibrated_scores           TEXT NOT NULL,
+    score_quantiles             TEXT NOT NULL,
+    injection_context           TEXT NOT NULL,
+    nearest_known_artifacts     TEXT NOT NULL,
+    review_status               TEXT NOT NULL,
+    review_notes                TEXT NOT NULL,
+    regeneration_command        TEXT NOT NULL,
+    created_at                  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ledger_candidate
+    ON candidate_ledger(candidate_id, id);
+CREATE INDEX IF NOT EXISTS idx_ledger_dataset
+    ON candidate_ledger(source_dataset_id);
 """
 
 _COLUMNS = (
@@ -80,7 +111,6 @@ class CandidateDatabase:
         Returns:
             The auto-assigned row ID.
         """
-        import json
         run_at = row.get("run_at") or datetime.now(UTC).isoformat()
         meta_raw = row.get("meta")
         meta = (json.dumps(meta_raw)
@@ -107,6 +137,66 @@ class CandidateDatabase:
         )
         self._conn.commit()
         return cur.lastrowid  # type: ignore[return-value]
+
+    def insert_provenanced(
+        self, record: CandidateLedgerRecord | dict[str, Any]
+    ) -> int:
+        """Validate and append one reproducible candidate-ledger record."""
+        validated = (
+            record
+            if isinstance(record, CandidateLedgerRecord)
+            else CandidateLedgerRecord.model_validate(record)
+        )
+        data = validated.model_dump(mode="json")
+        json_fields = (
+            "candidate_generator_params",
+            "model_versions",
+            "model_scores",
+            "calibrated_scores",
+            "score_quantiles",
+            "injection_context",
+            "nearest_known_artifacts",
+        )
+        for field in json_fields:
+            data[field] = json.dumps(data[field], sort_keys=True)
+        columns = tuple(data)
+        placeholders = ",".join("?" for _ in columns)
+        cursor = self._conn.execute(
+            f"INSERT INTO candidate_ledger ({','.join(columns)}) "
+            f"VALUES ({placeholders})",
+            tuple(data[column] for column in columns),
+        )
+        self._conn.commit()
+        return cursor.lastrowid  # type: ignore[return-value]
+
+    def candidate_history(self, candidate_id: str) -> list[CandidateLedgerRecord]:
+        """Return validated append history for one stable candidate ID."""
+        rows = self._conn.execute(
+            "SELECT * FROM candidate_ledger WHERE candidate_id=? ORDER BY id",
+            (candidate_id,),
+        ).fetchall()
+        json_fields = (
+            "candidate_generator_params",
+            "model_versions",
+            "model_scores",
+            "calibrated_scores",
+            "score_quantiles",
+            "injection_context",
+            "nearest_known_artifacts",
+        )
+        results: list[CandidateLedgerRecord] = []
+        for row in rows:
+            data = dict(row)
+            data.pop("id")
+            for field in json_fields:
+                data[field] = json.loads(data[field])
+            results.append(CandidateLedgerRecord.model_validate(data))
+        return results
+
+    def provenanced_count(self) -> int:
+        """Return the number of strict candidate-ledger records."""
+        row = self._conn.execute("SELECT COUNT(*) FROM candidate_ledger").fetchone()
+        return int(row[0])
 
     def latest(self, tic_id: int) -> dict[str, Any] | None:
         """Return the most recent row for *tic_id*, or None."""

@@ -14,11 +14,13 @@ by itself satisfy a master-guide evidence requirement.
    Kepler/K2 production datasets. Require the same contract when the first TESS
    or JWST row-level production manifest is created; do not invent placeholder
    datasets merely to claim mission coverage.
-2. **Phase 1 — reproducible candidate ledger:** `Skills/candidate_database.py`
-   provides a basic SQLite history, but it does not yet carry the master-guide
-   provenance fields (`source_dataset_id`, raw URI, preprocessing/generator
-   versions and parameters, model versions/scores, injection context, review
-   state, and regeneration command) or receive every production candidate.
+2. **Phase 1 — reproducible candidate ledger (IN PROGRESS):** version 0.2.31
+   adds a strict, mission-neutral, append-only provenance contract and SQLite
+   table carrying the master-guide fields (`source_dataset_id`, raw URI,
+   preprocessing/generator versions and parameters, model versions/scores,
+   injection context, review state, and regeneration command). Next, wire every
+   production scan path to write this contract rather than relying on the
+   legacy TESS-only convenience table.
 3. **Phase 1 — canonical regression evals:** no committed sample-level suite
    yet covers confirmed planets, known false positives, and injected controls
    with before/after pipeline comparisons.
