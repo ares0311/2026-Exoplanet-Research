@@ -1,6 +1,7 @@
 """Tests for Skills/star_scanner.py (offline / unit tests only)."""
 from __future__ import annotations
 
+import csv
 import json
 import sys
 from pathlib import Path
@@ -24,11 +25,23 @@ sys.modules.setdefault("astroquery.mast", _mock_astroquery_mast)
 
 from Skills.star_scanner import (  # noqa: E402
     ScanLog,
+    _load_prior_discovery_tic_ids,
+    _load_toi_tic_ids,
+    _write_run_report,
+    inspect_target_products,
+    main,
+    prepare_live_search_snapshot,
     priority_score,
     run_background_scan,
     run_target_scan,
     scan_star,
     select_targets,
+)
+
+from exo_toolkit.dataset_manifest import (  # noqa: E402
+    load_dataset_manifest,
+    sha256_file,
+    validate_dataset_manifest,
 )
 
 # ---------------------------------------------------------------------------
@@ -263,9 +276,9 @@ def _make_mock_catalog_result(rows: list[dict[str, Any]]) -> list[dict[str, Any]
 class TestSelectTargets:
     def _catalog_rows(self) -> list[dict[str, Any]]:
         return [
-            {"ID": 100, "Tmag": 12.0, "Teff": 4500.0, "contratio": 0.01},
-            {"ID": 200, "Tmag": 11.0, "Teff": 5800.0, "contratio": 0.05},
-            {"ID": 300, "Tmag": 13.5, "Teff": 3800.0, "contratio": 0.0},
+            {"ID": 100, "ra": 10.0, "dec": -5.0, "Tmag": 12.0, "Teff": 4500.0, "contratio": 0.01},
+            {"ID": 200, "ra": 20.0, "dec": 5.0, "Tmag": 11.0, "Teff": 5800.0, "contratio": 0.05},
+            {"ID": 300, "ra": 30.0, "dec": 15.0, "Tmag": 13.5, "Teff": 3800.0, "contratio": 0.0},
         ]
 
     @patch("astroquery.mast.Catalogs")
@@ -319,6 +332,290 @@ class TestSelectTargets:
         mock_catalogs.query_region.side_effect = RuntimeError("remote closed")
         with pytest.raises(RuntimeError, match="TIC target selection failed"):
             select_targets(n=2, max_tiles=1, retry_attempts=1)
+
+
+class _FakeProductTable(list[dict[str, Any]]):
+    colnames = ["dataURI", "size", "sequence_number", "productFilename"]
+
+
+class TestLiveSearchPreparation:
+    @staticmethod
+    def _target(tic_id: int, *, priority: float = 0.9) -> dict[str, Any]:
+        return {
+            "tic_id": tic_id,
+            "ra_deg": 10.0 + tic_id / 1000,
+            "dec_deg": -20.0,
+            "tmag": 12.5,
+            "teff": 4500.0,
+            "contratio": 0.01,
+            "priority": priority,
+        }
+
+    def test_inspect_target_products_preserves_exact_metadata(self) -> None:
+        table = _FakeProductTable(
+            [
+                {
+                    "dataURI": "mast:TESS/product-a.fits",
+                    "size": 100,
+                    "sequence_number": 1,
+                    "productFilename": "product-a.fits",
+                },
+                {
+                    "dataURI": "mast:TESS/product-a.fits",
+                    "size": 100,
+                    "sequence_number": 1,
+                    "productFilename": "product-a.fits",
+                },
+                {
+                    "dataURI": "mast:TESS/product-b.fits",
+                    "size": 250,
+                    "sequence_number": 2,
+                    "productFilename": "product-b.fits",
+                },
+            ]
+        )
+        search_result = MagicMock()
+        search_result.table = table
+        search_fn = MagicMock(return_value=search_result)
+
+        result = inspect_target_products(
+            self._target(101),
+            mission="TESS",
+            pipeline="QLP",
+            exptime="long",
+            search_fn=search_fn,
+        )
+
+        search_fn.assert_called_once_with(
+            "TIC 101", mission="TESS", author="QLP", exptime="long"
+        )
+        assert result["product_count"] == 2
+        assert result["total_bytes"] == 350
+        assert result["sectors"] == (1, 2)
+        assert [product["uri"] for product in result["products"]] == [
+            "mast:TESS/product-a.fits",
+            "mast:TESS/product-b.fits",
+        ]
+
+    def test_prepare_snapshot_writes_valid_policy_bundle(self, tmp_path: Path) -> None:
+        queue = tmp_path / "data_selection" / "target_priority_queue.csv"
+        snapshot = tmp_path / "data_selection" / "queue.batch-v1.csv"
+        batch = tmp_path / "data_selection" / "batch_manifests" / "batch-v1.json"
+        dataset = tmp_path / "metadata" / "dataset_manifests" / "dataset-v1.json"
+
+        def inspector(target: dict[str, Any], **_: object) -> dict[str, Any]:
+            result = dict(target)
+            result.update(
+                {
+                    "products": (
+                        {
+                            "uri": f"mast:TESS/{target['tic_id']}.fits",
+                            "filename": f"{target['tic_id']}.fits",
+                            "size_bytes": 1_000_000,
+                            "sector": 1,
+                        },
+                    ),
+                    "product_count": 1,
+                    "total_bytes": 1_000_000,
+                    "sectors": (1,),
+                    "n_sectors": 1,
+                    "priority": 0.9,
+                }
+            )
+            return result
+
+        result = prepare_live_search_snapshot(
+            [self._target(102), self._target(101)],
+            queue_path=queue,
+            immutable_snapshot_path=snapshot,
+            batch_manifest_path=batch,
+            dataset_manifest_path=dataset,
+            repo_root=tmp_path,
+            workers=2,
+            inspector_fn=inspector,
+            batch_id="batch-v1",
+            dataset_id="dataset-v1",
+        )
+
+        with queue.open(newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+            header = list(rows[0])
+        assert header == [
+            "target_id", "project", "source", "catalog_ids", "ra_deg", "dec_deg",
+            "data_products_available", "estimated_download_gb", "search_category",
+            "scientific_novelty", "prior_significance", "followup_leverage",
+            "data_quality", "method_advantage", "publication_value",
+            "community_integration", "new_followup_balance", "storage_cost_penalty",
+            "total_priority", "status", "notes", "citations",
+        ]
+        assert [row["target_id"] for row in rows] == ["TIC 101", "TIC 102"]
+        assert queue.read_text() == snapshot.read_text()
+
+        batch_payload = json.loads(batch.read_text())
+        assert batch_payload["expected_raw_files"] == 2
+        assert batch_payload["target_queue_snapshot"]["sha256"] == sha256_file(snapshot)
+        assert [item["target_id"] for item in batch_payload["product_inventory"]] == [
+            "TIC 101",
+            "TIC 102",
+        ]
+        manifest = load_dataset_manifest(dataset)
+        assert manifest.role == "live_search"
+        assert manifest.local_path == "data_selection/queue.batch-v1.csv"
+        assert manifest.row_count == manifest.group_count == 2
+        assert validate_dataset_manifest(dataset, repo_root=tmp_path).ok
+        assert result["target_count"] == 2
+
+        snapshot.write_text(snapshot.read_text() + "\n")
+        assert not validate_dataset_manifest(dataset, repo_root=tmp_path).ok
+
+    @pytest.mark.parametrize("failure", ["empty", "no_products", "missing_size"])
+    def test_prepare_snapshot_fails_closed(
+        self, tmp_path: Path, failure: str
+    ) -> None:
+        queue = tmp_path / "data_selection" / "queue.csv"
+        snapshot = tmp_path / "data_selection" / "snapshot.csv"
+        batch = tmp_path / "data_selection" / "batch.json"
+        dataset = tmp_path / "metadata" / "dataset.json"
+
+        targets = [] if failure == "empty" else [self._target(101)]
+
+        def inspector(target: dict[str, Any], **_: object) -> dict[str, Any]:
+            product_count = 0 if failure == "no_products" else 1
+            size = None if failure == "missing_size" else 100
+            return {
+                **target,
+                "products": (
+                    ()
+                    if not product_count
+                    else (
+                        {
+                            "uri": "mast:x",
+                            "filename": "x",
+                            "size_bytes": size,
+                            "sector": 1,
+                        },
+                    )
+                ),
+                "product_count": product_count,
+                "total_bytes": int(size or 0),
+                "sectors": () if not product_count else (1,),
+                "n_sectors": product_count,
+                "priority": 0.9,
+            }
+
+        with pytest.raises(RuntimeError):
+            prepare_live_search_snapshot(
+                targets,
+                queue_path=queue,
+                immutable_snapshot_path=snapshot,
+                batch_manifest_path=batch,
+                dataset_manifest_path=dataset,
+                repo_root=tmp_path,
+                inspector_fn=inspector,
+            )
+        assert not dataset.exists()
+
+    def test_prepare_only_routes_before_scanning(self, tmp_path: Path) -> None:
+        log_path = tmp_path / "scan.json"
+        target = self._target(101)
+        with (
+            patch("Skills.star_scanner._load_toi_tic_ids", return_value={1}),
+            patch("Skills.star_scanner._load_ctoi_tic_ids", return_value={2}),
+            patch(
+                "Skills.star_scanner._load_confirmed_host_tic_ids",
+                return_value=frozenset({3}),
+            ),
+            patch("Skills.star_scanner.select_targets", return_value=[target]),
+            patch("Skills.star_scanner.prepare_live_search_snapshot") as prepare,
+            patch("Skills.star_scanner.run_pipeline") as pipeline,
+        ):
+            exit_code = main(
+                [
+                    "--prepare-only",
+                    "--max-stars", "1",
+                    "--log", str(log_path),
+                    "--queue-path", str(tmp_path / "queue.csv"),
+                    "--queue-snapshot-path", str(tmp_path / "snapshot.csv"),
+                    "--batch-manifest-path", str(tmp_path / "batch.json"),
+                    "--dataset-manifest-path", str(tmp_path / "dataset.json"),
+                    "--no-git-report",
+                ]
+            )
+
+        assert exit_code == 0
+        prepare.assert_called_once()
+        pipeline.assert_not_called()
+        assert not log_path.exists()
+
+    def test_prior_discovery_logs_are_unioned(self, tmp_path: Path) -> None:
+        (tmp_path / "discovery_run_001.json").write_text(
+            json.dumps({"entries": {"101": {}, "102": {}}})
+        )
+        (tmp_path / "discovery_run_002_qlp.json").write_text(
+            json.dumps({"entries": {"102": {}, "103": {}}})
+        )
+
+        assert _load_prior_discovery_tic_ids(tmp_path, strict=True) == {
+            101,
+            102,
+            103,
+        }
+
+    def test_prepare_only_fails_before_selection_on_exclusion_error(
+        self, tmp_path: Path
+    ) -> None:
+        with (
+            patch("Skills.star_scanner._load_toi_tic_ids", return_value={1}),
+            patch(
+                "Skills.star_scanner._load_ctoi_tic_ids",
+                side_effect=RuntimeError("CTOI unavailable"),
+            ),
+            patch("Skills.star_scanner.select_targets") as select,
+            pytest.raises(RuntimeError, match="CTOI unavailable"),
+        ):
+            run_background_scan(
+                tmp_path / "scan.json",
+                prepare_only=True,
+                repo_root=tmp_path,
+            )
+        select.assert_not_called()
+
+    def test_toi_loader_strict_mode_rejects_empty_or_unknown_schema(self) -> None:
+        with (
+            patch("Skills.star_scanner._url_text", return_value="other\n1\n"),
+            pytest.raises(RuntimeError, match="TIC ID column"),
+        ):
+            _load_toi_tic_ids(strict=True)
+
+        with (
+            patch("Skills.star_scanner._url_text", return_value="TIC ID\n"),
+            pytest.raises(RuntimeError, match="no TIC IDs"),
+        ):
+            _load_toi_tic_ids(strict=True)
+
+    def test_run_report_uses_injected_git_runner(self, tmp_path: Path) -> None:
+        fake_runner = MagicMock()
+        with patch(
+            "Skills.star_scanner.run_and_commit_report", return_value=True
+        ) as commit:
+            _write_run_report(
+                started_at="2026-07-11T00:00:00+00:00",
+                elapsed_seconds=12.0,
+                items_processed=20,
+                items_written=18,
+                items_failed=0,
+                output_paths=("data_selection/target_priority_queue.csv",),
+                report_dir=tmp_path,
+                notes="metadata only",
+                git_run_fn=fake_runner,
+            )
+
+        report, path = commit.call_args.args
+        assert report.script == "star_scanner"
+        assert report.items_processed == 20
+        assert report.items_written == 18
+        assert path == tmp_path / "star_scanner.jsonl"
+        assert commit.call_args.kwargs["run_fn"] is fake_runner
 
 
 # ---------------------------------------------------------------------------

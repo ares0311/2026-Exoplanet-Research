@@ -1,0 +1,39 @@
+{
+  "acquired_at": "2026-07-11T19:23:30.348565Z",
+  "band_or_frequency": "TESS optical bandpass, approximately 600-1000 nm",
+  "cadence": {
+    "reason": null,
+    "status": "known",
+    "value": "long"
+  },
+  "data_product_type": "checksummed live-search target queue with MAST product inventory",
+  "dataset_id": "tess_live_search_v1",
+  "group_count": 18,
+  "instrument": "TESS cameras",
+  "known_caveats": [
+    "Product sizes are MAST metadata estimates and may differ from cached bytes.",
+    "The queue contains light curves only; target-pixel products require a separate follow-up manifest."
+  ],
+  "label_confidence": "unlabeled",
+  "label_source": "unlabeled live search after TOI, CTOI, and confirmed-host exclusions",
+  "license": "NASA/STScI public archive data; acknowledge MAST and the TESS mission",
+  "local_path": "data_selection/target_priority_queue.tess_live_search_v1.csv",
+  "preprocessing_version": "star-scanner-live-search-queue-v1",
+  "project": "2026 Exoplanet Research",
+  "role": "live_search",
+  "row_count": 18,
+  "schema_version": 1,
+  "sha256": "b80207dfc7a0112ae94198ce7f621d269e7b6713e8a2244de3bd6f49c77f4827",
+  "source_name": "MAST TIC catalog and TESS light-curve product metadata",
+  "source_url": "https://mast.stsci.edu/",
+  "target_ids": {
+    "count": 18,
+    "namespace": "TIC",
+    "selection": "faint-star novelty frontier with known-object exclusions"
+  },
+  "time_range": {
+    "reason": "per-target sector coverage is in the queue and exact product URIs are in the batch manifest inventory",
+    "status": "deferred",
+    "value": null
+  }
+}

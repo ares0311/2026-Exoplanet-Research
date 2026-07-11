@@ -1,0 +1,742 @@
+{
+  "acquisition_mode": "stream_process_evict",
+  "batch_id": "tess_live_search_v1",
+  "created_at": "2026-07-11T19:23:30.348565+00:00",
+  "estimated_download_gb": 0.04565088,
+  "eviction_rule": "evict redownloadable raw products after candidate rows are written",
+  "expected_derived_gb": 0.0,
+  "expected_raw_files": 103,
+  "free_space_before_gb": 340.564,
+  "free_space_required_after_gb": 10.0,
+  "manifest_owner": "Exoplanet agent",
+  "max_allowed_download_gb": 99.022129124,
+  "pin_rule": "pin queue, manifests, ledger rows, and unresolved candidate evidence",
+  "product_inventory": [
+    {
+      "products": [
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0001-0000000201249663_tess_v01_llc.fits",
+          "sector": 1,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0001/0000/0002/0124/9663/hlsp_qlp_tess_ffi_s0001-0000000201249663_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0028-0000000201249663_tess_v01_llc.fits",
+          "sector": 28,
+          "size_bytes": 204480,
+          "uri": "mast:HLSP/qlp/s0028/0000/0002/0124/9663/hlsp_qlp_tess_ffi_s0028-0000000201249663_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0068-0000000201249663_tess_v01_llc.fits",
+          "sector": 68,
+          "size_bytes": 708480,
+          "uri": "mast:HLSP/qlp/s0068/0000/0002/0124/9663/hlsp_qlp_tess_ffi_s0068-0000000201249663_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0095-0000000201249663_tess_v01_llc.fits",
+          "sector": 95,
+          "size_bytes": 648000,
+          "uri": "mast:HLSP/qlp/s0095/0000/0002/0124/9663/hlsp_qlp_tess_ffi_s0095-0000000201249663_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0096-0000000201249663_tess_v01_llc.fits",
+          "sector": 96,
+          "size_bytes": 659520,
+          "uri": "mast:HLSP/qlp/s0096/0000/0002/0124/9663/hlsp_qlp_tess_ffi_s0096-0000000201249663_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0102-0000000201249663_tess_v01_llc.fits",
+          "sector": 102,
+          "size_bytes": 633600,
+          "uri": "mast:HLSP/qlp/s0102/0000/0002/0124/9663/hlsp_qlp_tess_ffi_s0102-0000000201249663_tess_v01_llc.fits"
+        }
+      ],
+      "target_id": "TIC 201249663"
+    },
+    {
+      "products": [
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0001-0000000201249706_tess_v01_llc.fits",
+          "sector": 1,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0001/0000/0002/0124/9706/hlsp_qlp_tess_ffi_s0001-0000000201249706_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0028-0000000201249706_tess_v01_llc.fits",
+          "sector": 28,
+          "size_bytes": 204480,
+          "uri": "mast:HLSP/qlp/s0028/0000/0002/0124/9706/hlsp_qlp_tess_ffi_s0028-0000000201249706_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0068-0000000201249706_tess_v01_llc.fits",
+          "sector": 68,
+          "size_bytes": 708480,
+          "uri": "mast:HLSP/qlp/s0068/0000/0002/0124/9706/hlsp_qlp_tess_ffi_s0068-0000000201249706_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0095-0000000201249706_tess_v01_llc.fits",
+          "sector": 95,
+          "size_bytes": 648000,
+          "uri": "mast:HLSP/qlp/s0095/0000/0002/0124/9706/hlsp_qlp_tess_ffi_s0095-0000000201249706_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0096-0000000201249706_tess_v01_llc.fits",
+          "sector": 96,
+          "size_bytes": 659520,
+          "uri": "mast:HLSP/qlp/s0096/0000/0002/0124/9706/hlsp_qlp_tess_ffi_s0096-0000000201249706_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0102-0000000201249706_tess_v01_llc.fits",
+          "sector": 102,
+          "size_bytes": 633600,
+          "uri": "mast:HLSP/qlp/s0102/0000/0002/0124/9706/hlsp_qlp_tess_ffi_s0102-0000000201249706_tess_v01_llc.fits"
+        }
+      ],
+      "target_id": "TIC 201249706"
+    },
+    {
+      "products": [
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0001-0000000201251996_tess_v01_llc.fits",
+          "sector": 1,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0001/0000/0002/0125/1996/hlsp_qlp_tess_ffi_s0001-0000000201251996_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0028-0000000201251996_tess_v01_llc.fits",
+          "sector": 28,
+          "size_bytes": 204480,
+          "uri": "mast:HLSP/qlp/s0028/0000/0002/0125/1996/hlsp_qlp_tess_ffi_s0028-0000000201251996_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0068-0000000201251996_tess_v01_llc.fits",
+          "sector": 68,
+          "size_bytes": 708480,
+          "uri": "mast:HLSP/qlp/s0068/0000/0002/0125/1996/hlsp_qlp_tess_ffi_s0068-0000000201251996_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0069-0000000201251996_tess_v01_llc.fits",
+          "sector": 69,
+          "size_bytes": 662400,
+          "uri": "mast:HLSP/qlp/s0069/0000/0002/0125/1996/hlsp_qlp_tess_ffi_s0069-0000000201251996_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0095-0000000201251996_tess_v01_llc.fits",
+          "sector": 95,
+          "size_bytes": 648000,
+          "uri": "mast:HLSP/qlp/s0095/0000/0002/0125/1996/hlsp_qlp_tess_ffi_s0095-0000000201251996_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0096-0000000201251996_tess_v01_llc.fits",
+          "sector": 96,
+          "size_bytes": 659520,
+          "uri": "mast:HLSP/qlp/s0096/0000/0002/0125/1996/hlsp_qlp_tess_ffi_s0096-0000000201251996_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0102-0000000201251996_tess_v01_llc.fits",
+          "sector": 102,
+          "size_bytes": 633600,
+          "uri": "mast:HLSP/qlp/s0102/0000/0002/0125/1996/hlsp_qlp_tess_ffi_s0102-0000000201251996_tess_v01_llc.fits"
+        }
+      ],
+      "target_id": "TIC 201251996"
+    },
+    {
+      "products": [
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0001-0000000280792173_tess_v01_llc.fits",
+          "sector": 1,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0001/0000/0002/8079/2173/hlsp_qlp_tess_ffi_s0001-0000000280792173_tess_v01_llc.fits"
+        }
+      ],
+      "target_id": "TIC 280792173"
+    },
+    {
+      "products": [
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0001-0000000280794969_tess_v01_llc.fits",
+          "sector": 1,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0001/0000/0002/8079/4969/hlsp_qlp_tess_ffi_s0001-0000000280794969_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0028-0000000280794969_tess_v01_llc.fits",
+          "sector": 28,
+          "size_bytes": 204480,
+          "uri": "mast:HLSP/qlp/s0028/0000/0002/8079/4969/hlsp_qlp_tess_ffi_s0028-0000000280794969_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0068-0000000280794969_tess_v01_llc.fits",
+          "sector": 68,
+          "size_bytes": 708480,
+          "uri": "mast:HLSP/qlp/s0068/0000/0002/8079/4969/hlsp_qlp_tess_ffi_s0068-0000000280794969_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0095-0000000280794969_tess_v01_llc.fits",
+          "sector": 95,
+          "size_bytes": 648000,
+          "uri": "mast:HLSP/qlp/s0095/0000/0002/8079/4969/hlsp_qlp_tess_ffi_s0095-0000000280794969_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0096-0000000280794969_tess_v01_llc.fits",
+          "sector": 96,
+          "size_bytes": 659520,
+          "uri": "mast:HLSP/qlp/s0096/0000/0002/8079/4969/hlsp_qlp_tess_ffi_s0096-0000000280794969_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0102-0000000280794969_tess_v01_llc.fits",
+          "sector": 102,
+          "size_bytes": 633600,
+          "uri": "mast:HLSP/qlp/s0102/0000/0002/8079/4969/hlsp_qlp_tess_ffi_s0102-0000000280794969_tess_v01_llc.fits"
+        }
+      ],
+      "target_id": "TIC 280794969"
+    },
+    {
+      "products": [
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0001-0000000280794974_tess_v01_llc.fits",
+          "sector": 1,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0001/0000/0002/8079/4974/hlsp_qlp_tess_ffi_s0001-0000000280794974_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0028-0000000280794974_tess_v01_llc.fits",
+          "sector": 28,
+          "size_bytes": 204480,
+          "uri": "mast:HLSP/qlp/s0028/0000/0002/8079/4974/hlsp_qlp_tess_ffi_s0028-0000000280794974_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0068-0000000280794974_tess_v01_llc.fits",
+          "sector": 68,
+          "size_bytes": 708480,
+          "uri": "mast:HLSP/qlp/s0068/0000/0002/8079/4974/hlsp_qlp_tess_ffi_s0068-0000000280794974_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0095-0000000280794974_tess_v01_llc.fits",
+          "sector": 95,
+          "size_bytes": 648000,
+          "uri": "mast:HLSP/qlp/s0095/0000/0002/8079/4974/hlsp_qlp_tess_ffi_s0095-0000000280794974_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0096-0000000280794974_tess_v01_llc.fits",
+          "sector": 96,
+          "size_bytes": 659520,
+          "uri": "mast:HLSP/qlp/s0096/0000/0002/8079/4974/hlsp_qlp_tess_ffi_s0096-0000000280794974_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0102-0000000280794974_tess_v01_llc.fits",
+          "sector": 102,
+          "size_bytes": 633600,
+          "uri": "mast:HLSP/qlp/s0102/0000/0002/8079/4974/hlsp_qlp_tess_ffi_s0102-0000000280794974_tess_v01_llc.fits"
+        }
+      ],
+      "target_id": "TIC 280794974"
+    },
+    {
+      "products": [
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0001-0000000280803469_tess_v01_llc.fits",
+          "sector": 1,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0001/0000/0002/8080/3469/hlsp_qlp_tess_ffi_s0001-0000000280803469_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0002-0000000280803469_tess_v01_llc.fits",
+          "sector": 2,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0002/0000/0002/8080/3469/hlsp_qlp_tess_ffi_s0002-0000000280803469_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0028-0000000280803469_tess_v01_llc.fits",
+          "sector": 28,
+          "size_bytes": 204480,
+          "uri": "mast:HLSP/qlp/s0028/0000/0002/8080/3469/hlsp_qlp_tess_ffi_s0028-0000000280803469_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0068-0000000280803469_tess_v01_llc.fits",
+          "sector": 68,
+          "size_bytes": 708480,
+          "uri": "mast:HLSP/qlp/s0068/0000/0002/8080/3469/hlsp_qlp_tess_ffi_s0068-0000000280803469_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0095-0000000280803469_tess_v01_llc.fits",
+          "sector": 95,
+          "size_bytes": 648000,
+          "uri": "mast:HLSP/qlp/s0095/0000/0002/8080/3469/hlsp_qlp_tess_ffi_s0095-0000000280803469_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0096-0000000280803469_tess_v01_llc.fits",
+          "sector": 96,
+          "size_bytes": 659520,
+          "uri": "mast:HLSP/qlp/s0096/0000/0002/8080/3469/hlsp_qlp_tess_ffi_s0096-0000000280803469_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0102-0000000280803469_tess_v01_llc.fits",
+          "sector": 102,
+          "size_bytes": 633600,
+          "uri": "mast:HLSP/qlp/s0102/0000/0002/8080/3469/hlsp_qlp_tess_ffi_s0102-0000000280803469_tess_v01_llc.fits"
+        }
+      ],
+      "target_id": "TIC 280803469"
+    },
+    {
+      "products": [
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0001-0000000280803538_tess_v01_llc.fits",
+          "sector": 1,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0001/0000/0002/8080/3538/hlsp_qlp_tess_ffi_s0001-0000000280803538_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0028-0000000280803538_tess_v01_llc.fits",
+          "sector": 28,
+          "size_bytes": 204480,
+          "uri": "mast:HLSP/qlp/s0028/0000/0002/8080/3538/hlsp_qlp_tess_ffi_s0028-0000000280803538_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0068-0000000280803538_tess_v01_llc.fits",
+          "sector": 68,
+          "size_bytes": 708480,
+          "uri": "mast:HLSP/qlp/s0068/0000/0002/8080/3538/hlsp_qlp_tess_ffi_s0068-0000000280803538_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0095-0000000280803538_tess_v01_llc.fits",
+          "sector": 95,
+          "size_bytes": 648000,
+          "uri": "mast:HLSP/qlp/s0095/0000/0002/8080/3538/hlsp_qlp_tess_ffi_s0095-0000000280803538_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0096-0000000280803538_tess_v01_llc.fits",
+          "sector": 96,
+          "size_bytes": 659520,
+          "uri": "mast:HLSP/qlp/s0096/0000/0002/8080/3538/hlsp_qlp_tess_ffi_s0096-0000000280803538_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0102-0000000280803538_tess_v01_llc.fits",
+          "sector": 102,
+          "size_bytes": 633600,
+          "uri": "mast:HLSP/qlp/s0102/0000/0002/8080/3538/hlsp_qlp_tess_ffi_s0102-0000000280803538_tess_v01_llc.fits"
+        }
+      ],
+      "target_id": "TIC 280803538"
+    },
+    {
+      "products": [
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0001-0000000339578433_tess_v01_llc.fits",
+          "sector": 1,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0001/0000/0003/3957/8433/hlsp_qlp_tess_ffi_s0001-0000000339578433_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0002-0000000339578433_tess_v01_llc.fits",
+          "sector": 2,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0002/0000/0003/3957/8433/hlsp_qlp_tess_ffi_s0002-0000000339578433_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0028-0000000339578433_tess_v01_llc.fits",
+          "sector": 28,
+          "size_bytes": 204480,
+          "uri": "mast:HLSP/qlp/s0028/0000/0003/3957/8433/hlsp_qlp_tess_ffi_s0028-0000000339578433_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0068-0000000339578433_tess_v01_llc.fits",
+          "sector": 68,
+          "size_bytes": 708480,
+          "uri": "mast:HLSP/qlp/s0068/0000/0003/3957/8433/hlsp_qlp_tess_ffi_s0068-0000000339578433_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0095-0000000339578433_tess_v01_llc.fits",
+          "sector": 95,
+          "size_bytes": 648000,
+          "uri": "mast:HLSP/qlp/s0095/0000/0003/3957/8433/hlsp_qlp_tess_ffi_s0095-0000000339578433_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0096-0000000339578433_tess_v01_llc.fits",
+          "sector": 96,
+          "size_bytes": 659520,
+          "uri": "mast:HLSP/qlp/s0096/0000/0003/3957/8433/hlsp_qlp_tess_ffi_s0096-0000000339578433_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0102-0000000339578433_tess_v01_llc.fits",
+          "sector": 102,
+          "size_bytes": 633600,
+          "uri": "mast:HLSP/qlp/s0102/0000/0003/3957/8433/hlsp_qlp_tess_ffi_s0102-0000000339578433_tess_v01_llc.fits"
+        }
+      ],
+      "target_id": "TIC 339578433"
+    },
+    {
+      "products": [
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0001-0000000339578474_tess_v01_llc.fits",
+          "sector": 1,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0001/0000/0003/3957/8474/hlsp_qlp_tess_ffi_s0001-0000000339578474_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0002-0000000339578474_tess_v01_llc.fits",
+          "sector": 2,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0002/0000/0003/3957/8474/hlsp_qlp_tess_ffi_s0002-0000000339578474_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0028-0000000339578474_tess_v01_llc.fits",
+          "sector": 28,
+          "size_bytes": 204480,
+          "uri": "mast:HLSP/qlp/s0028/0000/0003/3957/8474/hlsp_qlp_tess_ffi_s0028-0000000339578474_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0068-0000000339578474_tess_v01_llc.fits",
+          "sector": 68,
+          "size_bytes": 708480,
+          "uri": "mast:HLSP/qlp/s0068/0000/0003/3957/8474/hlsp_qlp_tess_ffi_s0068-0000000339578474_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0095-0000000339578474_tess_v01_llc.fits",
+          "sector": 95,
+          "size_bytes": 648000,
+          "uri": "mast:HLSP/qlp/s0095/0000/0003/3957/8474/hlsp_qlp_tess_ffi_s0095-0000000339578474_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0096-0000000339578474_tess_v01_llc.fits",
+          "sector": 96,
+          "size_bytes": 659520,
+          "uri": "mast:HLSP/qlp/s0096/0000/0003/3957/8474/hlsp_qlp_tess_ffi_s0096-0000000339578474_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0102-0000000339578474_tess_v01_llc.fits",
+          "sector": 102,
+          "size_bytes": 633600,
+          "uri": "mast:HLSP/qlp/s0102/0000/0003/3957/8474/hlsp_qlp_tess_ffi_s0102-0000000339578474_tess_v01_llc.fits"
+        }
+      ],
+      "target_id": "TIC 339578474"
+    },
+    {
+      "products": [
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0001-0000000355651959_tess_v01_llc.fits",
+          "sector": 1,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0001/0000/0003/5565/1959/hlsp_qlp_tess_ffi_s0001-0000000355651959_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0028-0000000355651959_tess_v01_llc.fits",
+          "sector": 28,
+          "size_bytes": 204480,
+          "uri": "mast:HLSP/qlp/s0028/0000/0003/5565/1959/hlsp_qlp_tess_ffi_s0028-0000000355651959_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0068-0000000355651959_tess_v01_llc.fits",
+          "sector": 68,
+          "size_bytes": 708480,
+          "uri": "mast:HLSP/qlp/s0068/0000/0003/5565/1959/hlsp_qlp_tess_ffi_s0068-0000000355651959_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0095-0000000355651959_tess_v01_llc.fits",
+          "sector": 95,
+          "size_bytes": 648000,
+          "uri": "mast:HLSP/qlp/s0095/0000/0003/5565/1959/hlsp_qlp_tess_ffi_s0095-0000000355651959_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0096-0000000355651959_tess_v01_llc.fits",
+          "sector": 96,
+          "size_bytes": 659520,
+          "uri": "mast:HLSP/qlp/s0096/0000/0003/5565/1959/hlsp_qlp_tess_ffi_s0096-0000000355651959_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0102-0000000355651959_tess_v01_llc.fits",
+          "sector": 102,
+          "size_bytes": 633600,
+          "uri": "mast:HLSP/qlp/s0102/0000/0003/5565/1959/hlsp_qlp_tess_ffi_s0102-0000000355651959_tess_v01_llc.fits"
+        }
+      ],
+      "target_id": "TIC 355651959"
+    },
+    {
+      "products": [
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0001-0000000355651994_tess_v01_llc.fits",
+          "sector": 1,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0001/0000/0003/5565/1994/hlsp_qlp_tess_ffi_s0001-0000000355651994_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0028-0000000355651994_tess_v01_llc.fits",
+          "sector": 28,
+          "size_bytes": 204480,
+          "uri": "mast:HLSP/qlp/s0028/0000/0003/5565/1994/hlsp_qlp_tess_ffi_s0028-0000000355651994_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0068-0000000355651994_tess_v01_llc.fits",
+          "sector": 68,
+          "size_bytes": 708480,
+          "uri": "mast:HLSP/qlp/s0068/0000/0003/5565/1994/hlsp_qlp_tess_ffi_s0068-0000000355651994_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0095-0000000355651994_tess_v01_llc.fits",
+          "sector": 95,
+          "size_bytes": 648000,
+          "uri": "mast:HLSP/qlp/s0095/0000/0003/5565/1994/hlsp_qlp_tess_ffi_s0095-0000000355651994_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0096-0000000355651994_tess_v01_llc.fits",
+          "sector": 96,
+          "size_bytes": 659520,
+          "uri": "mast:HLSP/qlp/s0096/0000/0003/5565/1994/hlsp_qlp_tess_ffi_s0096-0000000355651994_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0102-0000000355651994_tess_v01_llc.fits",
+          "sector": 102,
+          "size_bytes": 633600,
+          "uri": "mast:HLSP/qlp/s0102/0000/0003/5565/1994/hlsp_qlp_tess_ffi_s0102-0000000355651994_tess_v01_llc.fits"
+        }
+      ],
+      "target_id": "TIC 355651994"
+    },
+    {
+      "products": [
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0001-0000000355652018_tess_v01_llc.fits",
+          "sector": 1,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0001/0000/0003/5565/2018/hlsp_qlp_tess_ffi_s0001-0000000355652018_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0002-0000000355652018_tess_v01_llc.fits",
+          "sector": 2,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0002/0000/0003/5565/2018/hlsp_qlp_tess_ffi_s0002-0000000355652018_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0028-0000000355652018_tess_v01_llc.fits",
+          "sector": 28,
+          "size_bytes": 204480,
+          "uri": "mast:HLSP/qlp/s0028/0000/0003/5565/2018/hlsp_qlp_tess_ffi_s0028-0000000355652018_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0068-0000000355652018_tess_v01_llc.fits",
+          "sector": 68,
+          "size_bytes": 708480,
+          "uri": "mast:HLSP/qlp/s0068/0000/0003/5565/2018/hlsp_qlp_tess_ffi_s0068-0000000355652018_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0095-0000000355652018_tess_v01_llc.fits",
+          "sector": 95,
+          "size_bytes": 648000,
+          "uri": "mast:HLSP/qlp/s0095/0000/0003/5565/2018/hlsp_qlp_tess_ffi_s0095-0000000355652018_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0096-0000000355652018_tess_v01_llc.fits",
+          "sector": 96,
+          "size_bytes": 659520,
+          "uri": "mast:HLSP/qlp/s0096/0000/0003/5565/2018/hlsp_qlp_tess_ffi_s0096-0000000355652018_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0102-0000000355652018_tess_v01_llc.fits",
+          "sector": 102,
+          "size_bytes": 633600,
+          "uri": "mast:HLSP/qlp/s0102/0000/0003/5565/2018/hlsp_qlp_tess_ffi_s0102-0000000355652018_tess_v01_llc.fits"
+        }
+      ],
+      "target_id": "TIC 355652018"
+    },
+    {
+      "products": [
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0001-0000000355687419_tess_v01_llc.fits",
+          "sector": 1,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0001/0000/0003/5568/7419/hlsp_qlp_tess_ffi_s0001-0000000355687419_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0002-0000000355687419_tess_v01_llc.fits",
+          "sector": 2,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0002/0000/0003/5568/7419/hlsp_qlp_tess_ffi_s0002-0000000355687419_tess_v01_llc.fits"
+        }
+      ],
+      "target_id": "TIC 355687419"
+    },
+    {
+      "products": [
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0001-0000000355687437_tess_v01_llc.fits",
+          "sector": 1,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0001/0000/0003/5568/7437/hlsp_qlp_tess_ffi_s0001-0000000355687437_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0002-0000000355687437_tess_v01_llc.fits",
+          "sector": 2,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0002/0000/0003/5568/7437/hlsp_qlp_tess_ffi_s0002-0000000355687437_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0028-0000000355687437_tess_v01_llc.fits",
+          "sector": 28,
+          "size_bytes": 204480,
+          "uri": "mast:HLSP/qlp/s0028/0000/0003/5568/7437/hlsp_qlp_tess_ffi_s0028-0000000355687437_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0068-0000000355687437_tess_v01_llc.fits",
+          "sector": 68,
+          "size_bytes": 708480,
+          "uri": "mast:HLSP/qlp/s0068/0000/0003/5568/7437/hlsp_qlp_tess_ffi_s0068-0000000355687437_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0095-0000000355687437_tess_v01_llc.fits",
+          "sector": 95,
+          "size_bytes": 648000,
+          "uri": "mast:HLSP/qlp/s0095/0000/0003/5568/7437/hlsp_qlp_tess_ffi_s0095-0000000355687437_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0096-0000000355687437_tess_v01_llc.fits",
+          "sector": 96,
+          "size_bytes": 659520,
+          "uri": "mast:HLSP/qlp/s0096/0000/0003/5568/7437/hlsp_qlp_tess_ffi_s0096-0000000355687437_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0102-0000000355687437_tess_v01_llc.fits",
+          "sector": 102,
+          "size_bytes": 633600,
+          "uri": "mast:HLSP/qlp/s0102/0000/0003/5568/7437/hlsp_qlp_tess_ffi_s0102-0000000355687437_tess_v01_llc.fits"
+        }
+      ],
+      "target_id": "TIC 355687437"
+    },
+    {
+      "products": [
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0001-0000000355704481_tess_v01_llc.fits",
+          "sector": 1,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0001/0000/0003/5570/4481/hlsp_qlp_tess_ffi_s0001-0000000355704481_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0002-0000000355704481_tess_v01_llc.fits",
+          "sector": 2,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0002/0000/0003/5570/4481/hlsp_qlp_tess_ffi_s0002-0000000355704481_tess_v01_llc.fits"
+        }
+      ],
+      "target_id": "TIC 355704481"
+    },
+    {
+      "products": [
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0001-0000000355704482_tess_v01_llc.fits",
+          "sector": 1,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0001/0000/0003/5570/4482/hlsp_qlp_tess_ffi_s0001-0000000355704482_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0002-0000000355704482_tess_v01_llc.fits",
+          "sector": 2,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0002/0000/0003/5570/4482/hlsp_qlp_tess_ffi_s0002-0000000355704482_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0028-0000000355704482_tess_v01_llc.fits",
+          "sector": 28,
+          "size_bytes": 204480,
+          "uri": "mast:HLSP/qlp/s0028/0000/0003/5570/4482/hlsp_qlp_tess_ffi_s0028-0000000355704482_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0068-0000000355704482_tess_v01_llc.fits",
+          "sector": 68,
+          "size_bytes": 708480,
+          "uri": "mast:HLSP/qlp/s0068/0000/0003/5570/4482/hlsp_qlp_tess_ffi_s0068-0000000355704482_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0095-0000000355704482_tess_v01_llc.fits",
+          "sector": 95,
+          "size_bytes": 648000,
+          "uri": "mast:HLSP/qlp/s0095/0000/0003/5570/4482/hlsp_qlp_tess_ffi_s0095-0000000355704482_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0096-0000000355704482_tess_v01_llc.fits",
+          "sector": 96,
+          "size_bytes": 659520,
+          "uri": "mast:HLSP/qlp/s0096/0000/0003/5570/4482/hlsp_qlp_tess_ffi_s0096-0000000355704482_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0102-0000000355704482_tess_v01_llc.fits",
+          "sector": 102,
+          "size_bytes": 633600,
+          "uri": "mast:HLSP/qlp/s0102/0000/0003/5570/4482/hlsp_qlp_tess_ffi_s0102-0000000355704482_tess_v01_llc.fits"
+        }
+      ],
+      "target_id": "TIC 355704482"
+    },
+    {
+      "products": [
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0001-0000000425884958_tess_v01_llc.fits",
+          "sector": 1,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0001/0000/0004/2588/4958/hlsp_qlp_tess_ffi_s0001-0000000425884958_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0002-0000000425884958_tess_v01_llc.fits",
+          "sector": 2,
+          "size_bytes": 80640,
+          "uri": "mast:HLSP/qlp/s0002/0000/0004/2588/4958/hlsp_qlp_tess_ffi_s0002-0000000425884958_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0028-0000000425884958_tess_v01_llc.fits",
+          "sector": 28,
+          "size_bytes": 204480,
+          "uri": "mast:HLSP/qlp/s0028/0000/0004/2588/4958/hlsp_qlp_tess_ffi_s0028-0000000425884958_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0068-0000000425884958_tess_v01_llc.fits",
+          "sector": 68,
+          "size_bytes": 708480,
+          "uri": "mast:HLSP/qlp/s0068/0000/0004/2588/4958/hlsp_qlp_tess_ffi_s0068-0000000425884958_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0095-0000000425884958_tess_v01_llc.fits",
+          "sector": 95,
+          "size_bytes": 648000,
+          "uri": "mast:HLSP/qlp/s0095/0000/0004/2588/4958/hlsp_qlp_tess_ffi_s0095-0000000425884958_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0096-0000000425884958_tess_v01_llc.fits",
+          "sector": 96,
+          "size_bytes": 659520,
+          "uri": "mast:HLSP/qlp/s0096/0000/0004/2588/4958/hlsp_qlp_tess_ffi_s0096-0000000425884958_tess_v01_llc.fits"
+        },
+        {
+          "filename": "hlsp_qlp_tess_ffi_s0102-0000000425884958_tess_v01_llc.fits",
+          "sector": 102,
+          "size_bytes": 633600,
+          "uri": "mast:HLSP/qlp/s0102/0000/0004/2588/4958/hlsp_qlp_tess_ffi_s0102-0000000425884958_tess_v01_llc.fits"
+        }
+      ],
+      "target_id": "TIC 425884958"
+    }
+  ],
+  "project": "2026 Exoplanet Research",
+  "project_managed_data_before_gb": 0.977870876,
+  "query": {
+    "exptime": "long",
+    "mission": "TESS",
+    "pipeline": "QLP",
+    "selection_rubric": "eight policy criteria scored 0-3; product-backed targets require >=18",
+    "target_count": 18
+  },
+  "role": "live_search",
+  "schema_version": 1,
+  "source_archive": "MAST TIC catalog and TESS light-curve products",
+  "stop_condition": "stop before 100 GB project-managed data, below 10 GB free, metadata mismatch, duplicate target, or elevated MAST failure/throttling rate",
+  "target_queue": "data_selection/target_priority_queue.csv",
+  "target_queue_snapshot": {
+    "path": "data_selection/target_priority_queue.tess_live_search_v1.csv",
+    "sha256": "b80207dfc7a0112ae94198ce7f621d269e7b6713e8a2244de3bd6f49c77f4827"
+  }
+}

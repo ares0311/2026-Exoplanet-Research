@@ -2,28 +2,53 @@
 
 **Purpose**: Prevent doom loops. Every agent and every session must read this before doing anything.
 
-**Last updated**: 2026-07-02 (strategic reset: the run006/run008 candidate-review loop is historical; active production work wholly adopts `docs/exoplanet_exomoon_dataset_handoff.md` and `docs/CNN_PRODUCTION_RUNBOOK.md` to close T1-1 with verified public data and a production-gated trained model; version 0.2.11 added a supplementary correctness fix wiring real TIC catalog stellar/contamination parameters into `vet_signal()`, version 0.2.12 hardens the active dataset handoff contract against exact-match TAP schema table-name bugs, and version 0.2.13 commits the leakage-safe Kepler manifest plus cleanup policy)
+**Last updated**: 2026-07-11 (the trained-model and formal-acceptance gates are
+complete; `tess_live_search_v1` is now the frozen metadata-only source for the
+next candidate-ledger wiring and bounded live-search phase)
 
 ---
 
 ## Current Production Direction (Read This First)
 
-The active production mission has been reset. The project is no longer spending
-its primary workflow on the run006/run008 QLP candidate-review loop. That loop
-produced useful scanner/debugging evidence, but it did not produce
-submission-ready candidates and should not block the trained-model path.
+The project is no longer spending its primary workflow on the run006/run008 QLP
+candidate-review loop. That loop produced useful scanner/debugging evidence,
+but it did not produce submission-ready candidates. The trained model, stacking
+calibration, and formal production-acceptance gates are now complete. The next
+active Phase 1 task is wiring schema-v2 candidate-ledger writes to the frozen
+`tess_live_search_v1` source before executing its live scan.
 
 The authoritative active plan is now:
 
-1. `docs/exoplanet_exomoon_dataset_handoff.md` — source-contract and data/ML
-   strategy
-2. `docs/CNN_PRODUCTION_RUNBOOK.md` — local operator workflow for the trained
-   model gate
-3. `docs/PRODUCTION_READINESS.md` — current Tier 1 gap ordering
+1. `docs/ROADMAP.md` — active master-guide phase ordering
+2. `metadata/dataset_manifests/tess_live_search_v1.json` — stable live-search
+   source ID and checksum
+3. `data_selection/batch_manifests/tess_live_search_v1.json` — exact target,
+   product, storage, and retention scope
+4. `docs/PRODUCTION_READINESS.md` — closed deployment gates and version history
 
 Use the discovery workflow below as historical/operational reference for live
 scans. Do not treat it as permission to continue the old review loop unless the
 user explicitly asks for discovery-scan forensics.
+
+### Frozen TESS live-search preparation
+
+The metadata-only command used to create v1 was:
+
+```bash
+git switch main
+git pull --ff-only origin main
+caffeinate -i .venv/bin/python Skills/star_scanner.py --prepare-only --max-stars 20 --workers 6
+```
+
+It queries target and product metadata only, writes the canonical priority
+queue plus immutable `tess_live_search_v1` manifests, validates their checksum,
+and exits before constructing a scan log or invoking the transit pipeline. It
+must fail closed if TOI, CTOI, confirmed-host, coordinate, product-URI, product-
+size, storage, or manifest validation is incomplete. V1 is now committed; do
+not rerun this command or use `--replace-preparation` to revise its membership.
+Create new explicitly versioned output paths and IDs for a future batch. Do not
+execute the 18-target raw-data scan until the schema-v2 candidate-ledger path is
+wired and tested against this source ID.
 
 ## The Discovery Mission (Operational Reference)
 
@@ -330,7 +355,8 @@ The pipeline can do these things today without new code:
 |------------|---------|
 | Scan a single star | `exo <TIC-ID> --output out.json` |
 | Scan a list of stars | `.venv/bin/python Skills/batch_scan.py targets.txt --output results.json --resume` |
-| Select novel TIC targets | `.venv/bin/python Skills/star_scanner.py --max-stars 500 --tmag-min 12 --tmag-max 15` |
+| Prepare a frozen novel-TIC live-search queue | `.venv/bin/python Skills/star_scanner.py --prepare-only --max-stars 20 --workers 6` |
+| Select and immediately scan novel TIC targets (legacy path; do not use for the frozen v1 queue) | `.venv/bin/python Skills/star_scanner.py --max-stars 500 --tmag-min 12 --tmag-max 15` |
 | Rank candidates by quality | `.venv/bin/python Skills/rank_candidates.py results.json --top 20` |
 | Check if target is already TOI | `.venv/bin/python Skills/toi_checker.py <TIC-ID>` |
 | Filter by FPP/pathway | `.venv/bin/python Skills/alert_filter.py results.json --fpp-max 0.15` |
@@ -343,17 +369,15 @@ The XGBoost model (`models/xgboost_koi.json`) is trained and available now.
 
 ---
 
-## The Immediate Next Action (As of 2026-07-01)
+## The Immediate Next Action (As of 2026-07-11)
 
-**Adopt the dataset/model-training brief** (higher priority than further
-run006/run008 review):
-
-1. Read `docs/exoplanet_exomoon_dataset_handoff.md`.
-2. Update or implement only work that closes T1-1 in
-   `docs/PRODUCTION_READINESS.md`.
-3. Before any human-run bulk download/training command, verify public source
-   URLs and schemas directly, estimate storage/runtime, and ensure the command
-   is resumable, bounded, visible, and optimized for `docs/SYSTEM_PROFILE.md`.
+Wire every outcome from the frozen `tess_live_search_v1` queue into candidate-
+ledger schema v2 using its stable `source_dataset_id` and complete exact raw URI
+tuple. Keep the existing legacy scanner log readable for compatibility, but do
+not treat it as the scientific provenance ledger. Add fail-closed tests before
+executing the 18-target live scan. That future scan's estimated raw footprint is
+only 0.04565088 GB and should use six I/O workers in one tab; cross-terminal
+sharding would add coordination without material benefit for this bounded batch.
 
 Historical run006/run008 evidence:
 

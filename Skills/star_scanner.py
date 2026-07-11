@@ -31,8 +31,11 @@ Usage
 from __future__ import annotations
 
 import argparse
+import csv
 import io
 import json
+import math
+import shutil
 import sys
 import threading
 import time
@@ -42,9 +45,22 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_REPO_ROOT))
+sys.path.insert(0, str(_REPO_ROOT / "src"))
 
-from exo_toolkit.cli import run_pipeline
+from exo_toolkit.cli import run_pipeline  # noqa: E402
+from exo_toolkit.dataset_manifest import (  # noqa: E402
+    DatasetManifest,
+    sha256_file,
+    validate_dataset_manifest,
+)
+from Skills.run_report import (  # noqa: E402
+    DEFAULT_REPORT_DIR,
+    RunReport,
+    report_path_for,
+    run_and_commit_report,
+)
 
 # ExoFOP TOI table (same endpoint used by fetch_tess_toi.py)
 _EXOFOP_URL = (
@@ -137,6 +153,14 @@ def _progress_suffix(done: int, total: int, start_time: float) -> str:
     rate = done / elapsed if elapsed > 0.0 else 0.0
     remaining = (total - done) / rate if rate > 0.0 else float("inf")
     return f"elapsed={elapsed:.0f}s ETA={_format_eta(remaining)}"
+
+
+def _atomic_write_text(path: Path, text: str) -> None:
+    """Write text atomically so preparation artifacts cannot be left partial."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(text, encoding="utf-8")
+    temporary.replace(path)
 
 # ---------------------------------------------------------------------------
 # Priority scoring
@@ -373,7 +397,29 @@ class ScanLog:
 # ---------------------------------------------------------------------------
 
 
-def _load_toi_tic_ids() -> set[int]:
+def _load_prior_discovery_tic_ids(
+    log_dir: Path,
+    *,
+    strict: bool = False,
+) -> set[int]:
+    """Union completed target IDs from every historical discovery-run log."""
+    tic_ids: set[int] = set()
+    for path in sorted(log_dir.glob("discovery_run*.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            entries = payload.get("entries", {})
+            if not isinstance(entries, dict):
+                raise ValueError("entries must be an object")
+            tic_ids.update(int(value) for value in entries)
+        except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+            if strict:
+                raise RuntimeError(
+                    f"Cannot parse historical discovery log {path}"
+                ) from exc
+    return tic_ids
+
+
+def _load_toi_tic_ids(*, strict: bool = False) -> set[int]:
     """Download the TESS TOI table and return the set of TIC IDs it contains."""
     import pandas as pd
 
@@ -386,51 +432,71 @@ def _load_toi_tic_ids() -> set[int]:
         # Fall back: any column with "tic"
         tic_col = next((c for c in df.columns if "tic" in c.lower()), None)
     if tic_col is None:
+        if strict:
+            raise RuntimeError("TOI source does not contain a TIC ID column")
         return set()
-    return {int(v) for v in df[tic_col].dropna()}
+    result = {int(v) for v in df[tic_col].dropna()}
+    if strict and not result:
+        raise RuntimeError("TOI source returned no TIC IDs")
+    return result
 
 
-def _load_ctoi_tic_ids() -> set[int]:
+def _load_ctoi_tic_ids(*, strict: bool = False) -> set[int]:
     """Download the ExoFOP CTOI table and return the set of TIC IDs it contains.
 
     Uses ``Skills/fetch_exofop_ctoi.py`` with its injectable fetch function.
-    Returns an empty set on any failure so the scan can continue.
+    Returns an empty set on any failure so a normal scan can continue. Strict
+    metadata preparation propagates the failure instead.
     """
     import importlib.util
 
     ctoi_path = _SKILLS_DIR / "fetch_exofop_ctoi.py"
     spec = importlib.util.spec_from_file_location("fetch_exofop_ctoi", ctoi_path)
     if spec is None or spec.loader is None:
+        if strict:
+            raise RuntimeError("Cannot load fetch_exofop_ctoi.py")
         return set()
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)  # type: ignore[attr-defined]
 
     try:
-        result = module.fetch_ctoi_table()
+        # Exclusion must include every current CTOI. The live ExoFOP export no
+        # longer carries the historical ratings column, so min_ratings=1 would
+        # silently filter the entire valid table.
+        result = module.fetch_ctoi_table(min_ratings=0)
+        if strict and result.flag != "OK":
+            raise RuntimeError(f"CTOI source returned flag={result.flag}")
         return {int(r["tic_id"]) for r in result.rows if r.get("tic_id")}
     except Exception:  # noqa: BLE001
+        if strict:
+            raise
         return set()
 
 
-def _load_confirmed_host_tic_ids() -> frozenset[int]:
+def _load_confirmed_host_tic_ids(*, strict: bool = False) -> frozenset[int]:
     """Return TIC IDs of confirmed transiting planet hosts from NASA Exoplanet Archive.
 
-    Uses ``Skills/fetch_confirmed_hosts.py``.  Returns an empty frozenset on failure.
+    Uses ``Skills/fetch_confirmed_hosts.py``. Returns an empty frozenset on
+    failure unless strict metadata preparation requests fail-closed behavior.
     """
     import importlib.util
 
     host_path = _SKILLS_DIR / "fetch_confirmed_hosts.py"
     spec = importlib.util.spec_from_file_location("fetch_confirmed_hosts", host_path)
     if spec is None or spec.loader is None:
+        if strict:
+            raise RuntimeError("Cannot load fetch_confirmed_hosts.py")
         return frozenset()
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)  # type: ignore[attr-defined]
 
     try:
-        return module.fetch_confirmed_host_tic_ids()
+        return module.fetch_confirmed_host_tic_ids(strict=strict)
     except Exception:  # noqa: BLE001
+        if strict:
+            raise
         return frozenset()
 
 
@@ -466,8 +532,8 @@ def select_targets(
         retry_delay: Seconds to wait between retry attempts.
 
     Returns:
-        List of dicts, sorted by ``"priority"`` descending, each with keys:
-        ``tic_id``, ``tmag``, ``teff``, ``contratio``, ``priority``.
+        List of dicts, sorted by ``"priority"`` descending, each with TIC ID,
+        coordinates, stellar metadata, contamination, and priority.
     """
     from astropy import units as u
     from astropy.coordinates import SkyCoord
@@ -541,6 +607,8 @@ def select_targets(
             targets.append(
                 {
                     "tic_id": tic_id,
+                    "ra_deg": _row_float_or_none(row, "ra"),
+                    "dec_deg": _row_float_or_none(row, "dec"),
                     "tmag": tmag,
                     "teff": teff,
                     "contratio": contratio,
@@ -558,6 +626,424 @@ def select_targets(
 
     targets.sort(key=lambda t: t["priority"], reverse=True)
     return targets[:n]
+
+
+def _row_float_or_none(row: Any, key: str) -> float | None:
+    """Return one finite catalog float, or ``None`` for missing/bad cells."""
+    try:
+        value = float(_row_get(row, key))
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) else None
+
+
+def inspect_target_products(
+    target: dict[str, Any],
+    *,
+    mission: str,
+    pipeline: str,
+    exptime: str,
+    search_fn: Any = None,
+) -> dict[str, Any]:
+    """Attach exact MAST light-curve product metadata without downloading files."""
+    if search_fn is None:
+        import lightkurve as lk
+
+        search_fn = lk.search_lightcurve
+
+    target_id = f"TIC {int(target['tic_id'])}"
+    search = search_fn(
+        target_id,
+        mission=mission,
+        author=pipeline,
+        exptime=exptime,
+    )
+    table = search.table
+    colnames = set(getattr(table, "colnames", ()))
+    uri_column = "dataURI" if "dataURI" in colnames else "dataURL"
+    products: list[dict[str, Any]] = []
+    seen_uris: set[str] = set()
+    for row in table:
+        uri = str(_row_get(row, uri_column) or "")
+        if not uri or uri in seen_uris:
+            continue
+        seen_uris.add(uri)
+        size_raw = _row_get(row, "size")
+        try:
+            size_bytes: int | None = max(0, int(float(size_raw)))
+        except (TypeError, ValueError):
+            size_bytes = None
+        sector_raw = _row_get(row, "sequence_number")
+        try:
+            sector = int(sector_raw)
+        except (TypeError, ValueError):
+            sector = None
+        products.append(
+            {
+                "uri": uri,
+                "filename": str(_row_get(row, "productFilename") or Path(uri).name),
+                "size_bytes": size_bytes,
+                "sector": sector,
+            }
+        )
+
+    sectors = sorted({item["sector"] for item in products if item["sector"] is not None})
+    result = dict(target)
+    result.update(
+        {
+            "products": tuple(products),
+            "product_count": len(products),
+            "total_bytes": sum(
+                int(item["size_bytes"] or 0) for item in products
+            ),
+            "sectors": tuple(sectors),
+            "n_sectors": len(sectors),
+        }
+    )
+    result["priority"] = priority_score(
+        float(result["tmag"]),
+        teff=result.get("teff"),
+        n_sectors=result["n_sectors"],
+        contratio=result.get("contratio"),
+    )
+    return result
+
+
+def _storage_penalty(estimated_download_gb: float) -> int:
+    if estimated_download_gb <= 5.0:
+        return 0
+    if estimated_download_gb <= 25.0:
+        return 1
+    if estimated_download_gb <= 100.0:
+        return 2
+    if estimated_download_gb <= 250.0:
+        return 3
+    return 5
+
+
+def _queue_row(target: dict[str, Any], *, pipeline: str) -> dict[str, Any]:
+    """Map verified metadata to the mandatory live-search queue contract."""
+    estimated_gb = float(target["total_bytes"]) / 1_000_000_000.0
+    penalty = _storage_penalty(estimated_gb)
+    tmag = float(target["tmag"])
+    teff = target.get("teff")
+    scientific_novelty = 3.0
+    prior_significance = 2.0 if teff is not None and float(teff) <= 5500 else 1.0
+    followup_leverage = 3.0 if tmag <= 13.0 else 2.0 if tmag <= 14.0 else 1.0
+    data_quality = round(3.0 * float(target["priority"]), 3)
+    method_advantage = 2.0
+    publication_value = 2.0
+    community_integration = 3.0
+    new_followup_balance = 3.0
+    total_priority = round(
+        scientific_novelty
+        + prior_significance
+        + followup_leverage
+        + data_quality
+        + method_advantage
+        + publication_value
+        + community_integration
+        + new_followup_balance
+        - penalty,
+        3,
+    )
+    sectors = ",".join(str(value) for value in target["sectors"])
+    return {
+        "target_id": f"TIC {int(target['tic_id'])}",
+        "project": "2026 Exoplanet Research",
+        "source": "MAST TIC and TESS light-curve product metadata",
+        "catalog_ids": f"TIC {int(target['tic_id'])}",
+        "ra_deg": target.get("ra_deg"),
+        "dec_deg": target.get("dec_deg"),
+        "data_products_available": (
+            f"{pipeline} light curves: {target['product_count']}; sectors: {sectors}"
+        ),
+        "estimated_download_gb": round(estimated_gb, 9),
+        "search_category": "new_target",
+        "scientific_novelty": scientific_novelty,
+        "prior_significance": prior_significance,
+        "followup_leverage": followup_leverage,
+        "data_quality": data_quality,
+        "method_advantage": method_advantage,
+        "publication_value": publication_value,
+        "community_integration": community_integration,
+        "new_followup_balance": new_followup_balance,
+        "storage_cost_penalty": penalty,
+        "total_priority": total_priority,
+        "status": (
+            "queued"
+            if target["product_count"] and total_priority >= 18.0
+            else "rejected_no_products"
+            if not target["product_count"]
+            else "rejected_low_priority"
+        ),
+        "notes": (
+            "Selected from the faint-star novelty frontier after TOI, CTOI, "
+            "confirmed-host, and prior-scan exclusions; exact MAST products verified."
+        ),
+        "citations": (
+            "https://mast.stsci.edu/; "
+            "https://exoplanetarchive.ipac.caltech.edu/; "
+            "https://exofop.ipac.caltech.edu/tess/"
+        ),
+    }
+
+
+def prepare_live_search_snapshot(
+    targets: list[dict[str, Any]],
+    *,
+    queue_path: Path,
+    immutable_snapshot_path: Path,
+    batch_manifest_path: Path,
+    dataset_manifest_path: Path,
+    repo_root: Path,
+    mission: str = "TESS",
+    pipeline: str = "QLP",
+    exptime: str = "long",
+    workers: int = 6,
+    inspector_fn: Any = None,
+    batch_id: str = "tess_live_search_v1",
+    dataset_id: str = "tess_live_search_v1",
+    replace: bool = False,
+) -> dict[str, Any]:
+    """Verify target products and freeze queue/batch/dataset metadata only."""
+    outputs = (
+        queue_path,
+        immutable_snapshot_path,
+        batch_manifest_path,
+        dataset_manifest_path,
+    )
+    existing = [str(path) for path in outputs if path.exists()]
+    if existing and not replace:
+        raise FileExistsError(
+            "Refusing to overwrite live-search preparation evidence: "
+            + ", ".join(existing)
+        )
+    if not targets:
+        raise RuntimeError("Cannot prepare a live-search snapshot from zero targets")
+
+    inspect = inspector_fn or inspect_target_products
+    worker_count = max(1, min(workers, len(targets)))
+    print(
+        f"Preparing live-search metadata for {len(targets)} targets "
+        f"(workers={worker_count}; no raw downloads) …",
+        flush=True,
+    )
+    started = time.monotonic()
+    inspected: list[dict[str, Any]] = []
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        futures = [
+            executor.submit(
+                inspect,
+                target,
+                mission=mission,
+                pipeline=pipeline,
+                exptime=exptime,
+            )
+            for target in targets
+        ]
+        for index, future in enumerate(as_completed(futures), 1):
+            result = future.result()
+            inspected.append(result)
+            print(
+                f"  [{index}/{len(targets)}] TIC {result['tic_id']} "
+                f"products={result['product_count']} "
+                f"{_progress_suffix(index, len(targets), started)}",
+                flush=True,
+            )
+
+    if any(
+        target.get("ra_deg") is None
+        or target.get("dec_deg") is None
+        or any(
+            product["size_bytes"] is None or int(product["size_bytes"]) <= 0
+            for product in target["products"]
+        )
+        for target in inspected
+    ):
+        raise RuntimeError(
+            "Cannot freeze live-search metadata with missing coordinates or product sizes"
+        )
+
+    rows = [_queue_row(target, pipeline=pipeline) for target in inspected]
+    rows.sort(key=lambda row: (-float(row["total_priority"]), str(row["target_id"])))
+    queued_rows = [row for row in rows if row["status"] == "queued"]
+    if not queued_rows:
+        raise RuntimeError(
+            "No product-backed targets satisfy the normal live-search priority gate (>=18)"
+        )
+    fieldnames = list(rows[0])
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames, lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(rows)
+    _atomic_write_text(queue_path, buffer.getvalue())
+
+    snapshot_buffer = io.StringIO()
+    snapshot_writer = csv.DictWriter(
+        snapshot_buffer, fieldnames=fieldnames, lineterminator="\n"
+    )
+    snapshot_writer.writeheader()
+    snapshot_writer.writerows(queued_rows)
+    _atomic_write_text(immutable_snapshot_path, snapshot_buffer.getvalue())
+
+    root = repo_root.resolve()
+    queue_relative = queue_path.resolve().relative_to(root).as_posix()
+    snapshot_relative = immutable_snapshot_path.resolve().relative_to(root).as_posix()
+    snapshot_sha256 = sha256_file(immutable_snapshot_path)
+    queued_target_ids = {str(row["target_id"]) for row in queued_rows}
+    queued_targets = [
+        target
+        for target in inspected
+        if f"TIC {int(target['tic_id'])}" in queued_target_ids
+    ]
+    total_bytes = sum(int(target["total_bytes"]) for target in queued_targets)
+    free_gb = shutil.disk_usage(root).free / 1_000_000_000.0
+    managed_paths = (
+        "data",
+        "datasets",
+        "cache",
+        ".cache",
+        "artifacts",
+        "outputs",
+        "downloads",
+        "tmp",
+    )
+    managed_bytes = sum(
+        path.stat().st_size
+        for name in managed_paths
+        for path in (root / name).rglob("*")
+        if path.is_file()
+    )
+    managed_gb = managed_bytes / 1_000_000_000.0
+    remaining_project_cap_gb = max(0.0, 100.0 - managed_gb)
+    estimated_download_gb = total_bytes / 1_000_000_000.0
+    if estimated_download_gb > remaining_project_cap_gb:
+        raise RuntimeError(
+            f"Prepared batch estimate {estimated_download_gb:.3f} GB exceeds "
+            f"remaining 100 GB project-data headroom {remaining_project_cap_gb:.3f} GB"
+        )
+    created_at = datetime.now(UTC)
+    batch_manifest = {
+        "schema_version": 1,
+        "batch_id": batch_id,
+        "project": "2026 Exoplanet Research",
+        "role": "live_search",
+        "acquisition_mode": "stream_process_evict",
+        "target_queue": queue_relative,
+        "target_queue_snapshot": {
+            "path": snapshot_relative,
+            "sha256": snapshot_sha256,
+        },
+        "source_archive": "MAST TIC catalog and TESS light-curve products",
+        "query": {
+            "mission": mission,
+            "pipeline": pipeline,
+            "exptime": exptime,
+            "target_count": len(queued_rows),
+            "selection_rubric": (
+                "eight policy criteria scored 0-3; product-backed targets require >=18"
+            ),
+        },
+        "estimated_download_gb": round(estimated_download_gb, 9),
+        "max_allowed_download_gb": round(remaining_project_cap_gb, 9),
+        "project_managed_data_before_gb": round(managed_gb, 9),
+        "expected_raw_files": sum(
+            int(target["product_count"]) for target in queued_targets
+        ),
+        "expected_derived_gb": 0.0,
+        "free_space_before_gb": round(free_gb, 3),
+        "free_space_required_after_gb": 10.0,
+        "eviction_rule": "evict redownloadable raw products after candidate rows are written",
+        "pin_rule": "pin queue, manifests, ledger rows, and unresolved candidate evidence",
+        "stop_condition": (
+            "stop before 100 GB project-managed data, below 10 GB free, metadata "
+            "mismatch, duplicate target, or elevated MAST failure/throttling rate"
+        ),
+        "manifest_owner": "Exoplanet agent",
+        "created_at": created_at.isoformat(),
+        "product_inventory": [
+            {
+                "target_id": f"TIC {int(target['tic_id'])}",
+                "products": list(target["products"]),
+            }
+            for target in sorted(queued_targets, key=lambda item: int(item["tic_id"]))
+        ],
+    }
+    _atomic_write_text(
+        batch_manifest_path,
+        json.dumps(batch_manifest, indent=2, sort_keys=True) + "\n",
+    )
+
+    dataset_manifest = DatasetManifest(
+        schema_version=1,
+        dataset_id=dataset_id,
+        project="2026 Exoplanet Research",
+        role="live_search",
+        source_name="MAST TIC catalog and TESS light-curve product metadata",
+        source_url="https://mast.stsci.edu/",
+        instrument="TESS cameras",
+        target_ids={
+            "namespace": "TIC",
+            "count": len(queued_rows),
+            "selection": "faint-star novelty frontier with known-object exclusions",
+        },
+        time_range={
+            "status": "deferred",
+            "reason": (
+                "per-target sector coverage is in the queue and exact product URIs "
+                "are in the batch manifest inventory"
+            ),
+        },
+        cadence={"status": "known", "value": exptime},
+        band_or_frequency="TESS optical bandpass, approximately 600-1000 nm",
+        data_product_type="checksummed live-search target queue with MAST product inventory",
+        acquired_at=created_at,
+        local_path=snapshot_relative,
+        sha256=snapshot_sha256,
+        license="NASA/STScI public archive data; acknowledge MAST and the TESS mission",
+        label_source="unlabeled live search after TOI, CTOI, and confirmed-host exclusions",
+        label_confidence="unlabeled",
+        preprocessing_version="star-scanner-live-search-queue-v1",
+        known_caveats=(
+            "Product sizes are MAST metadata estimates and may differ from cached bytes.",
+            "The queue contains light curves only; target-pixel products require "
+            "a separate follow-up manifest.",
+        ),
+        row_count=len(queued_rows),
+        group_count=len(queued_rows),
+    )
+    _atomic_write_text(
+        dataset_manifest_path,
+        json.dumps(dataset_manifest.model_dump(mode="json"), indent=2, sort_keys=True)
+        + "\n",
+    )
+    validation = validate_dataset_manifest(
+        dataset_manifest_path,
+        repo_root=root,
+    )
+    if not validation.ok:
+        raise RuntimeError(
+            "Written live-search dataset manifest failed validation: "
+            + "; ".join(validation.errors)
+        )
+    print(
+        f"Prepared {len(queued_rows)} queued targets / "
+        f"{batch_manifest['expected_raw_files']} products "
+        f"/ {batch_manifest['estimated_download_gb']:.6f} GB (metadata only)",
+        flush=True,
+    )
+    return {
+        "queue_path": str(queue_path),
+        "immutable_snapshot_path": str(immutable_snapshot_path),
+        "batch_manifest_path": str(batch_manifest_path),
+        "dataset_manifest_path": str(dataset_manifest_path),
+        "target_count": len(queued_rows),
+        "inspected_count": len(inspected),
+        "rejected_count": len(inspected) - len(queued_rows),
+        "expected_raw_files": batch_manifest["expected_raw_files"],
+        "estimated_download_gb": batch_manifest["estimated_download_gb"],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -762,16 +1248,30 @@ def run_background_scan(
     exptime: str = "long",
     query_radius_deg: float = 0.5,
     max_target_query_tiles: int = 60,
-    workers: int = 4,
+    workers: int = 6,
     request_delay: float = 0.5,
-) -> None:
+    prepare_only: bool = False,
+    queue_path: Path = Path("data_selection/target_priority_queue.csv"),
+    immutable_snapshot_path: Path = Path(
+        "data_selection/target_priority_queue.tess_live_search_v1.csv"
+    ),
+    batch_manifest_path: Path = Path(
+        "data_selection/batch_manifests/tess_live_search_v1.json"
+    ),
+    dataset_manifest_path: Path = Path(
+        "metadata/dataset_manifests/tess_live_search_v1.json"
+    ),
+    repo_root: Path = Path("."),
+    replace_preparation: bool = False,
+) -> dict[str, Any]:
     """Fetch a ranked target list and scan each star in priority order.
 
     Already-scanned stars (from *log_path*), TOI stars, community TOI (CTOI)
     stars, and confirmed transiting planet hosts from the NASA Exoplanet Archive
-    are excluded before scanning begins.  All exclusion lists fail open — if a
-    list cannot be fetched the scan continues without that exclusion.  The log
-    is updated after every star so progress is never lost on interruption.
+    are excluded before scanning begins. Normal scans preserve the historical
+    fail-open behavior for exclusion sources; metadata preparation fails closed
+    so an incomplete source cannot silently enter a frozen queue. The log is
+    updated after every star so progress is never lost on interruption.
 
     Args:
         log_path: Path to the persistent JSON scan log.
@@ -790,38 +1290,64 @@ def run_background_scan(
         exptime: MAST exposure hint.
         query_radius_deg: Cone-search radius for each bounded TIC target tile.
         max_target_query_tiles: Maximum number of TIC sky tiles to query.
-        workers: Maximum concurrent target scans. Default 4 keeps live MAST
-            use polite on the configured M4 Max while avoiding a serial run.
+        workers: Maximum concurrent target scans or metadata inspections.
+            Default 6 follows the active repo-tab worker convention.
         request_delay: Minimum seconds between worker scan starts.
+        prepare_only: Freeze the metadata-only queue and manifests, then stop
+            before any raw product download or pipeline execution.
     """
-    log = ScanLog(log_path)
+    log: ScanLog | None = None if prepare_only else ScanLog(log_path)
 
     print("Loading TESS TOI exclusion list …", flush=True)
-    try:
-        toi_ids = _load_toi_tic_ids()
-    except Exception as exc:  # noqa: BLE001
-        print(f"Warning: could not load TOI list ({exc}); skipping TOI exclusion", flush=True)
-        toi_ids = set()
+    if prepare_only:
+        toi_ids = _load_toi_tic_ids(strict=True)
+    else:
+        try:
+            toi_ids = _load_toi_tic_ids()
+        except Exception as exc:  # noqa: BLE001
+            print(
+                f"Warning: could not load TOI list ({exc}); skipping TOI exclusion",
+                flush=True,
+            )
+            toi_ids = set()
 
     print("Loading CTOI exclusion list …", flush=True)
-    try:
-        ctoi_ids = _load_ctoi_tic_ids()
-    except Exception as exc:  # noqa: BLE001
-        print(f"Warning: could not load CTOI list ({exc}); skipping CTOI exclusion", flush=True)
-        ctoi_ids = set()
+    ctoi_ids = (
+        _load_ctoi_tic_ids(strict=True) if prepare_only else _load_ctoi_tic_ids()
+    )
 
     print("Loading confirmed transiting planet hosts …", flush=True)
-    try:
+    if prepare_only:
+        confirmed_ids = _load_confirmed_host_tic_ids(strict=True)
+    else:
         confirmed_ids = _load_confirmed_host_tic_ids()
-    except Exception as exc:  # noqa: BLE001
-        print(f"Warning: could not load confirmed hosts ({exc}); skipping", flush=True)
-        confirmed_ids = frozenset()
 
-    already_scanned = log.scanned_ids()
-    exclude = toi_ids | ctoi_ids | confirmed_ids | already_scanned
+    prior_discovery_ids = _load_prior_discovery_tic_ids(
+        log_path.parent,
+        strict=prepare_only,
+    )
+    if prepare_only:
+        if log_path.exists():
+            log_payload = json.loads(log_path.read_text(encoding="utf-8"))
+            already_scanned = {
+                int(value) for value in log_payload.get("entries", {})
+            }
+        else:
+            already_scanned = set()
+    else:
+        assert log is not None
+        already_scanned = log.scanned_ids()
+    exclude = (
+        toi_ids
+        | ctoi_ids
+        | confirmed_ids
+        | prior_discovery_ids
+        | already_scanned
+    )
     print(
         f"Excluding {len(toi_ids):,} TOI  |  {len(ctoi_ids):,} CTOI  |  "
         f"{len(confirmed_ids):,} confirmed hosts  |  "
+        f"{len(prior_discovery_ids):,} historical discovery targets  |  "
         f"{len(already_scanned):,} already-scanned",
         flush=True,
     )
@@ -843,6 +1369,22 @@ def run_background_scan(
     except Exception as exc:  # noqa: BLE001
         print(f"Target selection failed: {exc}", file=sys.stderr, flush=True)
         raise
+
+    if prepare_only:
+        return prepare_live_search_snapshot(
+            targets,
+            queue_path=queue_path,
+            immutable_snapshot_path=immutable_snapshot_path,
+            batch_manifest_path=batch_manifest_path,
+            dataset_manifest_path=dataset_manifest_path,
+            repo_root=repo_root,
+            mission=mission,
+            pipeline=pipeline,
+            exptime=exptime,
+            workers=workers,
+            replace=replace_preparation,
+        )
+    assert log is not None
     worker_count = max(1, min(workers, len(targets)))
     print(
         f"Selected {len(targets)} candidate targets  "
@@ -858,10 +1400,17 @@ def run_background_scan(
             "or --query-radius-deg after checking live-service status.",
             flush=True,
         )
-        return
+        return {
+            "mode": "scan",
+            "items_processed": 0,
+            "items_written": 0,
+            "items_failed": 0,
+            "output_paths": (str(log_path),),
+        }
 
     start_time = time.monotonic()
     n_done = 0
+    n_failed = 0
     limiter = _StartRateLimiter(request_delay)
     print_lock = threading.Lock()
 
@@ -901,6 +1450,8 @@ def run_background_scan(
             tic_id = target["tic_id"]
             log.record(tic_id, result["status"], result)
             n_done += 1
+            if result["status"] == "error":
+                n_failed += 1
             with print_lock:
                 print(
                     f"[{n_done}/{len(targets)}] TIC {tic_id}  "
@@ -926,6 +1477,13 @@ def run_background_scan(
         f"| {summary['active']:,} active",
         flush=True,
     )
+    return {
+        "mode": "scan",
+        "items_processed": n_done,
+        "items_written": n_done - n_failed,
+        "items_failed": n_failed,
+        "output_paths": (str(log_path),),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -933,7 +1491,7 @@ def run_background_scan(
 # ---------------------------------------------------------------------------
 
 
-def _parse_args() -> argparse.Namespace:
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -946,6 +1504,14 @@ def _parse_args() -> argparse.Namespace:
     mode.add_argument(
         "--summary", action="store_true",
         help="Print scan log summary and exit (no scanning)",
+    )
+    mode.add_argument(
+        "--prepare-only",
+        action="store_true",
+        help=(
+            "Write a metadata-only live-search queue and manifests, then exit "
+            "before any light-curve download"
+        ),
     )
     p.add_argument(
         "--log", default="logs/scan_log.json",
@@ -974,8 +1540,8 @@ def _parse_args() -> argparse.Namespace:
                    help="TIC cone-search radius per target-selection tile (default: 0.5)")
     p.add_argument("--max-target-query-tiles", type=int, default=60,
                    help="Maximum TIC sky tiles to query for target selection (default: 60)")
-    p.add_argument("--workers", type=int, default=4,
-                   help="Concurrent target scans for live discovery (default: 4)")
+    p.add_argument("--workers", type=int, default=6,
+                   help="Concurrent target scans/metadata queries (default: 6)")
     p.add_argument("--request-delay", type=float, default=0.5,
                    help="Minimum seconds between worker scan starts (default: 0.5)")
     p.add_argument(
@@ -985,18 +1551,95 @@ def _parse_args() -> argparse.Namespace:
         "--model-path", default=None,
         help="XGBoost model JSON (required for --scorer xgboost/ensemble)",
     )
-    return p.parse_args()
+    p.add_argument(
+        "--queue-path",
+        default="data_selection/target_priority_queue.csv",
+        help="Canonical live-search target queue CSV",
+    )
+    p.add_argument(
+        "--queue-snapshot-path",
+        default="data_selection/target_priority_queue.tess_live_search_v1.csv",
+        help="Immutable queued-target snapshot CSV",
+    )
+    p.add_argument(
+        "--batch-manifest-path",
+        default="data_selection/batch_manifests/tess_live_search_v1.json",
+        help="Metadata-only live-search batch manifest JSON",
+    )
+    p.add_argument(
+        "--dataset-manifest-path",
+        default="metadata/dataset_manifests/tess_live_search_v1.json",
+        help="Validated live-search DatasetManifest JSON",
+    )
+    p.add_argument(
+        "--replace-preparation",
+        action="store_true",
+        help="Explicitly replace preparation artifacts with the same versioned paths",
+    )
+    p.add_argument(
+        "--no-git-report",
+        action="store_true",
+        help="Skip the required run-report append and commit/push step",
+    )
+    p.add_argument(
+        "--report-dir",
+        type=Path,
+        default=DEFAULT_REPORT_DIR,
+        help="Run-report ledger directory",
+    )
+    return p.parse_args(argv)
 
 
-if __name__ == "__main__":
-    args = _parse_args()
+def _write_run_report(
+    *,
+    started_at: str,
+    elapsed_seconds: float,
+    items_processed: int,
+    items_written: int,
+    items_failed: int,
+    output_paths: tuple[str, ...],
+    report_dir: Path,
+    notes: str = "",
+    git_run_fn: Any = None,
+) -> None:
+    """Append and safely publish one star-scanner completion report."""
+    report = RunReport(
+        script="star_scanner",
+        status="success" if items_failed == 0 else "partial",
+        started_at=started_at,
+        completed_at=datetime.now(UTC).isoformat(),
+        elapsed_seconds=elapsed_seconds,
+        items_processed=items_processed,
+        items_written=items_written,
+        items_failed=items_failed,
+        output_paths=output_paths,
+        notes=notes,
+    )
+    path = report_path_for("star_scanner", report_dir=report_dir)
+    kwargs: dict[str, Any] = {}
+    if git_run_fn is not None:
+        kwargs["run_fn"] = git_run_fn
+    ok = run_and_commit_report(report, path, **kwargs)
+    if ok:
+        print(f"Run report committed and pushed: {path}", flush=True)
+    else:
+        print(
+            f"Warning: run report written to {path} but commit/push failed",
+            file=sys.stderr,
+            flush=True,
+        )
+
+
+def main(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
+    """Run the scanner CLI and return a process exit code."""
+    args = _parse_args(argv)
     _log_path = Path(args.log)
     _model_path = Path(args.model_path) if args.model_path else None
 
     if args.summary:
         if not _log_path.exists():
             print(f"No scan log found at {_log_path}", file=sys.stderr)
-            sys.exit(1)
+            return 1
         _s = ScanLog(_log_path).summary()
         print(f"Scan log: {_log_path}")
         print(f"  Total scanned     : {_s['total']:,}")
@@ -1004,9 +1647,11 @@ if __name__ == "__main__":
         print(f"  Clear (no signal) : {_s['scanned_clear']:,}")
         print(f"  No data           : {_s['no_data']:,}")
         print(f"  Errors            : {_s['error']:,}")
-        sys.exit(0)
+        return 0
 
     if args.target:
+        started_at = datetime.now(UTC).isoformat()
+        started = time.monotonic()
         _result = run_target_scan(
             _log_path,
             args.target,
@@ -1028,12 +1673,28 @@ if __name__ == "__main__":
             )
         elif _result["status"] == "error":
             print(f"Error: {_result['error_message']}", file=sys.stderr)
-            sys.exit(2)
         else:
             print(f"No candidates found (status: {_result['status']})")
-        sys.exit(0)
+        if not args.no_git_report:
+            is_error = _result["status"] == "error"
+            _write_run_report(
+                started_at=started_at,
+                elapsed_seconds=time.monotonic() - started,
+                items_processed=1,
+                items_written=0 if is_error else 1,
+                items_failed=1 if is_error else 0,
+                output_paths=(str(_log_path),),
+                report_dir=args.report_dir,
+                notes="single-target scan",
+                git_run_fn=git_run_fn,
+            )
+        if _result["status"] == "error":
+            return 2
+        return 0
 
-    run_background_scan(
+    started_at = datetime.now(UTC).isoformat()
+    started = time.monotonic()
+    summary = run_background_scan(
         _log_path,
         n_targets=args.max_stars,
         tmag_range=(args.tmag_min, args.tmag_max),
@@ -1049,4 +1710,50 @@ if __name__ == "__main__":
         max_target_query_tiles=args.max_target_query_tiles,
         workers=args.workers,
         request_delay=args.request_delay,
+        prepare_only=args.prepare_only,
+        queue_path=Path(args.queue_path),
+        immutable_snapshot_path=Path(args.queue_snapshot_path),
+        batch_manifest_path=Path(args.batch_manifest_path),
+        dataset_manifest_path=Path(args.dataset_manifest_path),
+        repo_root=_SKILLS_DIR.parent,
+        replace_preparation=args.replace_preparation,
     )
+    if not args.no_git_report:
+        if args.prepare_only:
+            output_paths = (
+                summary["queue_path"],
+                summary["immutable_snapshot_path"],
+                summary["batch_manifest_path"],
+                summary["dataset_manifest_path"],
+            )
+            _write_run_report(
+                started_at=started_at,
+                elapsed_seconds=time.monotonic() - started,
+                items_processed=int(summary["inspected_count"]),
+                items_written=int(summary["target_count"]),
+                items_failed=0,
+                output_paths=output_paths,
+                report_dir=args.report_dir,
+                notes=(
+                    "metadata-only preparation; "
+                    f"{summary['rejected_count']} targets rejected by policy"
+                ),
+                git_run_fn=git_run_fn,
+            )
+        else:
+            _write_run_report(
+                started_at=started_at,
+                elapsed_seconds=time.monotonic() - started,
+                items_processed=int(summary["items_processed"]),
+                items_written=int(summary["items_written"]),
+                items_failed=int(summary["items_failed"]),
+                output_paths=tuple(summary["output_paths"]),
+                report_dir=args.report_dir,
+                notes="bounded background scan",
+                git_run_fn=git_run_fn,
+            )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

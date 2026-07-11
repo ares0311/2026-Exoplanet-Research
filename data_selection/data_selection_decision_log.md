@@ -1,5 +1,43 @@
 # Data Selection Decision Log
 
+## 2026-07-11 — TESS QLP live-search queue v1
+
+**Repo:** 2026 Exoplanet Research
+**Data:** 18 product-backed TIC targets in the immutable
+`tess_live_search_v1` queue (plus two no-product rejections retained in the
+canonical queue)
+**Role:** Live search
+**Acquisition mode:** Metadata-only preparation now; future raw acquisition is
+`stream_process_evict`
+**Estimated download GB:** 0.04565088 GB across 103 exact QLP products
+**Actual download GB:** 0 GB; this decision performed metadata queries only
+**Free space before:** 340.564 GB decimal as recorded by the batch manifest
+**Training priority score:** Not applicable; this dataset is forbidden for
+training and calibration
+**Live search priority score:** 19.332–21.0 for the executable snapshot; every
+included target clears the normal >=18 policy gate
+**Storage cost penalty:** 0 for every target (each is <=5 GB)
+**Why this data:** The queue freezes a small, uniformly selected faint-star
+novelty batch with verified QLP availability and exact MAST URIs, closing the
+row-level live-search manifest prerequisite for reproducible candidate-ledger
+wiring.
+**Why not alternatives:** SPOC is target-limited and repeatedly produced
+no-data historical scans for this frontier. Target-pixel files are larger and
+are reserved for candidate follow-up. Training, calibration, TOI, CTOI,
+confirmed-host, and 200 previously scanned targets are excluded.
+**Why this acquisition mode:** Metadata-first preparation establishes exact
+size and product scope without materializing raw FITS files. A later scan can
+fetch one target at a time and evict redownloadable raw products.
+**Eviction or pin rule:** Pin queues, manifests, ledger records, and unresolved
+candidate evidence; evict redownloadable raw light curves after durable results.
+**Leakage risks:** The live-search queue is role-isolated and explicitly
+forbidden for model training/calibration. It carries unlabeled targets only.
+**Manifest:** `metadata/dataset_manifests/tess_live_search_v1.json` and
+`data_selection/batch_manifests/tess_live_search_v1.json`
+**Expected scientific or model-hardening value:** Enables exact source IDs,
+product URIs, regeneration scope, and auditable null/candidate outcomes for the
+first post-model-production TESS live-search batch.
+
 ## 2026-07-10 — Versioned dataset-manifest contract
 
 **Repo:** 2026 Exoplanet Research

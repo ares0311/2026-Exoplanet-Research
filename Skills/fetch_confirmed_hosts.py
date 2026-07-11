@@ -1,15 +1,15 @@
 """Fetch TIC IDs of confirmed transiting planet hosts from NASA Exoplanet Archive.
 
 Queries the ``ps`` (planetary systems) TAP table for rows where
-``pl_tranflag=1`` (transiting geometry confirmed) and ``tic_id IS NOT NULL``.
+``tran_flag=1`` (transiting geometry confirmed) and ``tic_id IS NOT NULL``.
 
 Public API
 ----------
-fetch_confirmed_host_tic_ids(*, fetch_fn=None) -> frozenset[int]
+fetch_confirmed_host_tic_ids(*, fetch_fn=None, strict=False) -> frozenset[int]
     Return a frozenset of integer TIC IDs to exclude from discovery scans.
     On any network or parse failure returns an empty frozenset (fails open,
     so the scan continues without confirmed-planet exclusion rather than
-    crashing).
+    crashing). Strict mode raises for immutable metadata preparation.
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ _NEA_TAP_URL = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
 
 _QUERY = (
     "SELECT DISTINCT tic_id FROM ps "
-    "WHERE pl_tranflag=1 AND default_flag=1 AND tic_id IS NOT NULL"
+    "WHERE tran_flag=1 AND default_flag=1 AND tic_id IS NOT NULL"
 )
 
 
@@ -42,6 +42,7 @@ def _default_fetch(url: str) -> str:
 def fetch_confirmed_host_tic_ids(
     *,
     fetch_fn: Callable[[str], str] | None = None,
+    strict: bool = False,
 ) -> frozenset[int]:
     """Return TIC IDs of confirmed transiting planet hosts.
 
@@ -50,7 +51,8 @@ def fetch_confirmed_host_tic_ids(
             string).  Defaults to ``urllib.request.urlopen``.
 
     Returns:
-        Frozenset of integer TIC IDs.  Empty frozenset on any failure.
+        Frozenset of integer TIC IDs. Empty frozenset on any failure unless
+        ``strict=True``, which raises so production manifest preparation fails closed.
     """
     _fetch = fetch_fn or _default_fetch
 
@@ -60,6 +62,8 @@ def fetch_confirmed_host_tic_ids(
     try:
         raw = _fetch(url)
     except Exception:  # noqa: BLE001
+        if strict:
+            raise
         return frozenset()
 
     try:
@@ -69,10 +73,17 @@ def fetch_confirmed_host_tic_ids(
             val = (row.get("tic_id") or "").strip()
             if not val:
                 continue
+            if val.upper().startswith("TIC "):
+                val = val[4:].strip()
             try:
                 tic_ids.add(int(float(val)))
             except (ValueError, TypeError):
                 continue
-        return frozenset(tic_ids)
+        result = frozenset(tic_ids)
+        if strict and not result:
+            raise RuntimeError("Confirmed-host TAP query returned no TIC IDs")
+        return result
     except Exception:  # noqa: BLE001
+        if strict:
+            raise
         return frozenset()
