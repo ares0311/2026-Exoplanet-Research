@@ -7,6 +7,35 @@ policy_sources:
   - docs/astrometrics_external_and_cloud_storage_policy.md
 
 datasets:
+  - dataset_id: tess_live_search_v1
+    role: live_search
+    project: 2026 Exoplanet Research
+    source: MAST TIC catalog plus exact QLP light-curve product metadata
+    allowed_uses:
+      - Execute the bounded TESS QLP live-search batch recorded in its batch manifest
+      - Populate schema-v2 candidate-ledger source_dataset_id and raw-product provenance
+      - Record high-priority null results and candidate signals from the same frozen queue
+    forbidden_uses:
+      - Train or calibrate any model
+      - Substitute for a labeled validation or frozen-evaluation set
+      - Download target-pixel files without a separate follow-up manifest
+      - Claim discovery or submit externally without explicit human approval
+    split_group_keys:
+      - TIC target ID
+    manifest_path: data_selection/batch_manifests/tess_live_search_v1.json
+    dataset_manifest_paths:
+      - metadata/dataset_manifests/tess_live_search_v1.json
+    local_artifact_paths:
+      - data_selection/target_priority_queue.csv
+      - data_selection/target_priority_queue.tess_live_search_v1.csv
+    notes: >
+      Metadata-only preparation completed 2026-07-11. The immutable executable
+      snapshot contains 18 targets and 103 exact QLP product URIs totaling an
+      estimated 0.04565088 GB. Two additional inspected targets with no QLP
+      products remain in the canonical queue as rejected_no_products. Selection
+      excludes 7,753 TOIs, 3,787 CTOIs, 3,590 confirmed transiting hosts, and
+      200 historical discovery targets. No raw light curves were downloaded.
+
   - dataset_id: t1_1_kepler_master_train
     role: training
     project: 2026 Exoplanet Research

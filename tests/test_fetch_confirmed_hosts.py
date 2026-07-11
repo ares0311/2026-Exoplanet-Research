@@ -4,6 +4,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from Skills.fetch_confirmed_hosts import (  # noqa: E402
@@ -59,6 +61,12 @@ class TestParsing:
             fetch_fn=lambda _: _make_csv(("99999.0",))
         )
         assert 99999 in result
+
+    def test_tic_prefixed_archive_id(self) -> None:
+        result = fetch_confirmed_host_tic_ids(
+            fetch_fn=lambda _: _make_csv(("TIC 270790652",))
+        )
+        assert result == frozenset({270790652})
 
     def test_skips_empty_values(self) -> None:
         result = fetch_confirmed_host_tic_ids(
@@ -116,6 +124,22 @@ class TestFailOpen:
         assert result == frozenset()
 
 
+class TestStrictMode:
+    def test_network_error_raises(self) -> None:
+        def bad_fetch(_: str) -> str:
+            raise OSError("connection refused")
+
+        with pytest.raises(OSError, match="connection refused"):
+            fetch_confirmed_host_tic_ids(fetch_fn=bad_fetch, strict=True)
+
+    def test_empty_result_raises(self) -> None:
+        with pytest.raises(RuntimeError, match="no TIC IDs"):
+            fetch_confirmed_host_tic_ids(
+                fetch_fn=lambda _: "tic_id\n",
+                strict=True,
+            )
+
+
 # ---------------------------------------------------------------------------
 # URL and query
 # ---------------------------------------------------------------------------
@@ -130,7 +154,7 @@ class TestUrl:
         assert "FROM ps" in _QUERY
 
     def test_query_filters_transiting(self) -> None:
-        assert "pl_tranflag=1" in _QUERY
+        assert "tran_flag=1" in _QUERY
 
     def test_query_filters_default_flag(self) -> None:
         assert "default_flag=1" in _QUERY

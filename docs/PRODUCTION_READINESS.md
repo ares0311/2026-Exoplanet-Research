@@ -6,7 +6,8 @@ FPP 0.4405, while the TOI-146.01 false-positive control produced no signal.
 No Tier 1 gaps remain open.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 2,630 default tests passing, 2 integration_live deselected (2026-07-11)
+Test baseline: 2,643 default tests passing; 2 `integration_live` tests excluded by
+the configured marker expression (2026-07-11)
 
 ---
 
@@ -28,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.35 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.36 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -170,6 +171,25 @@ Benchmarks on the 16-CPU M4 Max preserved all 2,630 passes while reducing the
 suite from 226.45s serial to 81.57s with all 16 workers (the 8-worker result was
 81.54s, statistically equivalent). The portable `auto` setting lets constrained
 CI runners use their own reported CPU capacity rather than hard-coding the Mac.
+0.2.36 closes the real-live-manifest prerequisite for Phase 1 candidate-ledger
+wiring. `Skills/star_scanner.py --prepare-only` now performs a metadata-only,
+six-worker target preparation pass: it freezes the policy queue, exact MAST QLP
+product inventory, batch manifest, and checksum-validated `live_search` dataset
+manifest without downloading raw light curves or invoking the scan pipeline.
+Successful preparation and scan invocations now also use the required
+`star_scanner.jsonl` Run Report ledger, with the git runner injectable so tests
+never invoke the real commit/push path.
+The first immutable bundle, `tess_live_search_v1`, contains 18 eligible TIC
+targets and 103 exact QLP products totaling an estimated 0.04565088 GB; two
+additional inspected targets with no products remain as explicit rejections in
+the canonical queue. Selection excluded 7,753 TOIs, 3,787 CTOIs, 3,590
+confirmed transiting hosts, and all 200 targets in the historical discovery
+logs. The live preparation also exposed two upstream-contract changes that are
+now handled fail-closed: the current CTOI export no longer supplies the ratings
+column assumed by the old default filter, and the NASA Exoplanet Archive `ps`
+table uses `tran_flag` while TIC values are prefixed with `TIC `. Candidate-
+ledger schema v2 can now be wired to this stable source dataset and product
+inventory; that wiring remains the next Phase 1 roadmap task.
 
 ---
 
@@ -345,7 +365,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
 | 82 production-critical Skills/ | ✅ |
-| 2,626 default tests, ruff clean, mypy clean | ✅ |
+| 2,643 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -354,7 +374,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 
 Run these before any live deployment or public announcement:
 
-- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-11: 2,630 passed, 2 deselected)
+- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-11: 2,643 passed; 2 `integration_live` tests excluded by configuration)
 - [x] `.venv/bin/ruff check .` — no lint errors (2026-07-11: clean)
 - [x] `.venv/bin/python -m mypy src` — no type errors (2026-07-11: clean, 30 source files)
 - [x] `exo background-run-once --dry-run` — no config errors (2026-07-10: installed entry point exercised successfully; dry run wrote no ledger/outcome data)
