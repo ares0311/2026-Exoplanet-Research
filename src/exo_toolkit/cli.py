@@ -235,6 +235,7 @@ def run_pipeline(
     fetch_fn: Any = None,
     clean_fn: Any = None,
     stellar_params_fn: Any = None,
+    run_context: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Run the full pipeline on one target and return serialisable results.
 
@@ -265,6 +266,8 @@ def run_pipeline(
         clean_fn: Optional callable replacing ``clean_lightcurve`` (for tests).
         stellar_params_fn: Optional callable replacing ``fetch_tic_stellar_params``
             (for tests). Only consulted when ``mission == "TESS"``.
+        run_context: Optional mutable mapping populated with fetch and
+            preprocessing provenance even when no signal clears the search gate.
 
     Returns:
         List of dicts, one per candidate signal, suitable for JSON output.
@@ -333,6 +336,14 @@ def run_pipeline(
     if pipeline is not None:
         fetch_kwargs["pipeline"] = pipeline
     fetch_result = _fetch(target_id, mission, **fetch_kwargs)
+    if run_context is not None:
+        run_context.update(
+            {
+                "fetch_provenance": fetch_result.provenance.model_dump(mode="json"),
+                "preprocess_version": f"exo-toolkit-{__version__}:clean_lightcurve",
+                "toolkit_version": __version__,
+            }
+        )
     clean_result = _clean(fetch_result.light_curve)
     provenance_score = compute_provenance_score(fetch_result.provenance)
 

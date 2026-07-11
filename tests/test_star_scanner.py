@@ -23,16 +23,21 @@ _mock_astroquery.mast = _mock_astroquery_mast
 sys.modules.setdefault("astroquery", _mock_astroquery)
 sys.modules.setdefault("astroquery.mast", _mock_astroquery_mast)
 
+from Skills.candidate_database import CandidateDatabase  # noqa: E402
 from Skills.star_scanner import (  # noqa: E402
+    PreparedLiveSearchBundle,
     ScanLog,
+    _ledger_record_for_outcome,
     _load_prior_discovery_tic_ids,
     _load_toi_tic_ids,
     _write_run_report,
     inspect_target_products,
+    load_prepared_live_search_bundle,
     main,
     prepare_live_search_snapshot,
     priority_score,
     run_background_scan,
+    run_prepared_live_search,
     run_target_scan,
     scan_star,
     select_targets,
@@ -616,6 +621,193 @@ class TestLiveSearchPreparation:
         assert report.items_written == 18
         assert path == tmp_path / "star_scanner.jsonl"
         assert commit.call_args.kwargs["run_fn"] is fake_runner
+
+    def test_committed_prepared_bundle_cross_validates(self) -> None:
+        root = Path(__file__).resolve().parent.parent
+        bundle = load_prepared_live_search_bundle(
+            dataset_manifest_path=(
+                root / "metadata/dataset_manifests/tess_live_search_v1.json"
+            ),
+            batch_manifest_path=(
+                root / "data_selection/batch_manifests/tess_live_search_v1.json"
+            ),
+            repo_root=root,
+        )
+
+        assert bundle.dataset_id == "tess_live_search_v1"
+        assert len(bundle.targets) == 18
+        assert sum(len(target["raw_uris"]) for target in bundle.targets) == 103
+
+    def test_ledger_record_requires_exact_frozen_uri_tuple(self) -> None:
+        target = {
+            "tic_id": 101,
+            "target_id": "TIC 101",
+            "priority": 20.0,
+            "raw_uris": ("mast:a", "mast:b"),
+        }
+        context = {
+            "fetch_provenance": {
+                "raw_uris": ["mast:a", "mast:b"],
+                "sectors_or_quarters": [1, 2],
+            },
+            "preprocess_version": "clean-v1",
+        }
+        record = _ledger_record_for_outcome(
+            target=target,
+            source_dataset_id="tess_live_search_v1",
+            row=None,
+            pipeline_context=context,
+            min_snr=5.0,
+            max_peaks=5,
+            max_period_grid_points=20_000,
+            scorer="bayesian",
+            pipeline="QLP",
+            exptime="long",
+            model_path=None,
+        )
+        assert record.schema_version == 2
+        assert record.raw_uris == ("mast:a", "mast:b")
+        assert record.time_window == "sectors 1,2"
+        assert record.candidate_id == "TIC_101_null"
+
+        context["fetch_provenance"]["raw_uris"] = ["mast:a"]
+        with pytest.raises(RuntimeError, match="differ from frozen inventory"):
+            _ledger_record_for_outcome(
+                target=target,
+                source_dataset_id="tess_live_search_v1",
+                row=None,
+                pipeline_context=context,
+                min_snr=5.0,
+                max_peaks=5,
+                max_period_grid_points=20_000,
+                scorer="bayesian",
+                pipeline="QLP",
+                exptime="long",
+                model_path=None,
+            )
+
+    def test_prepared_shard_writes_only_its_target_to_schema_v2(
+        self, tmp_path: Path
+    ) -> None:
+        targets = tuple(
+            {
+                "tic_id": tic_id,
+                "target_id": f"TIC {tic_id}",
+                "priority": 20.0,
+                "raw_uris": (f"mast:{tic_id}",),
+            }
+            for tic_id in (101, 102)
+        )
+        bundle = PreparedLiveSearchBundle(
+            dataset_id="tess_live_search_v1",
+            batch_id="tess_live_search_v1",
+            targets=targets,
+        )
+
+        def fake_scan(tic_id: int, **_: object) -> dict[str, Any]:
+            provenance = {
+                "raw_uris": [f"mast:{tic_id}"],
+                "sectors_or_quarters": [1],
+            }
+            return {
+                "status": "candidate_found",
+                "n_signals": 1,
+                "best_period_days": 3.0,
+                "best_fpp": 0.1,
+                "best_pathway": "github_only_reproducibility",
+                "error_message": None,
+                "_pipeline_context": {
+                    "fetch_provenance": provenance,
+                    "preprocess_version": "clean-v1",
+                },
+                "_ledger_rows": [
+                    {
+                        "candidate_id": f"TIC_{tic_id}_s01",
+                        "fetch_provenance": provenance,
+                        "posterior": {"planet_candidate": 0.8},
+                        "scores": {"false_positive_probability": 0.2},
+                    }
+                ],
+            }
+
+        with patch("Skills.star_scanner.scan_star", side_effect=fake_scan):
+            summary = run_prepared_live_search(
+                bundle,
+                log_path=tmp_path / "scan.json",
+                candidate_db_path=tmp_path / "candidates.sqlite3",
+                workers=2,
+                request_delay=0.0,
+                shard_index=0,
+                shard_count=2,
+            )
+
+        db_path = tmp_path / "candidates.shard0of2.sqlite3"
+        with CandidateDatabase(db_path) as database:
+            assert database.provenanced_count() == 1
+            assert database.provenanced_target_ids("tess_live_search_v1") == {
+                "TIC 102"
+            }
+        assert summary["items_processed"] == 1
+        assert summary["items_written"] == 1
+        assert summary["items_failed"] == 0
+
+        with patch("Skills.star_scanner.scan_star") as scan:
+            resumed = run_prepared_live_search(
+                bundle,
+                log_path=tmp_path / "scan.json",
+                candidate_db_path=tmp_path / "candidates.sqlite3",
+                workers=2,
+                request_delay=0.0,
+                shard_index=0,
+                shard_count=2,
+            )
+        scan.assert_not_called()
+        assert resumed["items_processed"] == 0
+
+    def test_execute_prepared_cli_never_uses_dynamic_selection(
+        self, tmp_path: Path
+    ) -> None:
+        bundle = PreparedLiveSearchBundle(
+            dataset_id="tess_live_search_v1",
+            batch_id="tess_live_search_v1",
+            targets=(),
+        )
+        summary = {
+            "items_processed": 0,
+            "items_written": 0,
+            "items_failed": 0,
+            "output_paths": (str(tmp_path / "scan.json"),),
+        }
+        with (
+            patch(
+                "Skills.star_scanner.load_prepared_live_search_bundle",
+                return_value=bundle,
+            ) as load,
+            patch(
+                "Skills.star_scanner.run_prepared_live_search",
+                return_value=summary,
+            ) as execute,
+            patch("Skills.star_scanner.select_targets") as select,
+        ):
+            code = main(
+                [
+                    "--execute-prepared-batch",
+                    "--log",
+                    str(tmp_path / "scan.json"),
+                    "--candidate-db-path",
+                    str(tmp_path / "candidates.sqlite3"),
+                    "--shard-count",
+                    "3",
+                    "--shard-index",
+                    "1",
+                    "--no-git-report",
+                ]
+            )
+
+        assert code == 0
+        load.assert_called_once()
+        execute.assert_called_once()
+        select.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

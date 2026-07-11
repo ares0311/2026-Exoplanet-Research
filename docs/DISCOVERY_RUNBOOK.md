@@ -3,8 +3,8 @@
 **Purpose**: Prevent doom loops. Every agent and every session must read this before doing anything.
 
 **Last updated**: 2026-07-11 (the trained-model and formal-acceptance gates are
-complete; `tess_live_search_v1` is now the frozen metadata-only source for the
-next candidate-ledger wiring and bounded live-search phase)
+complete; `tess_live_search_v1` is now the frozen, schema-v2-ledger-wired source
+for the next bounded live-search evidence run)
 
 ---
 
@@ -14,8 +14,9 @@ The project is no longer spending its primary workflow on the run006/run008 QLP
 candidate-review loop. That loop produced useful scanner/debugging evidence,
 but it did not produce submission-ready candidates. The trained model, stacking
 calibration, and formal production-acceptance gates are now complete. The next
-active Phase 1 task is wiring schema-v2 candidate-ledger writes to the frozen
-`tess_live_search_v1` source before executing its live scan.
+active Phase 1 implementation is complete: schema-v2 candidate-ledger writes
+are wired to the frozen `tess_live_search_v1` source. The next step is its
+operator-coordinated live evidence run.
 
 The authoritative active plan is now:
 
@@ -47,8 +48,9 @@ must fail closed if TOI, CTOI, confirmed-host, coordinate, product-URI, product-
 size, storage, or manifest validation is incomplete. V1 is now committed; do
 not rerun this command or use `--replace-preparation` to revise its membership.
 Create new explicitly versioned output paths and IDs for a future batch. Do not
-execute the 18-target raw-data scan until the schema-v2 candidate-ledger path is
-wired and tested against this source ID.
+execute the 18-target raw-data scan with the legacy dynamic-selection mode; use
+only `--execute-prepared-batch`, which validates this source ID and exact URI
+inventory before writing any scientific ledger row.
 
 ## The Discovery Mission (Operational Reference)
 
@@ -371,13 +373,32 @@ The XGBoost model (`models/xgboost_koi.json`) is trained and available now.
 
 ## The Immediate Next Action (As of 2026-07-11)
 
-Wire every outcome from the frozen `tess_live_search_v1` queue into candidate-
-ledger schema v2 using its stable `source_dataset_id` and complete exact raw URI
-tuple. Keep the existing legacy scanner log readable for compatibility, but do
-not treat it as the scientific provenance ledger. Add fail-closed tests before
-executing the 18-target live scan. That future scan's estimated raw footprint is
-only 0.04565088 GB and should use six I/O workers in one tab; cross-terminal
-sharding would add coordination without material benefit for this bounded batch.
+Run the frozen 18-target batch only after explicit cross-terminal coordination.
+Although its estimated raw footprint is just 0.04565088 GB, historical QLP+BLS
+timings clear the three-minute sharding threshold. Use three process shards with
+six I/O workers each. The required TIC-ID modulo partition is 7/4/7 targets at
+three shards; four shards would regress to 1/6/8/3 and lengthen the critical
+path while wasting a tab. Each shard automatically scopes its scan log, SQLite
+ledger, and Run Report ledger. In three terminal tabs, use shard indices 0, 1,
+and 2:
+
+```bash
+git switch main
+git pull --ff-only origin main
+caffeinate -i .venv/bin/python Skills/star_scanner.py \
+  --execute-prepared-batch --log logs/tess_live_search_v1.json \
+  --candidate-db-path data/tess_live_search_v1.sqlite3 \
+  --scorer ensemble --model-path models/xgboost_koi.json \
+  --workers 6 --shard-count 3 --shard-index 0
+```
+
+Change only the final shard index in the other tabs. Stop if any shard reports
+`Candidate-ledger write refused`, a fetched-URI mismatch, repeated MAST timeout,
+or materially worse per-target rate than the first completed shard. The SQLite
+ledgers are local runtime artifacts; committed manifests and per-shard Run
+Reports are the GitHub-visible handoff. A rerun of the same shard command skips
+candidate/null targets already present in its ledger and retries only missing or
+`preprocessing_failure` targets. No external submission is authorized.
 
 Historical run006/run008 evidence:
 

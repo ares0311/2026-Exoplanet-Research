@@ -150,6 +150,20 @@ class CandidateDatabase:
         self, record: CandidateLedgerRecord | dict[str, Any]
     ) -> int:
         """Validate and append one reproducible candidate-ledger record."""
+        columns, values = self._provenanced_insert_values(record)
+        placeholders = ",".join("?" for _ in columns)
+        cursor = self._conn.execute(
+            f"INSERT INTO candidate_ledger ({','.join(columns)}) "
+            f"VALUES ({placeholders})",
+            values,
+        )
+        self._conn.commit()
+        return cursor.lastrowid  # type: ignore[return-value]
+
+    def _provenanced_insert_values(
+        self, record: CandidateLedgerRecord | dict[str, Any]
+    ) -> tuple[tuple[str, ...], tuple[Any, ...]]:
+        """Validate and serialize one ledger record without mutating SQLite."""
         validated = (
             record
             if isinstance(record, CandidateLedgerRecord)
@@ -173,14 +187,24 @@ class CandidateDatabase:
         for field in json_fields:
             data[field] = json.dumps(data[field], sort_keys=True)
         columns = tuple(data)
-        placeholders = ",".join("?" for _ in columns)
-        cursor = self._conn.execute(
-            f"INSERT INTO candidate_ledger ({','.join(columns)}) "
-            f"VALUES ({placeholders})",
-            tuple(data[column] for column in columns),
-        )
-        self._conn.commit()
-        return cursor.lastrowid  # type: ignore[return-value]
+        return columns, tuple(data[column] for column in columns)
+
+    def insert_provenanced_many(
+        self, records: list[CandidateLedgerRecord | dict[str, Any]]
+    ) -> tuple[int, ...]:
+        """Validate first, then append all records in one SQLite transaction."""
+        prepared = [self._provenanced_insert_values(record) for record in records]
+        row_ids: list[int] = []
+        with self._conn:
+            for columns, values in prepared:
+                placeholders = ",".join("?" for _ in columns)
+                cursor = self._conn.execute(
+                    f"INSERT INTO candidate_ledger ({','.join(columns)}) "
+                    f"VALUES ({placeholders})",
+                    values,
+                )
+                row_ids.append(int(cursor.lastrowid))
+        return tuple(row_ids)
 
     def candidate_history(self, candidate_id: str) -> list[CandidateLedgerRecord]:
         """Return validated append history for one stable candidate ID."""
@@ -211,6 +235,25 @@ class CandidateDatabase:
         """Return the number of strict candidate-ledger records."""
         row = self._conn.execute("SELECT COUNT(*) FROM candidate_ledger").fetchone()
         return int(row[0])
+
+    def provenanced_target_ids(self, source_dataset_id: str) -> frozenset[str]:
+        """Return targets already recorded for one immutable source dataset."""
+        rows = self._conn.execute(
+            "SELECT DISTINCT target_id FROM candidate_ledger WHERE source_dataset_id=?",
+            (source_dataset_id,),
+        ).fetchall()
+        return frozenset(str(row[0]) for row in rows)
+
+    def completed_provenanced_target_ids(
+        self, source_dataset_id: str
+    ) -> frozenset[str]:
+        """Return successful/null targets, leaving preprocessing failures retryable."""
+        rows = self._conn.execute(
+            "SELECT DISTINCT target_id FROM candidate_ledger "
+            "WHERE source_dataset_id=? AND review_status <> 'preprocessing_failure'",
+            (source_dataset_id,),
+        ).fetchall()
+        return frozenset(str(row[0]) for row in rows)
 
     def latest(self, tic_id: int) -> dict[str, Any] | None:
         """Return the most recent row for *tic_id*, or None."""

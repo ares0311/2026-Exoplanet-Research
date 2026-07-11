@@ -6,7 +6,7 @@ FPP 0.4405, while the TOI-146.01 false-positive control produced no signal.
 No Tier 1 gaps remain open.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 2,643 default tests passing; 2 `integration_live` tests excluded by
+Test baseline: 2,651 default tests passing; 2 `integration_live` tests excluded by
 the configured marker expression (2026-07-11)
 
 ---
@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.36 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.37 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -190,6 +190,18 @@ column assumed by the old default filter, and the NASA Exoplanet Archive `ps`
 table uses `tran_flag` while TIC values are prefixed with `TIC `. Candidate-
 ledger schema v2 can now be wired to this stable source dataset and product
 inventory; that wiring remains the next Phase 1 roadmap task.
+0.2.37 completes that candidate-ledger wiring for the frozen batch.
+`star_scanner.py --execute-prepared-batch` validates the dataset checksum,
+batch identity, exact target membership, per-target product sizes, and complete
+URI inventory before scanning. It writes every candidate, high-priority null,
+or post-fetch preprocessing failure as a schema-v2 record whose
+`source_dataset_id` is `tess_live_search_v1`; fetched URI tuples must exactly
+match the frozen inventory or the write is refused. The execution path is
+resume-safe, defaults to six I/O workers, and supports modulo process sharding
+with automatically scoped scan logs, SQLite ledgers, and Run Report ledgers.
+Runtime `data/*.sqlite*` files are now ignored and recorded in the local-
+artifact ledger, keeping `git add .` safe. No live scan was executed by this
+change; the 18-target evidence run remains operator-coordinated work.
 
 ---
 
@@ -365,7 +377,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
 | 82 production-critical Skills/ | ✅ |
-| 2,643 default tests, ruff clean, mypy clean | ✅ |
+| 2,651 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -374,7 +386,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 
 Run these before any live deployment or public announcement:
 
-- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-11: 2,643 passed; 2 `integration_live` tests excluded by configuration)
+- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-11: 2,651 passed; 2 `integration_live` tests excluded by configuration)
 - [x] `.venv/bin/ruff check .` — no lint errors (2026-07-11: clean)
 - [x] `.venv/bin/python -m mypy src` — no type errors (2026-07-11: clean, 30 source files)
 - [x] `exo background-run-once --dry-run` — no config errors (2026-07-10: installed entry point exercised successfully; dry run wrote no ledger/outcome data)
