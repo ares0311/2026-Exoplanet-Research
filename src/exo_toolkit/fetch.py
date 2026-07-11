@@ -51,6 +51,7 @@ class FetchProvenance(BaseModel):
     n_cadences: int = Field(ge=1)
     time_baseline_days: float = Field(ge=0.0)
     fetched_at: str  # ISO 8601 UTC
+    raw_uris: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -201,6 +202,7 @@ def _fetch_lightcurve_once(
                 f"(author={author!r}, exptime={exptime!r})"
             )
 
+        raw_uris = _extract_search_product_uris(search)
         collection, flux_columns_used = _download_collection_with_cache_repair(
             search,
             flux_columns=flux_columns,
@@ -208,7 +210,7 @@ def _fetch_lightcurve_once(
     except Exception as exc:
         if author.upper() != "QLP" or not _is_transient_fetch_error(exc):
             raise
-        collection, flux_columns_used = _download_qlp_collection_from_data_urls(
+        collection, flux_columns_used, raw_uris = _download_qlp_collection_from_data_urls(
             lk,
             target_id=target_id,
             mission=mission,
@@ -245,6 +247,7 @@ def _fetch_lightcurve_once(
         n_cadences=len(lc.time),
         time_baseline_days=time_baseline_days,
         fetched_at=datetime.datetime.now(datetime.UTC).isoformat(),
+        raw_uris=raw_uris,
     )
 
     return FetchResult(light_curve=lc, provenance=provenance)
@@ -289,7 +292,7 @@ def _download_qlp_collection_from_data_urls(
     exptime: str,
     sectors: list[int] | None,
     flux_columns: tuple[str, ...],
-) -> tuple[Any, tuple[str, ...]]:
+) -> tuple[Any, tuple[str, ...], tuple[str, ...]]:
     """Download QLP products directly from MAST-provided observation dataURL values."""
     from astroquery.mast import Observations  # noqa: PLC0415
 
@@ -309,9 +312,11 @@ def _download_qlp_collection_from_data_urls(
 
     light_curves: list[Any] = []
     flux_columns_used: list[str] = []
+    raw_uris: list[str] = []
     cache_dir = Path(lk.config.get_cache_dir())
     for row in observations:
         uri = str(row["dataURL"])
+        raw_uris.append(uri)
         local_path = (
             cache_dir
             / "mastDownload"
@@ -340,7 +345,30 @@ def _download_qlp_collection_from_data_urls(
 
     if not light_curves:
         raise ValueError("No downloadable QLP light curves returned by MAST dataURL fallback")
-    return lk.LightCurveCollection(light_curves), tuple(flux_columns_used)
+    return (
+        lk.LightCurveCollection(light_curves),
+        tuple(flux_columns_used),
+        tuple(raw_uris),
+    )
+
+
+def _extract_search_product_uris(search: Any) -> tuple[str, ...]:
+    """Return exact archive product URIs exposed by a Lightkurve search table."""
+    table = getattr(search, "table", None)
+    if table is None:
+        return ()
+    colnames = tuple(getattr(table, "colnames", ()) or ())
+    for column in ("dataURI", "dataURL"):
+        if column not in colnames:
+            continue
+        uris = tuple(
+            str(value)
+            for value in table[column]
+            if str(value).startswith(("mast:", "http://", "https://", "s3://"))
+        )
+        if uris:
+            return tuple(dict.fromkeys(uris))
+    return ()
 
 
 def _query_lightkurve_observations(
@@ -598,6 +626,7 @@ def _fetch_jwst(obsid: str, *, _skills_dir: Path | None = None) -> FetchResult:
         n_cadences=result.n_integrations,
         time_baseline_days=baseline_days,
         fetched_at=datetime.datetime.now(datetime.UTC).isoformat(),
+        raw_uris=(result.product_uri,) if getattr(result, "product_uri", "") else (),
     )
     return FetchResult(light_curve=lc, provenance=provenance)
 

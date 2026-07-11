@@ -72,6 +72,7 @@ class JwstLcResult:
     n_integrations: int
     product_type: str            # "x1dints" | "calints"
     warnings: list[str]
+    product_uri: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -347,6 +348,7 @@ def fetch_jwst_lc(
         n_integrations=int(mask.sum()),
         product_type=product_type,
         warnings=warnings,
+        product_uri=best["dataURI"],
     )
 
 

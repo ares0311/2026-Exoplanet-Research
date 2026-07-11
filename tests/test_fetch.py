@@ -29,6 +29,7 @@ from exo_toolkit.fetch import (
     FetchResult,
     _download_one_quietly,
     _ensure_download_products_quiet,
+    _extract_search_product_uris,
     _extract_sectors,
     _fetch_jwst,
     _first_row,
@@ -127,6 +128,21 @@ def _missing_flux_column_error(flux_column: str) -> RuntimeError:
         ) from KeyError(flux_column)
     except RuntimeError as exc:
         return exc
+
+
+def test_extract_search_product_uris_preserves_all_stitched_products() -> None:
+    search = MagicMock()
+    search.table.colnames = ["dataURI"]
+    search.table.__getitem__.return_value = [
+        "mast:TESS/product-a.fits",
+        "mast:TESS/product-b.fits",
+        "mast:TESS/product-a.fits",
+    ]
+
+    assert _extract_search_product_uris(search) == (
+        "mast:TESS/product-a.fits",
+        "mast:TESS/product-b.fits",
+    )
 
 
 def test_download_one_quietly_forces_astroquery_verbose_false(
@@ -630,6 +646,7 @@ class TestFetchLightcurve:
 
         assert result.light_curve is collection.stitch.return_value
         assert result.provenance.flux_column == "kspsap_flux"
+        assert result.provenance.raw_uris == (row["dataURL"],)
         assert downloaded
         assert mock_lk.read.call_args == call(
             downloaded[0],
@@ -1034,7 +1051,7 @@ from unittest.mock import MagicMock
 
 class JwstLcResult:
     def __init__(self, obsid, target_name, time_btjd, flux_norm, flux_err_norm,
-                 instrument, n_integrations, product_type, warnings):
+                 instrument, n_integrations, product_type, warnings, product_uri):
         self.obsid = obsid
         self.target_name = target_name
         self.time_btjd = time_btjd
@@ -1044,6 +1061,7 @@ class JwstLcResult:
         self.n_integrations = n_integrations
         self.product_type = product_type
         self.warnings = warnings
+        self.product_uri = product_uri
 
 def fetch_jwst_lc(obsid, **kwargs):
     return JwstLcResult(
@@ -1056,6 +1074,7 @@ def fetch_jwst_lc(obsid, **kwargs):
         n_integrations=3,
         product_type="x1dints",
         warnings=[],
+        product_uri="mast:JWST/product-x1dints.fits",
     )
 
 def to_lightkurve(result):
@@ -1085,6 +1104,7 @@ class TestFetchJwst:
         skills = self._skills_dir(tmp_path, _FAKE_JWST_MODULE)
         result = _fetch_jwst("jw12345", _skills_dir=skills)  # type: ignore[arg-type]
         assert isinstance(result, FetchResult)
+        assert result.provenance.raw_uris == ("mast:JWST/product-x1dints.fits",)
 
     def test_provenance_mission_is_jwst(self, tmp_path: pytest.TempPathFactory) -> None:
         skills = self._skills_dir(tmp_path, _FAKE_JWST_MODULE)
