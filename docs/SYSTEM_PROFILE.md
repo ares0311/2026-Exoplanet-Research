@@ -112,6 +112,18 @@ For a single large numerical job, allow native libraries to use more threads, co
 - Notebooks may use this system's memory and CPU headroom for exploration, but production code should keep resource limits explicit.
 - Reports should record enough provenance to reproduce results on this or another machine.
 
+### Test Suite
+
+- Run pytest through `pytest-xdist` with all reported CPUs and the work-stealing
+  scheduler (`-n auto --dist=worksteal`).
+- Measured 2026-07-11 on this 16-CPU M4 Max: 2,630 tests took 226.45s serial,
+  137.53s with 4 workers/load scheduling, 136.48s with 8 workers/load,
+  138.88s with 16 workers/load, 81.54s with 8 workers/work stealing, and
+  81.57s with 16 workers/work stealing. All runs passed identically.
+- The 16-worker work-stealing default uses the maximum available parallelism
+  with effectively identical best wall time; portable environments adapt via
+  xdist's `auto` worker count.
+
 ### AI/ML Training
 
 - PyTorch training should use `device=auto` defaults that resolve to `mps` on

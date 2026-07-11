@@ -230,7 +230,19 @@ run_and_commit_report(report, path)  # appends JSON line, then commits+pushes ON
 
 ## Parallelism-First Recipe Policy — MANDATORY
 
-**Standing rule: we always use sharding when it applies.** For any embarrassingly-parallel-across-independent-units workload (targets, files, folds, sectors, EPIC/TIC/KIC IDs, anything with a `--max-*`/`-n`/count-style bound), process-level sharding (`--shard-index`/`--shard-count`, one process per console tab) is the default shape, not merely something to weigh. If a target acquisition/processing script doesn't yet support it, that is a gap to close (mirroring the proven pattern below) before recommending a multi-tab live run — not a reason to fall back to a single-process recipe.
+**Standing rule: use the maximum safe parallelism available.** Parallelize
+independent tool calls, and use all safely usable workers/processes/shards for
+independent workload units. Correctness, measured throughput, memory capacity,
+and observed external-service throttling are the bounds; legacy conservative
+worker counts are baselines to exceed when measurements remain clean, not caps.
+
+For any embarrassingly-parallel-across-independent-units workload (targets,
+files, folds, sectors, EPIC/TIC/KIC IDs, anything with a `--max-*`/`-n`/count-
+style bound), process-level sharding (`--shard-index`/`--shard-count`, one
+process per console tab) is the default shape, not merely something to weigh.
+If a target acquisition/processing script doesn't yet support it, that is a
+gap to close (mirroring the proven pattern below) before recommending a
+multi-tab live run — not a reason to fall back to a single-process recipe.
 
 **Before giving the user any recipe expected to take longer than 3 minutes, always consider sharding, multiprocessing/multithreading, or other parallelism — do not default to a purely sequential recipe without first checking whether a faster shape exists.**
 This applies to every recipe, not just Kepler/TESS batch processing: training runs, injection-recovery sweeps, catalog downloads, evaluation/validation passes, anything with a `--max-*`/`-n`/count-style bound.
@@ -238,12 +250,21 @@ This applies to every recipe, not just Kepler/TESS batch processing: training ru
 **Before proposing a recipe:**
 1. Estimate the wall-clock time. If it's over ~3 minutes, explicitly work through whether the task is:
    - **Embarrassingly parallel across independent units** (targets, files, folds, sectors) → sharding (`--shard-index`/`--shard-count`, one process per console tab) is the default, per the pattern in `Skills/process_t1_kepler_batch.py` (version 0.2.18). Add it to the target script if missing rather than settling for `--workers`-only.
-   - **I/O-bound within one process** (network/catalog calls) → in-process worker concurrency (`--workers`, `ThreadPoolExecutor`) *within each shard*, per `docs/SYSTEM_PROFILE.md`'s 4-6 worker guidance for external-service workloads — sharding and per-shard workers compose (e.g. 4 shards × 6 workers each), they are not alternatives to choose between.
-   - **CPU-bound** (local computation, no external service) → multiprocessing or vectorization, per `docs/SYSTEM_PROFILE.md`'s higher local worker-count guidance (start near 12, measure before raising).
+   - **I/O-bound within one process** (network/catalog calls) → in-process worker concurrency (`--workers`, `ThreadPoolExecutor`) *within each shard*; sharding and per-shard workers compose and should scale upward until throughput stops improving or errors/throttling appear.
+   - **CPU-bound** (local computation, no external service) → multiprocessing or vectorization using all available CPUs by default, then retain a lower measured count only when it is demonstrably faster or required by memory limits.
    - Genuinely sequential (state must build incrementally, e.g. O-C ephemeris refinement across epochs) → say so explicitly rather than silently defaulting to slow.
 2. When a target script lacks sharding support, add it before recommending a multi-tab live run — mirroring the pattern already proven in `Skills/process_t1_kepler_batch.py` and `Skills/fetch_t1_2_k2_calibration_snippets.py` (sharding added 2026-07-10): partition by `id % shard_count`, auto-suffix each shard's output/failure files so concurrent processes never race on one file, wire `shard_index`/`shard_count` into the Run Report. The only exception is a genuinely trivial one-off task that will not clear the 3-minute bar even sequentially — say so explicitly rather than silently skipping sharding.
    - **Shard-capable scripts today**: `Skills/process_t1_kepler_batch.py` (`--shard-index`/`--shard-count`, version 0.2.18) and `Skills/fetch_t1_2_k2_calibration_snippets.py` (partitions by `epic_id % shard_count`, auto-suffixed per-shard output/failure files). Any other acquisition/processing script (see the Run Report Policy retrofit list above) still needs this pattern added the first time a live multi-target recipe for it would clear the 3-minute bar.
-3. Every parallel/sharded recipe must still respect `docs/SYSTEM_PROFILE.md`'s conservative guidance for live external services (do not recommend so many concurrent shards/workers that MAST/ExoFOP/NASA Exoplanet Archive throttling becomes likely) and must use the Run Report Policy above so progress is self-reporting across shards.
+3. Every parallel/sharded recipe must use the Run Report Policy above so
+progress is self-reporting across shards. For live services, start from the
+highest previously clean measurement and scale further while throughput
+improves; back off immediately on throttling, timeouts, or increased failures.
+
+4. Pytest runs use `pytest-xdist` with `-n auto --dist=worksteal` by default.
+On the recorded 16-CPU Mac this reduced the 2,630-test suite from 226.45s to
+81.57s while preserving the exact pass count. Override worker count only for
+a documented diagnosis or when a constrained environment cannot support its
+reported CPU count.
 
 **Ask, don't assume, when:**
 - The right shard/worker *count* (not whether to shard at all) depends on the operator's own tradeoffs — how many console tabs they're willing to dedicate, whether they want a tab free for other work, how much they trust the external service's rate limits at higher concurrency.

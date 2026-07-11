@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "exo-toolkit"
-version = "0.2.34"
+version = "0.2.35"
 description = "TESS/Kepler exoplanet candidate detection, vetting, scoring, and submission-pathway toolkit"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -49,6 +49,7 @@ dependencies = [
 dev = [
   "pytest",
   "pytest-cov",
+  "pytest-xdist==3.8.0",
   "ruff==0.15.15",
   "mypy==2.1.0",
   "pre-commit",
@@ -66,7 +67,7 @@ exo_toolkit = ["background/fixtures/*.json", "py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra -m 'not integration_live'"
+addopts = "-ra -m 'not integration_live' -n auto --dist=worksteal"
 markers = [
   "integration_live: tests that require live external services such as MAST or NASA Exoplanet Archive",
   "slow: tests that are slow or data-heavy"

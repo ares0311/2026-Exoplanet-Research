@@ -28,7 +28,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.34 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.35 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -164,6 +164,12 @@ v2 requires a non-empty `raw_uris` tuple, SQLite stores it losslessly, and v1
 history remains readable. Live ledger writes remain fail-closed until a real
 row-level live-search dataset manifest exists; training/calibration manifests
 must not be reused or a synthetic source ID invented merely to enable wiring.
+0.2.35 adopts maximum-safe parallelism as a standing directive and makes
+`pytest-xdist -n auto --dist=worksteal` the default local/CI test runner.
+Benchmarks on the 16-CPU M4 Max preserved all 2,630 passes while reducing the
+suite from 226.45s serial to 81.57s with all 16 workers (the 8-worker result was
+81.54s, statistically equivalent). The portable `auto` setting lets constrained
+CI runners use their own reported CPU capacity rather than hard-coding the Mac.
 
 ---
 
