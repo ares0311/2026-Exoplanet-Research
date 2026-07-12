@@ -6,7 +6,7 @@ FPP 0.4405, while the TOI-146.01 false-positive control produced no signal.
 No Tier 1 gaps remain open.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 2,651 default tests passing; 2 `integration_live` tests excluded by
+Test baseline: 2,652 default tests passing; 2 `integration_live` tests excluded by
 the configured marker expression (2026-07-11)
 
 ---
@@ -209,6 +209,19 @@ flushed line when every target starts plus a flushed 30-second heartbeat with
 completed, active, pending, elapsed, and ETA fields. The interval is configurable
 with `--heartbeat-seconds`; tests exercise the heartbeat while work is active.
 
+**TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW PENDING.** Three
+shards at six workers each processed all 18 frozen targets in 72.79 seconds of
+observed wall time, writing 56 schema-v2 records: 53 signal rows and three null
+results, with zero preprocessing or ledger failures. Per-shard run reports are
+committed and `artifacts/manifests/tess_live_search_v1_run_summary.json`
+preserves the ignored SQLite/log hashes and conservative review queue. Three
+signals on two targets have FPP below 0.15. TIC 201251996's two signals are
+31.7% and 58.4% deep with weak XGBoost support, so they are immediate likely-
+false-positive review cases, not escalation candidates. TIC 355651994_s02
+(P=97.1618 d, depth=1.1546%, FPP=0.0663) remains an unreviewed candidate signal
+requiring the full false-positive diagnostic path. Its QLP provenance score is
+0.5625, so no `tfop_ready` or external-submission claim is authorized.
+
 ---
 
 ## Tier 1 Gaps (Blocking Live Discovery Production)
@@ -383,7 +396,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
 | 82 production-critical Skills/ | ✅ |
-| 2,651 default tests, ruff clean, mypy clean | ✅ |
+| 2,652 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -392,7 +405,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 
 Run these before any live deployment or public announcement:
 
-- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-11: 2,651 passed; 2 `integration_live` tests excluded by configuration)
+- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-11: 2,652 passed; 2 `integration_live` tests excluded by configuration)
 - [x] `.venv/bin/ruff check .` — no lint errors (2026-07-11: clean)
 - [x] `.venv/bin/python -m mypy src` — no type errors (2026-07-11: clean, 30 source files)
 - [x] `exo background-run-once --dry-run` — no config errors (2026-07-10: installed entry point exercised successfully; dry run wrote no ledger/outcome data)

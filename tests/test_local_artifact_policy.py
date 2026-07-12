@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 from pathlib import Path
@@ -57,6 +58,7 @@ def test_git_add_dot_keeps_committed_sentinels_and_approved_models_visible() -> 
         "models/xgboost_toi.xgb.json",
         "docs/LOCAL_ARTIFACT_LEDGER.md",
         "artifacts/manifests/local_artifacts.json",
+        "artifacts/manifests/tess_live_search_v1_run_summary.json",
     ]
 
     for path in visible_paths:
@@ -75,7 +77,7 @@ def test_local_artifact_manifest_matches_human_ledger() -> None:
     assert manifest["policy"]["github_visible_ledger_required"] is True
     assert "deployment gates are closed" in manifest["production_gap"]
     assert "tess_live_search_v1" in manifest["production_gap"]
-    assert "three-shard live evidence run" in manifest["production_gap"]
+    assert "await conservative false-positive review" in manifest["production_gap"]
     assert "docs/exoplanet_exomoon_dataset_handoff.md" in ledger
 
     artifact_paths = {artifact["path"] for artifact in manifest["artifacts"]}
@@ -103,3 +105,31 @@ def test_local_artifact_manifest_matches_human_ledger() -> None:
         assert artifact["status"]
         assert artifact["next_action"]
         assert artifact["validation_gate"]
+
+
+def test_tess_live_search_run_summary_is_self_consistent() -> None:
+    summary = json.loads(
+        (REPO_ROOT / "artifacts/manifests/tess_live_search_v1_run_summary.json")
+        .read_text(encoding="utf-8")
+    )
+
+    execution = summary["execution"]
+    shards = summary["shards"]
+    assert execution["targets_processed"] == sum(
+        shard["targets_processed"] for shard in shards
+    ) == 18
+    assert execution["candidate_ledger_rows"] == sum(
+        shard["ledger_rows"] for shard in shards
+    ) == 56
+    assert execution["candidate_signal_rows"] + execution["null_result_rows"] == 56
+    assert execution["preprocessing_failure_rows"] == 0
+    assert len(summary["review_queue"]) == 3
+    assert len({row["target_id"] for row in summary["review_queue"]}) == 2
+
+    for shard in shards:
+        report = REPO_ROOT / (
+            "artifacts/manifests/run_reports/"
+            f"star_scanner.shard{shard['shard_index']}of3.jsonl"
+        )
+        digest = hashlib.sha256(report.read_bytes()).hexdigest()
+        assert digest == shard["run_report_sha256"]
