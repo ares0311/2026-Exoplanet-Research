@@ -44,9 +44,11 @@ by itself satisfy a master-guide evidence requirement.
    the diagnostic requires four. The requested follow-up is complete to the
    limit of available observations; do not add more ledger scaffolding or run
    another blind scan.
-3. **Phase 1 — canonical regression evals:** no committed sample-level suite
-   yet covers confirmed planets, known false positives, and injected controls
-   with before/after pipeline comparisons.
+3. **Phase 1 — canonical regression evals (COMPLETE):** version 0.2.41 adds
+   an offline sample-level suite with separate real-only and synthetic-inclusive
+   frozen-evaluation roles. It preserves the accepted pi Mensae c and TOI-146.01
+   controls, reruns deterministic deep/subthreshold injected-transit controls,
+   and reports per-case deltas against the committed v1 baseline.
 4. **Phase 2 — production sensitivity evidence:** generic BLS transit
    injection-recovery tooling exists, but committed recovery curves and
    sensitivity context tied to the production pipeline and
