@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "suite_id": "canonical_regression_eval_v1",
+  "dataset_ids": [
+    "canonical_real_controls_v1",
+    "canonical_injected_controls_v1"
+  ],
+  "cases": [
+    {
+      "case_id": "confirmed_pi_mensae_c",
+      "dataset_id": "canonical_real_controls_v1",
+      "kind": "confirmed_exoplanet",
+      "source_type": "formal_acceptance",
+      "source_path": "artifacts/manifests/formal_acceptance_v2.json",
+      "source_case_id": "confirmed_pi_mensae_c"
+    },
+    {
+      "case_id": "false_positive_toi_146_01",
+      "dataset_id": "canonical_real_controls_v1",
+      "kind": "known_false_positive",
+      "source_type": "formal_acceptance",
+      "source_path": "artifacts/manifests/formal_acceptance_v2.json",
+      "source_case_id": "false_positive_toi_146_01"
+    },
+    {
+      "case_id": "injected_deep_short_period",
+      "dataset_id": "canonical_injected_controls_v1",
+      "kind": "injected_transit_control",
+      "source_type": "injected_transit",
+      "target_id": "SYNTH-CANONICAL-DEEP-001",
+      "mission": "TESS",
+      "baseline_days": 18.0,
+      "cadence_minutes": 10.0,
+      "noise_ppm": 100.0,
+      "seed": 4101,
+      "period_days": 3.0,
+      "depth_ppm": 10000.0,
+      "duration_hours": 2.0,
+      "trials": 2,
+      "min_snr": 5.0,
+      "min_recovery_rate": 1.0,
+      "max_recovery_rate_drop": 0.0
+    },
+    {
+      "case_id": "injected_subthreshold_long_period",
+      "dataset_id": "canonical_injected_controls_v1",
+      "kind": "injected_transit_control",
+      "source_type": "injected_transit",
+      "target_id": "SYNTH-CANONICAL-WEAK-001",
+      "mission": "TESS",
+      "baseline_days": 18.0,
+      "cadence_minutes": 10.0,
+      "noise_ppm": 800.0,
+      "seed": 4102,
+      "period_days": 8.0,
+      "depth_ppm": 100.0,
+      "duration_hours": 2.0,
+      "trials": 2,
+      "min_snr": 7.0,
+      "max_recovery_rate": 0.0,
+      "max_recovery_rate_drop": 0.0
+    }
+  ]
+}
