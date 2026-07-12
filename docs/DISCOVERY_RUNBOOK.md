@@ -389,7 +389,8 @@ caffeinate -i .venv/bin/python Skills/star_scanner.py \
   --execute-prepared-batch --log logs/tess_live_search_v1.json \
   --candidate-db-path data/tess_live_search_v1.sqlite3 \
   --scorer ensemble --model-path models/xgboost_koi.json \
-  --workers 6 --shard-count 3 --shard-index 0
+  --workers 6 --heartbeat-seconds 30 \
+  --shard-count 3 --shard-index 0
 ```
 
 Change only the final shard index in the other tabs. Stop if any shard reports
@@ -399,6 +400,12 @@ ledgers are local runtime artifacts; committed manifests and per-shard Run
 Reports are the GitHub-visible handoff. A rerun of the same shard command skips
 candidate/null targets already present in its ledger and retries only missing or
 `preprocessing_failure` targets. No external submission is authorized.
+
+Each tab prints a startup banner, an immediate `[start]` line for every target,
+a flushed heartbeat every 30 seconds while work remains active, and a flushed
+completion line with elapsed time and ETA after every target. Silence beyond
+roughly 35 seconds is therefore abnormal and should be treated as a stop/debug
+signal rather than assumed to be a slow download.
 
 Historical run006/run008 evidence:
 
