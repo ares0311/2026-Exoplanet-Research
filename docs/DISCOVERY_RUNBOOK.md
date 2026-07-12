@@ -392,7 +392,9 @@ sharding (two products, expected under three minutes); do not broaden it into a
 multi-target or archive download. The first version 0.2.39 run downloaded both
 files and established that neither sector covers a predicted event. Version
 0.2.40 records that no-coverage result with exact time ranges rather than
-raising without an artifact. After 0.2.40 is merged, rerun from cache:
+raising without an artifact. The cache-only rerun completed in 8.97 seconds
+and auto-committed its Run Report as `986e7bc`; do not rerun it. The
+reproducibility command was:
 
 ```bash
 git switch main
@@ -406,8 +408,11 @@ caffeinate -i .venv/bin/python Skills/tpf_centroid_diagnostic.py \
 ```
 
 The command is single-process by design because only two independent products
-exist. It prints per-product progress/ETA and appends its structured completion
-record to `artifacts/manifests/run_reports/tpf_centroid_diagnostic.jsonl`.
+exist. Its structured result is summarized in
+`artifacts/manifests/tess_live_search_v1_tpf_coverage_summary.json`. Neither TPF
+contains a predicted event, and the QLP review has only two independent events
+versus four required for odd/even. Both checks are observationally unavailable;
+additional event-covering observations would be required to resolve them.
 
 Historical run006/run008 evidence:
 

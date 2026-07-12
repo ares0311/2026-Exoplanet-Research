@@ -142,11 +142,20 @@ def test_tess_live_search_review_summary_is_conservative_and_linked() -> None:
         (REPO_ROOT / "artifacts/manifests/tess_live_search_v1_fp_review_summary.json")
         .read_text(encoding="utf-8")
     )
+    followup = json.loads(
+        (REPO_ROOT / review["diagnostic_followup"]).read_text(encoding="utf-8")
+    )
     decisions = {row["candidate_id"]: row for row in review["decisions"]}
 
-    assert review["status"] == "conservative_review_complete_missing_diagnostics"
+    assert review["status"] == "conservative_review_complete_evidence_limited"
     assert decisions["TIC_201251996_s03"]["review_status"] == "likely_false_positive"
     assert decisions["TIC_201251996_s05"]["review_status"] == "likely_false_positive"
     assert decisions["TIC_355651994_s02"]["review_status"] == "plausible_but_weak"
     assert review["ledger_update"]["append_only_review_rows"] == 3
+    assert followup["review_status"] == "plausible_but_weak"
+    assert followup["centroid_result"]["status"] == "no_transit_coverage"
+    assert followup["centroid_result"]["products_analyzed"] == 0
+    assert followup["odd_even_result"]["measured_event_count"] == 2
+    assert followup["odd_even_result"]["required_event_count"] == 4
+    assert "rather than assumed favorable" in followup["conclusion"]
     assert "No candidate is follow-up-ready" in review["scientific_guardrail"]
