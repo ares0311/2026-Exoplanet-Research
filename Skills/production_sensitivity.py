@@ -122,6 +122,22 @@ def _cache_glob(target_id: str) -> str:
     return f"{prefix}_lc_*/{prefix}-*_llc.fits"
 
 
+def select_quarter_products(
+    paths: list[Path], curves: list[Any], requested_quarters: set[int]
+) -> tuple[list[Path], list[Any]]:
+    """Filter paths and curves together so provenance matches actual inputs."""
+    if len(paths) != len(curves):
+        raise ValueError("cached product paths and loaded curves must align")
+    if not requested_quarters:
+        return paths, curves
+    selected = [
+        (path, curve)
+        for path, curve in zip(paths, curves, strict=True)
+        if int(curve.meta["QUARTER"]) in requested_quarters
+    ]
+    return [path for path, _ in selected], [curve for _, curve in selected]
+
+
 def load_cached_background(
     background: dict[str, Any], cache_root: Path
 ) -> tuple[Any, FetchProvenance]:
@@ -136,10 +152,7 @@ def load_cached_background(
         )
     requested_quarters = {int(value) for value in background.get("quarters", [])}
     curves = [lk.read(path) for path in paths]
-    if requested_quarters:
-        curves = [
-            curve for curve in curves if int(curve.meta["QUARTER"]) in requested_quarters
-        ]
+    paths, curves = select_quarter_products(paths, curves, requested_quarters)
     if not curves:
         raise FileNotFoundError(
             f"cached products for {target_id} do not include quarters "

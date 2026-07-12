@@ -54,8 +54,11 @@ by itself satisfy a master-guide evidence requirement.
    cache-only real-background runner tied to the production pipeline,
    frozen-eval dataset ID, and `benchmark_cnn_v1` promotion package. A
    36-trial pre-merge smoke completed with zero failures in 7.1 seconds using
-   six workers. The durable production run and committed recovery curves are
-   still required; tooling-complete is not evidence-complete.
+   six workers. The first merged run was failed closed because quarter-filtered
+   inputs retained all-quarter provenance URIs; version 0.2.43 fixes and tests
+   aligned path/curve filtering. The corrected durable production run and
+   committed recovery curves are still required; tooling-complete is not
+   evidence-complete.
 5. **Phase 2 — calibrated candidate context:** extend production outputs with
    calibration dataset IDs, score quantiles, threshold versions, and empirical
    false-discovery context after the canonical eval and sensitivity sets exist.
