@@ -6,7 +6,7 @@ FPP 0.4405, while the TOI-146.01 false-positive control produced no signal.
 No Tier 1 gaps remain open.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (83 production-critical Skills; non-production fluff removed)
-Test baseline: 2,664 default tests passing; 2 `integration_live` tests excluded by
+Test baseline: 2,665 default tests passing; 2 `integration_live` tests excluded by
 the configured marker expression (2026-07-12)
 
 ---
@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.39 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.40 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -217,7 +217,14 @@ significance only when at least four events exist, strict JSON null otherwise,
 and partial-product failures; it also prints per-product ETA and writes a Run
 Report. It fails closed on inadequate transit coverage and explicitly says it
 cannot localize the transit source or replace difference imaging. The tool is
-offline-tested; its live two-product result is still pending.
+offline-tested. The first bounded live run downloaded both products but found
+no predicted transit coverage: sector 1 ends 4.643 days after the nearest prior
+event, and sector 28 begins 10.880 days before the nearest following event.
+0.2.40 makes that scientifically useful fail-closed outcome durable instead of
+raising without an artifact: all-no-coverage runs now write strict structured
+JSON with exact TPF time ranges, nearest predicted event centers, gap distances,
+and product provenance, then append a Run Report. The cached rerun that will
+produce that durable record remains pending.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW PENDING.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of
@@ -409,7 +416,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
 | 83 production-critical Skills/ | ✅ |
-| 2,664 default tests, ruff clean, mypy clean | ✅ |
+| 2,665 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -418,7 +425,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 
 Run these before any live deployment or public announcement:
 
-- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-12: 2,664 passed; 2 `integration_live` tests excluded by configuration)
+- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-12: 2,665 passed; 2 `integration_live` tests excluded by configuration)
 - [x] `.venv/bin/ruff check .` — no lint errors (2026-07-11: clean)
 - [x] `.venv/bin/python -m mypy src` — no type errors (2026-07-11: clean, 30 source files)
 - [x] `exo background-run-once --dry-run` — no config errors (2026-07-10: installed entry point exercised successfully; dry run wrote no ledger/outcome data)
