@@ -35,8 +35,11 @@ by itself satisfy a master-guide evidence requirement.
    and places three low-FPP signals on a conservative review queue. The first
    review is complete: two eclipse-scale signals are `likely_false_positive`;
    the remaining signal is `plausible_but_weak` because limb-darkening fails
-   and centroid/odd-even evidence is missing. The next work is the missing
-   diagnostic evidence, not more ledger scaffolding or another blind scan.
+   and centroid/odd-even evidence is missing. Version 0.2.39 adds the bounded,
+   Run-Report-enabled TESS-SPOC target-pixel centroid diagnostic needed for
+   that review; the two-product live result remains pending. The next work is
+   the missing diagnostic evidence, not more ledger scaffolding or another
+   blind scan.
 3. **Phase 1 — canonical regression evals:** no committed sample-level suite
    yet covers confirmed planets, known false positives, and injected controls
    with before/after pipeline comparisons.

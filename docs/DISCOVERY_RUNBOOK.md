@@ -385,9 +385,26 @@ per-transit odd/even evidence for that signal. Keep all language at “candidate
 signal”; QLP provenance is below the `tfop_ready` gate and no external
 submission is authorized. A 2026-07-12 storage preflight found the shared
 Lightkurve cache at 85 GB (41 GB Kepler, 37 GB TESS, 7.3 GB HLSP, 302 MB K2),
-above the 80 GB caution threshold. Do not download target-pixel/centroid data
-until cache attribution and cleanup are explicitly approved or the approved
-4 TB external SSD is available.
+above the 80 GB caution threshold. A metadata-only TESS-SPOC search found
+exactly two target-pixel products for TIC 355651994 (sectors 1 and 28), totaling
+12.25 MB. That bounded sample is not a substantial-data operation and needs no
+sharding (two products, expected under three minutes); do not broaden it into a
+multi-target or archive download. After version 0.2.39 is merged, run:
+
+```bash
+git switch main
+git pull --ff-only origin main
+caffeinate -i .venv/bin/python Skills/tpf_centroid_diagnostic.py \
+  "TIC 355651994" \
+  --period-days 97.16176299117727 \
+  --epoch-bjd 2458417.8455470423 \
+  --duration-hours 8.1 \
+  --output reports/tess_live_search_v1_TIC355651994_s02_centroid.json
+```
+
+The command is single-process by design because only two independent products
+exist. It prints per-product progress/ETA and appends its structured completion
+record to `artifacts/manifests/run_reports/tpf_centroid_diagnostic.jsonl`.
 
 Historical run006/run008 evidence:
 
