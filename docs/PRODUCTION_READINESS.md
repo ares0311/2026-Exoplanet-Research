@@ -5,9 +5,9 @@ catalog ephemeris for pi Mensae c was recovered within 0.005% with ensemble
 FPP 0.4405, while the TOI-146.01 false-positive control produced no signal.
 No Tier 1 gaps remain open.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
-Branch: `main` (82 production-critical Skills; non-production fluff removed)
-Test baseline: 2,653 default tests passing; 2 `integration_live` tests excluded by
-the configured marker expression (2026-07-11)
+Branch: `main` (83 production-critical Skills; non-production fluff removed)
+Test baseline: 2,664 default tests passing; 2 `integration_live` tests excluded by
+the configured marker expression (2026-07-12)
 
 ---
 
@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.38 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.39 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -208,6 +208,16 @@ could remain silent throughout a long download/BLS interval. They now print a
 flushed line when every target starts plus a flushed 30-second heartbeat with
 completed, active, pending, elapsed, and ETA fields. The interval is configurable
 with `--heartbeat-seconds`; tests exercise the heartbeat while work is active.
+0.2.39 adds `Skills/tpf_centroid_diagnostic.py`, a bounded TESS-SPOC target-pixel
+diagnostic for the remaining TIC 355651994_s02 review gap. It measures robust,
+pointing-corrected in-transit versus symmetric local out-of-transit aperture-
+photocenter offsets per independent event and sector. It records exact product
+provenance, aperture provenance, pixel/arcsecond offsets, event-level
+significance only when at least four events exist, strict JSON null otherwise,
+and partial-product failures; it also prints per-product ETA and writes a Run
+Report. It fails closed on inadequate transit coverage and explicitly says it
+cannot localize the transit source or replace difference imaging. The tool is
+offline-tested; its live two-product result is still pending.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW PENDING.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of
@@ -398,8 +408,8 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | CLI: `exo <TIC-ID>` + all `background-*` subcommands | ✅ |
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
-| 82 production-critical Skills/ | ✅ |
-| 2,653 default tests, ruff clean, mypy clean | ✅ |
+| 83 production-critical Skills/ | ✅ |
+| 2,664 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -408,7 +418,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 
 Run these before any live deployment or public announcement:
 
-- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-12: 2,653 passed; 2 `integration_live` tests excluded by configuration)
+- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-12: 2,664 passed; 2 `integration_live` tests excluded by configuration)
 - [x] `.venv/bin/ruff check .` — no lint errors (2026-07-11: clean)
 - [x] `.venv/bin/python -m mypy src` — no type errors (2026-07-11: clean, 30 source files)
 - [x] `exo background-run-once --dry-run` — no config errors (2026-07-10: installed entry point exercised successfully; dry run wrote no ledger/outcome data)

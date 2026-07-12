@@ -1629,6 +1629,26 @@
       "next_action": "Obtain missing centroid/contamination and per-transit evidence for TIC 355651994_s02 before reconsidering its review status; no external action."
     },
     {
+      "path": "reports/tess_live_search_v1_TIC355651994_s02_centroid.json",
+      "kind": "candidate_tpf_centroid_diagnostic",
+      "status": "pending_bounded_live_run",
+      "git_policy": "ignored_runtime_report",
+      "last_known": {
+        "tool_version": "0.2.39",
+        "target_id": "TIC 355651994",
+        "products_found_metadata_only": 2,
+        "sectors": [
+          1,
+          28
+        ],
+        "estimated_download_mb": 12.25,
+        "sharding": "not_warranted_for_two_products_under_three_minutes",
+        "verified_on": "2026-07-12"
+      },
+      "validation_gate": "Run only after version 0.2.39 merges; result must preserve per-sector coverage, centroid offset, significance, failures, and diagnostic-only guardrail.",
+      "next_action": "Run the bounded two-product diagnostic and preserve the output hash/result in committed review evidence before changing candidate status."
+    },
+    {
       "path": "~/.lightkurve/cache/mastDownload/",
       "kind": "shared_lightkurve_archive_cache",
       "status": "above_80gb_caution_threshold",
@@ -1640,11 +1660,13 @@
         "hlsp_gb": 7.3,
         "k2_gb": 0.302,
         "review_target_qlp_mb": 6.3,
-        "target_pixel_products_found": false,
+        "target_pixel_products_cached": false,
+        "target_pixel_products_metadata_only": 2,
+        "target_pixel_products_estimated_mb": 12.25,
         "verified_on": "2026-07-12"
       },
       "validation_gate": "Do not create more substantial local archive data while shared project-managed cache is at or above the 80 GB caution threshold without attribution audit and explicit cleanup/storage approval.",
-      "next_action": "Run a read-only cache attribution inventory; request explicit approval before deleting cache data or downloading target-pixel products, or wait for the approved 4 TB external SSD."
+      "next_action": "Permit only the recorded 12.25 MB TIC 355651994 diagnostic sample; require a fresh storage decision before any broader target-pixel, archive, or multi-target download."
     },
     {
       "path": "reports/",
