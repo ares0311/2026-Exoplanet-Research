@@ -14,7 +14,7 @@ by itself satisfy a master-guide evidence requirement.
    Kepler/K2 production datasets. Require the same contract when the first TESS
    or JWST row-level production manifest is created; do not invent placeholder
    datasets merely to claim mission coverage.
-2. **Phase 1 — reproducible candidate ledger (WIRED / LIVE EVIDENCE PENDING):** versions 0.2.31, 0.2.34, 0.2.36, and 0.2.37
+2. **Phase 1 — reproducible candidate ledger (LIVE EVIDENCE COMPLETE / REVIEW PENDING):** versions 0.2.31, 0.2.34, 0.2.36, and 0.2.37
    add a strict, mission-neutral, append-only provenance contract and SQLite
    table carrying the master-guide fields (`source_dataset_id`, raw URI,
    preprocessing/generator versions and parameters, model versions/scores,
@@ -29,8 +29,11 @@ by itself satisfy a master-guide evidence requirement.
    useful null results, and preprocessing failures. Execution fails closed if
    the dataset checksum, target membership, product inventory, or exact fetched
    URI tuple differs; process shards receive collision-free log, database, and
-   run-report paths. The remaining step is the approved live execution and its
-   resulting evidence, not more ledger scaffolding.
+   run-report paths. The three-shard live execution completed successfully on
+   2026-07-11: 18/18 targets, 56 schema-v2 rows, three high-priority nulls, and
+   zero failures. The committed run summary preserves local-ledger/log hashes
+   and places three low-FPP signals on a conservative review queue. The next
+   step is false-positive review, not more ledger scaffolding or another scan.
 3. **Phase 1 — canonical regression evals:** no committed sample-level suite
    yet covers confirmed planets, known false positives, and injected controls
    with before/after pipeline comparisons.

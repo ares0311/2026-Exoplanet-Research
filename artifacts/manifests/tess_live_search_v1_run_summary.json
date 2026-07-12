@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "batch_id": "tess_live_search_v1",
+  "source_dataset_id": "tess_live_search_v1",
+  "completed_at": "2026-07-12T00:38:28.031272+00:00",
+  "status": "success_review_pending",
+  "execution": {
+    "shard_count": 3,
+    "workers_per_shard": 6,
+    "heartbeat_seconds": 30,
+    "target_partition": [7, 4, 7],
+    "targets_processed": 18,
+    "targets_failed": 0,
+    "candidate_found_targets": 15,
+    "scanned_clear_targets": 3,
+    "candidate_ledger_rows": 56,
+    "candidate_signal_rows": 53,
+    "null_result_rows": 3,
+    "preprocessing_failure_rows": 0,
+    "combined_observed_wall_seconds": 72.786214,
+    "estimated_raw_download_gb": 0.04565088
+  },
+  "null_targets": [
+    "TIC 280792173",
+    "TIC 355704481",
+    "TIC 355704482"
+  ],
+  "review_queue": [
+    {
+      "candidate_id": "TIC_355651994_s02",
+      "target_id": "TIC 355651994",
+      "period_days": 97.16176299117727,
+      "epoch_bjd": 2458417.8455470423,
+      "duration_hours": 8.100000000000001,
+      "depth_ppm": 11546.297370136972,
+      "transit_count": 29,
+      "snr": 30.614579228898567,
+      "false_positive_probability": 0.06630565358830542,
+      "detection_confidence": 0.905282823707411,
+      "ensemble_planet_probability": 0.9504058577933259,
+      "xgb_planet_probability": 0.9671173691749573,
+      "provenance_score": 0.5625,
+      "pathway": "planet_hunters_discussion",
+      "review_status": "unreviewed",
+      "conservative_note": "Candidate signal only. QLP provenance is below tfop_ready; run full false-positive diagnostics before any escalation."
+    },
+    {
+      "candidate_id": "TIC_201251996_s05",
+      "target_id": "TIC 201251996",
+      "period_days": 65.84379753336802,
+      "epoch_bjd": 2458374.573652294,
+      "duration_hours": 9.149999999999999,
+      "depth_ppm": 317486.1001399633,
+      "transit_count": 43,
+      "snr": 379.3851483762082,
+      "false_positive_probability": 0.12649283873655592,
+      "detection_confidence": 0.8346026042438632,
+      "ensemble_planet_probability": 0.5051854795832524,
+      "xgb_planet_probability": 0.1368637979030609,
+      "provenance_score": 0.5625,
+      "pathway": "planet_hunters_discussion",
+      "review_status": "likely_false_positive_review_required",
+      "conservative_note": "The 31.7% depth is stellar-eclipse/artifact scale and the target has another extremely deep signal; prioritize rejection diagnostics, not escalation."
+    },
+    {
+      "candidate_id": "TIC_201251996_s03",
+      "target_id": "TIC 201251996",
+      "period_days": 123.54518273246188,
+      "epoch_bjd": 2458437.2851106273,
+      "duration_hours": 10.8,
+      "depth_ppm": 583988.1032696175,
+      "transit_count": 22,
+      "snr": 660.120761070086,
+      "false_positive_probability": 0.13363356972867724,
+      "detection_confidence": 0.8370395292976784,
+      "ensemble_planet_probability": 0.4626766345891631,
+      "xgb_planet_probability": 0.0589868389070034,
+      "provenance_score": 0.5625,
+      "pathway": "planet_hunters_discussion",
+      "review_status": "likely_false_positive_review_required",
+      "conservative_note": "The 58.4% depth is stellar-eclipse/artifact scale and ensemble/XGBoost support is weak; prioritize rejection diagnostics, not escalation."
+    }
+  ],
+  "shards": [
+    {
+      "shard_index": 0,
+      "targets_processed": 7,
+      "ledger_rows": 19,
+      "elapsed_seconds": 38.98961066699121,
+      "database_sha256": "0e8708044ff73cc158c0a6c4cd294358adee31b9836ce5ff350fe0e624d1f847",
+      "scan_log_sha256": "36f098f1711e557a82ab4cba9decea133b47613313225573f4d7168e6d22777b",
+      "run_report_sha256": "85dd014cf36f3c4c6a07d52a3244ce49ad75cd0e0b1c494c10c93d783aba82ef"
+    },
+    {
+      "shard_index": 1,
+      "targets_processed": 4,
+      "ledger_rows": 8,
+      "elapsed_seconds": 28.72707220900338,
+      "database_sha256": "074ba14a24397c42729bdee17bcae3f9375070af4be36334ed825b2a63fff5c3",
+      "scan_log_sha256": "c1a71bf9b44d53bdebc180c22a69cdc12ccbcffce51980acf325f8d9a14bdf5e",
+      "run_report_sha256": "79d6deb2638bb40e33a316f46aa46300a5c585fe13fc917233b989725adb00a9"
+    },
+    {
+      "shard_index": 2,
+      "targets_processed": 7,
+      "ledger_rows": 29,
+      "elapsed_seconds": 49.122174708987586,
+      "database_sha256": "937bc342e3171bcc1879619cb37569c3ad12910a6671ac74973bd0221c47f005",
+      "scan_log_sha256": "a37d59a510ccca765544a7824ab4459a118af1a866c6aa2e4e95ad9421c060b2",
+      "run_report_sha256": "b5354e7b2ecad195528214928c60e7aaf75bb217b20d6fb2cbbf060586a12699"
+    }
+  ],
+  "scientific_guardrail": "These are internally detected candidate signals, not confirmed planets or authorized external submissions."
+}

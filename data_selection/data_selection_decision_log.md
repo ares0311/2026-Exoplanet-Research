@@ -1,5 +1,27 @@
 # Data Selection Decision Log
 
+## 2026-07-11 — TESS QLP live-search queue v1 execution
+
+**Repo:** 2026 Exoplanet Research
+**Data:** All 18 frozen `tess_live_search_v1` targets
+**Role:** Live search
+**Execution:** Three process shards, six workers each, TIC modulo split 7/4/7
+**Outcome:** 18/18 targets processed in 72.79 seconds observed wall time; 56
+schema-v2 records (53 signal rows, three null rows), zero failures
+**Null targets:** TIC 280792173, TIC 355704481, TIC 355704482
+**Review queue:** Three signals on two targets have FPP < 0.15. TIC 201251996
+has two extremely deep signals (31.7% and 58.4%) with weak XGBoost support and
+is prioritized for false-positive rejection. TIC 355651994_s02 has P=97.1618 d,
+depth=1.1546%, FPP=0.0663, and remains an unreviewed candidate signal.
+**Provenance constraint:** All review-queue signals have QLP provenance score
+0.5625, below `tfop_ready`; no external submission is authorized.
+**Durable evidence:**
+`artifacts/manifests/tess_live_search_v1_run_summary.json`, the three committed
+Run Report ledgers, and ignored shard SQLite/log artifacts whose hashes are in
+the committed summary.
+**Next action:** Do not rerun the frozen batch. Apply the full false-positive
+diagnostic path to the review queue, deepest/weakest-support signals first.
+
 ## 2026-07-11 — TESS QLP live-search queue v1
 
 **Repo:** 2026 Exoplanet Research

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "last_updated": "2026-07-11",
-  "production_gap": "Tier 1 and Tier 2 deployment gates are closed; Phase 1 candidate-ledger code is wired to tess_live_search_v1 and awaits the operator-coordinated three-shard live evidence run",
+  "production_gap": "Tier 1 and Tier 2 deployment gates are closed; tess_live_search_v1 live evidence is complete and three low-FPP signals on two targets await conservative false-positive review",
   "policy": {
     "standard_operator_cadence": "git add .",
     "git_add_dot_must_be_safe": true,
@@ -1568,18 +1568,47 @@
     {
       "path": "data/tess_live_search_v1.shard*of3.sqlite3",
       "kind": "candidate_ledger_sqlite",
-      "status": "expected_not_yet_run",
+      "status": "complete_validated_review_pending",
       "git_policy": "ignored",
       "last_known": {
         "source_dataset_id": "tess_live_search_v1",
-        "expected_targets": 18,
+        "targets_processed": 18,
         "shard_count": 3,
         "workers_per_shard": 6,
         "estimated_raw_download_gb": 0.04565088,
+        "candidate_ledger_rows": 56,
+        "candidate_signal_rows": 53,
+        "null_result_rows": 3,
+        "preprocessing_failure_rows": 0,
+        "candidate_found_targets": 15,
+        "scanned_clear_targets": 3,
+        "observed_wall_seconds": 72.786214,
+        "database_sha256": [
+          "0e8708044ff73cc158c0a6c4cd294358adee31b9836ce5ff350fe0e624d1f847",
+          "074ba14a24397c42729bdee17bcae3f9375070af4be36334ed825b2a63fff5c3",
+          "937bc342e3171bcc1879619cb37569c3ad12910a6671ac74973bd0221c47f005"
+        ],
+        "committed_summary": "artifacts/manifests/tess_live_search_v1_run_summary.json",
         "verified_on": "2026-07-11"
       },
       "validation_gate": "Every row must use schema v2, exact fetched URIs matching the frozen product inventory, and source_dataset_id=tess_live_search_v1.",
-      "next_action": "Run only after explicit cross-terminal coordination using docs/DISCOVERY_RUNBOOK.md; the measured modulo split is 7/4/7 targets. Stop on URI mismatch, ledger refusal, throttling, or rate regression."
+      "next_action": "Do not rerun. Retain shard DBs unchanged; review TIC 201251996 as likely false-positive signals, then run full diagnostics for TIC 355651994_s02. No external submission is authorized."
+    },
+    {
+      "path": "artifacts/manifests/tess_live_search_v1_run_summary.json",
+      "kind": "live_search_evidence_summary",
+      "status": "committed_review_pending",
+      "git_policy": "commit",
+      "last_known": {
+        "source_dataset_id": "tess_live_search_v1",
+        "targets_processed": 18,
+        "candidate_ledger_rows": 56,
+        "signals_below_fpp_0_15": 3,
+        "review_targets": 2,
+        "verified_on": "2026-07-11"
+      },
+      "validation_gate": "All counts and hashes must match the three ignored shard databases, scan logs, and committed Run Report ledgers.",
+      "next_action": "Use this summary as the review handoff; do not characterize its entries as confirmed planets or submit externally."
     },
     {
       "path": "reports/",

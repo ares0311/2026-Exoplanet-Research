@@ -373,39 +373,14 @@ The XGBoost model (`models/xgboost_koi.json`) is trained and available now.
 
 ## The Immediate Next Action (As of 2026-07-11)
 
-Run the frozen 18-target batch only after explicit cross-terminal coordination.
-Although its estimated raw footprint is just 0.04565088 GB, historical QLP+BLS
-timings clear the three-minute sharding threshold. Use three process shards with
-six I/O workers each. The required TIC-ID modulo partition is 7/4/7 targets at
-three shards; four shards would regress to 1/6/8/3 and lengthen the critical
-path while wasting a tab. Each shard automatically scopes its scan log, SQLite
-ledger, and Run Report ledger. In three terminal tabs, use shard indices 0, 1,
-and 2:
-
-```bash
-git switch main
-git pull --ff-only origin main
-caffeinate -i .venv/bin/python Skills/star_scanner.py \
-  --execute-prepared-batch --log logs/tess_live_search_v1.json \
-  --candidate-db-path data/tess_live_search_v1.sqlite3 \
-  --scorer ensemble --model-path models/xgboost_koi.json \
-  --workers 6 --heartbeat-seconds 30 \
-  --shard-count 3 --shard-index 0
-```
-
-Change only the final shard index in the other tabs. Stop if any shard reports
-`Candidate-ledger write refused`, a fetched-URI mismatch, repeated MAST timeout,
-or materially worse per-target rate than the first completed shard. The SQLite
-ledgers are local runtime artifacts; committed manifests and per-shard Run
-Reports are the GitHub-visible handoff. A rerun of the same shard command skips
-candidate/null targets already present in its ledger and retries only missing or
-`preprocessing_failure` targets. No external submission is authorized.
-
-Each tab prints a startup banner, an immediate `[start]` line for every target,
-a flushed heartbeat every 30 seconds while work remains active, and a flushed
-completion line with elapsed time and ETA after every target. Silence beyond
-roughly 35 seconds is therefore abnormal and should be treated as a stop/debug
-signal rather than assumed to be a slow download.
+The frozen 18-target batch is complete; do not rerun it. Audit the conservative
+review queue in `artifacts/manifests/tess_live_search_v1_run_summary.json`.
+Prioritize rejection diagnostics for TIC 201251996 because both selected signals
+are stellar-eclipse/artifact-scale depths (31.7% and 58.4%) and have weak XGBoost
+support. Then run the full false-positive diagnostic path for the remaining
+unreviewed signal, TIC 355651994_s02 (P=97.1618 d, depth=1.1546%, FPP=0.0663).
+Keep all language at “candidate signal”; QLP provenance is below the
+`tfop_ready` gate and no external submission is authorized.
 
 Historical run006/run008 evidence:
 
