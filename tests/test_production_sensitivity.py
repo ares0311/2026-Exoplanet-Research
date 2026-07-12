@@ -10,6 +10,7 @@ from Skills.production_sensitivity import (
     inject_flux,
     match_recovery,
     scoped_output_path,
+    select_quarter_products,
     summarize_curves,
 )
 
@@ -103,6 +104,19 @@ def test_scoped_output_path_is_collision_free() -> None:
     )
 
 
+def test_quarter_filter_keeps_provenance_paths_aligned() -> None:
+    class Curve:
+        def __init__(self, quarter: int) -> None:
+            self.meta = {"QUARTER": quarter}
+
+    paths = [Path("q1.fits"), Path("q2.fits"), Path("q3.fits")]
+    selected_paths, selected_curves = select_quarter_products(
+        paths, [Curve(1), Curve(2), Curve(3)], {1}
+    )
+    assert selected_paths == [Path("q1.fits")]
+    assert [curve.meta["QUARTER"] for curve in selected_curves] == [1]
+
+
 def test_committed_config_has_two_frozen_eval_backgrounds() -> None:
     repo_root = Path(__file__).resolve().parent.parent
     config = json.loads(
@@ -113,4 +127,5 @@ def test_committed_config_has_two_frozen_eval_backgrounds() -> None:
     assert all(background["quarters"] == [1] for background in config["backgrounds"])
     assert all(background["max_baseline_days"] == 30.0 for background in config["backgrounds"])
     assert config["pipeline"]["period_max"] == 20.0
+    assert "full_ensemble_v0.2.43" in config["model_ids"]
     assert len(build_trials(config)) == 36

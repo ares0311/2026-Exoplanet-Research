@@ -5,7 +5,7 @@
   "model_ids": [
     "benchmark_cnn_v1",
     "xgboost_koi",
-    "full_ensemble_v0.2.41"
+    "full_ensemble_v0.2.43"
   ],
   "backgrounds": [
     {
