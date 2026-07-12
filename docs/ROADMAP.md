@@ -37,9 +37,11 @@ by itself satisfy a master-guide evidence requirement.
    the remaining signal is `plausible_but_weak` because limb-darkening fails
    and centroid/odd-even evidence is missing. Version 0.2.39 adds the bounded,
    Run-Report-enabled TESS-SPOC target-pixel centroid diagnostic needed for
-   that review; the two-product live result remains pending. The next work is
-   the missing diagnostic evidence, not more ledger scaffolding or another
-   blind scan.
+   that review. Its first live run established that neither available TPF
+   sector covers a predicted 97.16-day event; version 0.2.40 persists that
+   no-coverage result rather than raising without evidence. The next work is
+   the missing odd/even evidence, not more ledger scaffolding or another blind
+   scan.
 3. **Phase 1 — canonical regression evals:** no committed sample-level suite
    yet covers confirmed planets, known false positives, and injected controls
    with before/after pipeline comparisons.

@@ -247,6 +247,49 @@ def _search_product_provenance(search: Any) -> dict[str, Any]:
     }
 
 
+def _tpf_provenance(tpf: Any, target_id: str) -> dict[str, Any]:
+    return {
+        "mission": str(getattr(tpf, "mission", "TESS")),
+        "target_id": str(getattr(tpf, "targetid", target_id)),
+        "sector": int(tpf.sector),
+        "camera": int(tpf.camera),
+        "ccd": int(tpf.ccd),
+    }
+
+
+def _ephemeris_coverage(tpf: Any, *, period_days: float, epoch_bjd: float) -> dict[str, Any]:
+    """Summarize whether a predicted event center falls inside one TPF."""
+    time_values = np.asarray(tpf.time.jd, dtype=float)
+    finite = time_values[np.isfinite(time_values)]
+    if not len(finite):
+        return {"finite_cadences": 0}
+    start = float(np.min(finite))
+    end = float(np.max(finite))
+    first_event = math.floor((start - epoch_bjd) / period_days) - 1
+    last_event = math.ceil((end - epoch_bjd) / period_days) + 1
+    centers = [
+        epoch_bjd + event * period_days
+        for event in range(first_event, last_event + 1)
+    ]
+
+    def distance_to_interval(center: float) -> float:
+        if center < start:
+            return start - center
+        if center > end:
+            return center - end
+        return 0.0
+
+    nearest = min(centers, key=distance_to_interval)
+    return {
+        "finite_cadences": int(len(finite)),
+        "time_start_bjd": start,
+        "time_end_bjd": end,
+        "nearest_predicted_event_bjd": nearest,
+        "nearest_event_gap_days": distance_to_interval(nearest),
+        "predicted_event_center_in_coverage": start <= nearest <= end,
+    }
+
+
 def run_live(
     *,
     target_id: str,
@@ -280,6 +323,7 @@ def run_live(
     for index in range(len(search)):
         subset = search[index : index + 1]
         provenance = _search_product_provenance(subset)
+        tpf: Any = None
         try:
             tpf = subset.download(quality_bitmask="default")
             if tpf is None:
@@ -294,25 +338,26 @@ def run_live(
             product_records.append(
                 {
                     "search_product": provenance,
-                    "tpf": {
-                        "mission": str(getattr(tpf, "mission", "TESS")),
-                        "target_id": str(getattr(tpf, "targetid", target_id)),
-                        "sector": int(tpf.sector),
-                        "camera": int(tpf.camera),
-                        "ccd": int(tpf.ccd),
-                    },
+                    "tpf": _tpf_provenance(tpf, target_id),
+                    "ephemeris_coverage": _ephemeris_coverage(
+                        tpf, period_days=period_days, epoch_bjd=epoch_bjd
+                    ),
                     "result": asdict(result),
                 }
             )
             status = f"sector={result.sector} offset={result.offset_arcsec:.3f}arcsec"
         except Exception as exc:  # noqa: BLE001
-            failures.append(
-                {
-                    "product_index": index,
-                    "search_product": provenance,
-                    "error": str(exc),
-                }
-            )
+            failure = {
+                "product_index": index,
+                "search_product": provenance,
+                "error": str(exc),
+            }
+            if tpf is not None:
+                failure["tpf"] = _tpf_provenance(tpf, target_id)
+                failure["ephemeris_coverage"] = _ephemeris_coverage(
+                    tpf, period_days=period_days, epoch_bjd=epoch_bjd
+                )
+            failures.append(failure)
             status = f"ERROR {exc}"
         elapsed = time.monotonic() - started
         remaining = elapsed / (index + 1) * (len(search) - index - 1)
@@ -321,12 +366,21 @@ def run_live(
             f"ETA={remaining:.0f}s",
             flush=True,
         )
-    if not results:
-        raise RuntimeError("No target-pixel product produced a centroid result")
+    only_no_coverage = bool(failures) and all(
+        "insufficient centroid coverage" in item["error"] for item in failures
+    )
+    if results and not failures:
+        status = "complete"
+    elif results:
+        status = "partial"
+    elif only_no_coverage:
+        status = "no_transit_coverage"
+    else:
+        status = "failed"
     finite_sigmas = [item.offset_sigma for item in results if item.offset_sigma is not None]
     payload = {
         "schema_version": 1,
-        "tool_version": "0.2.39",
+        "tool_version": "0.2.40",
         "algorithm": "local_aperture_photocenter_v1",
         "algorithm_scope": (
             "Aperture-photocenter consistency only; this does not localize the "
@@ -340,12 +394,14 @@ def run_live(
             "epoch_bjd": epoch_bjd,
             "duration_hours": duration_hours,
         },
-        "status": "complete" if not failures else "partial",
+        "status": status,
         "products_found": len(search),
         "products_analyzed": len(results),
         "products_failed": len(failures),
         "max_offset_sigma": max(finite_sigmas) if finite_sigmas else None,
-        "max_offset_arcsec": max(item.offset_arcsec for item in results),
+        "max_offset_arcsec": (
+            max(item.offset_arcsec for item in results) if results else None
+        ),
         "products": product_records,
         "failures": failures,
         "created_at": datetime.now(UTC).isoformat(),
@@ -356,8 +412,8 @@ def run_live(
         json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n"
     )
     print(
-        f"Complete: analyzed={len(results)} failed={len(failures)} "
-        f"output={output_path}",
+        f"Complete: status={status} analyzed={len(results)} "
+        f"unusable={len(failures)} output={output_path}",
         flush=True,
     )
     return payload
@@ -382,9 +438,16 @@ def main(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
         output_path=args.output,
     )
     if not args.no_git_report:
+        payload_status = str(payload["status"])
+        report_status = {
+            "complete": "success",
+            "partial": "partial",
+            "no_transit_coverage": "partial",
+            "failed": "failed",
+        }[payload_status]
         report = RunReport(
             script="tpf_centroid_diagnostic",
-            status="success" if payload["products_failed"] == 0 else "partial",
+            status=report_status,
             started_at=started_at,
             completed_at=datetime.now(UTC).isoformat(),
             elapsed_seconds=time.monotonic() - started,
@@ -392,6 +455,7 @@ def main(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
             items_written=int(payload["products_analyzed"]),
             items_failed=int(payload["products_failed"]),
             output_paths=(str(args.output),),
+            notes=f"scientific_status={payload_status}",
         )
         kwargs = {"run_fn": git_run_fn} if git_run_fn is not None else {}
         ok = run_and_commit_report(
@@ -399,7 +463,7 @@ def main(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
         )
         if not ok:
             print("Warning: run report commit/push failed", file=sys.stderr, flush=True)
-    return 0
+    return 1 if payload["status"] == "failed" else 0
 
 
 if __name__ == "__main__":

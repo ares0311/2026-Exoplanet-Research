@@ -389,7 +389,10 @@ above the 80 GB caution threshold. A metadata-only TESS-SPOC search found
 exactly two target-pixel products for TIC 355651994 (sectors 1 and 28), totaling
 12.25 MB. That bounded sample is not a substantial-data operation and needs no
 sharding (two products, expected under three minutes); do not broaden it into a
-multi-target or archive download. After version 0.2.39 is merged, run:
+multi-target or archive download. The first version 0.2.39 run downloaded both
+files and established that neither sector covers a predicted event. Version
+0.2.40 records that no-coverage result with exact time ranges rather than
+raising without an artifact. After 0.2.40 is merged, rerun from cache:
 
 ```bash
 git switch main

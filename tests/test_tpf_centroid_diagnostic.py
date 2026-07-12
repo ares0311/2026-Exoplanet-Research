@@ -255,6 +255,25 @@ def test_run_live_records_product_provenance_and_partial_failure(
     )
 
 
+def test_run_live_persists_no_transit_coverage(tmp_path: Path) -> None:
+    output = tmp_path / "no_coverage.json"
+    payload = run_live(
+        target_id="TIC 123",
+        period_days=1000.0,
+        epoch_bjd=2458500.0,
+        duration_hours=1.0,
+        output_path=output,
+        search_fn=lambda *args, **kwargs: _FakeSearch([_fake_tpf()]),
+    )
+    assert payload["status"] == "no_transit_coverage"
+    assert payload["products_analyzed"] == 0
+    assert payload["max_offset_arcsec"] is None
+    coverage = payload["failures"][0]["ephemeris_coverage"]
+    assert coverage["predicted_event_center_in_coverage"] is False
+    assert coverage["nearest_event_gap_days"] > 0.0
+    assert json.loads(output.read_text())["status"] == "no_transit_coverage"
+
+
 def test_all_true_pipeline_mask_uses_threshold_fallback() -> None:
     tpf = _fake_tpf()
     threshold_mask = tpf.pipeline_mask.copy()
@@ -279,6 +298,7 @@ def test_main_writes_run_report_with_injected_runner(
         centroid_module,
         "run_live",
         lambda **kwargs: {
+            "status": "partial",
             "products_found": 2,
             "products_analyzed": 1,
             "products_failed": 1,
