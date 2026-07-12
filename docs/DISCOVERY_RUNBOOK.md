@@ -375,12 +375,15 @@ The XGBoost model (`models/xgboost_koi.json`) is trained and available now.
 
 The frozen 18-target batch is complete; do not rerun it. Audit the conservative
 review queue in `artifacts/manifests/tess_live_search_v1_run_summary.json`.
-Prioritize rejection diagnostics for TIC 201251996 because both selected signals
-are stellar-eclipse/artifact-scale depths (31.7% and 58.4%) and have weak XGBoost
-support. Then run the full false-positive diagnostic path for the remaining
-unreviewed signal, TIC 355651994_s02 (P=97.1618 d, depth=1.1546%, FPP=0.0663).
-Keep all language at “candidate signal”; QLP provenance is below the
-`tfop_ready` gate and no external submission is authorized.
+The first conservative review is complete. TIC 201251996_s03 and s05 are
+`likely_false_positive` because their stellar-eclipse-scale depths (58.4% and
+31.7%) fail large-depth and companion-radius checks and have weak XGBoost
+support. TIC 355651994_s02 (P=97.1618 d, depth=1.1546%, FPP=0.0663) is
+`plausible_but_weak`: 14 available checks pass, but limb-darkening plausibility
+fails and 17 diagnostics remain missing. Next obtain centroid/contamination and
+per-transit odd/even evidence for that signal. Keep all language at “candidate
+signal”; QLP provenance is below the `tfop_ready` gate and no external
+submission is authorized.
 
 Historical run006/run008 evidence:
 

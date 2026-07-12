@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "last_updated": "2026-07-11",
-  "production_gap": "Tier 1 and Tier 2 deployment gates are closed; tess_live_search_v1 live evidence is complete and three low-FPP signals on two targets await conservative false-positive review",
+  "last_updated": "2026-07-12",
+  "production_gap": "Tier 1 and Tier 2 deployment gates are closed; tess_live_search_v1 review classifies two low-FPP signals as likely false positives and one as plausible but weak pending centroid/contamination and per-transit diagnostics",
   "policy": {
     "standard_operator_cadence": "git add .",
     "git_add_dot_must_be_safe": true,
@@ -1568,7 +1568,7 @@
     {
       "path": "data/tess_live_search_v1.shard*of3.sqlite3",
       "kind": "candidate_ledger_sqlite",
-      "status": "complete_validated_review_pending",
+      "status": "complete_review_appended",
       "git_policy": "ignored",
       "last_known": {
         "source_dataset_id": "tess_live_search_v1",
@@ -1583,21 +1583,24 @@
         "candidate_found_targets": 15,
         "scanned_clear_targets": 3,
         "observed_wall_seconds": 72.786214,
-        "database_sha256": [
+        "execution_database_sha256": [
           "0e8708044ff73cc158c0a6c4cd294358adee31b9836ce5ff350fe0e624d1f847",
           "074ba14a24397c42729bdee17bcae3f9375070af4be36334ed825b2a63fff5c3",
           "937bc342e3171bcc1879619cb37569c3ad12910a6671ac74973bd0221c47f005"
         ],
+        "post_review_shard2_sha256": "1746481bbc953526dd65bed7fdba2a3e2f4b1312b781abedc3792479d0a5bbec",
+        "append_only_review_rows": 3,
         "committed_summary": "artifacts/manifests/tess_live_search_v1_run_summary.json",
-        "verified_on": "2026-07-11"
+        "committed_review_summary": "artifacts/manifests/tess_live_search_v1_fp_review_summary.json",
+        "verified_on": "2026-07-12"
       },
       "validation_gate": "Every row must use schema v2, exact fetched URIs matching the frozen product inventory, and source_dataset_id=tess_live_search_v1.",
-      "next_action": "Do not rerun. Retain shard DBs unchanged; review TIC 201251996 as likely false-positive signals, then run full diagnostics for TIC 355651994_s02. No external submission is authorized."
+      "next_action": "Do not rerun. Retain shard DBs unchanged; obtain missing centroid/contamination and per-transit diagnostics for TIC 355651994_s02. No external submission is authorized."
     },
     {
       "path": "artifacts/manifests/tess_live_search_v1_run_summary.json",
       "kind": "live_search_evidence_summary",
-      "status": "committed_review_pending",
+      "status": "committed_review_complete",
       "git_policy": "commit",
       "last_known": {
         "source_dataset_id": "tess_live_search_v1",
@@ -1605,10 +1608,25 @@
         "candidate_ledger_rows": 56,
         "signals_below_fpp_0_15": 3,
         "review_targets": 2,
-        "verified_on": "2026-07-11"
+        "review_summary": "artifacts/manifests/tess_live_search_v1_fp_review_summary.json",
+        "verified_on": "2026-07-12"
       },
       "validation_gate": "All counts and hashes must match the three ignored shard databases, scan logs, and committed Run Report ledgers.",
-      "next_action": "Use this summary as the review handoff; do not characterize its entries as confirmed planets or submit externally."
+      "next_action": "Use with the committed review summary; do not characterize its entries as confirmed planets or submit externally."
+    },
+    {
+      "path": "artifacts/manifests/tess_live_search_v1_fp_review_summary.json",
+      "kind": "candidate_false_positive_review",
+      "status": "committed_conservative_review_complete",
+      "git_policy": "commit",
+      "last_known": {
+        "likely_false_positive": 2,
+        "plausible_but_weak": 1,
+        "append_only_review_rows": 3,
+        "reviewed_on": "2026-07-12"
+      },
+      "validation_gate": "Input hashes must match the regenerated full pipeline rows and vetting reports, and the post-review shard-2 database hash must match the append-only ledger.",
+      "next_action": "Obtain missing centroid/contamination and per-transit evidence for TIC 355651994_s02 before reconsidering its review status; no external action."
     },
     {
       "path": "reports/",

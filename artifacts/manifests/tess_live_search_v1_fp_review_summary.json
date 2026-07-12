@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "batch_id": "tess_live_search_v1",
+  "reviewed_at": "2026-07-12T08:25:31.575910+00:00",
+  "status": "conservative_review_complete_missing_diagnostics",
+  "source_run_summary": "artifacts/manifests/tess_live_search_v1_run_summary.json",
+  "review_inputs": [
+    {
+      "path": "logs/tess_live_search_v1_TIC201251996_review.json",
+      "sha256": "dd4a8993ba3128b0b8019bd8b81600b2f443f96756d1e346ae5933b7539d2e12"
+    },
+    {
+      "path": "logs/tess_live_search_v1_TIC355651994_review.json",
+      "sha256": "92c79dbe619edef96ec165aec598c071b7ad870f06eb73d58b72bdfac26ef98a"
+    },
+    {
+      "path": "reports/tess_live_search_v1_TIC201251996_vetting.md",
+      "sha256": "5719480579660434f9dd6049323b5de74ad32ef7591cd5e75aa95bd7ab129891"
+    },
+    {
+      "path": "reports/tess_live_search_v1_TIC355651994_vetting.md",
+      "sha256": "ec9ef94645d328139912591355be6099ca0463bb391bc9235bc435dbf27977c7"
+    }
+  ],
+  "ledger_update": {
+    "path": "data/tess_live_search_v1.shard2of3.sqlite3",
+    "execution_sha256": "937bc342e3171bcc1879619cb37569c3ad12910a6671ac74973bd0221c47f005",
+    "post_review_sha256": "1746481bbc953526dd65bed7fdba2a3e2f4b1312b781abedc3792479d0a5bbec",
+    "append_only_review_rows": 3
+  },
+  "decisions": [
+    {
+      "candidate_id": "TIC_201251996_s03",
+      "review_status": "likely_false_positive",
+      "evidence": [
+        "depth_ppm=583988.1033 (58.4%)",
+        "large_depth_score=1.0 (fail)",
+        "companion_radius_too_large_score=1.0 (fail)",
+        "xgb_planet_probability=0.05899"
+      ],
+      "next_action": "Retain as likely stellar eclipse/artifact; do not escalate."
+    },
+    {
+      "candidate_id": "TIC_201251996_s05",
+      "review_status": "likely_false_positive",
+      "evidence": [
+        "depth_ppm=317486.1001 (31.7%)",
+        "large_depth_score=1.0 (fail)",
+        "companion_radius_too_large_score=1.0 (fail)",
+        "xgb_planet_probability=0.13686"
+      ],
+      "next_action": "Retain as likely stellar eclipse/artifact; do not escalate."
+    },
+    {
+      "candidate_id": "TIC_355651994_s02",
+      "review_status": "plausible_but_weak",
+      "evidence": [
+        "14 available vetting checks pass",
+        "limb_darkening_plausibility_score=0.0 (fail)",
+        "17 diagnostics remain missing",
+        "centroid and odd/even evidence are unavailable",
+        "provenance_score=0.5625"
+      ],
+      "next_action": "Keep as candidate signal only; obtain missing centroid/contamination and per-transit diagnostics before reconsidering review status."
+    }
+  ],
+  "scientific_guardrail": "No candidate is follow-up-ready, confirmed, or authorized for external submission."
+}
