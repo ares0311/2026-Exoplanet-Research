@@ -6,7 +6,7 @@ FPP 0.4405, while the TOI-146.01 false-positive control produced no signal.
 No Tier 1 gaps remain open.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (84 production-critical Skills; non-production fluff removed)
-Test baseline: 2,682 default tests passing; 2 `integration_live` tests excluded by
+Test baseline: 2,683 default tests passing; 2 `integration_live` tests excluded by
 the configured marker expression (2026-07-12)
 
 ---
@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.43 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.44 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -257,6 +257,18 @@ discovered quarter paths. Paths and curves are now filtered as aligned pairs,
 the regression is unit-tested, and the sensitivity config identifies the
 corrected `full_ensemble_v0.2.43` runtime. The invalid artifact and report are
 not retained; durable evidence still requires a corrected merged-code rerun.
+0.2.44 commits that corrected merged-code run as
+`artifacts/manifests/production_sensitivity_v1.json` (SHA-256
+`8c2246ec…b7b16a1`) plus its successful Run Report (SHA-256
+`55da9ad1…a9cc9cf`). All 36 trials completed in 6.83 seconds with 23 recoveries
+and zero failures; each background now records exactly one used Q1 product.
+Recovery was 12/12 at 1 day, 9/12 at 3 days, and 2/12 at 10 days; 9/18 for
+2-hour and 14/18 for 8-hour injections. Depth bins were non-monotonic
+(9/12 at 500 ppm, 8/12 at 2,000 ppm, 6/12 at 10,000 ppm), which is explicitly
+treated as small-grid/strongest-peak competition evidence rather than a
+physical completeness curve. This closes bounded short-period v1 evidence
+only. TTV, single-transit, gap, stellar-variability, longer-period, and
+multi-quarter coverage remain open before any general completeness claim.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of
@@ -453,8 +465,9 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
 | Canonical sample-level regression suite (real + isolated injected controls) | ✅ |
+| Bounded short-period real-background production sensitivity v1 | ✅ 23/36 recovered; zero failures |
 | 84 production-critical Skills/ | ✅ |
-| 2,682 default tests, ruff clean, mypy clean | ✅ |
+| 2,683 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -463,7 +476,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 
 Run these before any live deployment or public announcement:
 
-- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-12: 2,682 passed; 2 `integration_live` tests excluded by configuration)
+- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-12: 2,683 passed; 2 `integration_live` tests excluded by configuration)
 - [x] `.venv/bin/ruff check .` — no lint errors (2026-07-11: clean)
 - [x] `.venv/bin/python -m mypy src` — no type errors (2026-07-11: clean, 30 source files)
 - [x] `exo background-run-once --dry-run` — no config errors (2026-07-10: installed entry point exercised successfully; dry run wrote no ledger/outcome data)
