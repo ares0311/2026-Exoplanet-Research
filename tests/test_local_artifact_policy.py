@@ -59,6 +59,7 @@ def test_git_add_dot_keeps_committed_sentinels_and_approved_models_visible() -> 
         "docs/LOCAL_ARTIFACT_LEDGER.md",
         "artifacts/manifests/local_artifacts.json",
         "artifacts/manifests/tess_live_search_v1_run_summary.json",
+        "artifacts/manifests/tess_live_search_v1_fp_review_summary.json",
     ]
 
     for path in visible_paths:
@@ -77,7 +78,7 @@ def test_local_artifact_manifest_matches_human_ledger() -> None:
     assert manifest["policy"]["github_visible_ledger_required"] is True
     assert "deployment gates are closed" in manifest["production_gap"]
     assert "tess_live_search_v1" in manifest["production_gap"]
-    assert "await conservative false-positive review" in manifest["production_gap"]
+    assert "plausible but weak" in manifest["production_gap"]
     assert "docs/exoplanet_exomoon_dataset_handoff.md" in ledger
 
     artifact_paths = {artifact["path"] for artifact in manifest["artifacts"]}
@@ -93,6 +94,7 @@ def test_local_artifact_manifest_matches_human_ledger() -> None:
         "models/cnn*/",
         "logs/*.sqlite*",
         "data/tess_live_search_v1.shard*of3.sqlite3",
+        "artifacts/manifests/tess_live_search_v1_fp_review_summary.json",
         "reports/",
     }
     assert required_paths <= artifact_paths
@@ -133,3 +135,18 @@ def test_tess_live_search_run_summary_is_self_consistent() -> None:
         )
         digest = hashlib.sha256(report.read_bytes()).hexdigest()
         assert digest == shard["run_report_sha256"]
+
+
+def test_tess_live_search_review_summary_is_conservative_and_linked() -> None:
+    review = json.loads(
+        (REPO_ROOT / "artifacts/manifests/tess_live_search_v1_fp_review_summary.json")
+        .read_text(encoding="utf-8")
+    )
+    decisions = {row["candidate_id"]: row for row in review["decisions"]}
+
+    assert review["status"] == "conservative_review_complete_missing_diagnostics"
+    assert decisions["TIC_201251996_s03"]["review_status"] == "likely_false_positive"
+    assert decisions["TIC_201251996_s05"]["review_status"] == "likely_false_positive"
+    assert decisions["TIC_355651994_s02"]["review_status"] == "plausible_but_weak"
+    assert review["ledger_update"]["append_only_review_rows"] == 3
+    assert "No candidate is follow-up-ready" in review["scientific_guardrail"]
