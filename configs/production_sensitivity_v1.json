@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "suite_id": "production_sensitivity_v1",
+  "source_dataset_id": "t1_1_kepler_master_frozen_eval",
+  "model_ids": [
+    "benchmark_cnn_v1",
+    "xgboost_koi",
+    "full_ensemble_v0.2.41"
+  ],
+  "backgrounds": [
+    {
+      "target_id": "KIC 10002266",
+      "group_id": "kepler:kic:10002266",
+      "background_label": "frozen_eval_negative",
+      "quarters": [1],
+      "max_baseline_days": 30.0
+    },
+    {
+      "target_id": "KIC 10005758",
+      "group_id": "kepler:kic:10005758",
+      "background_label": "frozen_eval_positive",
+      "quarters": [1],
+      "max_baseline_days": 30.0
+    }
+  ],
+  "injection_grid": {
+    "period_days": [1.0, 3.0, 10.0],
+    "depth_ppm": [500.0, 2000.0, 10000.0],
+    "duration_hours": [2.0, 8.0],
+    "epoch_phase": 0.37
+  },
+  "pipeline": {
+    "period_min": 0.5,
+    "period_max": 20.0,
+    "duration_min_hours": 0.5,
+    "duration_max_hours": 10.0,
+    "n_durations": 8,
+    "min_snr": 5.0,
+    "max_peaks": 1,
+    "max_period_grid_points": 1000,
+    "xgboost_model_path": "models/xgboost_koi.json",
+    "cnn_checkpoint_path": "models/cnn/benchmark_cnn_v1/best.pt"
+  },
+  "recovery_period_relative_tolerance": 0.02,
+  "heartbeat_seconds": 30.0,
+  "sensitivity_scope": {
+    "evidence_class": "bounded_short_period_v1",
+    "limitations": [
+      "Uses the first 30 days of Kepler quarter 1 for each real background.",
+      "Covers 1-10 day periods only; multi-quarter and long-period sensitivity remain unmeasured.",
+      "Uses a bounded 1000-period and 8-duration blind BLS grid, not the live-search 20000-period grid."
+    ]
+  }
+}

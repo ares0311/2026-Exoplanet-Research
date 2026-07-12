@@ -28,7 +28,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import asdict, is_dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 import numpy as np
 import typer
@@ -74,6 +74,21 @@ app = typer.Typer(
 
 _VALID_SCORERS = ("bayesian", "xgboost", "ensemble", "cnn", "full-ensemble")
 CNN_SNIPPET_BINS = 201
+
+
+class _CnnScorer(Protocol):
+    """Shared surface of in-process and native-runtime-isolated CNN scorers."""
+
+    @property
+    def checkpoint_path(self) -> Path | None: ...
+
+    @property
+    def is_available(self) -> bool: ...
+
+    @property
+    def training_mission(self) -> str | None: ...
+
+    def predict_proba(self, snippet: list[float]) -> float: ...
 
 # Calibrated 2026-07-10 via Skills/calibrate_stacking_weights.py on the T1-2
 # held-out K2 calibration set (588 examples, AUC-maximising grid search,
@@ -224,6 +239,11 @@ def run_pipeline(
     *,
     exptime: str | None = None,
     pipeline: str | None = None,
+    period_min: float = 0.5,
+    period_max: float | None = 500.0,
+    duration_min_hours: float = 0.5,
+    duration_max_hours: float = 12.0,
+    n_durations: int = 20,
     min_snr: float = 5.0,
     max_peaks: int = 5,
     max_period_grid_points: int | None = 20_000,
@@ -244,6 +264,12 @@ def run_pipeline(
         mission: ``"TESS"``, ``"Kepler"``, ``"K2"``, or ``"JWST"``.
         exptime: Optional exposure-time hint passed to ``fetch_lightcurve``.
         pipeline: Optional pipeline/author override passed to ``fetch_lightcurve``.
+        period_min: Minimum BLS trial period in days.
+        period_max: Maximum BLS trial period in days, or ``None`` for the
+            baseline-derived search bound.
+        duration_min_hours: Minimum BLS transit duration in hours.
+        duration_max_hours: Maximum BLS transit duration in hours.
+        n_durations: Number of BLS duration-grid points.
         min_snr: Minimum BLS SNR threshold for candidate signals.
         max_peaks: Maximum number of signals to return from the BLS search.
         max_period_grid_points: Maximum BLS trial periods per peak. The default
@@ -290,23 +316,23 @@ def run_pipeline(
         stellar_params_fn if stellar_params_fn is not None else fetch_tic_stellar_params
     )
 
-    xgb_scorer = None
-    if scorer in ("xgboost", "ensemble", "full-ensemble"):
-        if model_path is None:
-            raise ValueError(
-                f"model_path is required when scorer='{scorer}'"
-            )
-        from exo_toolkit.ml.xgboost_scorer import XGBoostScorer
-        xgb_scorer = XGBoostScorer.load(model_path)
-
-    cnn_scorer = None
+    cnn_scorer: _CnnScorer | None = None
     if scorer in ("cnn", "full-ensemble"):
         if cnn_checkpoint_path is None:
             raise ValueError(
                 f"cnn_checkpoint_path is required when scorer='{scorer}'"
             )
-        from exo_toolkit.ml.cnn_scorer import CnnScorer
-        cnn_scorer = CnnScorer.from_checkpoint(cnn_checkpoint_path)
+        if scorer == "full-ensemble":
+            # XGBoost and PyTorch wheels load conflicting native runtimes on
+            # macOS. Keep PyTorch in an isolated child so full-ensemble scans
+            # cannot deadlock or terminate the parent interpreter.
+            from exo_toolkit.ml.isolated_cnn_scorer import IsolatedCnnScorer
+
+            cnn_scorer = IsolatedCnnScorer.from_checkpoint(cnn_checkpoint_path)
+        else:
+            from exo_toolkit.ml.cnn_scorer import CnnScorer
+
+            cnn_scorer = CnnScorer.from_checkpoint(cnn_checkpoint_path)
 
         if cnn_scorer.is_available and not allow_cross_mission_cnn:
             training_mission = cnn_scorer.training_mission
@@ -325,6 +351,15 @@ def run_pipeline(
                     "allow_cross_mission_cnn=True (--allow-cross-mission-cnn on "
                     "the CLI) only to deliberately test out-of-domain performance."
                 )
+
+    xgb_scorer = None
+    if scorer in ("xgboost", "ensemble", "full-ensemble"):
+        if model_path is None:
+            raise ValueError(
+                f"model_path is required when scorer='{scorer}'"
+            )
+        from exo_toolkit.ml.xgboost_scorer import XGBoostScorer
+        xgb_scorer = XGBoostScorer.load(model_path)
 
     calibration_result = None
     if calibration_path is not None:
@@ -358,6 +393,11 @@ def run_pipeline(
         clean_result.light_curve,
         target_id=target_id,
         mission=mission,
+        period_min=period_min,
+        period_max=period_max,
+        duration_min_hours=duration_min_hours,
+        duration_max_hours=duration_max_hours,
+        n_durations=n_durations,
         min_snr=min_snr,
         max_peaks=max_peaks,
         max_period_grid_points=max_period_grid_points,
@@ -450,6 +490,7 @@ def run_pipeline(
                 ),
                 "scorer_available": cnn_scorer.is_available,
                 "input": cnn_input_meta,
+                "runtime_isolation": scorer == "full-ensemble",
                 "experimental": True,
                 "production_gate_satisfied": False,
                 "scientific_use": "review_metadata_only",
@@ -457,8 +498,13 @@ def run_pipeline(
             cnn_prob = 0.5
             cnn_probability_status = "neutral_fallback"
             if cnn_scorer.is_available and cnn_snippet is not None:
-                cnn_prob = cnn_scorer.predict_proba(cnn_snippet)
-                cnn_probability_status = "computed"
+                try:
+                    cnn_prob = cnn_scorer.predict_proba(cnn_snippet)
+                    cnn_probability_status = "computed"
+                except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+                    cnn_meta["unavailable_reason"] = (
+                        f"isolated_cnn_inference_failed:{type(exc).__name__}"
+                    )
             elif not cnn_scorer.is_available:
                 cnn_meta["unavailable_reason"] = "cnn_scorer_unavailable"
             else:
