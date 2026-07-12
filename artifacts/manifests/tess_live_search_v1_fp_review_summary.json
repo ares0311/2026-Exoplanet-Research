@@ -2,8 +2,9 @@
   "schema_version": 1,
   "batch_id": "tess_live_search_v1",
   "reviewed_at": "2026-07-12T08:25:31.575910+00:00",
-  "status": "conservative_review_complete_missing_diagnostics",
+  "status": "conservative_review_complete_evidence_limited",
   "source_run_summary": "artifacts/manifests/tess_live_search_v1_run_summary.json",
+  "diagnostic_followup": "artifacts/manifests/tess_live_search_v1_tpf_coverage_summary.json",
   "review_inputs": [
     {
       "path": "logs/tess_live_search_v1_TIC201251996_review.json",
@@ -57,11 +58,12 @@
       "evidence": [
         "14 available vetting checks pass",
         "limb_darkening_plausibility_score=0.0 (fail)",
-        "17 diagnostics remain missing",
-        "centroid and odd/even evidence are unavailable",
+        "17 diagnostics were unavailable in the initial review",
+        "both available TPF sectors lack predicted-event coverage",
+        "odd/even is unmeasurable from only 2 independent events (4 required)",
         "provenance_score=0.5625"
       ],
-      "next_action": "Keep as candidate signal only; obtain missing centroid/contamination and per-transit diagnostics before reconsidering review status."
+      "next_action": "Keep as candidate signal only. Centroid and odd/even follow-up is complete to the limit of available observations; additional event-covering observations would be required to resolve either diagnostic."
     }
   ],
   "scientific_guardrail": "No candidate is follow-up-ready, confirmed, or authorized for external submission."

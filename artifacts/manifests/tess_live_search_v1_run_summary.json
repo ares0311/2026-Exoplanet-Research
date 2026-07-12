@@ -3,8 +3,9 @@
   "batch_id": "tess_live_search_v1",
   "source_dataset_id": "tess_live_search_v1",
   "completed_at": "2026-07-12T00:38:28.031272+00:00",
-  "status": "success_review_complete_missing_diagnostics",
+  "status": "success_review_complete_evidence_limited",
   "review_summary": "artifacts/manifests/tess_live_search_v1_fp_review_summary.json",
+  "diagnostic_followup": "artifacts/manifests/tess_live_search_v1_tpf_coverage_summary.json",
   "hash_scope": "Shard database hashes below are the immutable execution-completion hashes; append-only review rows produce a later hash recorded in review_summary.",
   "execution": {
     "shard_count": 3,

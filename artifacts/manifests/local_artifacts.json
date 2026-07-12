@@ -1595,12 +1595,12 @@
         "verified_on": "2026-07-12"
       },
       "validation_gate": "Every row must use schema v2, exact fetched URIs matching the frozen product inventory, and source_dataset_id=tess_live_search_v1.",
-      "next_action": "Do not rerun. Retain shard DBs unchanged; obtain missing centroid/contamination and per-transit diagnostics for TIC 355651994_s02. No external submission is authorized."
+      "next_action": "Do not rerun. Retain shard DBs unchanged; centroid/odd-even follow-up is observationally limited and no external submission is authorized."
     },
     {
       "path": "artifacts/manifests/tess_live_search_v1_run_summary.json",
       "kind": "live_search_evidence_summary",
-      "status": "committed_review_complete",
+      "status": "committed_review_complete_evidence_limited",
       "git_policy": "commit",
       "last_known": {
         "source_dataset_id": "tess_live_search_v1",
@@ -1609,6 +1609,7 @@
         "signals_below_fpp_0_15": 3,
         "review_targets": 2,
         "review_summary": "artifacts/manifests/tess_live_search_v1_fp_review_summary.json",
+        "diagnostic_followup": "artifacts/manifests/tess_live_search_v1_tpf_coverage_summary.json",
         "verified_on": "2026-07-12"
       },
       "validation_gate": "All counts and hashes must match the three ignored shard databases, scan logs, and committed Run Report ledgers.",
@@ -1617,44 +1618,68 @@
     {
       "path": "artifacts/manifests/tess_live_search_v1_fp_review_summary.json",
       "kind": "candidate_false_positive_review",
-      "status": "committed_conservative_review_complete",
+      "status": "committed_conservative_review_complete_evidence_limited",
       "git_policy": "commit",
       "last_known": {
         "likely_false_positive": 2,
         "plausible_but_weak": 1,
         "append_only_review_rows": 3,
+        "centroid_status": "no_transit_coverage",
+        "odd_even_status": "insufficient_independent_events_2_of_4",
         "reviewed_on": "2026-07-12"
       },
       "validation_gate": "Input hashes must match the regenerated full pipeline rows and vetting reports, and the post-review shard-2 database hash must match the append-only ledger.",
-      "next_action": "Obtain missing centroid/contamination and per-transit evidence for TIC 355651994_s02 before reconsidering its review status; no external action."
+      "next_action": "Retain plausible_but_weak. Additional event-covering observations are required to resolve centroid/odd-even; no external action."
+    },
+    {
+      "path": "artifacts/manifests/tess_live_search_v1_tpf_coverage_summary.json",
+      "kind": "candidate_diagnostic_followup_summary",
+      "status": "committed_complete_evidence_limited",
+      "git_policy": "commit",
+      "last_known": {
+        "candidate_id": "TIC_355651994_s02",
+        "centroid_status": "no_transit_coverage",
+        "tpf_products": 2,
+        "odd_even_status": "insufficient_independent_events",
+        "measured_events": 2,
+        "required_events": 4,
+        "run_report_commit": "986e7bc",
+        "verified_on": "2026-07-12"
+      },
+      "validation_gate": "Runtime and Run Report hashes must match the local strict JSON and committed Run Report ledger; review status must remain conservative.",
+      "next_action": "No further current-file analysis can resolve centroid or odd/even; additional event-covering observations would be required."
     },
     {
       "path": "reports/tess_live_search_v1_TIC355651994_s02_centroid.json",
       "kind": "candidate_tpf_centroid_diagnostic",
-      "status": "pending_cached_no_coverage_record",
+      "status": "complete_no_transit_coverage",
       "git_policy": "ignored_runtime_report",
       "last_known": {
         "tool_version": "0.2.40",
         "target_id": "TIC 355651994",
-        "products_found_metadata_only": 2,
+        "products_found": 2,
+        "products_analyzed": 0,
+        "runtime_sha256": "af9a71c60fc85f3d32702d0fbe921835331fcbc04b86176f966a70f8ccfebf9f",
+        "run_report_sha256": "5b7cc135c47ac82ddffd6dde5692c5c3238534c981b95e5df82ab2ac8709e78e",
+        "run_report_commit": "986e7bc",
         "sectors": [
           1,
           28
         ],
         "cached_on_disk_mb": 11.7,
-        "sector_1_time_start_bjd": 2458325.326775,
-        "sector_1_time_end_bjd": 2458353.160348,
-        "sector_1_nearest_event_bjd": 2458320.683784,
-        "sector_1_event_gap_days": 4.643,
-        "sector_28_time_start_bjd": 2459061.854342,
-        "sector_28_time_end_bjd": 2459087.097491,
-        "sector_28_nearest_event_bjd": 2459097.977888,
-        "sector_28_event_gap_days": 10.88,
+        "sector_1_time_start_bjd": 2458325.3476087167,
+        "sector_1_time_end_bjd": 2458353.1603477267,
+        "sector_1_nearest_event_bjd": 2458320.6837840513,
+        "sector_1_event_gap_days": 4.663824665360153,
+        "sector_28_time_start_bjd": 2459061.8612865927,
+        "sector_28_time_end_bjd": 2459087.0974911805,
+        "sector_28_nearest_event_bjd": 2459097.9778879806,
+        "sector_28_event_gap_days": 10.880396800115705,
         "sharding": "not_warranted_for_two_products_under_three_minutes",
         "verified_on": "2026-07-12"
       },
-      "validation_gate": "Rerun from cache after version 0.2.40 merges; result must preserve exact product provenance, per-sector time coverage, nearest predicted events, gap distances, and diagnostic-only guardrail.",
-      "next_action": "Persist the cached no-transit-coverage outcome and preserve its output hash/result in committed review evidence before changing candidate status."
+      "validation_gate": "Local runtime hash must match the committed follow-up summary; result must retain exact product provenance and diagnostic-only guardrail.",
+      "next_action": "Retain locally; use the committed follow-up summary as GitHub-visible durable truth."
     },
     {
       "path": "~/.lightkurve/cache/mastDownload/",

@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "batch_id": "tess_live_search_v1",
+  "candidate_id": "TIC_355651994_s02",
+  "review_status": "plausible_but_weak",
+  "diagnostic_status": "complete_evidence_limited",
+  "centroid_result": {
+    "status": "no_transit_coverage",
+    "runtime_path": "reports/tess_live_search_v1_TIC355651994_s02_centroid.json",
+    "runtime_sha256": "af9a71c60fc85f3d32702d0fbe921835331fcbc04b86176f966a70f8ccfebf9f",
+    "run_report_path": "artifacts/manifests/run_reports/tpf_centroid_diagnostic.jsonl",
+    "run_report_sha256": "5b7cc135c47ac82ddffd6dde5692c5c3238534c981b95e5df82ab2ac8709e78e",
+    "run_report_commit": "986e7bc",
+    "products_found": 2,
+    "products_analyzed": 0,
+    "products_without_transit_coverage": 2,
+    "sectors": [
+      {
+        "sector": 1,
+        "data_uri": "mast:HLSP/tess-spoc/s0001/target/0000/0003/5565/1994/hlsp_tess-spoc_tess_phot_0000000355651994-s0001_tess_v1_tp.fits",
+        "finite_cadences": 1183,
+        "time_start_bjd": 2458325.3476087167,
+        "time_end_bjd": 2458353.1603477267,
+        "nearest_predicted_event_bjd": 2458320.6837840513,
+        "nearest_event_gap_days": 4.663824665360153
+      },
+      {
+        "sector": 28,
+        "data_uri": "mast:HLSP/tess-spoc/s0028/target/0000/0003/5565/1994/hlsp_tess-spoc_tess_phot_0000000355651994-s0028_tess_v1_tp.fits",
+        "finite_cadences": 3448,
+        "time_start_bjd": 2459061.8612865927,
+        "time_end_bjd": 2459087.0974911805,
+        "nearest_predicted_event_bjd": 2459097.9778879806,
+        "nearest_event_gap_days": 10.880396800115705
+      }
+    ],
+    "interpretation": "Neither available TESS-SPOC target-pixel product contains a predicted event, so no aperture-photocenter shift can be measured. This is an observation-coverage limitation, not positive or negative centroid evidence."
+  },
+  "odd_even_result": {
+    "status": "insufficient_independent_events",
+    "source_path": "logs/tess_live_search_v1_TIC355651994_review.json",
+    "source_sha256": "92c79dbe619edef96ec165aec598c071b7ad870f06eb73d58b72bdfac26ef98a",
+    "measured_event_count": 2,
+    "required_event_count": 4,
+    "individual_depths": [
+      0.009907373986048018,
+      0.011495063222755841
+    ],
+    "individual_depth_errors": [
+      0.0025540688165097986,
+      0.00038073809952855644
+    ],
+    "interpretation": "The project odd/even diagnostic requires at least two odd and two even events. Two measured events cannot support that comparison."
+  },
+  "conclusion": "The requested centroid and odd/even follow-up is complete to the limit of the available observations. Both diagnostics remain unavailable rather than assumed favorable. TIC_355651994_s02 remains plausible_but_weak, with no tfop_ready or external-submission authorization.",
+  "completed_at": "2026-07-12T09:21:48.606527+00:00",
+  "scientific_guardrail": "This candidate signal is not a confirmed planet, follow-up-ready target, or authorized external submission."
+}

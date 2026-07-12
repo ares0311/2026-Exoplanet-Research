@@ -218,15 +218,22 @@ and partial-product failures; it also prints per-product ETA and writes a Run
 Report. It fails closed on inadequate transit coverage and explicitly says it
 cannot localize the transit source or replace difference imaging. The tool is
 offline-tested. The first bounded live run downloaded both products but found
-no predicted transit coverage: sector 1 ends 4.643 days after the nearest prior
-event, and sector 28 begins 10.880 days before the nearest following event.
+no predicted transit coverage: sector 1 begins 4.664 days after the nearest
+prior event, and sector 28 ends 10.880 days before the nearest following event.
 0.2.40 makes that scientifically useful fail-closed outcome durable instead of
 raising without an artifact: all-no-coverage runs now write strict structured
 JSON with exact TPF time ranges, nearest predicted event centers, gap distances,
-and product provenance, then append a Run Report. The cached rerun that will
-produce that durable record remains pending.
+and product provenance, then append a Run Report. The cached rerun completed in
+8.97 seconds and was auto-committed as `986e7bc`; its runtime JSON hash is
+`af9a71c6…bf9f`. The quality-masked sector-1 coverage begins 4.664 days after
+the nearest event, and sector 28 ends 10.880 days before the next. The existing
+QLP review contains exactly two independently measured events, while odd/even
+requires at least four. Therefore both requested diagnostics are complete to
+the limit of available observations and remain unavailable—not assumed
+favorable. The committed evidence is
+`artifacts/manifests/tess_live_search_v1_tpf_coverage_summary.json`.
 
-**TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW PENDING.** Three
+**TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of
 observed wall time, writing 56 schema-v2 records: 53 signal rows and three null
 results, with zero preprocessing or ledger failures. Per-shard run reports are
@@ -241,6 +248,11 @@ companion-radius checks, with weak XGBoost support. TIC 355651994_s02
 checks pass, but limb-darkening plausibility fails and 17 diagnostics remain
 missing, including centroid and odd/even evidence. Its QLP provenance score is
 0.5625, so no `tfop_ready` or external-submission claim is authorized.
+Follow-up now establishes that centroid and odd/even are observationally
+unavailable: neither of the two TPF sectors covers a predicted event, and only
+two QLP events exist versus four required for odd/even. The review status
+remains `plausible_but_weak`; additional event-covering observations, not more
+analysis of the current files, would be required to resolve those checks.
 
 ---
 
