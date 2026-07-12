@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.37 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.38 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -202,6 +202,12 @@ with automatically scoped scan logs, SQLite ledgers, and Run Report ledgers.
 Runtime `data/*.sqlite*` files are now ignored and recorded in the local-
 artifact ledger, keeping `git add .` safe. No live scan was executed by this
 change; the 18-target evidence run remains operator-coordinated work.
+0.2.38 closes an operator-visibility defect found before that run: prepared
+shards previously printed a startup banner and per-target completion ETA, but
+could remain silent throughout a long download/BLS interval. They now print a
+flushed line when every target starts plus a flushed 30-second heartbeat with
+completed, active, pending, elapsed, and ETA fields. The interval is configurable
+with `--heartbeat-seconds`; tests exercise the heartbeat while work is active.
 
 ---
 

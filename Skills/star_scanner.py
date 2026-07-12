@@ -1477,10 +1477,13 @@ def run_prepared_live_search(
     exptime: str = "long",
     shard_index: int = 0,
     shard_count: int = 1,
+    heartbeat_interval_seconds: float = 30.0,
 ) -> dict[str, Any]:
     """Execute one collision-free shard and append every outcome to ledger v2."""
     if shard_count < 1 or not 0 <= shard_index < shard_count:
         raise ValueError("shard_index must be in [0, shard_count)")
+    if heartbeat_interval_seconds <= 0.0:
+        raise ValueError("heartbeat_interval_seconds must be positive")
     scoped_log = _shard_scoped_path(log_path, shard_index, shard_count)
     scoped_db = _shard_scoped_path(candidate_db_path, shard_index, shard_count)
     shard_targets = [
@@ -1500,8 +1503,10 @@ def run_prepared_live_search(
         ]
         print(
             f"Prepared live search {bundle.dataset_id}: shard "
-            f"{shard_index}/{shard_count}, {len(targets)}/{len(shard_targets)} pending, "
-            f"workers={min(max(1, workers), max(1, len(targets)))}",
+            f"{shard_index}/{shard_count}, batch_total={len(bundle.targets)}, "
+            f"shard_total={len(shard_targets)}, pending={len(targets)}, "
+            f"workers={min(max(1, workers), max(1, len(targets)))}, "
+            f"heartbeat={heartbeat_interval_seconds:.0f}s",
             flush=True,
         )
         if not targets:
@@ -1519,11 +1524,45 @@ def run_prepared_live_search(
         n_done = 0
         n_failed = 0
         n_written = 0
+        active: set[int] = set()
+        state_lock = threading.Lock()
+        print_lock = threading.Lock()
+        heartbeat_stop = threading.Event()
+
+        def heartbeat() -> None:
+            while not heartbeat_stop.wait(heartbeat_interval_seconds):
+                with state_lock:
+                    completed = n_done
+                    active_count = len(active)
+                pending = max(0, len(targets) - completed - active_count)
+                progress = (
+                    _progress_suffix(completed, len(targets), started)
+                    if completed
+                    else f"elapsed={time.monotonic() - started:.0f}s ETA=pending"
+                )
+                with print_lock:
+                    print(
+                        f"  [heartbeat] completed={completed}/{len(targets)} "
+                        f"active={active_count} pending={pending} {progress}",
+                        flush=True,
+                    )
 
         def scan_target(target: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
             limiter.wait()
+            tic_id = int(target["tic_id"])
+            with state_lock:
+                active.add(tic_id)
+                completed = n_done
+                active_count = len(active)
+            with print_lock:
+                print(
+                    f"  [start] {target['target_id']} "
+                    f"priority={float(target['priority']):.3f} active={active_count} "
+                    f"{_progress_suffix(completed, len(targets), started)}",
+                    flush=True,
+                )
             result = scan_star(
-                int(target["tic_id"]),
+                tic_id,
                 mission="TESS",
                 min_snr=min_snr,
                 max_peaks=max_peaks,
@@ -1537,73 +1576,84 @@ def run_prepared_live_search(
             )
             return target, result
 
-        with ThreadPoolExecutor(max_workers=worker_count) as executor:
-            futures = [executor.submit(scan_target, target) for target in targets]
-            for future in as_completed(futures):
-                target, result = future.result()
-                rows = list(result.pop("_ledger_rows", []))
-                pipeline_context = dict(result.pop("_pipeline_context", {}))
-                records: list[CandidateLedgerRecord] = []
-                try:
-                    if rows:
-                        records = [
-                            _ledger_record_for_outcome(
-                                target=target,
-                                source_dataset_id=bundle.dataset_id,
-                                row=row,
-                                pipeline_context=pipeline_context,
-                                min_snr=min_snr,
-                                max_peaks=max_peaks,
-                                max_period_grid_points=max_period_grid_points,
-                                scorer=scorer,
-                                pipeline=pipeline,
-                                exptime=exptime,
-                                model_path=model_path,
+        heartbeat_thread = threading.Thread(target=heartbeat, daemon=True)
+        heartbeat_thread.start()
+        try:
+            with ThreadPoolExecutor(max_workers=worker_count) as executor:
+                futures = [executor.submit(scan_target, target) for target in targets]
+                for future in as_completed(futures):
+                    target, result = future.result()
+                    tic_id = int(target["tic_id"])
+                    rows = list(result.pop("_ledger_rows", []))
+                    pipeline_context = dict(result.pop("_pipeline_context", {}))
+                    records: list[CandidateLedgerRecord] = []
+                    try:
+                        if rows:
+                            records = [
+                                _ledger_record_for_outcome(
+                                    target=target,
+                                    source_dataset_id=bundle.dataset_id,
+                                    row=row,
+                                    pipeline_context=pipeline_context,
+                                    min_snr=min_snr,
+                                    max_peaks=max_peaks,
+                                    max_period_grid_points=max_period_grid_points,
+                                    scorer=scorer,
+                                    pipeline=pipeline,
+                                    exptime=exptime,
+                                    model_path=model_path,
+                                )
+                                for row in rows
+                            ]
+                        elif pipeline_context.get("fetch_provenance"):
+                            records = [
+                                _ledger_record_for_outcome(
+                                    target=target,
+                                    source_dataset_id=bundle.dataset_id,
+                                    row=None,
+                                    pipeline_context=pipeline_context,
+                                    min_snr=min_snr,
+                                    max_peaks=max_peaks,
+                                    max_period_grid_points=max_period_grid_points,
+                                    scorer=scorer,
+                                    pipeline=pipeline,
+                                    exptime=exptime,
+                                    model_path=model_path,
+                                    failure_message=(
+                                        str(result["error_message"])
+                                        if result["status"] == "error"
+                                        else None
+                                    ),
+                                )
+                            ]
+                        else:
+                            raise RuntimeError(
+                                "No exact fetch provenance was available for ledger insertion"
                             )
-                            for row in rows
-                        ]
-                    elif pipeline_context.get("fetch_provenance"):
-                        records = [
-                            _ledger_record_for_outcome(
-                                target=target,
-                                source_dataset_id=bundle.dataset_id,
-                                row=None,
-                                pipeline_context=pipeline_context,
-                                min_snr=min_snr,
-                                max_peaks=max_peaks,
-                                max_period_grid_points=max_period_grid_points,
-                                scorer=scorer,
-                                pipeline=pipeline,
-                                exptime=exptime,
-                                model_path=model_path,
-                                failure_message=(
-                                    str(result["error_message"])
-                                    if result["status"] == "error"
-                                    else None
-                                ),
-                            )
-                        ]
-                    else:
-                        raise RuntimeError(
-                            "No exact fetch provenance was available for ledger insertion"
-                        )
-                    database.insert_provenanced_many(records)
-                except Exception as exc:  # noqa: BLE001
-                    result["status"] = "error"
-                    result["error_message"] = f"Candidate-ledger write refused: {exc}"
-                    records = []
+                        database.insert_provenanced_many(records)
+                    except Exception as exc:  # noqa: BLE001
+                        result["status"] = "error"
+                        result["error_message"] = f"Candidate-ledger write refused: {exc}"
+                        records = []
 
-                log.record(int(target["tic_id"]), result["status"], result)
-                n_done += 1
-                n_written += len(records)
-                if result["status"] == "error":
-                    n_failed += 1
-                print(
-                    f"  [{n_done}/{len(targets)}] {target['target_id']} "
-                    f"{_status_text(result)} ledger_rows={len(records)} "
-                    f"{_progress_suffix(n_done, len(targets), started)}",
-                    flush=True,
-                )
+                    log.record(tic_id, result["status"], result)
+                    with state_lock:
+                        active.discard(tic_id)
+                        n_done += 1
+                        completed = n_done
+                    n_written += len(records)
+                    if result["status"] == "error":
+                        n_failed += 1
+                    with print_lock:
+                        print(
+                            f"  [{completed}/{len(targets)}] {target['target_id']} "
+                            f"{_status_text(result)} ledger_rows={len(records)} "
+                            f"{_progress_suffix(completed, len(targets), started)}",
+                            flush=True,
+                        )
+        finally:
+            heartbeat_stop.set()
+            heartbeat_thread.join(timeout=heartbeat_interval_seconds + 1.0)
 
     return {
         "mode": "prepared_scan",
@@ -1936,6 +1986,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--request-delay", type=float, default=0.5,
                    help="Minimum seconds between worker scan starts (default: 0.5)")
     p.add_argument(
+        "--heartbeat-seconds",
+        type=float,
+        default=30.0,
+        help="Prepared-scan heartbeat interval in seconds (default: 30)",
+    )
+    p.add_argument(
         "--scorer", default="bayesian", choices=["bayesian", "xgboost", "ensemble"],
     )
     p.add_argument(
@@ -2090,6 +2146,7 @@ def main(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
             exptime=args.exptime,
             shard_index=args.shard_index,
             shard_count=args.shard_count,
+            heartbeat_interval_seconds=args.heartbeat_seconds,
         )
         if not args.no_git_report:
             _write_run_report(

@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import json
 import sys
+import time
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -687,7 +688,7 @@ class TestLiveSearchPreparation:
             )
 
     def test_prepared_shard_writes_only_its_target_to_schema_v2(
-        self, tmp_path: Path
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         targets = tuple(
             {
@@ -705,6 +706,7 @@ class TestLiveSearchPreparation:
         )
 
         def fake_scan(tic_id: int, **_: object) -> dict[str, Any]:
+            time.sleep(0.04)
             provenance = {
                 "raw_uris": [f"mast:{tic_id}"],
                 "sectors_or_quarters": [1],
@@ -739,6 +741,7 @@ class TestLiveSearchPreparation:
                 request_delay=0.0,
                 shard_index=0,
                 shard_count=2,
+                heartbeat_interval_seconds=0.01,
             )
 
         db_path = tmp_path / "candidates.shard0of2.sqlite3"
@@ -750,6 +753,12 @@ class TestLiveSearchPreparation:
         assert summary["items_processed"] == 1
         assert summary["items_written"] == 1
         assert summary["items_failed"] == 0
+        output = capsys.readouterr().out
+        assert "batch_total=2" in output
+        assert "[start] TIC 102" in output
+        assert "[heartbeat]" in output
+        assert "elapsed=" in output
+        assert "ETA=" in output
 
         with patch("Skills.star_scanner.scan_star") as scan:
             resumed = run_prepared_live_search(
@@ -807,6 +816,7 @@ class TestLiveSearchPreparation:
         assert code == 0
         load.assert_called_once()
         execute.assert_called_once()
+        assert execute.call_args.kwargs["heartbeat_interval_seconds"] == 30.0
         select.assert_not_called()
 
 
