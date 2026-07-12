@@ -92,6 +92,22 @@ Observed held-out test metrics:
 Temperature scaling selected `T=1.0`, so calibration was the identity and did
 not degrade Brier score or ECE.
 
+### Production-pipeline sensitivity evidence
+
+Version 0.2.44 commits the bounded `production_sensitivity_v1` real-background
+injection suite. It links `benchmark_cnn_v1`, `xgboost_koi`, and the calibrated
+full ensemble to the `t1_1_kepler_master_frozen_eval` dataset role. On two
+30-day Kepler Q1 backgrounds, the production pipeline recovered 23/36 injected
+signals with zero execution failures. The durable sample-level artifact and
+curves are `artifacts/manifests/production_sensitivity_v1.json`.
+
+This is short-period context, not a new model-promotion gate or a survey
+completeness claim. It covers 1, 3, and 10 days, two durations, three depths,
+and only two backgrounds. The strongest-peak-only search produced non-monotonic
+depth bins, so those 12-sample bins must not be extrapolated. TTV,
+single-transit, gap, explicit variability, longer-period, and multi-quarter
+coverage remain unmeasured.
+
 ## Runtime And System Notes
 
 - Expected local Python: 3.14.3 in `.venv`.
@@ -112,8 +128,9 @@ not degrade Brier score or ECE.
 - The model consumes folded snippets, not full light curves, target pixel files,
   centroid diagnostics, or follow-up photometry.
 - Metrics are held-out corpus metrics, not discovery-yield proof.
-- Full-ensemble production still requires T1-2 stacking calibration after CNN
-  promotion.
+- Full-ensemble production uses the completed T1-2 stacking calibration, whose
+  zero CNN blend weight means CNN probabilities remain review metadata rather
+  than decision weight.
 
 ## Promotion Scope
 

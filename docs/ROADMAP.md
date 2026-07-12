@@ -49,16 +49,22 @@ by itself satisfy a master-guide evidence requirement.
    frozen-evaluation roles. It preserves the accepted pi Mensae c and TOI-146.01
    controls, reruns deterministic deep/subthreshold injected-transit controls,
    and reports per-case deltas against the committed v1 baseline.
-4. **Phase 2 — production sensitivity evidence:** generic BLS transit
+4. **Phase 2 — production sensitivity evidence (BOUNDED V1 COMPLETE; COVERAGE
+   EXPANSION OPEN):** generic BLS transit
    injection-recovery tooling exists, and version 0.2.42 adds a bounded,
    cache-only real-background runner tied to the production pipeline,
    frozen-eval dataset ID, and `benchmark_cnn_v1` promotion package. A
    36-trial pre-merge smoke completed with zero failures in 7.1 seconds using
    six workers. The first merged run was failed closed because quarter-filtered
    inputs retained all-quarter provenance URIs; version 0.2.43 fixes and tests
-   aligned path/curve filtering. The corrected durable production run and
-   committed recovery curves are still required; tooling-complete is not
-   evidence-complete.
+   aligned path/curve filtering. The corrected merged-code run is now committed
+   at `artifacts/manifests/production_sensitivity_v1.json`: 23/36 recoveries,
+   zero failures, and curves by period, depth, duration, and real-background
+   label. This closes the bounded short-period evidence deliverable, not general
+   completeness. Next expand to the master-guide's TTV, single-transit, gap,
+   stellar-variability, multi-quarter, and longer-period cases. The v1 depth
+   bins are non-monotonic under a 12-sample/bin, strongest-peak-only search and
+   must not be interpreted as a survey completeness law.
 5. **Phase 2 — calibrated candidate context:** extend production outputs with
    calibration dataset IDs, score quantiles, threshold versions, and empirical
    false-discovery context after the canonical eval and sensitivity sets exist.
@@ -120,9 +126,12 @@ by itself satisfy a master-guide evidence requirement.
 - [x] `Skills/injection_recovery.py` — inject synthetic box transits, recover via BLS
 - [x] Measures recovery rate by radius, period, noise level
 - [x] 25 tests in `tests/test_injection_recovery.py`
-- [ ] Produce and commit production-pipeline recovery curves on real-background
+- [x] Produce and commit bounded production-pipeline recovery curves on real-background
   canonical cases, with manifest IDs and explicit linkage to the frozen
-  `benchmark_cnn_v1` evidence package (master-guide Phase 2 requirement)
+  `benchmark_cnn_v1` evidence package (`production_sensitivity_v1`)
+- [ ] Expand sensitivity coverage to TTV, single-transit, data-gap,
+  stellar-variability, multi-quarter, and longer-period cases before making a
+  general completeness claim
 
 ---
 

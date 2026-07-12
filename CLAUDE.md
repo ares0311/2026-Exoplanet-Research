@@ -21,8 +21,10 @@ The active production priority is master-guide Phase 2 sensitivity evidence:
 version 0.2.42 adds the bounded real-background production-pipeline runner and
 fixes the XGBoost/PyTorch full-ensemble native-runtime collision. Version
 0.2.43 makes quarter-filtered product provenance fail-closed after the first
-merged run exposed an all-quarter URI overstatement. The corrected durable
-recovery curves remain pending; see `docs/ROADMAP.md`.
+merged run exposed an all-quarter URI overstatement. Version 0.2.44 commits the
+corrected bounded v1 curves (23/36 recovered, zero failures). The active Phase
+2 priority is expanding sensitivity beyond this short-period grid to TTV,
+single-transit, gap, variability, and multi-quarter cases; see `docs/ROADMAP.md`.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
@@ -86,7 +88,7 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 131 top-level test files. Local validation on 2026-07-12 passed with 2,682 default tests and 2 `integration_live` tests deselected.
+**Current test surface:** 131 top-level test files. Local validation on 2026-07-12 passed with 2,683 default tests and 2 `integration_live` tests deselected.
 **Skills:** 112 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
 
 ---

@@ -129,3 +129,27 @@ def test_committed_config_has_two_frozen_eval_backgrounds() -> None:
     assert config["pipeline"]["period_max"] == 20.0
     assert "full_ensemble_v0.2.43" in config["model_ids"]
     assert len(build_trials(config)) == 36
+
+
+def test_committed_evidence_is_complete_and_provenance_bounded() -> None:
+    repo_root = Path(__file__).resolve().parent.parent
+    evidence = json.loads(
+        (repo_root / "artifacts/manifests/production_sensitivity_v1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert evidence["toolkit_version"] == "0.2.43"
+    assert evidence["suite_id"] == "production_sensitivity_v1"
+    assert evidence["source_dataset_id"] == "t1_1_kepler_master_frozen_eval"
+    assert "benchmark_cnn_v1" in evidence["model_ids"]
+    assert evidence["curves"]["overall"] == {
+        "trials": 36,
+        "recovered": 23,
+        "recovery_rate": 23 / 36,
+    }
+    assert evidence["failures"] == []
+    assert all(
+        background["sectors_or_quarters"] == [1]
+        and len(background["raw_uris"]) == 1
+        for background in evidence["backgrounds"]
+    )
