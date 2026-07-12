@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "dataset_id": "canonical_real_controls_v1",
+  "project": "2026 Exoplanet Research",
+  "role": "frozen_eval",
+  "source_name": "Catalog-backed formal acceptance controls",
+  "source_url": "https://exoplanetarchive.ipac.caltech.edu/",
+  "instrument": "TESS cameras",
+  "target_ids": {
+    "namespace": "TIC",
+    "count": 2,
+    "selection": "One confirmed-planet control and one catalog false-positive control accepted by formal_acceptance_v2"
+  },
+  "time_range": {
+    "status": "deferred",
+    "reason": "Exact observing coverage belongs to the immutable formal-acceptance source report"
+  },
+  "cadence": {
+    "status": "known",
+    "value": "TESS SPOC short cadence"
+  },
+  "band_or_frequency": "TESS optical bandpass, approximately 600-1000 nm",
+  "data_product_type": "Frozen sample-level regression outcomes",
+  "acquired_at": "2026-07-12T21:42:50Z",
+  "local_path": "artifacts/manifests/canonical_regression_eval_v1.json",
+  "sha256": "6d81384f78e1070b2fe198eb82a4a7f299aea74a83e7ccbd82f19a90ee80337b",
+  "license": "NASA/STScI public archive data; acknowledge MAST, NASA Exoplanet Archive, and TESS",
+  "label_source": "NASA Exoplanet Archive dispositions preserved by formal_acceptance_v2",
+  "label_confidence": "authoritative",
+  "preprocessing_version": "canonical-regression-eval-v1",
+  "known_caveats": [
+    "The offline suite compares immutable accepted outcomes and does not re-download or reprocess the real light curves",
+    "The confirmed control remains a known object and cannot support a discovery claim"
+  ],
+  "row_count": 2,
+  "group_count": 2
+}

@@ -6,7 +6,7 @@ FPP 0.4405, while the TOI-146.01 false-positive control produced no signal.
 No Tier 1 gaps remain open.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (83 production-critical Skills; non-production fluff removed)
-Test baseline: 2,665 default tests passing; 2 `integration_live` tests excluded by
+Test baseline: 2,670 default tests passing; 2 `integration_live` tests excluded by
 the configured marker expression (2026-07-12)
 
 ---
@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.40 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.41 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -232,6 +232,13 @@ requires at least four. Therefore both requested diagnostics are complete to
 the limit of available observations and remain unavailable—not assumed
 favorable. The committed evidence is
 `artifacts/manifests/tess_live_search_v1_tpf_coverage_summary.json`.
+0.2.41 closes the Phase 1 canonical-regression-eval gap with a four-case,
+offline suite. Catalog-backed confirmed-planet and known-false-positive
+controls remain isolated from deterministic injected controls through separate
+`frozen_eval` registry roles. The committed baseline records pi Mensae c PASS,
+TOI-146.01 conservative rejection PASS, 2/2 deep-transit recovery, and 0/2
+subthreshold recovery; future runs emit sample-level metric deltas and fail on
+outcome or recovery-rate regressions.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of
@@ -427,8 +434,9 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | CLI: `exo <TIC-ID>` + all `background-*` subcommands | ✅ |
 | Background automation (SQLite, priority, reports, approval gate) | ✅ |
 | Calibration module (Platt scaling, isotonic PAVA, Brier metrics) | ✅ |
+| Canonical sample-level regression suite (real + isolated injected controls) | ✅ |
 | 83 production-critical Skills/ | ✅ |
-| 2,665 default tests, ruff clean, mypy clean | ✅ |
+| 2,670 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -437,7 +445,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 
 Run these before any live deployment or public announcement:
 
-- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-12: 2,665 passed; 2 `integration_live` tests excluded by configuration)
+- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-12: 2,670 passed; 2 `integration_live` tests excluded by configuration)
 - [x] `.venv/bin/ruff check .` — no lint errors (2026-07-11: clean)
 - [x] `.venv/bin/python -m mypy src` — no type errors (2026-07-11: clean, 30 source files)
 - [x] `exo background-run-once --dry-run` — no config errors (2026-07-10: installed entry point exercised successfully; dry run wrote no ledger/outcome data)
@@ -446,6 +454,7 @@ Run these before any live deployment or public announcement:
 - [x] Verify `models/xgboost_koi.json` and `models/xgboost_koi.xgb.json` exist for XGBoost scorer (stale `xgboost_koi_meta.json` name corrected 2026-07-10 — the actual companion-file convention is `.xgb.json`, see `src/exo_toolkit/ml/xgboost_scorer.py`; both files confirmed present 2026-07-10)
 - [x] Formal production-ensemble confirmed control — pi Mensae c / TIC 261136679 recovered 6.2676207 d against the catalog 6.2679 d period (0.005% relative error) with ensemble FPP 0.4405 on 2026-07-11; PASS. The separate Bayesian-only TOI-700 v1 control remains a documented FAIL and regression target.
 - [x] Formal production-ensemble false-positive control — TOI-146.01 / TIC 355636844 produced no signal above the production detection threshold on 2026-07-11; conservative rejection PASS.
+- [x] Canonical offline regression suite — four sample-level controls PASS against `canonical_regression_eval_v1`; real-only and synthetic-inclusive frozen-evaluation roles remain separate (2026-07-12).
 
 **2026-07-10 CLI routing bug found and fixed while running this checklist**: `exo background-run-once --dry-run`, `exo run-summary`, and `exo sqlite-integrity` — the exact invocations this checklist and `AGENTS.md`/`CLAUDE.md` document — did not work as documented. Root cause: `pyproject.toml`'s `[project.scripts]` registered `exo` to `exo_toolkit.cli:app`, a Typer app that only implements the `exo <TARGET-ID>` transit-scan command; the 17 background-automation subcommands are implemented separately by `exo_toolkit.cli`'s argparse `main()`/`build_parser()`, which was never wired to the installed console script at all (only reachable via `python -m exo_toolkit.cli <subcommand>`, the form `docs/SCHEDULER.md` correctly documents for cron/systemd). Invoking `exo background-run-once` therefore silently misparsed `"background-run-once"` as a scan TARGET_ID and failed with a Typer usage error, not a config error. Fixed: `src/exo_toolkit/cli.py` gains `cli_entry()`, a small dispatcher that routes to `main()` when the first argument names a background subcommand (`_background_command_handlers()` is now the single source of truth for that name list, shared with `build_parser()`) and falls through to the Typer `app` otherwise; `pyproject.toml`'s `exo` script now points to `exo_toolkit.cli:cli_entry`. `Skills/mcp_bootstrap_server.py`'s `_exo_command()` helper had the same bug from the other direction (it preferred a bare `exo` found on PATH over the module-invocation form for these same three subcommands) and is fixed the same way. 5 new regression tests (`TestCliEntry` in `tests/test_cli.py`, `test_background_subcommands_use_module_invocation_not_bare_exo` in `tests/test_mcp_bootstrap_server.py`); full suite re-run clean (2,611 passed). The editable install was resynchronized in the repository `.venv`, and all three installed entry-point commands now run successfully; `sqlite-integrity` reports `ok: true`.
 

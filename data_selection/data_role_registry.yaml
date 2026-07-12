@@ -1,5 +1,5 @@
 schema_version: 1
-last_updated: 2026-07-10
+last_updated: 2026-07-12
 project: 2026 Exoplanet Research
 policy_sources:
   - docs/astrometrics_data_selection_policy.md
@@ -7,6 +7,50 @@ policy_sources:
   - docs/astrometrics_external_and_cloud_storage_policy.md
 
 datasets:
+  - dataset_id: canonical_real_controls_v1
+    role: frozen_eval
+    project: 2026 Exoplanet Research
+    source: Catalog-backed TESS outcomes preserved by formal_acceptance_v2
+    allowed_uses:
+      - Offline sample-level regression comparison against accepted confirmed-planet and false-positive outcomes
+      - Release-gate detection of changed formal-acceptance outcomes
+    forbidden_uses:
+      - Model training, calibration, or threshold tuning
+      - Discovery claims or external submission
+      - Substitution for a population-level sensitivity study
+    split_group_keys:
+      - TIC target ID
+    manifest_path: artifacts/manifests/canonical_regression_eval_v1.json
+    dataset_manifest_paths:
+      - metadata/dataset_manifests/canonical_real_controls_v1.json
+    local_artifact_paths: []
+    notes: >
+      Real-only frozen controls remain separate from injected cases. The
+      offline suite compares immutable accepted outcomes and does not claim to
+      re-fetch or reprocess the underlying light curves.
+
+  - dataset_id: canonical_injected_controls_v1
+    role: frozen_eval
+    project: 2026 Exoplanet Research
+    source: Deterministic project-generated TESS-like light curves with exact injection truth
+    allowed_uses:
+      - Detect sample-level transit-search recovery regressions
+      - Compare current recovery metrics with the immutable v1 baseline
+    forbidden_uses:
+      - Supervised model training or calibration
+      - Real-only performance claims
+      - Discovery claims or external submission
+    split_group_keys:
+      - Synthetic control ID and random seed
+    manifest_path: artifacts/manifests/canonical_regression_eval_v1.json
+    dataset_manifest_paths:
+      - metadata/dataset_manifests/canonical_injected_controls_v1.json
+    local_artifact_paths: []
+    notes: >
+      Synthetic-inclusive evaluation is deliberately isolated from the
+      catalog-backed real-only role. Version 1 freezes a 2/2 deep-signal
+      recovery and a 0/2 subthreshold non-recovery control.
+
   - dataset_id: tess_live_search_v1
     role: live_search
     project: 2026 Exoplanet Research

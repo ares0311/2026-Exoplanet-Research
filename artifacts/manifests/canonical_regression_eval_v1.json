@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "suite_id": "canonical_regression_eval_v1",
+  "toolkit_version": "0.2.41",
+  "git_commit": "d2f2c40b5ea46c206053a929534d3bf5f6421c57",
+  "evaluated_at": "2026-07-12T21:42:50.071499+00:00",
+  "baseline_suite_id": null,
+  "dataset_ids": [
+    "canonical_real_controls_v1",
+    "canonical_injected_controls_v1"
+  ],
+  "status": "PASS",
+  "cases": [
+    {
+      "case_id": "confirmed_pi_mensae_c",
+      "dataset_id": "canonical_real_controls_v1",
+      "kind": "confirmed_exoplanet",
+      "source_type": "formal_acceptance",
+      "current": {
+        "source_suite_id": "formal_acceptance_v2",
+        "source_toolkit_version": "0.2.33",
+        "source_git_commit": "bb5c82fa4cae001ea8c00b87f394a1ff46286053",
+        "source_case_id": "confirmed_pi_mensae_c",
+        "passed": true,
+        "observed_count": 3,
+        "matching_count": 1,
+        "period_days": 6.267620729813179,
+        "fpp": 0.4404785001825209
+      },
+      "baseline": null,
+      "deltas": {},
+      "passed": true,
+      "reasons": []
+    },
+    {
+      "case_id": "false_positive_toi_146_01",
+      "dataset_id": "canonical_real_controls_v1",
+      "kind": "known_false_positive",
+      "source_type": "formal_acceptance",
+      "current": {
+        "source_suite_id": "formal_acceptance_v2",
+        "source_toolkit_version": "0.2.33",
+        "source_git_commit": "bb5c82fa4cae001ea8c00b87f394a1ff46286053",
+        "source_case_id": "false_positive_toi_146_01",
+        "passed": true,
+        "observed_count": 0,
+        "matching_count": 0,
+        "period_days": null,
+        "fpp": null
+      },
+      "baseline": null,
+      "deltas": {},
+      "passed": true,
+      "reasons": []
+    },
+    {
+      "case_id": "injected_deep_short_period",
+      "dataset_id": "canonical_injected_controls_v1",
+      "kind": "injected_transit_control",
+      "source_type": "injected_transit",
+      "current": {
+        "seed": 4101,
+        "recovered_count": 2,
+        "trial_count": 2,
+        "recovery_rate": 1.0,
+        "period_days": 3.0012005402431092,
+        "depth_ppm": 9226.056668723762,
+        "snr": 802.4695413500418
+      },
+      "baseline": null,
+      "deltas": {},
+      "passed": true,
+      "reasons": []
+    },
+    {
+      "case_id": "injected_subthreshold_long_period",
+      "dataset_id": "canonical_injected_controls_v1",
+      "kind": "injected_transit_control",
+      "source_type": "injected_transit",
+      "current": {
+        "seed": 4102,
+        "recovered_count": 0,
+        "trial_count": 2,
+        "recovery_rate": 0.0,
+        "period_days": null,
+        "depth_ppm": null,
+        "snr": null
+      },
+      "baseline": null,
+      "deltas": {},
+      "passed": true,
+      "reasons": []
+    }
+  ]
+}

@@ -60,14 +60,22 @@ def test_formal_acceptance_outcome_change_is_failure() -> None:
     assert reasons == ["formal_acceptance_outcome_changed"]
 
 
-def test_full_committed_suite_passes_without_network(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_full_committed_suite_matches_baseline_without_network(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr("Skills.canonical_regression_eval._git_commit", lambda: "test")
     repo_root = Path(__file__).resolve().parent.parent
     config = json.loads(
         (repo_root / "configs/canonical_regression_eval_v1.json").read_text(encoding="utf-8")
     )
-    report = evaluate_suite(config, repo_root=repo_root)
+    baseline = json.loads(
+        (repo_root / "artifacts/manifests/canonical_regression_eval_v1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    report = evaluate_suite(config, repo_root=repo_root, baseline=baseline)
     assert report["status"] == "PASS"
+    assert all(not case["reasons"] for case in report["cases"])
     assert [case["kind"] for case in report["cases"]] == [
         "confirmed_exoplanet",
         "known_false_positive",

@@ -310,3 +310,36 @@ Future work (not requested, recorded for a future agent): a genuine
 same-domain stacking calibration for Kepler-mission `full-ensemble` scoring
 would need a fresh, dedicated held-out Kepler set not already claimed by
 `data_role_registry.yaml`'s training/validation/frozen-eval roles.
+
+## 2026-07-12 Decision: Canonical Regression Evaluation v1
+
+- Date: 2026-07-12
+- Repo: 2026 Exoplanet Research
+- Data: `canonical_real_controls_v1` and `canonical_injected_controls_v1`
+- Role: `frozen_eval` (separate real-only and synthetic-inclusive roles)
+- Acquisition mode: metadata-only reuse plus deterministic local generation
+- Estimated download GB: 0
+- Actual download GB: 0
+- Free space before: 307 GiB
+- Free space after: unchanged within filesystem reporting precision
+- Training priority score: not applicable
+- Live search priority score: not applicable
+- Storage cost penalty: negligible (4.7 KB config plus baseline report)
+- Why this data: closes the Phase 1 canonical-regression-eval gap with one
+  accepted confirmed-planet control, one accepted catalog false-positive
+  control, and two deterministic injected-transit controls.
+- Why not alternatives: no live archive fetch is required; the accepted formal
+  suite is already durable evidence, while the injected controls exercise the
+  current search implementation offline.
+- Why this acquisition mode: the shared Lightkurve cache is above the 80 GB
+  caution threshold, and this regression gate needs no new raw data.
+- Eviction or pin rule: commit and retain the small immutable baseline,
+  configuration, manifests, and registry entries indefinitely.
+- Leakage risks: both roles forbid training, calibration, and threshold tuning;
+  synthetic controls are explicitly separated from the real-only role.
+- Manifest: `metadata/dataset_manifests/canonical_real_controls_v1.json` and
+  `metadata/dataset_manifests/canonical_injected_controls_v1.json`
+- Expected scientific or model-hardening value: every pipeline change can now
+  report sample-level outcome and metric deltas against a versioned baseline.
+- Citations: `docs/astrometrics_coding_agents_master_guide.md` Phase 1.5 and
+  `artifacts/manifests/formal_acceptance_v2.json`.

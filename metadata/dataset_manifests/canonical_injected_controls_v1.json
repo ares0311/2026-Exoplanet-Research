@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "dataset_id": "canonical_injected_controls_v1",
+  "project": "2026 Exoplanet Research",
+  "role": "frozen_eval",
+  "source_name": "Deterministic injected TESS-like transit controls",
+  "source_url": "https://github.com/ares0311/2026-Exoplanet-Research/blob/main/configs/canonical_regression_eval_v1.json",
+  "instrument": "Simulated TESS-like photometry",
+  "target_ids": {
+    "namespace": "SYNTH-CANONICAL",
+    "count": 2,
+    "selection": "One high-signal recovery control and one subthreshold non-recovery control with frozen seeds"
+  },
+  "time_range": {
+    "status": "known",
+    "value": "18-day deterministic simulated baselines"
+  },
+  "cadence": {
+    "status": "known",
+    "value": "10-minute simulated cadence"
+  },
+  "band_or_frequency": "Dimensionless normalized TESS-like white-light flux",
+  "data_product_type": "Deterministic injected-transit regression outcomes",
+  "acquired_at": "2026-07-12T21:42:50Z",
+  "local_path": "artifacts/manifests/canonical_regression_eval_v1.json",
+  "sha256": "6d81384f78e1070b2fe198eb82a4a7f299aea74a83e7ccbd82f19a90ee80337b",
+  "license": "Apache-2.0 project-generated deterministic controls",
+  "label_source": "Exact configured injection truth; not a supervised-training source",
+  "label_confidence": "authoritative",
+  "preprocessing_version": "canonical-regression-eval-v1",
+  "known_caveats": [
+    "Synthetic controls are isolated from the real-only frozen evaluation role",
+    "These controls measure deterministic search regression behavior, not astrophysical population performance"
+  ],
+  "row_count": 2,
+  "group_count": 2
+}
