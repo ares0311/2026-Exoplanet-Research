@@ -383,7 +383,11 @@ support. TIC 355651994_s02 (P=97.1618 d, depth=1.1546%, FPP=0.0663) is
 fails and 17 diagnostics remain missing. Next obtain centroid/contamination and
 per-transit odd/even evidence for that signal. Keep all language at “candidate
 signal”; QLP provenance is below the `tfop_ready` gate and no external
-submission is authorized.
+submission is authorized. A 2026-07-12 storage preflight found the shared
+Lightkurve cache at 85 GB (41 GB Kepler, 37 GB TESS, 7.3 GB HLSP, 302 MB K2),
+above the 80 GB caution threshold. Do not download target-pixel/centroid data
+until cache attribution and cleanup are explicitly approved or the approved
+4 TB external SSD is available.
 
 Historical run006/run008 evidence:
 

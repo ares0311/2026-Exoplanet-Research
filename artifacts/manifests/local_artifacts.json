@@ -1629,6 +1629,24 @@
       "next_action": "Obtain missing centroid/contamination and per-transit evidence for TIC 355651994_s02 before reconsidering its review status; no external action."
     },
     {
+      "path": "~/.lightkurve/cache/mastDownload/",
+      "kind": "shared_lightkurve_archive_cache",
+      "status": "above_80gb_caution_threshold",
+      "git_policy": "external_local_cache_never_commit",
+      "last_known": {
+        "total_gb": 85.0,
+        "kepler_gb": 41.0,
+        "tess_gb": 37.0,
+        "hlsp_gb": 7.3,
+        "k2_gb": 0.302,
+        "review_target_qlp_mb": 6.3,
+        "target_pixel_products_found": false,
+        "verified_on": "2026-07-12"
+      },
+      "validation_gate": "Do not create more substantial local archive data while shared project-managed cache is at or above the 80 GB caution threshold without attribution audit and explicit cleanup/storage approval.",
+      "next_action": "Run a read-only cache attribution inventory; request explicit approval before deleting cache data or downloading target-pixel products, or wait for the approved 4 TB external SSD."
+    },
+    {
       "path": "reports/",
       "kind": "runtime_report_export",
       "status": "runtime_only",
