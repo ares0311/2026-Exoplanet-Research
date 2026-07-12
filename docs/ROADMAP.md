@@ -50,10 +50,12 @@ by itself satisfy a master-guide evidence requirement.
    controls, reruns deterministic deep/subthreshold injected-transit controls,
    and reports per-case deltas against the committed v1 baseline.
 4. **Phase 2 — production sensitivity evidence:** generic BLS transit
-   injection-recovery tooling exists, but committed recovery curves and
-   sensitivity context tied to the production pipeline and
-   `benchmark_cnn_v1` promotion package do not. Tooling-complete is not
-   evidence-complete.
+   injection-recovery tooling exists, and version 0.2.42 adds a bounded,
+   cache-only real-background runner tied to the production pipeline,
+   frozen-eval dataset ID, and `benchmark_cnn_v1` promotion package. A
+   36-trial pre-merge smoke completed with zero failures in 7.1 seconds using
+   six workers. The durable production run and committed recovery curves are
+   still required; tooling-complete is not evidence-complete.
 5. **Phase 2 — calibrated candidate context:** extend production outputs with
    calibration dataset IDs, score quantiles, threshold versions, and empirical
    false-discovery context after the canonical eval and sensitivity sets exist.

@@ -207,6 +207,28 @@ class TestRunPipeline:
             "exptime": "long",
         }
 
+    def test_search_grid_options_forwarded(self) -> None:
+        lc = _mock_lc()
+        with patch("exo_toolkit.cli.search_lightcurve", return_value=[]) as search:
+            run_pipeline(
+                "KIC 1",
+                "Kepler",
+                period_min=0.75,
+                period_max=20.0,
+                duration_min_hours=1.0,
+                duration_max_hours=8.0,
+                n_durations=7,
+                fetch_fn=self._patched_fetch(lc),
+                clean_fn=self._patched_clean(lc),
+            )
+
+        kwargs = search.call_args.kwargs
+        assert kwargs["period_min"] == 0.75
+        assert kwargs["period_max"] == 20.0
+        assert kwargs["duration_min_hours"] == 1.0
+        assert kwargs["duration_max_hours"] == 8.0
+        assert kwargs["n_durations"] == 7
+
     def test_one_row_per_signal(self) -> None:
         lc = _mock_lc()
         signals = [_make_signal(3.0), _make_signal(7.0)]
@@ -953,7 +975,10 @@ class TestScorerOption:
                 return_value="planet_hunters_discussion",
             ),
             patch("exo_toolkit.ml.xgboost_scorer.XGBoostScorer.load", return_value=mock_xgb),
-            patch("exo_toolkit.ml.cnn_scorer.CnnScorer.from_checkpoint", return_value=mock_cnn),
+            patch(
+                "exo_toolkit.ml.isolated_cnn_scorer.IsolatedCnnScorer.from_checkpoint",
+                return_value=mock_cnn,
+            ),
         ):
             result = run_pipeline(
                 "TIC 0",
@@ -1000,7 +1025,10 @@ class TestScorerOption:
                 return_value="planet_hunters_discussion",
             ),
             patch("exo_toolkit.ml.xgboost_scorer.XGBoostScorer.load", return_value=mock_xgb),
-            patch("exo_toolkit.ml.cnn_scorer.CnnScorer.from_checkpoint", return_value=mock_cnn),
+            patch(
+                "exo_toolkit.ml.isolated_cnn_scorer.IsolatedCnnScorer.from_checkpoint",
+                return_value=mock_cnn,
+            ),
         ):
             result = run_pipeline(
                 "TIC 0",
