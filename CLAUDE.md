@@ -35,6 +35,10 @@ baseline (AUC 0.823495; top-100 yield 72% vs 6%). Do not repeat this compact
 architecture unchanged. Broad unlabeled Kepler/TESS data, stellar-variability
 labels, injection-recovery comparison, and external foundation-model baselines
 remain open. See `docs/ROADMAP.md` and `docs/REPRESENTATION_BENCHMARK.md`.
+Version 0.2.51 adds a metadata-only builder for the next data gate: it inventories
+existing cached TESS SPOC light curves, excludes every local labeled and frozen
+live-search TIC, records exact MAST URIs/cache-relative paths/sizes, and never
+opens FITS payloads or downloads data. The merged-code inventory run is pending.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
@@ -98,8 +102,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 134 top-level test files. Local validation on 2026-07-12 passed with 2,703 default tests and 2 `integration_live` tests deselected.
-**Skills:** 114 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
+**Current test surface:** 135 top-level test files. Local validation on 2026-07-12 passed with 2,705 default tests and 2 `integration_live` tests deselected.
+**Skills:** 115 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
 
 ---
 

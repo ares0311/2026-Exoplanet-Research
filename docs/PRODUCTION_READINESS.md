@@ -5,8 +5,8 @@ catalog ephemeris for pi Mensae c was recovered within 0.005% with ensemble
 FPP 0.4405, while the TOI-146.01 false-positive control produced no signal.
 No Tier 1 gaps remain open.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
-Branch: `main` (86 production-critical Skills; non-production fluff removed)
-Test baseline: 2,703 default tests passing; 2 `integration_live` tests excluded by
+Branch: `main` (87 production-critical Skills; non-production fluff removed)
+Test baseline: 2,705 default tests passing; 2 `integration_live` tests excluded by
 the configured marker expression (2026-07-12)
 
 ---
@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.50 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.51 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -329,6 +329,15 @@ the representation contains useful ranking signal but not enough to replace
 the CNN. The compact architecture is rejected unchanged. Phase 3 remains open
 for materially broader unlabeled data and the missing variability, injection,
 and foundation-model comparisons.
+0.2.51 adds a metadata-only TESS cache inventory builder for the next Phase 3
+data gate. Read-only preflight found the 41 GB Kepler cache has 6,515 unique
+KICs but only 11 outside the labeled master corpus, so it is not a broad
+unlabeled source. The 37 GB TESS SPOC cache has 14,728 product directories and
+3,033 unique TICs, 2,797 outside all local labeled TESS corpora before frozen
+live-role exclusion. The builder records exact MAST URIs, cache-relative paths,
+sectors, and sizes; excludes labeled/live TICs; prints progress/ETA; writes a
+Run Report; and never opens FITS payloads or downloads data. Its merged-code
+inventory run remains pending.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of
@@ -528,8 +537,8 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Bounded short-period real-background production sensitivity v1 | ✅ 23/36 recovered; zero failures |
 | Expanded Q1-Q4 production sensitivity v2 | ✅ 8/16 recovered; zero failures |
 | Empirical full-ensemble candidate context | ✅ 588-row K2 reference; no invented threshold |
-| 86 production-critical Skills/ | ✅ |
-| 2,703 default tests, ruff clean, mypy clean | ✅ |
+| 87 production-critical Skills/ | ✅ |
+| 2,705 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -538,7 +547,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 
 Run these before any live deployment or public announcement:
 
-- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-12: 2,703 passed; 2 `integration_live` tests excluded by configuration)
+- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-12: 2,705 passed; 2 `integration_live` tests excluded by configuration)
 - [x] `.venv/bin/ruff check .` — no lint errors (2026-07-12: clean)
 - [x] `.venv/bin/python -m mypy src` — no type errors (2026-07-12: clean, 33 source files)
 - [x] `exo background-run-once --dry-run` — no config errors (2026-07-10: installed entry point exercised successfully; dry run wrote no ledger/outcome data)
