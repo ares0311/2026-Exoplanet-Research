@@ -79,16 +79,19 @@ by itself satisfy a master-guide evidence requirement.
    Version 0.2.48 commits `models/candidate_context_v1.json`, built from merged
    code over all 588 reference rows with exact source hashes and a successful
    Run Report. No probability calibration or threshold is claimed.
-6. **Phase 3 representation benchmark (PILOT TOOLING READY; EVIDENCE RUN
-   PENDING):** version 0.2.49 adds a bounded masked-reconstruction Transformer
+6. **Phase 3 representation benchmark (BOUNDED PILOT COMPLETE; CNN GATE NOT
+   MET):** version 0.2.49 adds a bounded masked-reconstruction Transformer
    pilot over the existing predefined KIC-grouped Kepler splits. Labels are
    hidden during training-only pretraining; the encoder is frozen before a
    linear probe; validation selects states; and the frozen test split opens
    once against a period/duration/flux-summary linear baseline and
-   `benchmark_cnn_v1`. The merged-code result is still required. Even a passing
-   pilot does not close Phase 3: broad unlabeled Kepler/TESS data, stellar-
-   variability labels, injection-recovery comparison, and external foundation-
-   model baselines remain missing.
+   `benchmark_cnn_v1`. Version 0.2.50 commits the merged-code MPS result:
+   embedding test AUC 0.832630/F1 0.635135/top-100 yield 72%; tabular test AUC
+   0.823495/F1 0.274336/top-100 yield 6%; CNN AUC 0.957211/F1 0.834688. The
+   compact pilot is rejected as a CNN replacement and must not be repeated
+   unchanged. Phase 3 remains active for a materially different experiment
+   backed by broad unlabeled Kepler/TESS data, stellar-variability labels,
+   injection-recovery comparison, and external foundation-model baselines.
 
 ## Milestone 1 — Scoring and Classification Engine ✓ COMPLETE
 

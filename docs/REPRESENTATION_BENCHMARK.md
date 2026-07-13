@@ -41,3 +41,23 @@ The training loop is a single stateful optimization and is not shardable.
 Batching uses the selected accelerator; `device=auto` prefers MPS, then CUDA,
 then CPU. Every epoch prints loss, learning rate, patience state, and ETA. A
 successful run writes a structured result plus a Run Report.
+
+## Pilot v1 measured result
+
+The merged-code run completed on 2026-07-12 in 33.5 seconds on Apple MPS. It
+processed train/validation/test counts 10,800/2,393/2,456 and selected epoch 11
+with validation masked MSE 125.091329.
+
+| Model | Test AUC | F1 at 0.5 | Top-100 positive yield |
+|---|---:|---:|---:|
+| Frozen embedding + linear probe | 0.832630 | 0.635135 | 72% |
+| Period/duration/flux-summary probe | 0.823495 | 0.274336 | 6% |
+| `benchmark_cnn_v1` | 0.957211 | 0.834688 | not measured in this pilot |
+
+Outcome: `does_not_beat_cnn`. The compact masked Transformer is rejected as a
+CNN replacement and must not be tuned against or rerun on this frozen test
+split. Its ranking improvement over the small tabular baseline supports a
+materially different follow-up only after satisfying the missing Phase 3 data
+contract. Durable evidence is
+`artifacts/manifests/representation_pilot_v1.json`; the local checkpoint is
+ignored and retained only for reproducibility.

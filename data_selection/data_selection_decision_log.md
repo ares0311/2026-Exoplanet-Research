@@ -25,6 +25,11 @@ result manifest and Run Report; safely below the 100 GB project ceiling.
 **Next action:** Merge the benchmark tooling, run it from merged `main`, and
 commit the measured outcome separately without changing the gate after seeing
 the frozen-test result.
+**Measured outcome:** Merged-code MPS run completed in 33.5 seconds. Embedding
+test AUC 0.832630 did not beat `benchmark_cnn_v1` AUC 0.957211. The frozen test
+is now consumed for pilot v1 and must not be used to tune or rerun this compact
+architecture. Retain the 72% top-100 yield versus the tabular baseline's 6% as
+motivation only for a materially different, newly versioned data/model plan.
 
 ## 2026-07-12 — K2 empirical candidate-score context v1
 

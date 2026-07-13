@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "last_updated": "2026-07-12",
-  "production_gap": "Tier 1 and Tier 2 deployment gates are closed; tess_live_search_v1 review classifies two low-FPP signals as likely false positives and one as plausible but weak pending centroid/contamination and per-transit diagnostics",
+  "production_gap": "Tier 1 and Tier 2 deployment gates are closed; tess_live_search_v1 retains one plausible but weak signal with evidence-limited follow-up complete; the Phase 3 compact masked-representation pilot did not beat benchmark_cnn_v1 and broader unlabeled Kepler/TESS, variability, injection, and foundation-model evidence remains open",
   "policy": {
     "standard_operator_cadence": "git add .",
     "git_add_dot_must_be_safe": true,
@@ -1680,6 +1680,32 @@
       },
       "validation_gate": "Local runtime hash must match the committed follow-up summary; result must retain exact product provenance and diagnostic-only guardrail.",
       "next_action": "Retain locally; use the committed follow-up summary as GitHub-visible durable truth."
+    },
+    {
+      "path": "checkpoints/representation_pilot_v1/",
+      "kind": "self_supervised_representation_checkpoint",
+      "status": "rejected_as_cnn_replacement",
+      "git_policy": "ignored",
+      "last_known": {
+        "checkpoint": "checkpoints/representation_pilot_v1/best.pt",
+        "checkpoint_size_kb": 100,
+        "checkpoint_sha256": "a1c486a546318134e978160421d48717c01e64f4258eef5ec4f9d9be780ef0d5",
+        "result_manifest": "artifacts/manifests/representation_pilot_v1.json",
+        "result_manifest_sha256": "74835fc90b6e94ad5cbb352a4efae00cb36042066f5035b5fe7ec7b093807fc4",
+        "run_report_commit": "9576098",
+        "resolved_device": "mps",
+        "elapsed_seconds": 33.5,
+        "best_epoch": 11,
+        "embedding_test_auc": 0.8326302786115131,
+        "embedding_test_f1": 0.6351351351351351,
+        "embedding_top_100_positive_fraction": 0.72,
+        "tabular_test_auc": 0.8234949340273633,
+        "tabular_top_100_positive_fraction": 0.06,
+        "benchmark_cnn_v1_test_auc": 0.957211,
+        "verified_on": "2026-07-12"
+      },
+      "validation_gate": "Embedding test AUC must strictly exceed benchmark_cnn_v1 AUC 0.957211; measured 0.832630, so the gate failed.",
+      "next_action": "Retain for reproducibility only; do not promote, tune on the consumed frozen test, or rerun this compact architecture unchanged."
     },
     {
       "path": "~/.lightkurve/cache/mastDownload/",

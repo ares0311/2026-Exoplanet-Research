@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.49 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.50 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -318,6 +318,17 @@ uses accelerator-first `device=auto`, per-epoch progress/ETA, an ignored
 checkpoint, exact hashes, and a Run Report. Tooling is complete; the merged-
 code evidence run remains pending, and the full Phase 3 data/evaluation
 requirements remain explicitly open.
+0.2.50 commits the merged-code Phase 3 pilot result at
+`artifacts/manifests/representation_pilot_v1.json` (SHA-256
+`74835fc9…807fc4`). The 33.5-second MPS run processed all 15,649 predefined
+rows and selected masked-reconstruction epoch 11. The frozen embedding probe
+did not beat the promoted CNN: test AUC 0.832630 and F1 0.635135 versus CNN AUC
+0.957211 and F1 0.834688. It did exceed the deliberately small tabular baseline
+(AUC 0.823495) and raised top-100 positive yield from 6% to 72%, evidence that
+the representation contains useful ranking signal but not enough to replace
+the CNN. The compact architecture is rejected unchanged. Phase 3 remains open
+for materially broader unlabeled data and the missing variability, injection,
+and foundation-model comparisons.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of
