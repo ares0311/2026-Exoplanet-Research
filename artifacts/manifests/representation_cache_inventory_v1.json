@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "inventory_id": "tess_cached_unlabeled_representation_v1",
+  "created_at_utc": "2026-07-13T01:35:22.182193+00:00",
+  "acquisition_mode": "metadata_only_existing_cache",
+  "cache_root": "~/.lightkurve/cache/mastDownload/TESS",
+  "cache_product_directories": 14728,
+  "cache_unique_tics": 3033,
+  "eligible_product_count": 11960,
+  "eligible_unique_tics": 2790,
+  "eligible_bytes": 29797620480,
+  "eligible_gb_decimal": 29.79762048,
+  "excluded_local_labeled_tics": 236,
+  "excluded_live_search_tics": 0,
+  "unparsed_directories": 0,
+  "rows_path": "metadata/representation_tess_unlabeled_cache_v1.jsonl",
+  "rows_sha256": "38a869666269367480a1aa9d2a29d76a86fb2ec6d2259a23635ad44f257c155a",
+  "label_status": "unlabeled_relative_to_local_corpora_only",
+  "role": "training",
+  "allowed_use": "self-supervised pretraining with no label-derived objective",
+  "forbidden_uses": [
+    "supervised target labels",
+    "validation, calibration, or frozen evaluation",
+    "candidate discovery or external submission"
+  ],
+  "limitations": [
+    "Inventory reflects mutable local cache state at creation time.",
+    "Unlabeled means absent from the listed local labeled corpora, not astrophysically label-free.",
+    "No FITS payloads or headers were opened and raw products were not hashed.",
+    "No new data were downloaded and no derived light-curve arrays were generated."
+  ]
+}

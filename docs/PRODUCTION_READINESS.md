@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.51 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.52 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -336,8 +336,16 @@ unlabeled source. The 37 GB TESS SPOC cache has 14,728 product directories and
 3,033 unique TICs, 2,797 outside all local labeled TESS corpora before frozen
 live-role exclusion. The builder records exact MAST URIs, cache-relative paths,
 sectors, and sizes; excludes labeled/live TICs; prints progress/ETA; writes a
-Run Report; and never opens FITS payloads or downloads data. Its merged-code
-inventory run remains pending.
+Run Report; and never opens FITS payloads or downloads data.
+0.2.52 commits that merged-code inventory and registers it as
+`tess_cached_unlabeled_representation_v1`. The 2.6-second metadata-only run
+scanned 14,728 cache directories and selected 11,960 exact SPOC light-curve
+products across 2,790 TICs and 84 sectors, totaling 29.79762048 GB already on
+disk. It excluded 236 locally labeled TICs; none of the 18 frozen live-search
+TICs overlapped this SPOC cache. The 6.1 MB row inventory has SHA-256
+`38a86966…c155a`; Run Report commit `2016811`. The source is training-only and
+does not close Phase 3. Derived-array creation remains gated on a bounded
+streaming/preprocessing size and throughput benchmark.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of

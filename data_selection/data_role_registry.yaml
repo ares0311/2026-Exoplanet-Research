@@ -7,6 +7,32 @@ policy_sources:
   - docs/astrometrics_external_and_cloud_storage_policy.md
 
 datasets:
+  - dataset_id: tess_cached_unlabeled_representation_v1
+    role: training
+    project: 2026 Exoplanet Research
+    source: Existing NASA MAST TESS SPOC light-curve cache, metadata-only inventory
+    allowed_uses:
+      - Self-supervised representation pretraining with no label-derived objective
+      - Estimate preprocessing/runtime/storage requirements before deriving any arrays
+    forbidden_uses:
+      - Supervised label fitting
+      - Validation, calibration, threshold tuning, or frozen evaluation
+      - Candidate discovery, review, or external submission
+    split_group_keys:
+      - TIC target ID
+    manifest_path: artifacts/manifests/representation_cache_inventory_v1.json
+    dataset_manifest_paths:
+      - metadata/dataset_manifests/tess_cached_unlabeled_representation_v1.json
+    local_artifact_paths:
+      - ~/.lightkurve/cache/mastDownload/TESS
+    notes: >
+      Merged-code metadata-only inventory completed 2026-07-12: 11,960 SPOC
+      light-curve products across 2,790 TICs, 29.79762048 GB already cached.
+      Every TIC in the listed local labeled corpora was excluded; none of the
+      frozen tess_live_search_v1 TICs overlapped the SPOC cache. Unlabeled is a
+      local-role statement, not an astrophysical guarantee. No FITS payloads
+      were opened and no data were downloaded.
+
   - dataset_id: canonical_real_controls_v1
     role: frozen_eval
     project: 2026 Exoplanet Research
