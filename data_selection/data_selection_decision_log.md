@@ -1,5 +1,28 @@
 # Data Selection Decision Log
 
+## 2026-07-12 — Cached TESS unlabeled representation source v1
+
+**Repo:** 2026 Exoplanet Research
+**Data:** 11,960 existing cached TESS SPOC light-curve products across 2,790 TICs
+and 84 represented sectors; 29.79762048 GB already on disk.
+**Role:** Training only, for self-supervised objectives with no labels.
+**Acquisition:** Metadata-only inventory; zero downloads and zero FITS reads.
+**Decision:** Register the exact cache-relative product paths and
+`mast:TESS/product/...` URIs after excluding every TIC in local labeled corpora
+and the frozen `tess_live_search_v1` role.
+**Leakage controls:** Group by TIC; forbid validation, calibration, frozen
+evaluation, candidate discovery, and supervised label use. "Unlabeled" means
+absent from the project's listed local labeled corpora, not astrophysically
+label-free.
+**Storage:** The committed row inventory is 6.1 MB. Raw products already occupy
+29.79762048 GB inside the existing 37 GB TESS cache; no derived arrays are
+authorized yet while the shared archive cache remains above 80 GB.
+**Evidence:** Row SHA-256 `38a869666269367480a1aa9d2a29d76a86fb2ec6d2259a23635ad44f257c155a`;
+summary SHA-256 `2a1b876f8983d9493a6dd4831406af623a754db6e024029793527d60234ce0e3`;
+Run Report commit `2016811`.
+**Next action:** Design a streaming or bounded-sample preprocessing benchmark
+that estimates derived size and throughput before creating any training arrays.
+
 ## 2026-07-12 — Kepler masked-representation pilot v1
 
 **Repo:** 2026 Exoplanet Research

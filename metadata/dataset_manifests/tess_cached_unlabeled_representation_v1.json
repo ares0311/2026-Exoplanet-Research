@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "dataset_id": "tess_cached_unlabeled_representation_v1",
+  "project": "2026 Exoplanet Research",
+  "role": "training",
+  "source_name": "NASA MAST cached TESS SPOC light-curve products",
+  "source_url": "https://archive.stsci.edu/missions-and-data/tess",
+  "instrument": "TESS photometer",
+  "target_ids": {
+    "namespace": "TIC",
+    "count": 2790,
+    "selection": "Existing cached SPOC light-curve products after excluding every TIC present in local labeled corpora and the frozen tess_live_search_v1 role"
+  },
+  "time_range": {
+    "status": "known",
+    "value": "84 represented TESS sectors spanning sector numbers 1-98"
+  },
+  "cadence": {
+    "status": "known",
+    "value": "11,283 standard SPOC light-curve products and 677 fast-cadence SPOC light-curve products"
+  },
+  "band_or_frequency": "TESS optical bandpass",
+  "data_product_type": "Metadata-only JSONL inventory of cached SPOC light-curve FITS products",
+  "acquired_at": "2026-07-13T01:35:22.182193Z",
+  "local_path": "metadata/representation_tess_unlabeled_cache_v1.jsonl",
+  "sha256": "38a869666269367480a1aa9d2a29d76a86fb2ec6d2259a23635ad44f257c155a",
+  "license": "NASA/STScI public archive data; acknowledge the TESS mission and MAST",
+  "label_source": "No labels assigned; TICs present in local labeled corpora were excluded",
+  "label_confidence": "unlabeled",
+  "preprocessing_version": "representation-cache-inventory-v1-metadata-only",
+  "known_caveats": [
+    "Unlabeled means absent from the project's listed local labeled corpora, not astrophysically label-free",
+    "Inventory reflects mutable local cache state at creation time",
+    "No FITS payloads or headers were opened and raw products were not hashed",
+    "The 29.79762048 GB raw products already existed outside the repository; no data were downloaded",
+    "This source is training-only and cannot be used for validation, calibration, frozen evaluation, or discovery claims"
+  ],
+  "row_count": 11960,
+  "group_count": 2790
+}

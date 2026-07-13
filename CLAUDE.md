@@ -35,10 +35,12 @@ baseline (AUC 0.823495; top-100 yield 72% vs 6%). Do not repeat this compact
 architecture unchanged. Broad unlabeled Kepler/TESS data, stellar-variability
 labels, injection-recovery comparison, and external foundation-model baselines
 remain open. See `docs/ROADMAP.md` and `docs/REPRESENTATION_BENCHMARK.md`.
-Version 0.2.51 adds a metadata-only builder for the next data gate: it inventories
+Version 0.2.52 records the completed metadata-only next-data gate: it inventories
 existing cached TESS SPOC light curves, excludes every local labeled and frozen
 live-search TIC, records exact MAST URIs/cache-relative paths/sizes, and never
-opens FITS payloads or downloads data. The merged-code inventory run is pending.
+opens FITS payloads or downloads data. The committed inventory contains 11,960
+products across 2,790 TICs (29.79762048 GB already cached); no derived arrays
+are authorized until a bounded preprocessing size/throughput benchmark exists.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.

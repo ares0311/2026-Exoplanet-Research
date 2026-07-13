@@ -95,9 +95,13 @@ by itself satisfy a master-guide evidence requirement.
    Version 0.2.51 adds the cache-only source-inventory builder needed before any
    follow-up: the 41 GB Kepler cache contains only 11 KICs outside the labeled
    master corpus, while the 37 GB TESS cache contains 2,797 TICs outside local
-   labeled corpora before live-role exclusion. The merged-code metadata-only
-   inventory is pending; no new archive download is authorized while the shared
-   cache remains above the 80 GB caution threshold.
+   labeled corpora before live-role exclusion. No new archive download is
+   authorized while the shared cache remains above the 80 GB caution threshold.
+   Version 0.2.52 commits the merged-code result: 11,960 exact SPOC products
+   across 2,790 eligible TICs and 84 sectors,
+   totaling 29.79762048 GB already cached. The dataset is registered training-
+   only. Next, benchmark streaming/bounded-sample preprocessing size and
+   throughput before authorizing any derived arrays or new model training.
 
 ## Milestone 1 — Scoring and Classification Engine ✓ COMPLETE
 
