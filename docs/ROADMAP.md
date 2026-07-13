@@ -49,8 +49,8 @@ by itself satisfy a master-guide evidence requirement.
    frozen-evaluation roles. It preserves the accepted pi Mensae c and TOI-146.01
    controls, reruns deterministic deep/subthreshold injected-transit controls,
    and reports per-case deltas against the committed v1 baseline.
-4. **Phase 2 — production sensitivity evidence (BOUNDED V1 COMPLETE; COVERAGE
-   EXPANSION OPEN):** generic BLS transit
+4. **Phase 2 — production sensitivity evidence (BOUNDED V1 + EXPANDED V2
+   COMPLETE):** generic BLS transit
    injection-recovery tooling exists, and version 0.2.42 adds a bounded,
    cache-only real-background runner tied to the production pipeline,
    frozen-eval dataset ID, and `benchmark_cnn_v1` promotion package. A
@@ -61,13 +61,17 @@ by itself satisfy a master-guide evidence requirement.
    at `artifacts/manifests/production_sensitivity_v1.json`: 23/36 recoveries,
    zero failures, and curves by period, depth, duration, and real-background
    label. This closes the bounded short-period evidence deliverable, not general
-   completeness. Next expand to the master-guide's TTV, single-transit, gap,
-   stellar-variability, multi-quarter, and longer-period cases. The v1 depth
-   bins are non-monotonic under a 12-sample/bin, strongest-peak-only search and
-   must not be interpreted as a survey completeness law.
-5. **Phase 2 — calibrated candidate context:** extend production outputs with
-   calibration dataset IDs, score quantiles, threshold versions, and empirical
-   false-discovery context after the canonical eval and sensitivity sets exist.
+   completeness. The v1 depth bins are non-monotonic under a 12-sample/bin,
+   strongest-peak-only search and must not be interpreted as a survey
+   completeness law.
+   Version 0.2.46 commits the merged-code v2 artifact: 8/16 recovered in 7.98
+   seconds with zero failures. Moderate TTV and both gap scenarios recovered;
+   strong TTV, 90-day periodic, single-transit, and low-depth variability cases
+   did not. These are measured boundary cases, not favorable assumptions.
+5. **Phase 2 — calibrated candidate context (ACTIVE):** extend production
+   outputs with calibration dataset IDs, score quantiles, threshold versions,
+   and empirical false-discovery context now that canonical eval and sensitivity
+   sets exist.
 6. **Phase 3 only after 1–5:** benchmark self-supervised light-curve embeddings
    against BLS/tabular/`benchmark_cnn_v1`; do not start frontier representation
    work while Phase 1–2 evidence gaps remain.
@@ -129,13 +133,14 @@ by itself satisfy a master-guide evidence requirement.
 - [x] Produce and commit bounded production-pipeline recovery curves on real-background
   canonical cases, with manifest IDs and explicit linkage to the frozen
   `benchmark_cnn_v1` evidence package (`production_sensitivity_v1`)
-- [ ] Expand sensitivity coverage to TTV, single-transit, data-gap,
+- [x] Expand bounded sensitivity coverage to TTV, single-transit, data-gap,
    stellar-variability, multi-quarter, and longer-period cases before making a
   general completeness claim. Version 0.2.45 adds the explicit 16-trial v2
   scenario contract across two Q1-Q4 backgrounds, including event-overlap
   recovery semantics for single transits and cadence accounting for gaps. A
-  cache-only pre-merge smoke completed in 17.6 seconds with 8/16 recoveries and
-  zero failures; durable merged-code v2 evidence remains pending.
+  cache-only merged-code run completed in 7.98 seconds with 8/16 recoveries and
+  zero failures; durable evidence is `production_sensitivity_v2.json`. This
+  checks scenario coverage, not general survey completeness.
 
 ---
 
