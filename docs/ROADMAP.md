@@ -92,6 +92,12 @@ by itself satisfy a master-guide evidence requirement.
    unchanged. Phase 3 remains active for a materially different experiment
    backed by broad unlabeled Kepler/TESS data, stellar-variability labels,
    injection-recovery comparison, and external foundation-model baselines.
+   Version 0.2.51 adds the cache-only source-inventory builder needed before any
+   follow-up: the 41 GB Kepler cache contains only 11 KICs outside the labeled
+   master corpus, while the 37 GB TESS cache contains 2,797 TICs outside local
+   labeled corpora before live-role exclusion. The merged-code metadata-only
+   inventory is pending; no new archive download is authorized while the shared
+   cache remains above the 80 GB caution threshold.
 
 ## Milestone 1 — Scoring and Classification Engine ✓ COMPLETE
 
