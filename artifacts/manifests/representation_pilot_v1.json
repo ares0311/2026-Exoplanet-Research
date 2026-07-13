@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "benchmark_id": "kepler_masked_embedding_pilot_v1",
+  "status": "does_not_beat_cnn",
+  "created_at_utc": "2026-07-13T01:07:49.653032+00:00",
+  "dataset_ids": {
+    "pretrain": "t1_1_kepler_master_train",
+    "validation": "t1_1_kepler_master_validation",
+    "frozen_eval": "t1_1_kepler_master_frozen_eval"
+  },
+  "corpus_path": "data/processed/t1_1_kepler_master_combined.jsonl",
+  "corpus_sha256": "2bd3eb1e928942f3f4059fdf2de037ca2ac32fab05c74d41a24d227f06600eb2",
+  "config_path": "configs/representation_pilot_v1.json",
+  "config_sha256": "9ecaa4d5b966f8bcbedda96c2cb8afdeddd62f6c05df7d47317244858cb86c15",
+  "checkpoint_path": "checkpoints/representation_pilot_v1/best.pt",
+  "checkpoint_sha256": "a1c486a546318134e978160421d48717c01e64f4258eef5ec4f9d9be780ef0d5",
+  "resolved_device": "mps",
+  "split_counts": {
+    "train": 10800,
+    "val": 2393,
+    "test": 2456
+  },
+  "pretraining": {
+    "best_epoch": 11,
+    "best_val_masked_mse": 125.09132857699143
+  },
+  "embedding_linear_probe": {
+    "validation_auc": 0.8243459459459459,
+    "probe_epochs": 25,
+    "test": {
+      "auc": 0.8326302786115131,
+      "f1_at_0_5": 0.6351351351351351,
+      "top_k": 100,
+      "top_k_positive_fraction": 0.72
+    }
+  },
+  "tabular_linear_probe": {
+    "features": [
+      "log_period",
+      "log_duration",
+      "flux_mean",
+      "flux_std",
+      "flux_p01",
+      "flux_p05",
+      "flux_min"
+    ],
+    "validation_auc": 0.8210028314028314,
+    "probe_epochs": 44,
+    "test": {
+      "auc": 0.8234949340273633,
+      "f1_at_0_5": 0.27433628318584075,
+      "top_k": 100,
+      "top_k_positive_fraction": 0.06
+    }
+  },
+  "benchmark_cnn_v1": {
+    "test_auc": 0.957211,
+    "test_f1": 0.834688
+  },
+  "gate": "embedding test AUC must strictly exceed benchmark_cnn_v1 test AUC",
+  "limitations": [
+    "Pilot uses labeled Kepler snippets as unlabeled inputs; it is not broad unlabeled Kepler/TESS pretraining.",
+    "No stellar-variability label benchmark is available in this corpus.",
+    "No embedding-based injection-recovery comparison is included.",
+    "The test split is opened once for this versioned pilot and must not be used for tuning.",
+    "This pilot cannot promote or replace benchmark_cnn_v1 regardless of outcome."
+  ]
+}

@@ -28,11 +28,13 @@ commits the Q1-Q4 v2 run (8/16 recovered, zero failures) for TTV,
 single-transit, deterministic gaps, injected stellar variability, and 90-day
 cases. Version 0.2.48 commits the fail-closed empirical candidate-context
 reference from the held-out K2 calibration role. Phase 1 and bounded Phase 2
-are complete. Version 0.2.49 adds the leakage-safe Phase 3 masked-representation
-pilot contract against a BLS-metadata/statistical linear baseline and frozen
-`benchmark_cnn_v1`; the merged-code evidence run is still required and the
-full Phase 3 data requirements remain open. See `docs/ROADMAP.md` and
-`docs/REPRESENTATION_BENCHMARK.md`.
+are complete. Version 0.2.50 commits the leakage-safe Phase 3 masked-
+representation pilot: its embedding probe did not beat `benchmark_cnn_v1`
+(test AUC 0.832630 vs 0.957211), although it exceeded the small tabular
+baseline (AUC 0.823495; top-100 yield 72% vs 6%). Do not repeat this compact
+architecture unchanged. Broad unlabeled Kepler/TESS data, stellar-variability
+labels, injection-recovery comparison, and external foundation-model baselines
+remain open. See `docs/ROADMAP.md` and `docs/REPRESENTATION_BENCHMARK.md`.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
