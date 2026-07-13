@@ -130,8 +130,12 @@ by itself satisfy a master-guide evidence requirement.
   canonical cases, with manifest IDs and explicit linkage to the frozen
   `benchmark_cnn_v1` evidence package (`production_sensitivity_v1`)
 - [ ] Expand sensitivity coverage to TTV, single-transit, data-gap,
-  stellar-variability, multi-quarter, and longer-period cases before making a
-  general completeness claim
+   stellar-variability, multi-quarter, and longer-period cases before making a
+  general completeness claim. Version 0.2.45 adds the explicit 16-trial v2
+  scenario contract across two Q1-Q4 backgrounds, including event-overlap
+  recovery semantics for single transits and cadence accounting for gaps. A
+  cache-only pre-merge smoke completed in 17.6 seconds with 8/16 recoveries and
+  zero failures; durable merged-code v2 evidence remains pending.
 
 ---
 
