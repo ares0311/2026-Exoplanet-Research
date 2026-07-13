@@ -8,7 +8,9 @@ import pytest
 from Skills.production_sensitivity import (
     build_trials,
     inject_flux,
+    inject_trial_arrays,
     match_recovery,
+    match_single_event_recovery,
     scoped_output_path,
     select_quarter_products,
     summarize_curves,
@@ -77,6 +79,8 @@ def test_summarize_curves_preserves_sample_counts_and_model_context() -> None:
             "depth_ppm": 500.0,
             "duration_hours": 2.0,
             "background_label": "negative",
+            "scenario_id": "periodic_grid",
+            "injection_type": "periodic",
             "recovered": True,
             "cnn_planet_probability": 0.8,
             "full_ensemble_planet_probability": 0.7,
@@ -86,6 +90,8 @@ def test_summarize_curves_preserves_sample_counts_and_model_context() -> None:
             "depth_ppm": 2000.0,
             "duration_hours": 2.0,
             "background_label": "negative",
+            "scenario_id": "periodic_grid",
+            "injection_type": "periodic",
             "recovered": False,
             "cnn_planet_probability": None,
             "full_ensemble_planet_probability": None,
@@ -115,6 +121,130 @@ def test_quarter_filter_keeps_provenance_paths_aligned() -> None:
     )
     assert selected_paths == [Path("q1.fits")]
     assert [curve.meta["QUARTER"] for curve in selected_curves] == [1]
+
+
+def test_explicit_scenarios_expand_across_backgrounds() -> None:
+    config = {
+        "backgrounds": [
+            {"target_id": "KIC 1", "background_label": "negative"},
+            {"target_id": "KIC 2", "background_label": "positive"},
+        ],
+        "injection_scenarios": [
+            {
+                "scenario_id": "ttv",
+                "injection_type": "ttv",
+                "period_days": 10.0,
+                "depth_ppm": 2000.0,
+                "duration_hours": 4.0,
+                "ttv_amplitude_hours": 6.0,
+            }
+        ],
+    }
+    trials = build_trials(config)
+    assert len(trials) == 2
+    assert all(trial.scenario_id == "ttv" for trial in trials)
+    assert all(trial.ttv_amplitude_hours == 6.0 for trial in trials)
+
+
+def test_single_transit_injects_only_one_event() -> None:
+    time = np.linspace(0.0, 30.0, 3001)
+    trial = build_trials(
+        {
+            "backgrounds": [{"target_id": "KIC 1", "background_label": "negative"}],
+            "injection_scenarios": [
+                {
+                    "scenario_id": "single",
+                    "injection_type": "single_transit",
+                    "period_days": 10.0,
+                    "depth_ppm": 10_000.0,
+                    "duration_hours": 4.0,
+                    "epoch_phase": 0.5,
+                }
+            ],
+        }
+    )[0]
+    injected, keep, epoch = inject_trial_arrays(time, np.ones_like(time), trial)
+    dipped_times = time[injected < 1.0]
+    assert np.all(keep)
+    assert epoch == pytest.approx(5.0)
+    assert dipped_times.min() > 4.9
+    assert dipped_times.max() < 5.1
+
+
+def test_ttv_injection_offsets_second_transit() -> None:
+    time = np.linspace(0.0, 25.0, 25_001)
+    trial = build_trials(
+        {
+            "backgrounds": [{"target_id": "KIC 1", "background_label": "negative"}],
+            "injection_scenarios": [
+                {
+                    "scenario_id": "ttv",
+                    "injection_type": "ttv",
+                    "period_days": 10.0,
+                    "depth_ppm": 10_000.0,
+                    "duration_hours": 1.0,
+                    "epoch_phase": 0.0,
+                    "ttv_amplitude_hours": 6.0,
+                    "ttv_cycle_transits": 4,
+                }
+            ],
+        }
+    )[0]
+    injected, _, _ = inject_trial_arrays(time, np.ones_like(time), trial)
+    nominal_index = int(np.argmin(np.abs(time - 10.0)))
+    shifted_index = int(np.argmin(np.abs(time - 10.25)))
+    assert injected[nominal_index] == pytest.approx(1.0)
+    assert injected[shifted_index] == pytest.approx(0.99)
+
+
+def test_data_gap_masks_configured_event() -> None:
+    time = np.linspace(0.0, 25.0, 2501)
+    trial = build_trials(
+        {
+            "backgrounds": [{"target_id": "KIC 1", "background_label": "negative"}],
+            "injection_scenarios": [
+                {
+                    "scenario_id": "gap",
+                    "injection_type": "data_gap",
+                    "period_days": 10.0,
+                    "depth_ppm": 2000.0,
+                    "duration_hours": 4.0,
+                    "epoch_phase": 0.0,
+                    "gap_transit_index": 1,
+                    "gap_duration_hours": 6.0,
+                }
+            ],
+        }
+    )[0]
+    _, keep, _ = inject_trial_arrays(time, np.ones_like(time), trial)
+    assert not keep[int(np.argmin(np.abs(time - 10.0)))]
+    assert keep[int(np.argmin(np.abs(time - 9.0)))]
+
+
+def test_single_event_recovery_matches_event_time_not_period() -> None:
+    row = {"period_days": 7.0, "epoch_bjd": 100.0, "duration_hours": 4.0}
+    assert match_single_event_recovery([row], 107.05, 4.0) is row
+    assert match_single_event_recovery([row], 108.0, 4.0) is None
+
+
+def test_v2_config_covers_master_guide_scenarios() -> None:
+    repo_root = Path(__file__).resolve().parent.parent
+    config = json.loads(
+        (repo_root / "configs/production_sensitivity_v2.json").read_text(encoding="utf-8")
+    )
+    injection_types = {
+        scenario["injection_type"] for scenario in config["injection_scenarios"]
+    }
+    assert injection_types == {
+        "periodic",
+        "ttv",
+        "single_transit",
+        "data_gap",
+        "stellar_variability",
+    }
+    assert all(background["quarters"] == [1, 2, 3, 4] for background in config["backgrounds"])
+    assert max(scenario["period_days"] for scenario in config["injection_scenarios"]) == 90.0
+    assert len(build_trials(config)) == 16
 
 
 def test_committed_config_has_two_frozen_eval_backgrounds() -> None:

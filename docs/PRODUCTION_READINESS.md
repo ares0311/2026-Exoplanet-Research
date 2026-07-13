@@ -6,7 +6,7 @@ FPP 0.4405, while the TOI-146.01 false-positive control produced no signal.
 No Tier 1 gaps remain open.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (84 production-critical Skills; non-production fluff removed)
-Test baseline: 2,683 default tests passing; 2 `integration_live` tests excluded by
+Test baseline: 2,689 default tests passing; 2 `integration_live` tests excluded by
 the configured marker expression (2026-07-12)
 
 ---
@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.44 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.45 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -269,6 +269,14 @@ treated as small-grid/strongest-peak competition evidence rather than a
 physical completeness curve. This closes bounded short-period v1 evidence
 only. TTV, single-transit, gap, stellar-variability, longer-period, and
 multi-quarter coverage remain open before any general completeness claim.
+0.2.45 adds the expanded v2 sensitivity contract without rewriting v1. Explicit
+scenario rows cover periodic 3/90-day signals, moderate/strong sinusoidal TTV,
+single-transit event-time recovery, partial/full deterministic data gaps, and
+low-depth injection over 5,000-ppm stellar variability on two real Kepler Q1-Q4
+backgrounds. Gap cases record source, injected, and removed cadence counts.
+The 16-trial, six-worker pre-merge smoke completed in 17.6 seconds with 8
+recoveries and zero failures. That smoke is tooling validation only; durable v2
+curves require a merged-code rerun.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of
@@ -467,7 +475,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Canonical sample-level regression suite (real + isolated injected controls) | ✅ |
 | Bounded short-period real-background production sensitivity v1 | ✅ 23/36 recovered; zero failures |
 | 84 production-critical Skills/ | ✅ |
-| 2,683 default tests, ruff clean, mypy clean | ✅ |
+| 2,689 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -476,7 +484,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 
 Run these before any live deployment or public announcement:
 
-- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-12: 2,683 passed; 2 `integration_live` tests excluded by configuration)
+- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-12: 2,689 passed; 2 `integration_live` tests excluded by configuration)
 - [x] `.venv/bin/ruff check .` — no lint errors (2026-07-11: clean)
 - [x] `.venv/bin/python -m mypy src` — no type errors (2026-07-11: clean, 30 source files)
 - [x] `exo background-run-once --dry-run` — no config errors (2026-07-10: installed entry point exercised successfully; dry run wrote no ledger/outcome data)

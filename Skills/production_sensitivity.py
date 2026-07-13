@@ -45,6 +45,14 @@ class Trial:
     depth_ppm: float
     duration_hours: float
     epoch_phase: float
+    scenario_id: str = "periodic_grid"
+    injection_type: str = "periodic"
+    ttv_amplitude_hours: float = 0.0
+    ttv_cycle_transits: int = 3
+    gap_transit_index: int | None = None
+    gap_duration_hours: float = 0.0
+    variability_amplitude_ppm: float = 0.0
+    variability_period_days: float = 1.0
 
 
 def build_trials(
@@ -55,6 +63,40 @@ def build_trials(
         raise ValueError("require shard_count >= 1 and 0 <= shard_index < shard_count")
     trials: list[Trial] = []
     index = 0
+    scenarios = config.get("injection_scenarios")
+    if scenarios is not None:
+        for background in config["backgrounds"]:
+            for scenario in scenarios:
+                trial = Trial(
+                    index=index,
+                    target_id=str(background["target_id"]),
+                    background_label=str(background["background_label"]),
+                    period_days=float(scenario["period_days"]),
+                    depth_ppm=float(scenario["depth_ppm"]),
+                    duration_hours=float(scenario["duration_hours"]),
+                    epoch_phase=float(scenario.get("epoch_phase", 0.37)),
+                    scenario_id=str(scenario["scenario_id"]),
+                    injection_type=str(scenario["injection_type"]),
+                    ttv_amplitude_hours=float(scenario.get("ttv_amplitude_hours", 0.0)),
+                    ttv_cycle_transits=int(scenario.get("ttv_cycle_transits", 3)),
+                    gap_transit_index=(
+                        int(scenario["gap_transit_index"])
+                        if scenario.get("gap_transit_index") is not None
+                        else None
+                    ),
+                    gap_duration_hours=float(scenario.get("gap_duration_hours", 0.0)),
+                    variability_amplitude_ppm=float(
+                        scenario.get("variability_amplitude_ppm", 0.0)
+                    ),
+                    variability_period_days=float(
+                        scenario.get("variability_period_days", 1.0)
+                    ),
+                )
+                if index % shard_count == shard_index:
+                    trials.append(trial)
+                index += 1
+        return trials
+
     grid = config["injection_grid"]
     for background in config["backgrounds"]:
         for period in grid["period_days"]:
@@ -94,25 +136,93 @@ def inject_flux(
     return result
 
 
-def inject_lightcurve(light_curve: Any, trial: Trial) -> tuple[Any, float]:
-    """Copy a Lightkurve object and inject one configured transit signal."""
-    time_bjd = np.asarray(light_curve.time.jd, dtype=float)
+def _inject_at_centers(
+    time_bjd: np.ndarray,
+    flux: np.ndarray,
+    centers_bjd: list[float],
+    *,
+    duration_hours: float,
+    depth_ppm: float,
+) -> np.ndarray:
+    result = np.asarray(flux, dtype=float).copy()
+    half_duration_days = duration_hours / 48.0
+    for center in centers_bjd:
+        in_transit = np.abs(time_bjd - center) <= half_duration_days
+        result[in_transit] *= 1.0 - depth_ppm / 1_000_000.0
+    return result
+
+
+def inject_trial_arrays(
+    time_bjd: np.ndarray, flux: np.ndarray, trial: Trial
+) -> tuple[np.ndarray, np.ndarray, float]:
+    """Inject one configured scenario and return flux, cadence mask, and epoch."""
     finite_time = time_bjd[np.isfinite(time_bjd)]
     if len(finite_time) == 0:
         raise ValueError(f"background {trial.target_id} has no finite timestamps")
     epoch_bjd = float(finite_time[0] + trial.epoch_phase * trial.period_days)
+    result = np.asarray(flux, dtype=float).copy()
+
+    if trial.variability_amplitude_ppm:
+        if trial.variability_period_days <= 0:
+            raise ValueError("variability_period_days must be positive")
+        phase = 2.0 * np.pi * (time_bjd - finite_time[0]) / trial.variability_period_days
+        result *= 1.0 + trial.variability_amplitude_ppm / 1_000_000.0 * np.sin(phase)
+
+    if trial.injection_type == "single_transit":
+        centers = [epoch_bjd]
+    elif trial.injection_type == "ttv":
+        if trial.ttv_cycle_transits < 2:
+            raise ValueError("ttv_cycle_transits must be at least 2")
+        n_min = math.floor((float(finite_time[0]) - epoch_bjd) / trial.period_days) - 1
+        n_max = math.ceil((float(finite_time[-1]) - epoch_bjd) / trial.period_days) + 1
+        centers = [
+            epoch_bjd
+            + n * trial.period_days
+            + trial.ttv_amplitude_hours
+            / 24.0
+            * math.sin(2.0 * math.pi * n / trial.ttv_cycle_transits)
+            for n in range(n_min, n_max + 1)
+        ]
+    elif trial.injection_type in {"periodic", "data_gap", "stellar_variability"}:
+        centers = []
+    else:
+        raise ValueError(f"unsupported injection_type {trial.injection_type!r}")
+
+    if centers:
+        result = _inject_at_centers(
+            time_bjd,
+            result,
+            centers,
+            duration_hours=trial.duration_hours,
+            depth_ppm=trial.depth_ppm,
+        )
+    else:
+        result = inject_flux(
+            time_bjd,
+            result,
+            period_days=trial.period_days,
+            epoch_bjd=epoch_bjd,
+            duration_hours=trial.duration_hours,
+            depth_ppm=trial.depth_ppm,
+        )
+
+    keep = np.ones(len(time_bjd), dtype=bool)
+    if trial.gap_transit_index is not None and trial.gap_duration_hours > 0:
+        gap_center = epoch_bjd + trial.gap_transit_index * trial.period_days
+        keep &= np.abs(time_bjd - gap_center) > trial.gap_duration_hours / 48.0
+    return result, keep, epoch_bjd
+
+
+def inject_lightcurve(light_curve: Any, trial: Trial) -> tuple[Any, float]:
+    """Copy a Lightkurve object and inject one configured transit signal."""
+    time_bjd = np.asarray(light_curve.time.jd, dtype=float)
     flux = np.asarray(light_curve.flux.value, dtype=float)
-    injected = inject_flux(
-        time_bjd,
-        flux,
-        period_days=trial.period_days,
-        epoch_bjd=epoch_bjd,
-        duration_hours=trial.duration_hours,
-        depth_ppm=trial.depth_ppm,
-    )
+    injected, keep, epoch_bjd = inject_trial_arrays(time_bjd, flux, trial)
     result = light_curve.copy()
     unit = getattr(light_curve.flux, "unit", None)
     result.flux = injected if unit is None else injected * unit
+    if not np.all(keep):
+        result = result[keep]
     return result, epoch_bjd
 
 
@@ -215,6 +325,33 @@ def match_recovery(
     )
 
 
+def match_single_event_recovery(
+    rows: list[dict[str, Any]], injected_epoch_bjd: float, duration_hours: float
+) -> dict[str, Any] | None:
+    """Match a single event by overlap with any recovered periodic ephemeris."""
+    matches: list[tuple[float, dict[str, Any]]] = []
+    for row in rows:
+        period = row.get("period_days")
+        epoch = row.get("epoch_bjd")
+        recovered_duration = row.get("duration_hours")
+        if (
+            not all(isinstance(value, (int, float)) for value in (period, epoch))
+            or float(period) <= 0
+        ):
+            continue
+        phase_distance = abs(
+            ((injected_epoch_bjd - float(epoch) + float(period) / 2.0) % float(period))
+            - float(period) / 2.0
+        )
+        tolerance_days = max(
+            duration_hours,
+            float(recovered_duration) if isinstance(recovered_duration, (int, float)) else 0.0,
+        ) / 24.0
+        if phase_distance <= tolerance_days:
+            matches.append((phase_distance, row))
+    return min(matches, key=lambda item: item[0])[1] if matches else None
+
+
 PipelineFn = Callable[..., list[dict[str, Any]]]
 
 
@@ -250,19 +387,36 @@ def execute_trial(
         allow_cross_mission_cnn=True,
         fetch_fn=fetch_fn,
     )
-    recovered = match_recovery(
-        rows,
-        trial.period_days,
-        tolerance=float(config["recovery_period_relative_tolerance"]),
-    )
+    if trial.injection_type == "single_transit":
+        recovered = match_single_event_recovery(rows, epoch_bjd, trial.duration_hours)
+        recovery_basis = "event_time_overlap"
+    else:
+        recovered = match_recovery(
+            rows,
+            trial.period_days,
+            tolerance=float(config["recovery_period_relative_tolerance"]),
+        )
+        recovery_basis = "period_exact_half_double"
     return {
         "trial_index": trial.index,
         "target_id": trial.target_id,
         "background_label": trial.background_label,
+        "scenario_id": trial.scenario_id,
+        "injection_type": trial.injection_type,
         "period_days": trial.period_days,
         "depth_ppm": trial.depth_ppm,
         "duration_hours": trial.duration_hours,
         "epoch_bjd": epoch_bjd,
+        "ttv_amplitude_hours": trial.ttv_amplitude_hours,
+        "ttv_cycle_transits": trial.ttv_cycle_transits,
+        "gap_transit_index": trial.gap_transit_index,
+        "gap_duration_hours": trial.gap_duration_hours,
+        "source_cadences": provenance.n_cadences,
+        "injected_cadences": len(injected_lc),
+        "cadences_removed": provenance.n_cadences - len(injected_lc),
+        "variability_amplitude_ppm": trial.variability_amplitude_ppm,
+        "variability_period_days": trial.variability_period_days,
+        "recovery_basis": recovery_basis,
         "recovered": recovered is not None,
         "candidate_count": len(rows),
         "recovered_period_days": recovered.get("period_days") if recovered else None,
@@ -290,7 +444,14 @@ def _mean(values: list[float]) -> float | None:
 def summarize_curves(results: list[dict[str, Any]]) -> dict[str, Any]:
     """Aggregate sample results into period/depth/duration recovery curves."""
     curves: dict[str, list[dict[str, Any]]] = {}
-    for field in ("period_days", "depth_ppm", "duration_hours", "background_label"):
+    for field in (
+        "scenario_id",
+        "injection_type",
+        "period_days",
+        "depth_ppm",
+        "duration_hours",
+        "background_label",
+    ):
         points: list[dict[str, Any]] = []
         for value in sorted({result[field] for result in results}):
             group = [result for result in results if result[field] == value]
