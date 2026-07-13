@@ -42,6 +42,7 @@ from exo_toolkit.background.priority import build_priority_summary
 from exo_toolkit.background.runner import background_run_once
 from exo_toolkit.background.storage import BackgroundStore
 from exo_toolkit.calibration import apply_calibration, load_calibration
+from exo_toolkit.candidate_context import contextualize_score, load_candidate_context
 from exo_toolkit.clean import clean_lightcurve
 from exo_toolkit.fetch import compute_provenance_score, fetch_lightcurve, fetch_tic_stellar_params
 from exo_toolkit.pathway import classify_submission_pathway
@@ -74,6 +75,7 @@ app = typer.Typer(
 
 _VALID_SCORERS = ("bayesian", "xgboost", "ensemble", "cnn", "full-ensemble")
 CNN_SNIPPET_BINS = 201
+DEFAULT_CANDIDATE_CONTEXT_PATH = Path("models/candidate_context_v1.json")
 
 
 class _CnnScorer(Protocol):
@@ -251,6 +253,7 @@ def run_pipeline(
     model_path: Path | None = None,
     cnn_checkpoint_path: Path | None = None,
     calibration_path: Path | None = None,
+    candidate_context_path: Path | None = None,
     allow_cross_mission_cnn: bool = False,
     fetch_fn: Any = None,
     clean_fn: Any = None,
@@ -282,6 +285,10 @@ def run_pipeline(
             written by :func:`~exo_toolkit.calibration.save_calibration`.
             When provided, each output row gains a ``"calibrated_posterior"``
             key with probabilities adjusted by the fitted calibration model.
+        candidate_context_path: Optional empirical full-ensemble score-reference
+            artifact. When omitted, ``models/candidate_context_v1.json`` is used
+            if present. It supplies rank/FDR context but no probability
+            calibration or decision threshold.
         allow_cross_mission_cnn: When ``scorer`` is ``"cnn"``/``"full-ensemble"``,
             a CNN checkpoint whose declared ``training_mission`` (or lack
             thereof) does not match ``mission`` is refused by default — Kepler↔
@@ -364,6 +371,16 @@ def run_pipeline(
     calibration_result = None
     if calibration_path is not None:
         calibration_result = load_calibration(calibration_path)
+
+    candidate_context_reference = None
+    if candidate_context_path is not None and scorer != "full-ensemble":
+        raise ValueError("candidate_context_path is only valid for full-ensemble scoring")
+    if scorer == "full-ensemble":
+        resolved_context_path = candidate_context_path
+        if resolved_context_path is None and DEFAULT_CANDIDATE_CONTEXT_PATH.exists():
+            resolved_context_path = DEFAULT_CANDIDATE_CONTEXT_PATH
+        if resolved_context_path is not None:
+            candidate_context_reference = load_candidate_context(resolved_context_path)
 
     fetch_kwargs: dict[str, Any] = {}
     if exptime is not None:
@@ -526,6 +543,13 @@ def run_pipeline(
                     + cnn_weight * cnn_prob
                     + bayes_weight * posterior.planet_candidate
                 )
+                if candidate_context_reference is not None:
+                    row.update(
+                        contextualize_score(
+                            float(row["full_ensemble_planet_probability"]),
+                            candidate_context_reference,
+                        )
+                    )
 
         if calibration_result is not None:
             cal_post = apply_calibration(posterior, calibration_result)
@@ -572,6 +596,14 @@ def _print_results(rows: list[dict[str, Any]], target_id: str) -> None:
             table.add_row("XGBoost P(planet)", f"{row['xgb_planet_probability']:.3f}")
         if "ensemble_planet_probability" in row:
             table.add_row("Ensemble P(planet)", f"{row['ensemble_planet_probability']:.3f}")
+        if "score_quantile" in row:
+            table.add_row("Reference score quantile", f"{row['score_quantile']:.3f}")
+        if row.get("false_discovery_estimate") is not None:
+            table.add_row(
+                "Reference empirical FDR",
+                f"{row['false_discovery_estimate']:.3f} "
+                f"(n={row['false_discovery_reference_n']})",
+            )
         table.add_row("FPP", f"{row['scores']['false_positive_probability']:.3f}")
         table.add_row("Detection confidence", f"{row['scores']['detection_confidence']:.3f}")
         table.add_row("Provenance score", f"{row['provenance_score']:.3f}")
@@ -620,6 +652,14 @@ def scan(
         None,
         "--cnn-checkpoint",
         help="Path to CNN .pt checkpoint (required for cnn/full-ensemble scorers)",
+    ),
+    candidate_context_path: Path | None = typer.Option(
+        None,
+        "--candidate-context",
+        help=(
+            "Empirical full-ensemble score context JSON; defaults to "
+            "models/candidate_context_v1.json when present"
+        ),
     ),
     allow_cross_mission_cnn: bool = typer.Option(
         False,
@@ -695,6 +735,7 @@ def scan(
             scorer=scorer,
             model_path=model_path,
             cnn_checkpoint_path=cnn_checkpoint_path,
+            candidate_context_path=candidate_context_path,
             allow_cross_mission_cnn=allow_cross_mission_cnn,
         )
     except Exception as exc:  # noqa: BLE001

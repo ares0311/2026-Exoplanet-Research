@@ -195,11 +195,14 @@ datasets:
     allowed_uses:
       - Score with the already-trained xgboost_koi.json and benchmark_cnn_v1 scorers plus the Bayesian log-score model
       - Grid-search Tier-3 stacking blend weights (ensemble_weight_optimizer.py / calibrate_stacking_weights.py) for T1-2
+      - Derive empirical full-ensemble score quantiles and observed false-discovery fractions with explicit K2-domain and selected-class-balance limitations
     forbidden_uses:
       - Train XGBoost or CNN model weights
       - Report a final held-out performance claim for benchmark_cnn_v1 (that role belongs to t1_1_kepler_master_frozen_eval)
       - Reuse these same EPIC targets as a future T1-1-style Kepler/K2 CNN training-corpus expansion (would create a train/calibration overlap once consumed here)
       - Blind-search discovery claims
+      - Treat empirical K2 false-discovery fractions as guaranteed operational FDR bounds or probability calibration
+      - Define or tune a production decision threshold without a separate approved threshold-selection plan
     split_group_keys:
       - K2 EPIC target (one calibration row per star; k2:epic:<id> group keys, disjoint from the kepler:kic:<id> namespace used by T1-1 by construction)
     manifest_path: metadata/t1_2_k2_calibration_manifest.jsonl
@@ -218,6 +221,11 @@ datasets:
       the CNN score requires a bounded live fetch of native K2 light curves
       (fetch_t1_2_k2_calibration_snippets.py, human-run on the operator's Mac)
       before calibrate_stacking_weights.py can produce final T1-2 weights.
+      The completed 588-row prediction subset may also support descriptive
+      full-ensemble score-rank and observed tail-negative context. This does
+      not change the dataset role, probability-calibrate the score, define a
+      threshold, or make its selected K2 class balance representative of TESS
+      live-search prevalence.
       Two real unit bugs were found and fixed while building this dataset:
       (1) k2pandc's pl_tranmid is already full BJD_TDB, not BKJD as an
       existing script (fetch_tess_k2_overlap_snippets.py) assumed -- that

@@ -71,7 +71,12 @@ by itself satisfy a master-guide evidence requirement.
 5. **Phase 2 — calibrated candidate context (ACTIVE):** extend production
    outputs with calibration dataset IDs, score quantiles, threshold versions,
    and empirical false-discovery context now that canonical eval and sensitivity
-   sets exist.
+   sets exist. Version 0.2.47 adds a validated reference contract, builder, CLI
+   output wiring, and schema-v2 ledger preservation for the exact calibrated
+   full-ensemble score. It deliberately emits null probability calibration and
+   null decision threshold while reporting empirical K2 score rank and observed
+   tail-negative fraction with numerator/denominator and domain limitations.
+   The merged-code reference artifact remains required before this item closes.
 6. **Phase 3 only after 1–5:** benchmark self-supervised light-curve embeddings
    against BLS/tabular/`benchmark_cnn_v1`; do not start frontier representation
    work while Phase 1–2 evidence gaps remain.

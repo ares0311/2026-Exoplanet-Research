@@ -26,8 +26,9 @@ corrected bounded v1 curves (23/36 recovered, zero failures). The active Phase
 2 sensitivity now has bounded v1 and expanded v2 evidence. Version 0.2.46
 commits the Q1-Q4 v2 run (8/16 recovered, zero failures) for TTV,
 single-transit, deterministic gaps, injected stellar variability, and 90-day
-cases. The active priority is Phase 2 calibrated candidate context; see
-`docs/ROADMAP.md`.
+cases. Version 0.2.47 adds fail-closed empirical candidate-context tooling from
+the held-out K2 calibration role; its merged-code reference artifact remains
+pending. See `docs/ROADMAP.md`.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
@@ -91,8 +92,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 131 top-level test files. Local validation on 2026-07-12 passed with 2,690 default tests and 2 `integration_live` tests deselected.
-**Skills:** 112 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
+**Current test surface:** 133 top-level test files. Local validation on 2026-07-12 passed with 2,699 default tests and 2 `integration_live` tests deselected.
+**Skills:** 113 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
 
 ---
 

@@ -687,6 +687,53 @@ class TestLiveSearchPreparation:
                 model_path=None,
             )
 
+    def test_ledger_record_preserves_candidate_context(self) -> None:
+        target = {
+            "tic_id": 101,
+            "target_id": "TIC 101",
+            "priority": 20.0,
+            "raw_uris": ("mast:a",),
+        }
+        row = _make_pipeline_row()
+        row.update(
+            {
+                "fetch_provenance": {
+                    "raw_uris": ["mast:a"],
+                    "sectors_or_quarters": [1],
+                },
+                "score_quantile": 0.92,
+                "calibration_dataset_id": "t1_2_k2pandc_calibration",
+                "threshold_version": "no_decision_threshold_v1",
+                "candidate_context_id": "context_v1",
+                "false_discovery_estimate": 0.08,
+                "false_discovery_reference_n": 100,
+                "false_discovery_reference_negatives": 8,
+            }
+        )
+        record = _ledger_record_for_outcome(
+            target=target,
+            source_dataset_id="tess_live_search_v1",
+            row=row,
+            pipeline_context={},
+            min_snr=5.0,
+            max_peaks=5,
+            max_period_grid_points=20_000,
+            scorer="full-ensemble",
+            pipeline="QLP",
+            exptime="long",
+            model_path=None,
+        )
+        assert record.score_quantiles == {
+            "full_ensemble_planet_probability": pytest.approx(0.92)
+        }
+        assert record.model_versions["calibration_dataset_id"] == (
+            "t1_2_k2pandc_calibration"
+        )
+        assert record.model_versions["threshold_version"] == (
+            "no_decision_threshold_v1"
+        )
+        assert record.model_scores["false_discovery_estimate"] == pytest.approx(0.08)
+
     def test_prepared_shard_writes_only_its_target_to_schema_v2(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
