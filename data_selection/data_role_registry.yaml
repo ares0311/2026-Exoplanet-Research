@@ -211,6 +211,7 @@ datasets:
     local_artifact_paths:
       - data/t1_2_k2_calibration_snippets.jsonl
       - metadata/t1_2_k2_calibration_partial_predictions.jsonl
+    context_artifact_path: models/candidate_context_v1.json
     notes: >
       596 rows (356 CONFIRMED / 240 FALSE POSITIVE) selected 2026-07-10 from
       2,261 live-verified usable k2pandc rows; disjoint EPIC namespace from

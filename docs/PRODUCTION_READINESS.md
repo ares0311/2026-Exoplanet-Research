@@ -6,7 +6,7 @@ FPP 0.4405, while the TOI-146.01 false-positive control produced no signal.
 No Tier 1 gaps remain open.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (85 production-critical Skills; non-production fluff removed)
-Test baseline: 2,699 default tests passing; 2 `integration_live` tests excluded by
+Test baseline: 2,700 default tests passing; 2 `integration_live` tests excluded by
 the configured marker expression (2026-07-12)
 
 ---
@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.47 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.48 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -299,6 +299,15 @@ probability calibration or decision utility—`calibrated_score` and
 none exists. Schema-v2 live-search ledger records preserve the context. The
 real reference build completed as a temporary smoke; the merged-code artifact
 is still required before this roadmap item closes.
+0.2.48 commits that merged-code reference at
+`models/candidate_context_v1.json` (SHA-256 `b7d7a72d…ff1216c`) and its
+successful report-only commit `24fea1b`. The artifact validates 588 sorted
+scores (356 positive, 232 negative) against exact prediction and stacking-
+weight hashes. Full-ensemble scans automatically load it when present; outputs
+and schema-v2 ledger rows now carry empirical rank/FDR context. The null
+calibrated score and null decision threshold are intentional production facts,
+not missing work. Bounded Phase 2 is complete; the active roadmap priority is
+the Phase 3 representation benchmark.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of
@@ -497,8 +506,9 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Canonical sample-level regression suite (real + isolated injected controls) | ✅ |
 | Bounded short-period real-background production sensitivity v1 | ✅ 23/36 recovered; zero failures |
 | Expanded Q1-Q4 production sensitivity v2 | ✅ 8/16 recovered; zero failures |
+| Empirical full-ensemble candidate context | ✅ 588-row K2 reference; no invented threshold |
 | 85 production-critical Skills/ | ✅ |
-| 2,699 default tests, ruff clean, mypy clean | ✅ |
+| 2,700 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -507,7 +517,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 
 Run these before any live deployment or public announcement:
 
-- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-12: 2,699 passed; 2 `integration_live` tests excluded by configuration)
+- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-12: 2,700 passed; 2 `integration_live` tests excluded by configuration)
 - [x] `.venv/bin/ruff check .` — no lint errors (2026-07-11: clean)
 - [x] `.venv/bin/python -m mypy src` — no type errors (2026-07-11: clean, 30 source files)
 - [x] `exo background-run-once --dry-run` — no config errors (2026-07-10: installed entry point exercised successfully; dry run wrote no ledger/outcome data)

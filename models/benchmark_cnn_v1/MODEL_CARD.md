@@ -116,6 +116,16 @@ recovered; strong TTV, 90-day periodic, single-transit, and 500-ppm transit over
 misses are retained as model/pipeline boundary evidence and must not be
 converted into favorable assumptions.
 
+### Candidate score context
+
+Version 0.2.48 commits `models/candidate_context_v1.json`, a 588-row empirical
+reference for the calibrated full-ensemble score. It reports score rank and the
+observed negative fraction at or above a score with reference counts. Because
+the reference is selected K2 catalog data and stacking optimized AUC, it is not
+probability calibration, operational TESS prevalence, or a decision threshold.
+The production output therefore keeps `calibrated_score` and
+`decision_threshold` null and identifies `no_decision_threshold_v1` explicitly.
+
 ## Runtime And System Notes
 
 - Expected local Python: 3.14.3 in `.venv`.
