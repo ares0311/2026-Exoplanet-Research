@@ -68,7 +68,7 @@ by itself satisfy a master-guide evidence requirement.
    seconds with zero failures. Moderate TTV and both gap scenarios recovered;
    strong TTV, 90-day periodic, single-transit, and low-depth variability cases
    did not. These are measured boundary cases, not favorable assumptions.
-5. **Phase 2 — calibrated candidate context (ACTIVE):** extend production
+5. **Phase 2 — calibrated candidate context (COMPLETE):** extend production
    outputs with calibration dataset IDs, score quantiles, threshold versions,
    and empirical false-discovery context now that canonical eval and sensitivity
    sets exist. Version 0.2.47 adds a validated reference contract, builder, CLI
@@ -76,8 +76,10 @@ by itself satisfy a master-guide evidence requirement.
    full-ensemble score. It deliberately emits null probability calibration and
    null decision threshold while reporting empirical K2 score rank and observed
    tail-negative fraction with numerator/denominator and domain limitations.
-   The merged-code reference artifact remains required before this item closes.
-6. **Phase 3 only after 1–5:** benchmark self-supervised light-curve embeddings
+   Version 0.2.48 commits `models/candidate_context_v1.json`, built from merged
+   code over all 588 reference rows with exact source hashes and a successful
+   Run Report. No probability calibration or threshold is claimed.
+6. **Phase 3 representation benchmark (ACTIVE):** benchmark self-supervised light-curve embeddings
    against BLS/tabular/`benchmark_cnn_v1`; do not start frontier representation
    work while Phase 1–2 evidence gaps remain.
 

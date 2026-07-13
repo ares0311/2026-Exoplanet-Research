@@ -69,3 +69,21 @@ def test_reference_round_trip(tmp_path: Path) -> None:
 def test_raw_score_must_be_probability() -> None:
     with pytest.raises(ValueError, match="raw_score"):
         contextualize_score(1.1, _reference())
+
+
+def test_committed_candidate_context_has_exact_sources_and_no_threshold() -> None:
+    repo_root = Path(__file__).resolve().parent.parent
+    reference = load_candidate_context(repo_root / "models/candidate_context_v1.json")
+    assert reference.context_id == "full_ensemble_k2_empirical_context_v1"
+    assert reference.calibration_dataset_id == "t1_2_k2pandc_calibration"
+    assert reference.n_samples == 588
+    assert reference.n_positive == 356
+    assert reference.n_negative == 232
+    assert reference.decision_threshold is None
+    assert reference.threshold_version == "no_decision_threshold_v1"
+    assert reference.source_predictions_sha256 == (
+        "27694774052035da5a3ed31f2e1ef2edf6149be2fac972b75589adb261831278"
+    )
+    assert reference.stacking_weights_sha256 == (
+        "e9f73f2d162847e5621dc61916e0f39032f18ba082f3d1cc7429eed9ad89054b"
+    )
