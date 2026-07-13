@@ -1,5 +1,29 @@
 # Data Selection Decision Log
 
+## 2026-07-12 — K2 empirical candidate-score context v1
+
+**Repo:** 2026 Exoplanet Research
+**Data:** 588 completed rows from `t1_2_k2pandc_calibration`
+**Role:** Calibration (descriptive reuse; role unchanged)
+**Acquisition:** No download; reuse the committed completed-predictions artifact
+and calibrated stacking weights.
+**Decision:** Permit the exact full-ensemble scores to define an empirical CDF
+and observed negative fraction at or above a candidate score. Preserve the
+reference numerator/denominator and K2-domain limitations on every output.
+**Fail-closed fields:** `calibrated_score=null`, `decision_threshold=null`, and
+`threshold_version=no_decision_threshold_v1` because T1-2 optimized AUC rather
+than probability calibration or threshold utility.
+**Rejected interpretation:** The observed tail-negative fraction is not a
+guaranteed operational FDR bound. The catalog-selected K2 class balance is not
+TESS live-search prevalence, and a zero observed fraction does not prove zero
+false-discovery risk.
+**Leakage:** No model fitting or threshold tuning occurs. The reference remains
+the already-designated held-out calibration role and is not promoted to frozen
+evaluation or training.
+**Storage:** Negligible; one small sorted-score reference plus Run Report.
+**Next action:** Merge the builder/output wiring, generate the reference from
+merged code, validate hashes/counts, then commit the artifact separately.
+
 ## 2026-07-11 — TESS QLP live-search queue v1 execution
 
 **Repo:** 2026 Exoplanet Research

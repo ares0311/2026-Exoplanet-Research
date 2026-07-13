@@ -5,8 +5,8 @@ catalog ephemeris for pi Mensae c was recovered within 0.005% with ensemble
 FPP 0.4405, while the TOI-146.01 false-positive control produced no signal.
 No Tier 1 gaps remain open.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
-Branch: `main` (84 production-critical Skills; non-production fluff removed)
-Test baseline: 2,690 default tests passing; 2 `integration_live` tests excluded by
+Branch: `main` (85 production-critical Skills; non-production fluff removed)
+Test baseline: 2,699 default tests passing; 2 `integration_live` tests excluded by
 the configured marker expression (2026-07-12)
 
 ---
@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.46 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.47 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -288,6 +288,17 @@ variability each recovered 0/2. Exact Q1-Q4 provenance lists four products per
 background. Bounded scenario coverage is now durable; these two-sample cells
 are boundary evidence, not survey completeness estimates. Phase 2 calibrated
 candidate context is the next active production priority.
+0.2.47 adds fail-closed calibrated-candidate-context tooling. A frozen Pydantic
+reference contract and Run-Report-enabled builder derive exact full-ensemble
+score ranks from the 588-row `t1_2_k2pandc_calibration` predictions and
+production stacking weights. Full-ensemble output gains raw score, empirical
+quantile, calibration dataset ID, threshold version, observed tail-negative
+fraction, and its reference counts/limitations. Because T1-2 optimized AUC—not
+probability calibration or decision utility—`calibrated_score` and
+`decision_threshold` remain null and the threshold version explicitly says
+none exists. Schema-v2 live-search ledger records preserve the context. The
+real reference build completed as a temporary smoke; the merged-code artifact
+is still required before this roadmap item closes.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of
@@ -486,8 +497,8 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Canonical sample-level regression suite (real + isolated injected controls) | ✅ |
 | Bounded short-period real-background production sensitivity v1 | ✅ 23/36 recovered; zero failures |
 | Expanded Q1-Q4 production sensitivity v2 | ✅ 8/16 recovered; zero failures |
-| 84 production-critical Skills/ | ✅ |
-| 2,690 default tests, ruff clean, mypy clean | ✅ |
+| 85 production-critical Skills/ | ✅ |
+| 2,699 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -496,7 +507,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 
 Run these before any live deployment or public announcement:
 
-- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-12: 2,690 passed; 2 `integration_live` tests excluded by configuration)
+- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-12: 2,699 passed; 2 `integration_live` tests excluded by configuration)
 - [x] `.venv/bin/ruff check .` — no lint errors (2026-07-11: clean)
 - [x] `.venv/bin/python -m mypy src` — no type errors (2026-07-11: clean, 30 source files)
 - [x] `exo background-run-once --dry-run` — no config errors (2026-07-10: installed entry point exercised successfully; dry run wrote no ledger/outcome data)

@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 from typer.testing import CliRunner
 
+from exo_toolkit.candidate_context import CandidateContextReference
 from exo_toolkit.cli import app, cli_entry, run_pipeline
 from exo_toolkit.features import RawDiagnostics
 from exo_toolkit.fetch import FetchProvenance
@@ -1044,6 +1045,77 @@ class TestScorerOption:
         assert result[0]["meta"]["cnn"]["probability_status"] == "computed"
         expected = 0.95 * 0.8 + 0.00 * 0.9 + 0.05 * posterior.planet_candidate
         assert result[0]["full_ensemble_planet_probability"] == pytest.approx(expected)
+
+    def test_run_pipeline_full_ensemble_adds_empirical_context(
+        self, tmp_path: Path
+    ) -> None:
+        lc = _mock_transit_lc()
+        signal = _make_signal()
+        posterior = _uniform_posterior()
+        scores = _make_scores()
+        mock_xgb = MagicMock()
+        mock_xgb.predict_proba.return_value = 0.8
+        mock_cnn = MagicMock(
+            is_available=True,
+            checkpoint_path=tmp_path / "cnn.pt",
+            training_mission="TESS",
+        )
+        mock_cnn.predict_proba.return_value = 0.9
+        reference = CandidateContextReference(
+            context_id="context_v1",
+            calibration_dataset_id="calibration_v1",
+            score_name="full_ensemble_planet_probability",
+            threshold_version="no_decision_threshold_v1",
+            scores_ascending=(0.2, 0.7, 0.9),
+            labels_aligned=(0, 1, 1),
+            n_samples=3,
+            n_positive=2,
+            n_negative=1,
+            source_predictions_path="predictions.jsonl",
+            source_predictions_sha256="a" * 64,
+            stacking_weights_path="weights.json",
+            stacking_weights_sha256="b" * 64,
+            limitations=("reference only",),
+        )
+        with (
+            patch("exo_toolkit.cli.search_lightcurve", return_value=[signal]),
+            patch(
+                "exo_toolkit.cli.vet_signal",
+                return_value=MagicMock(features=CandidateFeatures()),
+            ),
+            patch("exo_toolkit.cli.score_candidate", return_value=(posterior, scores)),
+            patch(
+                "exo_toolkit.cli.classify_submission_pathway",
+                return_value="planet_hunters_discussion",
+            ),
+            patch("exo_toolkit.ml.xgboost_scorer.XGBoostScorer.load", return_value=mock_xgb),
+            patch(
+                "exo_toolkit.ml.isolated_cnn_scorer.IsolatedCnnScorer.from_checkpoint",
+                return_value=mock_cnn,
+            ),
+            patch("exo_toolkit.cli.load_candidate_context", return_value=reference),
+        ):
+            result = run_pipeline(
+                "TIC 0",
+                "TESS",
+                scorer="full-ensemble",
+                model_path=tmp_path / "model.json",
+                cnn_checkpoint_path=tmp_path / "cnn.pt",
+                candidate_context_path=tmp_path / "context.json",
+                fetch_fn=lambda *_: _make_fetch_result(lc),
+                clean_fn=lambda *_: MagicMock(light_curve=lc),
+                stellar_params_fn=lambda *_: {},
+            )
+
+        row = result[0]
+        assert row["raw_score"] == pytest.approx(
+            row["full_ensemble_planet_probability"]
+        )
+        assert row["calibrated_score"] is None
+        assert row["calibration_dataset_id"] == "calibration_v1"
+        assert row["threshold_version"] == "no_decision_threshold_v1"
+        assert row["decision_threshold"] is None
+        assert 0.0 <= row["score_quantile"] <= 1.0
 
     def test_run_pipeline_cnn_blocks_cross_mission_by_default(self, tmp_path: Path) -> None:
         lc = _mock_transit_lc()

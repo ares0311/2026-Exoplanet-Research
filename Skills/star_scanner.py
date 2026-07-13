@@ -1226,12 +1226,24 @@ def _ledger_record_for_outcome(
         calibrated_scores = {
             str(key): value for key, value in row.get("calibrated_posterior", {}).items()
         }
+        if "false_discovery_estimate" in row:
+            model_scores["false_discovery_estimate"] = row["false_discovery_estimate"]
+            model_scores["false_discovery_reference_n"] = row.get(
+                "false_discovery_reference_n"
+            )
+            model_scores["false_discovery_reference_negatives"] = row.get(
+                "false_discovery_reference_negatives"
+            )
         review_status = "unreviewed"
         review_notes = ""
     model_versions = {"exo_toolkit": __version__, "scorer": scorer}
     if model_path is not None:
         model_versions["model_path"] = str(model_path)
         model_versions["model_sha256"] = sha256_file(model_path)
+    if row is not None and row.get("calibration_dataset_id"):
+        model_versions["calibration_dataset_id"] = str(row["calibration_dataset_id"])
+        model_versions["threshold_version"] = str(row["threshold_version"])
+        model_versions["candidate_context_id"] = str(row["candidate_context_id"])
     regeneration_command = (
         f"caffeinate -i .venv/bin/python Skills/star_scanner.py --target "
         f"{int(target['tic_id'])} --mission TESS --pipeline {pipeline} "
@@ -1258,7 +1270,11 @@ def _ledger_record_for_outcome(
         model_versions=model_versions,
         model_scores=model_scores,
         calibrated_scores=calibrated_scores,
-        score_quantiles={},
+        score_quantiles=(
+            {"full_ensemble_planet_probability": row.get("score_quantile")}
+            if row is not None and "score_quantile" in row
+            else {}
+        ),
         injection_context={"status": "not_injected", "source_role": "live_search"},
         nearest_known_artifacts=(),
         review_status=review_status,
