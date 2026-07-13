@@ -108,6 +108,14 @@ depth bins, so those 12-sample bins must not be extrapolated. TTV,
 single-transit, gap, explicit variability, longer-period, and multi-quarter
 coverage remain unmeasured.
 
+Version 0.2.46 adds the expanded Q1-Q4 `production_sensitivity_v2` artifact.
+Across 16 deterministic scenario trials the pipeline recovered 8 with zero
+execution failures. Moderate TTV and both deterministic-gap scenarios were
+recovered; strong TTV, 90-day periodic, single-transit, and 500-ppm transit over
+5,000-ppm injected variability cases were missed on both backgrounds. These
+misses are retained as model/pipeline boundary evidence and must not be
+converted into favorable assumptions.
+
 ## Runtime And System Notes
 
 - Expected local Python: 3.14.3 in `.venv`.

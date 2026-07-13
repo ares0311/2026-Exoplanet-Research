@@ -283,3 +283,38 @@ def test_committed_evidence_is_complete_and_provenance_bounded() -> None:
         and len(background["raw_uris"]) == 1
         for background in evidence["backgrounds"]
     )
+
+
+def test_committed_v2_evidence_covers_expanded_scenarios() -> None:
+    repo_root = Path(__file__).resolve().parent.parent
+    evidence = json.loads(
+        (repo_root / "artifacts/manifests/production_sensitivity_v2.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert evidence["toolkit_version"] == "0.2.45"
+    assert evidence["suite_id"] == "production_sensitivity_v2"
+    assert evidence["curves"]["overall"] == {
+        "trials": 16,
+        "recovered": 8,
+        "recovery_rate": 0.5,
+    }
+    assert evidence["failures"] == []
+    assert {
+        row["injection_type"] for row in evidence["results"]
+    } == {"periodic", "ttv", "single_transit", "data_gap", "stellar_variability"}
+    assert all(
+        background["sectors_or_quarters"] == [1, 2, 3, 4]
+        and len(background["raw_uris"]) == 4
+        for background in evidence["backgrounds"]
+    )
+    assert all(
+        row["cadences_removed"] > 0
+        for row in evidence["results"]
+        if row["injection_type"] == "data_gap"
+    )
+    assert all(
+        row["recovery_basis"] == "event_time_overlap"
+        for row in evidence["results"]
+        if row["injection_type"] == "single_transit"
+    )
