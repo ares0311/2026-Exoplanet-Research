@@ -5,8 +5,8 @@ catalog ephemeris for pi Mensae c was recovered within 0.005% with ensemble
 FPP 0.4405, while the TOI-146.01 false-positive control produced no signal.
 No Tier 1 gaps remain open.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
-Branch: `main` (85 production-critical Skills; non-production fluff removed)
-Test baseline: 2,700 default tests passing; 2 `integration_live` tests excluded by
+Branch: `main` (86 production-critical Skills; non-production fluff removed)
+Test baseline: 2,703 default tests passing; 2 `integration_live` tests excluded by
 the configured marker expression (2026-07-12)
 
 ---
@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.48 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.49 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -308,6 +308,16 @@ and schema-v2 ledger rows now carry empirical rank/FDR context. The null
 calibrated score and null decision threshold are intentional production facts,
 not missing work. Bounded Phase 2 is complete; the active roadmap priority is
 the Phase 3 representation benchmark.
+0.2.49 adds the bounded Phase 3 benchmark contract and tooling. A compact
+masked-reconstruction Transformer pretrains only on the predefined Kepler
+training split with labels hidden from the objective, freezes its encoder,
+fits a linear probe, and opens the KIC-grouped frozen test split once. The
+result compares grouped AUC and top-100 yield against a period/duration/flux-
+summary linear baseline and frozen `benchmark_cnn_v1` AUC 0.957211. The script
+uses accelerator-first `device=auto`, per-epoch progress/ETA, an ignored
+checkpoint, exact hashes, and a Run Report. Tooling is complete; the merged-
+code evidence run remains pending, and the full Phase 3 data/evaluation
+requirements remain explicitly open.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of
@@ -507,8 +517,8 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Bounded short-period real-background production sensitivity v1 | ✅ 23/36 recovered; zero failures |
 | Expanded Q1-Q4 production sensitivity v2 | ✅ 8/16 recovered; zero failures |
 | Empirical full-ensemble candidate context | ✅ 588-row K2 reference; no invented threshold |
-| 85 production-critical Skills/ | ✅ |
-| 2,700 default tests, ruff clean, mypy clean | ✅ |
+| 86 production-critical Skills/ | ✅ |
+| 2,703 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -517,9 +527,9 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 
 Run these before any live deployment or public announcement:
 
-- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-12: 2,700 passed; 2 `integration_live` tests excluded by configuration)
-- [x] `.venv/bin/ruff check .` — no lint errors (2026-07-11: clean)
-- [x] `.venv/bin/python -m mypy src` — no type errors (2026-07-11: clean, 30 source files)
+- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-12: 2,703 passed; 2 `integration_live` tests excluded by configuration)
+- [x] `.venv/bin/ruff check .` — no lint errors (2026-07-12: clean)
+- [x] `.venv/bin/python -m mypy src` — no type errors (2026-07-12: clean, 33 source files)
 - [x] `exo background-run-once --dry-run` — no config errors (2026-07-10: installed entry point exercised successfully; dry run wrote no ledger/outcome data)
 - [x] `.venv/bin/python Skills/tier2_progress_reporter.py` — 2026-07-11 reports READY from 15,649 committed-evidence examples/snippets, promoted checkpoint, calibration, and registry entry
 - [x] Verify `configs/background_search_v0.json` fingerprint matches expected value (2026-07-10: `exo sqlite-integrity` returned `ok: true` and `missing_config_fingerprint_count: 0`)

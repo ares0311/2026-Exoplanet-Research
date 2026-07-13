@@ -87,6 +87,7 @@ datasets:
     allowed_uses:
       - Fit benchmark_cnn_v1 model parameters
       - Reproduce the selected master checkpoint training run
+      - Fit the versioned Phase 3 masked-reconstruction pilot with labels hidden from the pretraining objective
     forbidden_uses:
       - Tune final thresholds
       - Report blind-search discoveries
@@ -110,6 +111,7 @@ datasets:
       - Select best epoch by validation AUC
       - Fit temperature scaling calibration parameter
       - Early stopping and learning-rate scheduling
+      - Select masked-reconstruction and frozen linear-probe states for the versioned Phase 3 pilot
     forbidden_uses:
       - Final held-out performance claim
       - Blind-search discovery claim
@@ -153,6 +155,7 @@ datasets:
     allowed_uses:
       - One-time benchmark_cnn_v1 promotion gate report
       - Regression comparison against future model families
+      - One-time grouped-holdout evaluation of each versioned Phase 3 representation benchmark
     forbidden_uses:
       - Training
       - Epoch selection

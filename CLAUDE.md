@@ -28,8 +28,11 @@ commits the Q1-Q4 v2 run (8/16 recovered, zero failures) for TTV,
 single-transit, deterministic gaps, injected stellar variability, and 90-day
 cases. Version 0.2.48 commits the fail-closed empirical candidate-context
 reference from the held-out K2 calibration role. Phase 1 and bounded Phase 2
-are complete; the active roadmap priority is the Phase 3 representation
-benchmark against BLS/tabular/`benchmark_cnn_v1`. See `docs/ROADMAP.md`.
+are complete. Version 0.2.49 adds the leakage-safe Phase 3 masked-representation
+pilot contract against a BLS-metadata/statistical linear baseline and frozen
+`benchmark_cnn_v1`; the merged-code evidence run is still required and the
+full Phase 3 data requirements remain open. See `docs/ROADMAP.md` and
+`docs/REPRESENTATION_BENCHMARK.md`.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
@@ -93,8 +96,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 133 top-level test files. Local validation on 2026-07-12 passed with 2,700 default tests and 2 `integration_live` tests deselected.
-**Skills:** 113 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
+**Current test surface:** 134 top-level test files. Local validation on 2026-07-12 passed with 2,703 default tests and 2 `integration_live` tests deselected.
+**Skills:** 114 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
 
 ---
 

@@ -79,9 +79,16 @@ by itself satisfy a master-guide evidence requirement.
    Version 0.2.48 commits `models/candidate_context_v1.json`, built from merged
    code over all 588 reference rows with exact source hashes and a successful
    Run Report. No probability calibration or threshold is claimed.
-6. **Phase 3 representation benchmark (ACTIVE):** benchmark self-supervised light-curve embeddings
-   against BLS/tabular/`benchmark_cnn_v1`; do not start frontier representation
-   work while Phase 1–2 evidence gaps remain.
+6. **Phase 3 representation benchmark (PILOT TOOLING READY; EVIDENCE RUN
+   PENDING):** version 0.2.49 adds a bounded masked-reconstruction Transformer
+   pilot over the existing predefined KIC-grouped Kepler splits. Labels are
+   hidden during training-only pretraining; the encoder is frozen before a
+   linear probe; validation selects states; and the frozen test split opens
+   once against a period/duration/flux-summary linear baseline and
+   `benchmark_cnn_v1`. The merged-code result is still required. Even a passing
+   pilot does not close Phase 3: broad unlabeled Kepler/TESS data, stellar-
+   variability labels, injection-recovery comparison, and external foundation-
+   model baselines remain missing.
 
 ## Milestone 1 — Scoring and Classification Engine ✓ COMPLETE
 
