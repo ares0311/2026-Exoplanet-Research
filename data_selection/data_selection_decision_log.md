@@ -1,5 +1,31 @@
 # Data Selection Decision Log
 
+## 2026-07-12 — Kepler masked-representation pilot v1
+
+**Repo:** 2026 Exoplanet Research
+**Data:** Existing 15,649-row `t1_1_kepler_master_combined` corpus
+**Roles:** Existing predefined training, validation, and frozen-evaluation roles
+**Acquisition:** No download; reuse the validated local corpus and its KIC-grouped splits.
+**Decision:** Permit masked-reconstruction pretraining on training rows with labels
+hidden from the objective, then freeze the encoder and fit a linear probe on
+training labels. Validation may select the pretraining/probe states. The frozen
+test split may be opened once for the versioned v1 result.
+**Comparison:** Report grouped test AUC and top-100 positive yield against a
+period/duration/flux-summary linear baseline and the frozen
+`benchmark_cnn_v1` AUC 0.957211.
+**Leakage controls:** Fail on any `group_key` overlap; compute normalization
+from training rows only; never tune from test results; record exact corpus,
+config, and checkpoint hashes.
+**Rejected interpretation:** These labeled snippets are being treated as
+unlabeled inputs, but they are not a broad unlabeled Kepler/TESS corpus. A
+pilot pass would not satisfy the full master-guide data requirement or authorize
+model promotion.
+**Storage:** No new raw data. One ignored small checkpoint plus one committed
+result manifest and Run Report; safely below the 100 GB project ceiling.
+**Next action:** Merge the benchmark tooling, run it from merged `main`, and
+commit the measured outcome separately without changing the gate after seeing
+the frozen-test result.
+
 ## 2026-07-12 — K2 empirical candidate-score context v1
 
 **Repo:** 2026 Exoplanet Research

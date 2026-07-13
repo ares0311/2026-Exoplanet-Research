@@ -1,0 +1,20 @@
+{
+  "n_bins": 201,
+  "d_model": 32,
+  "n_heads": 4,
+  "n_layers": 2,
+  "dim_feedforward": 64,
+  "dropout": 0.1,
+  "mask_fraction": 0.2,
+  "batch_size": 128,
+  "pretrain_epochs": 12,
+  "probe_epochs": 80,
+  "learning_rate": 0.001,
+  "probe_learning_rate": 0.03,
+  "weight_decay": 0.0001,
+  "patience": 4,
+  "probe_patience": 12,
+  "seed": 42,
+  "device": "auto",
+  "top_k": 100
+}
