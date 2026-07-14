@@ -93,7 +93,8 @@ def test_exo_guard_tool_list_is_fixed() -> None:
 def test_quality_gate_tool_uses_canonical_parallel_supervisor() -> None:
     command = _quality_gate_command()
     assert command[1:] == ("Skills/run_quality_gates.py",)
-    assert command[0].endswith("/.venv/bin/python")
+    assert Path(command[0]).is_file()
+    assert Path(command[0]).name.startswith("python")
 
 
 def test_background_subcommands_use_module_invocation_not_bare_exo() -> None:
