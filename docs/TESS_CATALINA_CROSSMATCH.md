@@ -1,9 +1,17 @@
 # TESS–Catalina Variability-Label Crossmatch
 
 Version 0.2.62 adds the bounded gate between the verified Catalina label source
-and the 2,790-TIC cached TESS representation inventory. Its immutable contract
-is `metadata/tess_catalina_crossmatch_contract_v1.json`; its implementation is
+and the 2,790-TIC cached TESS representation inventory. Its active immutable
+contract is `metadata/tess_catalina_crossmatch_contract_v2.json`; its implementation is
 `Skills/crossmatch_tess_catalina_labels.py`.
+
+Contract v1 is retained as failed live-schema evidence. MAST rejected its
+`duplicate_i` column before returning rows. Version 0.2.65 activates v2 with
+the live-verified `duplicate_id` field and builds the selected-column request
+from the contract itself.
+The v2 single-batch probe returned all six requested TIC rows in 1.5 seconds
+without a schema error; the 0.2.65 6×6 release gate passed 2,761 tests plus
+Ruff/mypy as 8/8 supervised gates in 26.2 seconds.
 
 ## Authorized scope
 
@@ -27,7 +35,7 @@ optional byte-73 inspection flag. Missing trailing flag bytes mean no flag;
 rows outside the supported 71- to 73-byte fixed-width range still fail closed
 before any MAST request.
 The version 0.2.64 release gate passed 2,760 default tests plus Ruff/mypy as
-8/8 supervised gates in 34.3 seconds under the canonical 6×6 topology.
+8/8 supervised gates in 25.2 seconds under the canonical 6×6 topology.
 
 ## Match safeguards
 

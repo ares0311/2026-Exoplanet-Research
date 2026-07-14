@@ -174,6 +174,11 @@ workers.
   retry remains the next throughput and service-error measurement.
 - Version 0.2.64 validation passed 2,760 tests plus Ruff/mypy as 8/8 supervised
   gates in 25.2 seconds with the canonical 6×6 test topology.
+- Version 0.2.65 uses MAST's live-verified `duplicate_id` TIC column through
+  contract v2; v1's rejected `duplicate_i` field is retained as audit evidence.
+  Validate one six-ID request before the next 6×6 merged-main retry.
+- The v2 six-ID probe returned all rows in 1.5 seconds. Version 0.2.65
+  validation passed 2,761 tests plus Ruff/mypy as 8/8 gates in 26.2 seconds.
 - Version 0.2.63 validation passed the unchanged 2,759 tests plus Ruff/mypy as
   8/8 supervised gates in 27.3 seconds with the canonical 6×6 test topology.
 

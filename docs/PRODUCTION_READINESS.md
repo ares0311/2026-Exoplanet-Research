@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.64 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.65 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -513,6 +513,14 @@ The version 0.2.64 release gate passed 2,760 default tests plus Ruff/mypy as
 8/8 supervised gates in 25.2 seconds under the canonical 6×6 topology; a
 direct parse of the pinned gzip validated all 47,055 rows and the exact flag
 distribution.
+The next merged 6×6 attempt reached MAST and failed closed because v1 requested
+the nonexistent `duplicate_i` column. A bounded live schema check showed MAST
+accepts `duplicate_id` and rejects `duplicate_i`. Version 0.2.65 preserves v1
+as audit evidence, activates `tess_catalina_crossmatch_contract_v2.json`, and
+constructs the MAST column list from that contract. No pilot output was written.
+The v2 single-batch probe returned all six requested TIC rows in 1.5 seconds.
+The version 0.2.65 release gate passed 2,761 default tests plus Ruff/mypy as
+8/8 supervised gates in 26.2 seconds under the canonical 6×6 topology.
 The version 0.2.63 release gate passed the unchanged 2,759 default tests plus
 Ruff/mypy as 8/8 supervised gates in 27.3 seconds under the canonical 6×6
 topology.
