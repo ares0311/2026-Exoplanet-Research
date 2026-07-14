@@ -53,6 +53,13 @@ zero payload bytes downloaded. Evidence artifact SHA-256 is
 Run Report commit `ae4e659`. The source prerequisite is complete, but measured
 inference and every scientific comparison item above remain open.
 
+Version 0.2.57 adds the one-product/two-model inference smoke that addresses
+the runtime-integration portion of the first remaining item. It pins optional
+dependencies, exact weight revisions, a deterministic cached input, CPU thread
+bounds, output shape/finiteness, and isolated memory/timing. Merged smoke
+evidence remains required and will not itself satisfy grouped holdout, top-k,
+variability, or injection-recovery comparison.
+
 The training loop is a single stateful optimization and is not shardable.
 Batching uses the selected accelerator; `device=auto` prefers MPS, then CUDA,
 then CPU. Every epoch prints loss, learning rate, patience state, and ETA. A

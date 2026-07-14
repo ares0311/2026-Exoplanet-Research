@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "exo-toolkit"
-version = "0.2.56"
+version = "0.2.57"
 description = "TESS/Kepler exoplanet candidate detection, vetting, scoring, and submission-pathway toolkit"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -46,6 +46,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+representation = [
+  "light-curve==0.13.1",
+  "onnxruntime==1.27.0",
+  "huggingface-hub==1.23.0"
+]
 dev = [
   "pytest",
   "pytest-cov",

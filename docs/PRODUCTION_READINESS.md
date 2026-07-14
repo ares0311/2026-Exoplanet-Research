@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.56 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.57 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -421,6 +421,21 @@ Run Report commit `ae4e659`. The external-baseline source identity/footprint
 gate is complete. It does not authorize dependency installation, model weight
 download, inference, or training; stellar-variability labels and the
 injection-recovery comparison remain open scientific prerequisites.
+0.2.57 adds the bounded runtime gate that must precede any broad embedding
+extraction. `Skills/smoke_representation_baseline_inference.py` validates the
+source and training-only inventory contracts, selects one deterministic cached
+SPOC product, keeps at most 2,048 clean positive-flux cadences, and downloads
+only the two exact-revision ONNX files into ignored in-repo cache. Each model
+runs in an isolated CPU child with one ONNX intra/inter-op thread; success
+requires a finite `(1, 1, 1, 256)` mean embedding and records time, peak RSS,
+model/input hashes, provider, and thread bounds. The `representation` optional
+dependency group pins the three already-verified packages without changing the
+default runtime. Nine offline tests pass. Merged dependency dry-run,
+installation, and smoke evidence remain next; no training, full-corpus
+extraction, or production model change is authorized. The canonical local gate
+passed 2,743 default tests plus Ruff/mypy in 24.2 seconds with the optional
+inference packages absent, confirming default tests remain offline and
+dependency-independent.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of
@@ -630,7 +645,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 
 Run these before any live deployment or public announcement:
 
-- [x] `.venv/bin/python Skills/run_quality_gates.py` — six test shards × six xdist workers plus concurrent Ruff/mypy all pass (2026-07-14: 2,734 passed; 2 `integration_live` tests excluded; 26.1s wall time)
+- [x] `.venv/bin/python Skills/run_quality_gates.py` — six test shards × six xdist workers plus concurrent Ruff/mypy all pass (2026-07-14: 2,743 passed; 2 `integration_live` tests excluded; 24.2s wall time)
 - [x] `exo background-run-once --dry-run` — no config errors (2026-07-10: installed entry point exercised successfully; dry run wrote no ledger/outcome data)
 - [x] `.venv/bin/python Skills/tier2_progress_reporter.py` — 2026-07-11 reports READY from 15,649 committed-evidence examples/snippets, promoted checkpoint, calibration, and registry entry
 - [x] Verify `configs/background_search_v0.json` fingerprint matches expected value (2026-07-10: `exo sqlite-integrity` returned `ok: true` and `missing_config_fingerprint_count: 0`)

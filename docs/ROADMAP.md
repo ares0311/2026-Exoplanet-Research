@@ -152,6 +152,15 @@ by itself satisfy a master-guide evidence requirement.
    a bounded inference smoke that measures ONNX memory/numerics before any
    optional dependency or weight installation; the scientific experiment also
    still requires variability labels and injection-recovery comparison.
+   Version 0.2.57 implements that smoke: one deterministic cached SPOC product,
+   at most 2,048 cadences, two exact-revision models, isolated one-thread CPU
+   sessions, finite 256-dimensional output checks, and structured timing/RSS
+   evidence. The optional dependency group and ignored model-cache ledger keep
+   the default runtime and `git add .` safe. Next run a merged pip dry-run,
+   install only the optional group, and execute the smoke. A pass will close
+   runtime integration only, not the variability/injection/scientific gates.
+   The local 6×6 gate passed 2,743 default tests plus Ruff/mypy in 24.2 seconds
+   with optional inference packages absent.
 
 ## Milestone 1 — Scoring and Classification Engine ✓ COMPLETE
 

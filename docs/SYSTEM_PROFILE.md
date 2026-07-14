@@ -136,6 +136,8 @@ For a single large numerical job, allow native libraries to use more threads, co
   Ruff/mypy in 31.1s with the same six-shard × six-worker configuration.
 - Version 0.2.56 validation on 2026-07-14 passed 2,734 default tests plus
   Ruff/mypy in 26.1s with the same six-shard × six-worker configuration.
+- Version 0.2.57 validation on 2026-07-14 passed 2,743 default tests plus
+  Ruff/mypy in 24.2s with the same six-shard × six-worker configuration.
 
 ### Cache-local representation preprocessing
 
@@ -164,6 +166,10 @@ For a single large numerical job, allow native libraries to use more threads, co
   embeddings across independent light curves with one parent, six shards, and
   six workers per shard. Keep ONNX Runtime intra/inter-op thread counts bounded
   so 36 workers do not create nested native-thread oversubscription.
+- Version 0.2.57's one-product smoke runs each selected model in a separate CPU
+  process with one ONNX intra-op and one inter-op thread. Sequential children
+  make peak RSS attributable; this is a measurement exception, not the future
+  extraction topology.
 
 ### AI/ML Training
 
