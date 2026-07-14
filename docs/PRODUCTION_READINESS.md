@@ -5,9 +5,9 @@ catalog ephemeris for pi Mensae c was recovered within 0.005% with ensemble
 FPP 0.4405, while the TOI-146.01 false-positive control produced no signal.
 No Tier 1 gaps remain open.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
-Branch: `main` (89 production-critical Skills; non-production fluff removed)
-Test baseline: 2,718 default tests passing; 2 `integration_live` tests excluded by
-the configured marker expression (2026-07-13)
+Branch: `main` (90 production-critical Skills; non-production fluff removed)
+Test baseline: 2,726 default tests passing; 2 `integration_live` tests excluded by
+the configured marker expression (2026-07-13; 6×6 gate: 34.1s)
 
 ---
 
@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.53 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.54 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -367,6 +367,19 @@ covered BLS layer instead of repeating expensive real searches. This
 single-parent optimized pattern is now the default for every safely
 partitionable workload. The acquisition launcher's merged-code
 validation remains a no-download dry run.
+0.2.54 adds `Skills/benchmark_representation_preprocessing.py`, the bounded
+Phase 3 gate that must run before derived arrays or broader representation
+training are authorized. It validates the exact committed training-only TESS
+inventory and cached-file containment/sizes, selects 36 distinct TIC groups
+across sectors 1-98, and uses six supervised Python shard subprocesses with six
+FITS workers each. Each product is filtered to finite `QUALITY == 0` cadences,
+robustly normalized, resampled to 2,048 float32 bins in memory, hashed for
+evidence, and discarded. The aggregate records throughput, child/parent memory,
+and projected full-inventory normalized-flux size; it performs no downloads.
+Eight focused tests, the real-inventory dry run, a six-subprocess real-cache
+smoke (6/6 successful), and the full 2,726-test/Ruff/mypy 6×6 gate pass. The
+merged-code 36-product evidence artifact is intentionally pending until this
+release reaches `main`.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of
@@ -566,8 +579,8 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Bounded short-period real-background production sensitivity v1 | ✅ 23/36 recovered; zero failures |
 | Expanded Q1-Q4 production sensitivity v2 | ✅ 8/16 recovered; zero failures |
 | Empirical full-ensemble candidate context | ✅ 588-row K2 reference; no invented threshold |
-| 89 production-critical Skills/ | ✅ |
-| 2,718 default tests, ruff clean, mypy clean | ✅ |
+| 90 production-critical Skills/ | ✅ |
+| 2,726 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -576,7 +589,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 
 Run these before any live deployment or public announcement:
 
-- [x] `.venv/bin/python Skills/run_quality_gates.py` — six test shards × six xdist workers plus concurrent Ruff/mypy all pass (2026-07-13: 2,718 passed; 2 `integration_live` tests excluded; 34.1s wall time)
+- [x] `.venv/bin/python Skills/run_quality_gates.py` — six test shards × six xdist workers plus concurrent Ruff/mypy all pass (2026-07-13: 2,726 passed; 2 `integration_live` tests excluded; 34.1s wall time)
 - [x] `exo background-run-once --dry-run` — no config errors (2026-07-10: installed entry point exercised successfully; dry run wrote no ledger/outcome data)
 - [x] `.venv/bin/python Skills/tier2_progress_reporter.py` — 2026-07-11 reports READY from 15,649 committed-evidence examples/snippets, promoted checkpoint, calibration, and registry entry
 - [x] Verify `configs/background_search_v0.json` fingerprint matches expected value (2026-07-10: `exo sqlite-integrity` returned `ok: true` and `missing_config_fingerprint_count: 0`)

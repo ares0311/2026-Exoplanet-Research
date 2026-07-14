@@ -130,6 +130,21 @@ For a single large numerical job, allow native libraries to use more threads, co
   2,718 default tests plus Ruff/mypy in 34.1s, about 58% faster than the 81.57s
   single-universe baseline. Direct `-n auto --dist=worksteal` remains the
   focused-test and constrained-environment fallback.
+- Version 0.2.54 validation on the same date passed 2,726 default tests plus
+  Ruff/mypy in 34.1s with the same six-shard × six-worker configuration.
+
+### Cache-local representation preprocessing
+
+- `Skills/benchmark_representation_preprocessing.py` uses six ordinary Python
+  shard subprocesses with six FITS I/O/preprocessing threads per shard. This
+  avoids Python process-pool semaphore requirements while preserving the 6×6
+  single-parent model inside the approved sandbox.
+- Numeric backend inner threads are capped at one in every shard. The bounded
+  production sample is 36 products, one per TIC group, so every worker owns at
+  most one product in the default run.
+- A six-product real-cache process smoke passed 6/6 with no derived-array
+  persistence on 2026-07-13. Use the merged 36-product result—not the smoke—to
+  decide whether the measured throughput and memory justify further scaling.
 
 ### AI/ML Training
 

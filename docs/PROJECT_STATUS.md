@@ -1,8 +1,8 @@
 # PROJECT STATUS
 
 ## Status: Active Development
-## Phase: Dataset/Model Training Reset — production checkpoint path
-## Last Updated: 2026-07-08
+## Phase: Phase 3 bounded representation preprocessing gate
+## Last Updated: 2026-07-13
 
 ---
 
@@ -14,8 +14,8 @@ The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit w
 - Bayesian log-score model over six hypotheses
 - Optional XGBoost and stacking scorer modes (Tier 1 model trained: Kepler KOI AUC=0.992)
 - SQLite-backed background automation with top-level logs
-- 98 standalone `Skills/` utility scripts (`rg --files Skills -g '*.py'`)
-- 114 top-level test files
+- 118 standalone `Skills/` utility scripts (`rg --files Skills -g '*.py'`)
+- 138 top-level test files
 - 27 package Python modules under `src/exo_toolkit/`
 - JWST time-series ingestion wired into the CLI with `--mission JWST`
 - Novel TESS target scanning that excludes TOI, CTOI, and confirmed-host catalogs
@@ -244,7 +244,7 @@ Validated on 2026-07-13:
 ```
 
 Result: Ruff and mypy passed; six disjoint pytest shards × six xdist workers
-passed 2,718 default tests in 34.1 seconds total. Two `integration_live` tests
+passed 2,726 default tests in 34.1 seconds total. Two `integration_live` tests
 remain excluded by default.
 
 ---
