@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.69 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.70 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -565,6 +565,18 @@ Aggregate SHA-256 is `36de00dc…da403`; Run Report commit is `78b7be6`.
 The version 0.2.69 evidence-release gate passed 2,773 default tests plus
 Ruff/mypy as 8/8 supervised gates in 32.3 seconds under the canonical 6x6
 topology.
+Version 0.2.70 closes the follow-up scientific-design prerequisite with the
+immutable cache-only representation variability/injection contract and 6x6
+benchmark harness. It selects all 48 matched TICs, freezes four bounded
+3/10-day and 500/2,000-ppm scenarios, and requires 192 unique BLS trials plus
+384 unique paired frozen-model rows. Chronos-Bolt tiny and Astromer2 use their
+already-verified exact ONNX cache files; only hashes and cosine/L2 distances
+may be written. The merged-main execution remains pending. A PASS must include
+zero failures, duplicates, downloads, or persisted embeddings and cannot
+authorize training or a production change. See
+`docs/REPRESENTATION_VARIABILITY_INJECTION_BENCHMARK.md`.
+The version 0.2.70 release gate passed 2,780 default tests plus Ruff/mypy as
+8/8 supervised gates in 33.3 seconds under the canonical 6x6 topology.
 The version 0.2.63 release gate passed the unchanged 2,759 default tests plus
 Ruff/mypy as 8/8 supervised gates in 27.3 seconds under the canonical 6×6
 topology.

@@ -28,6 +28,9 @@ HARD_STORAGE_LIMIT_GB = 100.0
 _GB = 1_000_000_000
 _RESERVED_FLAGS = ("--workers", "--shard-index", "--shard-count")
 _ALLOWED_SCRIPTS = {
+    "benchmark_representation_variability_injection.py": (
+        "cache-only paired BLS and frozen-embedding benchmark"
+    ),
     "preflight_tess_asassn_labels.py": "metadata-only exact-TIC ASAS-SN overlap preflight",
     "crossmatch_tess_catalina_labels.py": "bounded TESS-Catalina metadata pilot",
     "process_t1_kepler_batch.py": "Kepler manifest processor (validated at 6x6)",

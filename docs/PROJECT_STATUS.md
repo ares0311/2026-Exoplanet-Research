@@ -124,6 +124,16 @@ summaries, aggregate, and integrity test. Follow-up embedding-aware benchmark
 design is now the active scientific gate; training remains unauthorized.
 The 0.2.69 evidence-release gate passed 2,773 default tests plus Ruff/mypy as
 8/8 supervised gates in 32.3 seconds under the canonical 6x6 topology.
+Version 0.2.70 freezes the next cache-only gate: all 48 matched TICs, four
+bounded injection cells, 192 unique blind-BLS trials, and 384 paired rows from
+the exact cached Chronos-Bolt tiny and Astromer2 models. The implementation is
+allowlisted in the single-parent 6x6 launcher and persists no embeddings or
+modified light curves. The merged-main evidence run is next. Its results are
+descriptive only; training, broad extraction, promotion, and production scoring
+remain unauthorized. See
+`docs/REPRESENTATION_VARIABILITY_INJECTION_BENCHMARK.md`.
+The 0.2.70 release gate passed 2,780 default tests plus Ruff/mypy as 8/8
+supervised gates in 33.3 seconds under the canonical 6x6 topology.
 The 0.2.63 release gate passed the unchanged 2,759 tests plus Ruff/mypy as 8/8
 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 

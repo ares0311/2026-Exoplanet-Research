@@ -375,6 +375,25 @@ the seven exact-path Run Report ledgers are commit `78b7be6`.
 The version 0.2.69 evidence-release gate passed 2,773 default tests plus
 Ruff/mypy as 8/8 supervised gates in 32.3 seconds under the canonical 6x6
 topology.
+
+**Phase 3 representation variability/injection gate:** version 0.2.70 freezes
+`metadata/representation_variability_injection_contract_v1.json` and adds
+`Skills/benchmark_representation_variability_injection.py`. The benchmark uses
+all 48 training-disabled ASAS-SN matches and four precommitted 3/10-day,
+500/2,000-ppm injection cells: 192 unique trials and 384 paired frozen-model
+rows. Blind BLS runs alongside Chronos-Bolt tiny and Astromer2 embedding shifts.
+No catalog/model payload, embedding array, or modified light curve may be
+downloaded or persisted. Run only from clean merged `main` through
+`Skills/run_six_shards.py`: six modulo TIC shards, six FITS/BLS workers per
+shard, and one serialized exact-weight session per model per shard. Global
+reconciliation must prove 48 TICs, 192 trials, 384 unique model rows, two exact
+models, zero failures/duplicates/downloads/persisted embeddings, and both
+authorization flags false. A PASS is descriptive scientific evidence only; it
+does not authorize training, extraction, promotion, or production scoring. See
+`docs/REPRESENTATION_VARIABILITY_INJECTION_BENCHMARK.md`.
+The version 0.2.70 release gate passed 2,780 default tests plus Ruff/mypy as
+8/8 supervised gates in 33.3 seconds under the canonical 6x6 topology.
+
 The version 0.2.62 release gate passed 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 34.3 seconds under the canonical 6×6 topology.
 Version 0.2.63 explicitly ignores the shared

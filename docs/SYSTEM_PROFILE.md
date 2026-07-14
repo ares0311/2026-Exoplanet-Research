@@ -206,6 +206,16 @@ workers.
   scale higher for this already-sub-10-second workload.
 - Version 0.2.69 validation passed 2,773 default tests plus Ruff/mypy as 8/8
   supervised gates in 32.3 seconds under the canonical 6x6 test topology.
+- Version 0.2.70's representation variability/injection harness retains the
+  six-shard x six-worker shape for 48 independent cached TICs. FITS preparation
+  and blind BLS own the six per-shard workers; frozen embedding inference is
+  serialized through one Chronos-Bolt tiny and one Astromer2 session per shard
+  so the process topology does not multiply into 72 ONNX sessions. Numeric and
+  ONNX inner threads remain one. A one-TIC cache-only smoke read 12,508 clean
+  cadences, completed all four injection/BLS trials, and returned finite
+  256-element outputs from both models in under two seconds without writes.
+- Version 0.2.70 validation passed 2,780 default tests plus Ruff/mypy as 8/8
+  supervised gates in 33.3 seconds under the canonical 6x6 test topology.
 - Version 0.2.63 validation passed the unchanged 2,759 tests plus Ruff/mypy as
   8/8 supervised gates in 27.3 seconds with the canonical 6×6 test topology.
 
