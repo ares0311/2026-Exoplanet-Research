@@ -138,6 +138,9 @@ For a single large numerical job, allow native libraries to use more threads, co
   Ruff/mypy in 26.1s with the same six-shard × six-worker configuration.
 - Version 0.2.57 validation on 2026-07-14 passed 2,743 default tests plus
   Ruff/mypy in 24.2s with the same six-shard × six-worker configuration.
+- Version 0.2.58 validation on 2026-07-14 passed 2,743 default tests plus
+  Ruff/mypy in 26.2s with the same configuration and the optional
+  representation dependencies installed.
 
 ### Cache-local representation preprocessing
 
@@ -170,6 +173,9 @@ For a single large numerical job, allow native libraries to use more threads, co
   process with one ONNX intra-op and one inter-op thread. Sequential children
   make peak RSS attributable; this is a measurement exception, not the future
   extraction topology.
+- Keep `HF_HOME` and `HF_XET_CACHE` under the ignored in-repo model cache
+  before Hub import. The 0.2.57 smoke proved that Xet otherwise falls back to a
+  sandbox-blocked home-cache log path; 0.2.58 makes containment explicit.
 
 ### AI/ML Training
 

@@ -33,6 +33,12 @@ weight payload is 29,890,844 bytes; package wheels and transitive dependencies
 are separate environment state. The smoke downloads no mission data and writes
 no derived light-curve corpus.
 
+Version 0.2.58 sets `HF_HOME` and `HF_XET_CACHE` below the ignored model cache
+before importing `huggingface_hub`. The first merged 0.2.57 attempt exposed
+this requirement by failing closed when Xet tried to write its log below
+sandbox-blocked `~/.cache/huggingface`; it downloaded no model payload and left
+only 8 KB of local-dir metadata.
+
 ## Runtime installation
 
 The optional `representation` dependency group is pinned to the already

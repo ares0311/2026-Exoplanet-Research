@@ -107,6 +107,13 @@ tests cover source drift, preprocessing, pinned downloads, thread/provider
 bounds, call signatures, and guardrails. The merged smoke remains next; no
 scientific comparison or full-inventory extraction is authorized. See
 `docs/REPRESENTATION_INFERENCE_SMOKE.md`.
+The first merged 0.2.57 invocation failed closed before downloading a model:
+the Xet helper attempted to create its log below sandbox-blocked
+`~/.cache/huggingface`. Version 0.2.58 fixes that integration defect by setting
+`HF_HOME` and `HF_XET_CACHE` to ignored repo-contained paths before the lazy
+Hub import. The partial cache is only 8 KB of metadata. The 0.2.58 6×6 gate
+passed 2,743 tests plus Ruff/mypy in 26.2 seconds with the optional group
+installed; merged smoke evidence remains next.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
@@ -170,7 +177,7 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 140 top-level test files. Version 0.2.57 adds nine offline external-baseline inference-smoke tests; the full 6×6 run passed 2,743 default tests plus Ruff/mypy in 24.2s with optional inference packages absent.
+**Current test surface:** 140 top-level test files. Version 0.2.58 carries nine offline external-baseline inference-smoke tests; the full 6×6 run passed 2,743 default tests plus Ruff/mypy in 26.2s with the optional representation group installed.
 **Skills:** 120 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
 
 ---

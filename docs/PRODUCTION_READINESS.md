@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.57 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.58 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -436,6 +436,15 @@ extraction, or production model change is authorized. The canonical local gate
 passed 2,743 default tests plus Ruff/mypy in 24.2 seconds with the optional
 inference packages absent, confirming default tests remain offline and
 dependency-independent.
+The first merged 0.2.57 runtime attempt failed closed before model payload
+download: `hf-xet` tried to write its runtime log under sandbox-blocked
+`~/.cache/huggingface`. It produced only 8 KB of ignored local-dir metadata,
+no result artifact, and no Run Report. Version 0.2.58 configures `HF_HOME` and
+`HF_XET_CACHE` below `.cache/representation_models/` before Hub import, keeping
+all helper state repo-contained and ignored. The optional group is installed
+and `pip check` passes; its measured venv delta is 119,648 KiB. The 0.2.58
+canonical gate passed the same 2,743 tests plus Ruff/mypy in 26.2 seconds.
+Merged smoke execution remains the next runtime gate.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of
@@ -645,7 +654,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 
 Run these before any live deployment or public announcement:
 
-- [x] `.venv/bin/python Skills/run_quality_gates.py` — six test shards × six xdist workers plus concurrent Ruff/mypy all pass (2026-07-14: 2,743 passed; 2 `integration_live` tests excluded; 24.2s wall time)
+- [x] `.venv/bin/python Skills/run_quality_gates.py` — six test shards × six xdist workers plus concurrent Ruff/mypy all pass (2026-07-14: 2,743 passed; 2 `integration_live` tests excluded; 26.2s wall time on 0.2.58 with optional representation dependencies installed)
 - [x] `exo background-run-once --dry-run` — no config errors (2026-07-10: installed entry point exercised successfully; dry run wrote no ledger/outcome data)
 - [x] `.venv/bin/python Skills/tier2_progress_reporter.py` — 2026-07-11 reports READY from 15,649 committed-evidence examples/snippets, promoted checkpoint, calibration, and registry entry
 - [x] Verify `configs/background_search_v0.json` fingerprint matches expected value (2026-07-10: `exo sqlite-integrity` returned `ok: true` and `missing_config_fingerprint_count: 0`)
