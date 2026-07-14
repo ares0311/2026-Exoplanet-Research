@@ -39,6 +39,19 @@ this requirement by failing closed when Xet tried to write its log below
 sandbox-blocked `~/.cache/huggingface`; it downloaded no model payload and left
 only 8 KB of local-dir metadata.
 
+## Merged result
+
+The merged 0.2.58 retry passed on 2026-07-14. Both exact-revision models emitted
+finite `(1, 1, 1, 256)` embeddings from the same 2,048-cadence TESS input in
+26.875 seconds total. Chronos-Bolt tiny peak RSS was 126,058,496 bytes;
+Astromer2 peak RSS was 186,204,160 bytes. Exact ONNX payload is 29,890,844
+bytes, while all ignored cache files total 29,960,842 bytes. The durable result
+artifact SHA-256 is `1cc59ab32e3a8a57e7d966c7cb9b22af04185c0c45245547c853fae7e5de5d10`;
+Run Report commit is `f8a7207`. Version 0.2.59 records the runtime gate as
+complete. This PASS does not authorize broad extraction or training.
+The 0.2.59 6×6 evidence-release gate passed 2,743 default tests plus Ruff/mypy
+in 34.3 seconds.
+
 ## Runtime installation
 
 The optional `representation` dependency group is pinned to the already

@@ -77,9 +77,11 @@ This closes source identity and direct-footprint evidence only. It does not
 verify inference numerics or authorize dependency installation, weight
 download, model training, or production promotion.
 
-Version 0.2.57 implements the separately bounded runtime gate in
-`docs/REPRESENTATION_INFERENCE_SMOKE.md`; merged smoke evidence is still
-required before any broader extraction decision.
+Version 0.2.59 records the successful separately bounded runtime gate in
+`docs/REPRESENTATION_INFERENCE_SMOKE.md` (artifact SHA
+`1cc59ab3…5de5d10`, Run Report `f8a7207`). Source and runtime prerequisites are
+complete; scientific variability/injection gates still block broader
+extraction or training.
 
 ## Parallelism decision
 

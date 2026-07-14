@@ -50,15 +50,18 @@ The merged version 0.2.56 verification passed on 2026-07-14: 7/7 operations in
 4.94 seconds, all five sources verified, 56,036,648 projected direct bytes, and
 zero payload bytes downloaded. Evidence artifact SHA-256 is
 `5610bbb859463e180bd9ee65ee7317518458560421487253d272b2d3b5753042`;
-Run Report commit `ae4e659`. The source prerequisite is complete, but measured
-inference and every scientific comparison item above remain open.
+Run Report commit `ae4e659`. The source prerequisite is complete.
 
 Version 0.2.57 adds the one-product/two-model inference smoke that addresses
 the runtime-integration portion of the first remaining item. It pins optional
 dependencies, exact weight revisions, a deterministic cached input, CPU thread
 bounds, output shape/finiteness, and isolated memory/timing. Merged smoke
-evidence remains required and will not itself satisfy grouped holdout, top-k,
-variability, or injection-recovery comparison.
+evidence will not itself satisfy grouped holdout, top-k, variability, or
+injection-recovery comparison. The merged retry passed both exact models in
+26.875 seconds with finite `(1,1,1,256)` embeddings and max child RSS
+186,204,160 bytes. Artifact SHA-256 is `1cc59ab3…5de5d10`; Run Report commit
+`f8a7207`. Version 0.2.59 records runtime integration complete while every
+scientific comparison item above remains open.
 
 The training loop is a single stateful optimization and is not shardable.
 Batching uses the selected accelerator; `device=auto` prefers MPS, then CUDA,

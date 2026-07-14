@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "last_updated": "2026-07-14",
-  "production_gap": "Tier 1 and Tier 2 deployment gates are closed; tess_live_search_v1 retains one plausible but weak signal with evidence-limited follow-up complete; Phase 3 external baseline sources and preprocessing are evidenced, while bounded inference, stellar-variability labels, injection comparison, and broader scientific evaluation remain open",
+  "production_gap": "Tier 1 and Tier 2 deployment gates are closed; tess_live_search_v1 retains one plausible but weak signal with evidence-limited follow-up complete; Phase 3 external baseline source, preprocessing, and bounded runtime gates are evidenced, while stellar-variability labels, injection comparison, and broader scientific evaluation remain open",
   "policy": {
     "standard_operator_cadence": "git add .",
     "git_add_dot_must_be_safe": true,
@@ -1710,18 +1710,25 @@
     {
       "path": ".cache/representation_models/",
       "kind": "external_representation_model_cache",
-      "status": "expected_not_yet_materialized",
+      "status": "local_validated_pass",
       "git_policy": "ignored",
       "last_known": {
-        "tool_version": "0.2.58",
-        "expected_models": 2,
-        "expected_weight_bytes": 29890844,
+        "tool_version": "0.2.59",
+        "models": 2,
+        "weight_bytes": 29890844,
+        "cache_file_bytes": 29960842,
+        "cache_allocated_kib": 29288,
+        "max_child_peak_rss_bytes": 186204160,
+        "elapsed_seconds": 26.875301584019326,
+        "artifact": "artifacts/manifests/representation_baseline_inference_smoke_v1.json",
+        "artifact_sha256": "1cc59ab32e3a8a57e7d966c7cb9b22af04185c0c45245547c853fae7e5de5d10",
+        "run_report_commit": "f8a7207",
         "source_contract": "metadata/representation_baseline_source_contract_v1.json",
         "source_evidence": "artifacts/manifests/representation_baseline_source_verification_v1.json",
         "verified_on": "2026-07-14"
       },
-      "validation_gate": "Materialize only exact contract revisions through the merged one-product inference smoke; verify file sizes and SHA-256 before session creation.",
-      "next_action": "Run dependency dry-run after merge, install only the optional representation group, execute the bounded smoke, and record actual cache size/hashes. Do not commit weights or authorize full-inventory extraction from a smoke PASS."
+      "validation_gate": "PASS: merged one-product smoke verified exact revisions/hashes and finite (1,1,1,256) embeddings for both models on CPU with one intra/inter-op thread.",
+      "next_action": "Retain ignored exact-revision cache for the future frozen scientific comparison. Do not authorize full-inventory extraction or training until stellar-variability labels and injection-recovery design are committed."
     },
     {
       "path": "~/.lightkurve/cache/mastDownload/",

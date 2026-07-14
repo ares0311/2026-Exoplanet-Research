@@ -297,6 +297,8 @@ configuration; optional inference packages remained absent from default tests.
 Version 0.2.58 passed the same 2,743 tests plus Ruff/mypy in 26.2s after the
 optional representation group was installed and the Hub/Xet cache-containment
 regression was added.
+Version 0.2.59 passed 2,743 tests plus Ruff/mypy in 34.3s while recording the
+successful merged inference artifact and closing the bounded runtime gate.
 
 This optimized single-parent shard/worker shape is the standing default
 wherever work is safely partitionable: acquisition, processing, tests,
@@ -357,6 +359,14 @@ Version 0.2.58 also requires the smoke to set `HF_HOME` and `HF_XET_CACHE`
 inside `.cache/representation_models/` before importing `huggingface_hub`.
 This is a sandbox, secret-isolation, and `git add .` safety requirement: never
 let the runtime fall back to `~/.cache/huggingface`.
+The merged 0.2.58 retry passed both exact models on 2026-07-14 in 26.875
+seconds: Chronos-Bolt tiny peak RSS 126,058,496 bytes and Astromer2 peak RSS
+186,204,160 bytes, both finite `(1, 1, 1, 256)` embeddings. Exact weight
+payload is 29,890,844 bytes; full ignored cache file content is 29,960,842
+bytes. Durable artifact SHA-256 is `1cc59ab3…5de5d10`; Run Report commit
+`f8a7207`. Runtime integration is complete. The next Phase 3 work is scientific
+design/evidence for stellar-variability labels and injection recovery—not
+unbounded extraction or training.
 
 **Ask, don't assume, when:**
 - The right shard/worker *count* (not whether to shard at all) depends on the operator's own tradeoffs — available machine capacity, concurrent work, and trust in the external service's rate limits.

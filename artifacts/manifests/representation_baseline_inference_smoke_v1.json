@@ -1,0 +1,103 @@
+{
+  "artifact_id": "representation_baseline_inference_smoke_v1",
+  "completed_at_utc": "2026-07-14T05:05:54.927482+00:00",
+  "downloaded_this_run_bytes": 29890844,
+  "elapsed_seconds": 26.875301584019326,
+  "full_inventory_extraction_authorized": false,
+  "inventory_sha256": "38a869666269367480a1aa9d2a29d76a86fb2ec6d2259a23635ad44f257c155a",
+  "limitations": [
+    "One-product smoke verifies runtime integration, finite shape, timing, and memory only.",
+    "Embedding hashes are device/runtime evidence, not scientific performance metrics.",
+    "No grouped holdout, top-k, variability, or injection-recovery comparison is performed."
+  ],
+  "model_cache": ".cache/representation_models",
+  "model_cache_bytes": 29890844,
+  "results": [
+    {
+      "commit": "4f1a5566ae2358712e89fe9189a209a9190c7fca",
+      "embedding_norm": 4.201900959014893,
+      "embedding_sha256": "e6e1b52f303cccf8dd0cd375560450e66207d04f4dc367da852291c02b6bafdd",
+      "embedding_shape": [
+        1,
+        1,
+        1,
+        256
+      ],
+      "filename": "chronos-bolt-tiny.onnx",
+      "finite": true,
+      "inference_seconds": 0.0029167920583859086,
+      "input": {
+        "cache_relative_path": "tess2024030031500-s0075-0000000184426431-0270-s/tess2024030031500-s0075-0000000184426431-0270-s_lc.fits",
+        "group_key": "tess:tic:184426431",
+        "input_bytes": 2024640,
+        "input_cadences": 19947,
+        "relative_magnitude_sha256": "52bc465174ca969c56eb43cb0590b9addc21021c652f3aad556a0bb031339b98",
+        "retained_cadences": 2048,
+        "sector": 75,
+        "target_id": "TIC 184426431"
+      },
+      "inter_op_num_threads": 1,
+      "intra_op_num_threads": 1,
+      "model_bytes": 13901747,
+      "model_sha256": "67c02abc13cd46912314bee7e6651cccc5b0e17c8564a67db226f6e26da78245",
+      "name": "Chronos-Bolt tiny",
+      "peak_rss_bytes": 126058496,
+      "provider": "CPUExecutionProvider",
+      "repo": "light-curve/chronos-bolt-tiny",
+      "session_seconds": 0.028411958017386496,
+      "status": "success"
+    },
+    {
+      "commit": "17752a44aaaa1cd4a014be53e463ee06b61e68f0",
+      "embedding_norm": 17.232351303100586,
+      "embedding_sha256": "6446095cfc2c7a8c1e3d97571c95f37023962a99780875416a729899bf0b8ddc",
+      "embedding_shape": [
+        1,
+        1,
+        1,
+        256
+      ],
+      "filename": "astromer2.onnx",
+      "finite": true,
+      "inference_seconds": 0.06098691595252603,
+      "input": {
+        "cache_relative_path": "tess2024030031500-s0075-0000000184426431-0270-s/tess2024030031500-s0075-0000000184426431-0270-s_lc.fits",
+        "group_key": "tess:tic:184426431",
+        "input_bytes": 2024640,
+        "input_cadences": 19947,
+        "relative_magnitude_sha256": "52bc465174ca969c56eb43cb0590b9addc21021c652f3aad556a0bb031339b98",
+        "retained_cadences": 2048,
+        "sector": 75,
+        "target_id": "TIC 184426431"
+      },
+      "inter_op_num_threads": 1,
+      "intra_op_num_threads": 1,
+      "model_bytes": 15989097,
+      "model_sha256": "1791a71414cc6e1677774369643569a537a48631e897ae2c2de18e32d41d9987",
+      "name": "Astromer2",
+      "peak_rss_bytes": 186204160,
+      "provider": "CPUExecutionProvider",
+      "repo": "light-curve/astromer2",
+      "session_seconds": 0.025116416974924505,
+      "status": "success"
+    }
+  ],
+  "runtime_python": "3.14.3",
+  "schema_version": 1,
+  "selected_input": {
+    "cache_relative_path": "tess2024030031500-s0075-0000000184426431-0270-s/tess2024030031500-s0075-0000000184426431-0270-s_lc.fits",
+    "group_key": "tess:tic:184426431",
+    "input_bytes": 2024640,
+    "input_cadences": 19947,
+    "relative_magnitude_sha256": "52bc465174ca969c56eb43cb0590b9addc21021c652f3aad556a0bb031339b98",
+    "retained_cadences": 2048,
+    "sector": 75,
+    "target_id": "TIC 184426431"
+  },
+  "source_contract_sha256": "38793347a4f404f62aa46a086ad20cb358046a365393333710dd83fca93a3730",
+  "source_evidence_sha256": "5610bbb859463e180bd9ee65ee7317518458560421487253d272b2d3b5753042",
+  "source_gate_status": "success",
+  "started_at_utc": "2026-07-14T05:05:28.052057+00:00",
+  "status": "success",
+  "training_authorized": false
+}

@@ -141,6 +141,8 @@ For a single large numerical job, allow native libraries to use more threads, co
 - Version 0.2.58 validation on 2026-07-14 passed 2,743 default tests plus
   Ruff/mypy in 26.2s with the same configuration and the optional
   representation dependencies installed.
+- Version 0.2.59 evidence-release validation on 2026-07-14 passed 2,743 default
+  tests plus Ruff/mypy in 34.3s with the same configuration.
 
 ### Cache-local representation preprocessing
 
@@ -176,6 +178,10 @@ For a single large numerical job, allow native libraries to use more threads, co
 - Keep `HF_HOME` and `HF_XET_CACHE` under the ignored in-repo model cache
   before Hub import. The 0.2.57 smoke proved that Xet otherwise falls back to a
   sandbox-blocked home-cache log path; 0.2.58 makes containment explicit.
+- The merged bounded retry completed in 26.875s. Chronos-Bolt tiny used
+  126,058,496 bytes peak RSS and Astromer2 used 186,204,160 bytes; both emitted
+  finite `(1,1,1,256)` embeddings with one ONNX intra/inter-op thread. Version
+  0.2.59 records this runtime baseline for later 6×6 extraction sizing.
 
 ### AI/ML Training
 

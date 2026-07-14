@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.58 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.59 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -430,8 +430,8 @@ runs in an isolated CPU child with one ONNX intra/inter-op thread; success
 requires a finite `(1, 1, 1, 256)` mean embedding and records time, peak RSS,
 model/input hashes, provider, and thread bounds. The `representation` optional
 dependency group pins the three already-verified packages without changing the
-default runtime. Nine offline tests pass. Merged dependency dry-run,
-installation, and smoke evidence remain next; no training, full-corpus
+default runtime. Nine offline tests pass. At that point the merged dependency
+dry-run, installation, and smoke evidence remained next; no training, full-corpus
 extraction, or production model change is authorized. The canonical local gate
 passed 2,743 default tests plus Ruff/mypy in 24.2 seconds with the optional
 inference packages absent, confirming default tests remain offline and
@@ -444,7 +444,18 @@ no result artifact, and no Run Report. Version 0.2.58 configures `HF_HOME` and
 all helper state repo-contained and ignored. The optional group is installed
 and `pip check` passes; its measured venv delta is 119,648 KiB. The 0.2.58
 canonical gate passed the same 2,743 tests plus Ruff/mypy in 26.2 seconds.
-Merged smoke execution remains the next runtime gate.
+The merged 0.2.58 retry then passed both exact models in 26.875 seconds. Both
+emitted finite `(1, 1, 1, 256)` embeddings from the same 2,048-cadence TESS
+input; Chronos-Bolt tiny peak RSS was 126,058,496 bytes and Astromer2 peak RSS
+was 186,204,160 bytes. Exact weight payload is 29,890,844 bytes and all ignored
+cache files total 29,960,842 bytes. Durable artifact
+`representation_baseline_inference_smoke_v1.json` has SHA-256
+`1cc59ab32e3a8a57e7d966c7cb9b22af04185c0c45245547c853fae7e5de5d10`;
+Run Report commit `f8a7207`. Version 0.2.59 records this PASS. Runtime
+integration is complete, but no training or full-corpus extraction is
+authorized; stellar-variability labels and injection-recovery comparison
+remain the next scientific gates. The 0.2.59 evidence-release gate passed all
+2,743 default tests plus Ruff/mypy under the 6×6 topology in 34.3 seconds.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of
@@ -654,7 +665,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 
 Run these before any live deployment or public announcement:
 
-- [x] `.venv/bin/python Skills/run_quality_gates.py` — six test shards × six xdist workers plus concurrent Ruff/mypy all pass (2026-07-14: 2,743 passed; 2 `integration_live` tests excluded; 26.2s wall time on 0.2.58 with optional representation dependencies installed)
+- [x] `.venv/bin/python Skills/run_quality_gates.py` — six test shards × six xdist workers plus concurrent Ruff/mypy all pass (2026-07-14: 2,743 passed; 2 `integration_live` tests excluded; 34.3s wall time on 0.2.59 with optional representation dependencies installed)
 - [x] `exo background-run-once --dry-run` — no config errors (2026-07-10: installed entry point exercised successfully; dry run wrote no ledger/outcome data)
 - [x] `.venv/bin/python Skills/tier2_progress_reporter.py` — 2026-07-11 reports READY from 15,649 committed-evidence examples/snippets, promoted checkpoint, calibration, and registry entry
 - [x] Verify `configs/background_search_v0.json` fingerprint matches expected value (2026-07-10: `exo sqlite-integrity` returned `ok: true` and `missing_config_fingerprint_count: 0`)
