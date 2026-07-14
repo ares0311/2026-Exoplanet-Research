@@ -1,0 +1,73 @@
+{
+  "aggregate_download_bytes_if_installed": 56036648,
+  "artifact_id": "representation_baseline_source_verification_v1",
+  "contract_path": "metadata/representation_baseline_source_contract_v1.json",
+  "contract_sha256": "38793347a4f404f62aa46a086ad20cb358046a365393333710dd83fca93a3730",
+  "limitations": [
+    "This contract verifies source identity and bounded footprint only; it does not verify inference numerics.",
+    "No package or model dependency is added to the default runtime by this contract.",
+    "No model training, checkpoint promotion, or production scoring change is authorized.",
+    "Stellar-variability labels and the injection-recovery comparison remain separate Phase 3 prerequisites."
+  ],
+  "metadata_requests": 7,
+  "models": [
+    {
+      "commit": "4f1a5566ae2358712e89fe9189a209a9190c7fca",
+      "embedding_dimension": 256,
+      "filename": "chronos-bolt-tiny.onnx",
+      "license": "Apache-2.0",
+      "max_observations": 2048,
+      "repo": "light-curve/chronos-bolt-tiny",
+      "sha256": "67c02abc13cd46912314bee7e6651cccc5b0e17c8564a67db226f6e26da78245",
+      "size_bytes": 13901747,
+      "status": "verified"
+    },
+    {
+      "commit": "17752a44aaaa1cd4a014be53e463ee06b61e68f0",
+      "embedding_dimension": 256,
+      "filename": "astromer2.onnx",
+      "license": "MIT",
+      "max_observations": 200,
+      "repo": "light-curve/astromer2",
+      "sha256": "1791a71414cc6e1677774369643569a537a48631e897ae2c2de18e32d41d9987",
+      "size_bytes": 15989097,
+      "status": "verified"
+    }
+  ],
+  "packages": [
+    {
+      "filename": "light_curve-0.13.1-cp310-abi3-macosx_14_0_arm64.whl",
+      "name": "light-curve",
+      "requires_python": ">=3.10",
+      "sha256": "76074ef46ebd026c42fbaf07047ec6f12930c4ccf01759890612b07ff616a09d",
+      "size_bytes": 6941527,
+      "status": "verified",
+      "version": "0.13.1"
+    },
+    {
+      "filename": "onnxruntime-1.27.0-cp314-cp314-macosx_14_0_arm64.whl",
+      "name": "onnxruntime",
+      "requires_python": ">=3.11",
+      "sha256": "0874edc171f470fc4dd2bbb60bc0989612ed1a8b89b365cda016630a93227f13",
+      "size_bytes": 18433941,
+      "status": "verified",
+      "version": "1.27.0"
+    },
+    {
+      "filename": "huggingface_hub-1.23.0-py3-none-any.whl",
+      "name": "huggingface-hub",
+      "requires_python": ">=3.10.0",
+      "sha256": "b1d604788f5adc7f0eb246e03e0ec19011ca06e38400218c347dccc3dffa64a2",
+      "size_bytes": 770336,
+      "status": "verified",
+      "version": "1.23.0"
+    }
+  ],
+  "payload_bytes_downloaded": 0,
+  "runtime_python": "3.14.3",
+  "schema_version": 1,
+  "status": "success",
+  "training_authorized": false,
+  "verification_mode": "primary_metadata_only",
+  "verified_at_utc": "2026-07-14T04:32:02.138759+00:00"
+}

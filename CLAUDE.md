@@ -89,8 +89,13 @@ Xet and then could not see the resolver's `x-repo-commit`/`x-linked-*`
 headers. Version 0.2.56 disables redirects only for this HEAD check, captures
 the authoritative 302 headers, and adds an offline regression test. A live
 read-only HEAD smoke returned the exact pinned Chronos commit, size, and hash.
-The 0.2.56 full 6×6 gate passed 2,734 tests plus Ruff/mypy in 26.1s; rerun the
-merged verifier before treating the source gate as evidenced.
+The 0.2.56 full 6×6 gate passed 2,734 tests plus Ruff/mypy in 26.1s. The merged
+full verifier then passed 7/7 operations in 4.94s, verifying all five pinned
+sources and 56,036,648 projected direct bytes with zero payload downloads.
+Artifact SHA-256 is `5610bbb8…3042`; Run Report commit `ae4e659`. Source
+identity/footprint is now evidenced. Inference, dependencies, weights, and
+training remain unauthorized until a separate bounded inference smoke is
+designed and approved by the production gate sequence.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.

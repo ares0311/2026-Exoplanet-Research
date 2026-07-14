@@ -63,6 +63,20 @@ an optional dependency group.
 Stellar-variability labels and the injection-recovery comparison remain open
 prerequisites. A source verification PASS alone is not a scientific result.
 
+## Measured source verification
+
+The merged version 0.2.56 run completed on 2026-07-14 in 4.9396 seconds. It
+passed all seven metadata operations, verified the three pinned wheels and two
+pinned ONNX model sources, confirmed the 56,036,648-byte direct footprint, and
+downloaded zero payload bytes. The evidence artifact is
+`artifacts/manifests/representation_baseline_source_verification_v1.json`
+(SHA-256 `5610bbb859463e180bd9ee65ee7317518458560421487253d272b2d3b5753042`);
+the self-reported ledger commit is `ae4e659`.
+
+This closes source identity and direct-footprint evidence only. It does not
+verify inference numerics or authorize dependency installation, weight
+download, model training, or production promotion.
+
 ## Parallelism decision
 
 The verifier performs seven small metadata operations and is expected to
