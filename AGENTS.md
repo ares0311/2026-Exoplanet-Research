@@ -318,6 +318,20 @@ after a small live-service throughput measurement. See
 The version 0.2.60 release gate passed 2,751 default tests plus Ruff/mypy as
 8/8 supervised gates in 25.2 seconds using six pytest shards with six xdist
 workers each.
+The merged verifier then passed 5/5 primary-source operations on 2026-07-14 in
+3.334 seconds: 47,055 rows and all 17 class counts matched, the required schema
+and 1,166,660-byte delivery metadata were exact, three labeled rows validated,
+and zero full-catalog bytes were downloaded. Durable artifact SHA-256 is
+`eb5d4bc6ae02065752e515fff19ed9b012d163f1d82a2be958796a65ba339b9a`;
+Run Report commit `b0003bb`. Version 0.2.61 records source identity complete.
+This does not authorize crossmatch or training; the next gate is the bounded,
+leakage-safe 2,790-TIC metadata/crossmatch design described above.
+The version 0.2.61 evidence-release gate passed the unchanged 2,751 default
+tests plus Ruff/mypy as 8/8 supervised gates in 40.2 seconds under the same
+6×6 topology. All six test shards were slower than the immediately prior run
+but remained balanced (25.1-40.1 seconds), with no errors or timeouts; this was
+not a single-shard serialization regression and does not justify scaling above
+36 test workers.
 
 This optimized single-parent shard/worker shape is the standing default
 wherever work is safely partitionable: acquisition, processing, tests,

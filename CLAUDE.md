@@ -134,6 +134,12 @@ verification is next and does not authorize crossmatch or training. The later
 independent-TIC pass must use the single-parent six-shard/six-worker shape after
 a small service-throughput measurement. See
 `docs/STELLAR_VARIABILITY_LABEL_SOURCE_CONTRACT.md`.
+The merged verifier passed 5/5 operations in 3.334 seconds on 2026-07-14:
+47,055 rows, all 17 class counts, required schema and delivery headers, and
+three labeled sample rows matched with zero full-catalog bytes downloaded.
+Artifact SHA-256 is `eb5d4bc…39b9a`; Run Report commit `b0003bb`. Version
+0.2.61 records source identity complete. Crossmatch and training remain gated;
+the next step is the leakage-safe 2,790-TIC metadata/crossmatch design.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
@@ -197,7 +203,7 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 141 top-level test files. Version 0.2.60 adds eight offline stellar-variability label-source contract tests; its full release gate passed 2,751 default tests plus Ruff/mypy as 8/8 supervised gates in 25.2s with six pytest shards and six xdist workers each.
+**Current test surface:** 141 top-level test files. Version 0.2.60 adds eight offline stellar-variability label-source contract tests; its full release gate passed 2,751 default tests plus Ruff/mypy as 8/8 supervised gates in 25.2s with six pytest shards and six xdist workers each. Version 0.2.61 records the merged source evidence without changing the test surface; its evidence-release gate passed the same 2,751 tests plus Ruff/mypy as 8/8 gates in 40.2s. All six shards slowed without errors/timeouts or a single-shard imbalance, so retain 6×6 rather than scaling further.
 **Skills:** 121 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
 
 ---

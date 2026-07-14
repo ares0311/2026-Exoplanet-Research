@@ -64,6 +64,14 @@ crossmatch and embedding-aware injection comparison remain gated; independent
 TIC work uses the single-parent six-shard/six-worker pattern. The version
 0.2.60 release gate passed 2,751 default tests plus Ruff/mypy in 25.2 seconds.
 
+The merged source verifier passed 5/5 operations in 3.334 seconds, validating
+47,055 rows, all 17 class counts, schema, delivery metadata, and three sample
+rows with zero full-catalog bytes. Artifact SHA-256 is `eb5d4bc6…39b9a`; Run
+Report commit `b0003bb`. Version 0.2.61 records source identity complete. The
+2,790-TIC crossmatch and embedding-aware injection comparison remain gated.
+The 0.2.61 evidence-release gate passed 2,751 tests plus Ruff/mypy as 8/8
+supervised gates in 40.2 seconds under the canonical 6×6 topology.
+
 ---
 
 ## What Is Complete
