@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.59 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.60 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -456,6 +456,22 @@ integration is complete, but no training or full-corpus extraction is
 authorized; stellar-variability labels and injection-recovery comparison
 remain the next scientific gates. The 0.2.59 evidence-release gate passed all
 2,743 default tests plus Ruff/mypy under the 6×6 topology in 34.3 seconds.
+
+Version 0.2.60 pins the first acceptable stellar-variability ground-truth
+source before any crossmatch or training. The Drake et al. Catalina
+CDS/VizieR table supplies 47,055 publication-backed rows across 17 classes
+with explicit inspection flags; its compressed payload is only 1,166,660
+bytes. `Skills/verify_stellar_variability_label_source.py` performs five
+primary-source checks (delivery headers, schema, row count, class distribution,
+and three sample rows), writes structured evidence and a Run Report, and
+downloads zero full-catalog bytes. Eight offline tests cover success and
+fail-closed drift. Gaia DR3 automated predictions are rejected as ground truth,
+and gated approximately 160 GB StarEmbed data are not authorized under the
+100 GB ceiling. The merged live metadata verification is next. Source PASS
+will still leave the leakage-safe 2,790-TIC crossmatch and embedding-aware
+injection comparison open; the independent-TIC work must use the measured
+single-parent 6×6 shape. The version 0.2.60 release gate passed 2,751 default
+tests plus Ruff/mypy as 8/8 supervised gates in 25.2 seconds.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of
