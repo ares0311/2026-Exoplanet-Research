@@ -145,7 +145,13 @@ by itself satisfy a master-guide evidence requirement.
    commit/size/hash headers. Version 0.2.56 preserves the authoritative initial
    HEAD response, covers it with an offline regression test, and passes a live
    read-only header smoke. Its 6×6 gate passed 2,734 tests plus Ruff/mypy in
-   26.1 seconds. Rerun the full verifier from merged `main` next.
+   26.1 seconds. The merged full verifier subsequently passed 7/7 operations in
+   4.94 seconds, verifying all five pinned sources and 56,036,648 projected
+   direct bytes with zero payload downloads (artifact SHA `5610bbb8…3042`, Run
+   Report commit `ae4e659`). Source identity/footprint is complete. Next design
+   a bounded inference smoke that measures ONNX memory/numerics before any
+   optional dependency or weight installation; the scientific experiment also
+   still requires variability labels and injection-recovery comparison.
 
 ## Milestone 1 — Scoring and Classification Engine ✓ COMPLETE
 

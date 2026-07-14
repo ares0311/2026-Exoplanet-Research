@@ -158,6 +158,8 @@ For a single large numerical job, allow native libraries to use more threads, co
   overhead.
 - Source verification is seven small metadata operations and intentionally
   sequential; process startup would dominate. It downloads zero payload bytes.
+- The merged version 0.2.56 run measured 4.94 seconds for all seven operations,
+  confirming that sequential metadata verification is the correct shape.
 - After a separate inference smoke establishes memory and throughput, extract
   embeddings across independent light curves with one parent, six shards, and
   six workers per shard. Keep ONNX Runtime intra/inter-op thread counts bounded

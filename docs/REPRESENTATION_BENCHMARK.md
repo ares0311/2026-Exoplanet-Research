@@ -46,6 +46,13 @@ must pass from merged code before dependencies or weights are introduced. This
 is not inference evidence and does not close any scientific comparison item;
 see `docs/REPRESENTATION_BASELINE_SOURCE_CONTRACT.md`.
 
+The merged version 0.2.56 verification passed on 2026-07-14: 7/7 operations in
+4.94 seconds, all five sources verified, 56,036,648 projected direct bytes, and
+zero payload bytes downloaded. Evidence artifact SHA-256 is
+`5610bbb859463e180bd9ee65ee7317518458560421487253d272b2d3b5753042`;
+Run Report commit `ae4e659`. The source prerequisite is complete, but measured
+inference and every scientific comparison item above remain open.
+
 The training loop is a single stateful optimization and is not shardable.
 Batching uses the selected accelerator; `device=auto` prefers MPS, then CUDA,
 then CPU. Every epoch prints loss, learning rate, patience state, and ETA. A

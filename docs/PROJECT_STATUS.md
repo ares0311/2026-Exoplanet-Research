@@ -24,13 +24,15 @@ Local validation note: validated on Python 3.14.3 in `.venv` with `xgboost` depe
 
 Phase 3 source gate: version 0.2.55 pins the 56,036,648-byte direct package and
 model footprint for Chronos-Bolt tiny plus Astromer2 and adds a metadata-only,
-fail-closed verifier. Merged-code verification is next; inference and training
-remain unauthorized. The canonical local 6×6 release gate passed 2,733 default
-tests plus Ruff/mypy in 31.1 seconds. The first merged verifier run then failed
-closed on followed Hugging Face HEAD redirects without writing evidence or
-downloading payloads. Version 0.2.56 preserves the authoritative resolver
-headers, passes a live HEAD smoke, and passes 2,734 tests plus Ruff/mypy in
-26.1 seconds. Merged full verification remains next.
+fail-closed verifier. Its first merged run failed closed on followed Hugging
+Face HEAD redirects without writing evidence or downloading payloads. Version
+0.2.56 preserves the authoritative resolver headers and passes 2,734 tests plus
+Ruff/mypy in 26.1 seconds. The merged full verifier then passed 7/7 operations
+in 4.94 seconds: five
+sources verified, 56,036,648 projected direct bytes, and zero payload bytes
+downloaded. Artifact SHA-256 is `5610bbb8…3042`; Run Report commit `ae4e659`.
+Source identity/footprint is complete, while dependencies, weights, inference,
+training, stellar-variability labels, and injection comparison remain gated.
 
 ---
 

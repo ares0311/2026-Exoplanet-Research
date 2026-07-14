@@ -328,6 +328,14 @@ The verifier must inspect the initial Hugging Face resolver response without
 following its 302 redirect: commit, size, and content SHA live in
 `x-repo-commit`, `x-linked-size`, and `x-linked-etag` on that authoritative
 response, not on the final Xet object-store response.
+The merged version 0.2.56 verifier passed on 2026-07-14: 7/7 metadata
+operations in 4.94 seconds, five sources verified, 56,036,648 projected direct
+bytes, and zero payload bytes downloaded. Durable evidence is
+`artifacts/manifests/representation_baseline_source_verification_v1.json`
+(SHA-256 `5610bbb859463e180bd9ee65ee7317518458560421487253d272b2d3b5753042`);
+Run Report commit `ae4e659`. This closes source identity/footprint only. It
+still does not authorize dependency installation, weights, inference, or
+training.
 
 **Ask, don't assume, when:**
 - The right shard/worker *count* (not whether to shard at all) depends on the operator's own tradeoffs — available machine capacity, concurrent work, and trust in the external service's rate limits.

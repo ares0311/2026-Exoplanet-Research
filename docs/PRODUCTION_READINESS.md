@@ -411,7 +411,16 @@ Version 0.2.56 installs a no-redirect handler for this HEAD request, treats the
 authoritative 302 headers as the result, and adds an offline regression test.
 A live read-only Chronos HEAD smoke returned the exact pinned commit, size, and
 hash. The 0.2.56 canonical release gate passed 2,734 tests plus Ruff/mypy in
-26.1 seconds. The merged full verifier rerun remains next.
+26.1 seconds. The merged full verifier then passed all 7/7 metadata operations
+in 4.9396 seconds: three exact Python wheels plus two exact ONNX repositories
+and pinned resolver headers, with five sources verified, 56,036,648 projected
+direct bytes, and zero payload bytes downloaded. Durable artifact
+`representation_baseline_source_verification_v1.json` has SHA-256
+`5610bbb859463e180bd9ee65ee7317518458560421487253d272b2d3b5753042`;
+Run Report commit `ae4e659`. The external-baseline source identity/footprint
+gate is complete. It does not authorize dependency installation, model weight
+download, inference, or training; stellar-variability labels and the
+injection-recovery comparison remain open scientific prerequisites.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of
