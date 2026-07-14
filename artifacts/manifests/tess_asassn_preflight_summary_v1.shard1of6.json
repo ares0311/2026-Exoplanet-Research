@@ -1,0 +1,78 @@
+{
+  "artifact_id": "tess_asassn_preflight_shard_v1",
+  "batch_size": 50,
+  "batches": 10,
+  "catalog_payload_bytes_downloaded": 0,
+  "class_counts": {
+    "EA": 6,
+    "EB": 1,
+    "EW": 1,
+    "ROT": 1
+  },
+  "contract_path": "metadata/asassn_variability_label_source_contract_v1.json",
+  "contract_sha256": "1239ba626f0f3c66e4e8c16003fa4089bc4acb3415f3bd9976ae249d862c8248",
+  "discoveries": 2,
+  "elapsed_seconds": 5.876411917037331,
+  "inventory_sha256": "38a869666269367480a1aa9d2a29d76a86fb2ec6d2259a23635ad44f257c155a",
+  "known_variables": 7,
+  "matched_rows": 9,
+  "matched_unique_tics": 9,
+  "median_probability": 0.979,
+  "minimum_probability": 0.924,
+  "output_path": "artifacts/manifests/tess_asassn_preflight_v1.shard1of6.jsonl",
+  "output_sha256": "62f9c6ea86be282a870fe87c8a4e5e0c060770bfeff5957e6cb23065f300ed20",
+  "schema_version": 1,
+  "selected_tics": 454,
+  "shard_count": 6,
+  "shard_index": 0,
+  "source_verification": {
+    "class_counts": {
+      "CWA": 153,
+      "CWB": 74,
+      "DCEP": 434,
+      "DCEPS": 112,
+      "DSCT": 2395,
+      "EA": 21927,
+      "EB": 13371,
+      "EW": 47570,
+      "HADS": 2231,
+      "L": 13938,
+      "M": 6650,
+      "ROT": 53169,
+      "RRAB": 19035,
+      "RRC": 6968,
+      "RRD": 512,
+      "RVA": 3,
+      "SR": 189404,
+      "VAR": 559,
+      "YSO": 356
+    },
+    "delivery": {
+      "content_length_bytes": 64258159,
+      "content_type": "application/x-gzip",
+      "etag": "\"3d4806f-64cbfa4509cad\"",
+      "last_modified": "Wed, 11 Mar 2026 13:30:39 GMT"
+    },
+    "discovery_counts": {
+      "False": 262834,
+      "True": 116027
+    },
+    "full_catalog_payload_bytes_downloaded": 0,
+    "metadata_requests": 6,
+    "required_columns": {
+      "ASAS-SN": "CHAR(28)",
+      "Class": "VARCHAR",
+      "DEJ2000": "DOUBLE",
+      "Discovery": "CHAR(5)",
+      "Prob": "DOUBLE",
+      "RAJ2000": "DOUBLE",
+      "TIC": "CHAR(14)"
+    },
+    "row_count": 378861,
+    "status": "pass",
+    "tic_row_count": 378861
+  },
+  "status": "success",
+  "training_authorized": false,
+  "workers": 6
+}

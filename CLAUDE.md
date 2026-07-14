@@ -189,6 +189,20 @@ keeps training, extraction, promotion, and production scoring unauthorized.
 See `docs/ASASSN_VARIABILITY_LABEL_PREFLIGHT.md`.
 The version 0.2.68 release gate passed 2,772 default tests plus Ruff/mypy as
 8/8 supervised gates in 31.3 seconds under the canonical 6x6 topology.
+The merged 6x6 preflight passed and reproduced the exploratory result: 48
+unique exact-TIC matches among all 2,790 rows (EA=26, EB=9, EW=2, ROT=10,
+SR=1), including 44 known variables and four discoveries, minimum probability
+0.902, and zero duplicate TIC/source identifiers. The observed first-start to
+last-completion wall time was 6.762 seconds across 58 exact-ID batches plus six
+source-metadata operations; no catalog payload bytes were downloaded. Version
+0.2.69 commits and integrity-tests the evidence. Follow-up embedding-aware
+benchmark design is authorized, while training and production changes remain
+unauthorized.
+Aggregate SHA-256 is `36de00dc…da403`; the seven exact-path Run Report ledgers
+are commit `78b7be6`.
+The version 0.2.69 evidence-release gate passed 2,773 default tests plus
+Ruff/mypy as 8/8 supervised gates in 32.3 seconds under the canonical 6x6
+topology.
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.

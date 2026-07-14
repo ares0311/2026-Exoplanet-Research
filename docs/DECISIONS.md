@@ -685,3 +685,40 @@ With native numeric libraries limited to one thread per test worker, the first
 optimized 6×6 quality run passed 2,718 default tests plus Ruff and mypy in 34.1
 seconds. The prior single-universe xdist baseline was 81.57 seconds, so the new
 shape reduced measured wall time by about 58% without duplicating tests.
+
+---
+
+## DECISION-022: Admit ASAS-SN Only As A Training-Disabled Variability Benchmark Candidate
+
+**Date:** 2026-07-14
+**Status:** Accepted for follow-up design only
+
+### Context
+
+The publication-backed Catalina source passed identity checks but produced zero
+candidates in the frozen 216-TIC pilot. ASAS-SN Catalog X exposes exact TIC IDs
+for all 378,861 rows. Its merged metadata-only 6x6 preflight found 48 unique
+matches across the full frozen 2,790-TIC inventory, including 44 known variables
+and four survey discoveries, with probabilities at least 0.902 and no duplicate
+TIC or source identifiers.
+
+### Decision
+
+1. Accept the 48 ASAS-SN matches as sufficient to design the next bounded,
+   embedding-aware stellar-variability/injection benchmark.
+2. Preserve the raw `Class`, `Prob`, `Discovery`, TIC, and ASAS-SN identifiers.
+3. Do not call these rows ground truth: `Class` is automated random-forest
+   output augmented by Citizen ASAS-SN data and publication quality control.
+4. Keep every current artifact and future design gate
+   `training_authorized=false`; supervised training, promotion, and production
+   scoring changes require a separate scientific decision and stronger labels.
+5. Do not download the 64,258,159-byte table or ASAS-SN light curves for the
+   next gate; the exact-TIC metadata already resolves the relevant cached TESS
+   products.
+
+### Evidence
+
+The merged run processed 58 exact-ID batches plus six source-metadata
+operations with zero full-catalog bytes. First-shard-start to last-completion
+wall time was 6.762 seconds. All five aggregate checks passed; class counts are
+EA=26, EB=9, EW=2, ROT=10, and SR=1.
