@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 _PACKAGE_NAME = "exo-toolkit"
-_FALLBACK_VERSION = "0.2.64"
+_FALLBACK_VERSION = "0.2.65"
 
 
 def _source_tree_version() -> str | None:

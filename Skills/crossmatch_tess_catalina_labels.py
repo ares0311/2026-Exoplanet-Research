@@ -32,7 +32,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from Skills.run_report import RunReport, report_path_for, run_and_commit_report  # noqa: E402
 
-DEFAULT_CONTRACT = REPO_ROOT / "metadata/tess_catalina_crossmatch_contract_v1.json"
+DEFAULT_CONTRACT = REPO_ROOT / "metadata/tess_catalina_crossmatch_contract_v2.json"
 DEFAULT_CACHE = REPO_ROOT / ".cache/stellar_variability_labels/table3.dat.gz"
 DEFAULT_OUTPUT = REPO_ROOT / "artifacts/manifests/tess_catalina_crossmatch_pilot_v1.jsonl"
 DEFAULT_SUMMARY = REPO_ROOT / "artifacts/manifests/tess_catalina_crossmatch_pilot_v1.json"
@@ -268,6 +268,8 @@ def ensure_catalog_cache(
 
 
 def _optional_float(value: Any) -> float | None:
+    if value is None or str(value).strip() in {"", "--", "None"}:
+        return None
     try:
         result = float(value)
     except (TypeError, ValueError):
@@ -314,13 +316,14 @@ def parse_catalog(path: Path, contract: Mapping[str, Any]) -> tuple[CatalinaReco
     return tuple(records)
 
 
-def _default_query(tic_ids: Sequence[int]) -> Iterable[Mapping[str, Any]]:
+def _mast_query(
+    tic_ids: Sequence[int], columns: Sequence[str]
+) -> Iterable[Mapping[str, Any]]:
     from astroquery.mast import Mast
 
-    columns = "ID,ra,dec,Tmag,Vmag,GAIA,pmRA,pmDEC,duplicate_i,objType"
     table = Mast.mast_query(
         "Mast.Catalogs.Filtered.Tic.Rows",
-        columns=columns,
+        columns=",".join(columns),
         ID=[str(value) for value in tic_ids],
         pagesize=max(100, len(tic_ids) * 2),
     )
@@ -338,7 +341,7 @@ def _tic_record(row: Mapping[str, Any]) -> TicRecord:
     dec = _optional_float(row.get("dec"))
     if ra is None or dec is None or not (0 <= ra < 360 and -90 <= dec <= 90):
         raise ValueError(f"TIC {tic_id} has invalid coordinates")
-    duplicate = _optional_float(row.get("duplicate_i"))
+    duplicate = _optional_float(row.get("duplicate_id"))
     return TicRecord(
         tic_id=tic_id,
         ra_deg=ra,
@@ -358,7 +361,7 @@ def query_tic_metadata(
     *,
     workers: int,
     batch_size: int,
-    query_fn: QueryFn = _default_query,
+    query_fn: QueryFn,
     retry_attempts: int = 3,
 ) -> tuple[TicRecord, ...]:
     """Query exact TIC batches concurrently, failing closed on missing/extra rows."""
@@ -543,7 +546,7 @@ def run_crossmatch(
     shard_count: int,
     dry_run: bool = False,
     download_fn: DownloadFn = _download,
-    query_fn: QueryFn = _default_query,
+    query_fn: QueryFn | None = None,
     report_fn: ReportFn = run_and_commit_report,
 ) -> dict[str, Any]:
     """Run one deterministic shard or validate it without network/file output."""
@@ -594,11 +597,13 @@ def run_crossmatch(
     started = time.monotonic()
     catalog_path = ensure_catalog_cache(contract, cache_path, download_fn=download_fn)
     catalog = parse_catalog(catalog_path, contract)
+    columns = tuple(str(value) for value in contract["tic_query"]["columns"])
+    effective_query_fn = query_fn or (lambda values: _mast_query(values, columns))
     tics = query_tic_metadata(
         selected,
         workers=workers,
         batch_size=batch_size,
-        query_fn=query_fn,
+        query_fn=effective_query_fn,
         retry_attempts=int(contract["tic_query"]["retry_attempts"]),
     )
     rows = crossmatch_records(tics, catalog, contract["match_policy"])

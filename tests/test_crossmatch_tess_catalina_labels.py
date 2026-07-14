@@ -127,7 +127,7 @@ def _query_rows(tic_ids: list[int] | tuple[int, ...]) -> list[dict[str, Any]]:
             "GAIA": str(1000 + tic_id),
             "pmRA": 1.0,
             "pmDEC": 2.0,
-            "duplicate_i": None,
+            "duplicate_id": None,
             "objType": "STAR",
         }
         for tic_id in tic_ids
@@ -143,6 +143,14 @@ def test_contract_and_catalog_parser_validate_counts(tmp_path: Path) -> None:
     assert records[0].class_code == 1
     assert records[1].class_flag is None
     assert records[-1].class_code == 17
+
+
+def test_merged_contract_uses_verified_mast_duplicate_column() -> None:
+    contract = load_contract(
+        Path("metadata/tess_catalina_crossmatch_contract_v2.json")
+    )
+    assert "duplicate_id" in contract["tic_query"]["columns"]
+    assert "duplicate_i" not in contract["tic_query"]["columns"]
 
 
 def test_catalog_parser_rejects_rows_shorter_than_required_fields(tmp_path: Path) -> None:

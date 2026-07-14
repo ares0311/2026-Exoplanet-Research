@@ -157,6 +157,12 @@ optional trailing fields; malformed rows outside the 71- to 73-byte source
 range still fail before MAST access. Its release gate passed 2,760 default
 tests plus Ruff/mypy as 8/8 supervised gates in 25.2 seconds under 6×6; the
 pinned gzip parsed all 47,055 rows exactly.
+Version 0.2.65 preserves the invalid MAST-column v1 contract for audit and
+makes `metadata/tess_catalina_crossmatch_contract_v2.json` active. A live
+single-request schema check proved `duplicate_id` is accepted while
+`duplicate_i` is rejected; selected columns now come from the active contract.
+The v2 six-ID probe returned all six rows in 1.5 seconds. Its release gate
+passed 2,761 default tests plus Ruff/mypy as 8/8 gates in 26.2 seconds.
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.

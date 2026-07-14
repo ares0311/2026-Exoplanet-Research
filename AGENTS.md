@@ -363,6 +363,15 @@ The version 0.2.64 release gate passed 2,760 default tests plus Ruff/mypy as
 8/8 supervised gates in 25.2 seconds under the canonical 6×6 topology; a
 direct parse of the pinned gzip validated all 47,055 rows and the exact flag
 distribution.
+Version 0.2.65 preserves v1 as failed live-schema evidence and supersedes it
+with `metadata/tess_catalina_crossmatch_contract_v2.json`: MAST accepts the
+TIC duplicate field `duplicate_id` and rejects v1's `duplicate_i`. The script
+now builds its selected-column request from the active contract so code and
+contract cannot silently drift again. The failed 6×6 attempt made only rejected
+schema requests and wrote no pilot artifacts.
+The v2 single-batch probe returned all six requested TIC rows in 1.5 seconds
+with no schema error. The version 0.2.65 release gate passed 2,761 default
+tests plus Ruff/mypy as 8/8 supervised gates in 26.2 seconds under 6×6.
 The version 0.2.63 release gate passed the unchanged 2,759 default tests plus
 Ruff/mypy as 8/8 supervised gates in 27.3 seconds under the canonical 6×6
 topology.

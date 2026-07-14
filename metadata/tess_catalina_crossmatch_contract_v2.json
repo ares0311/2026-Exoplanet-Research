@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "contract_id": "tess_catalina_crossmatch_contract_v2",
+  "created_at_utc": "2026-07-14T21:31:00Z",
+  "supersedes": "tess_catalina_crossmatch_contract_v1",
+  "change_reason": "Live MAST schema validation accepts duplicate_id and rejects the v1 duplicate_i column before returning rows.",
+  "purpose": "Bounded leakage-safe pilot matching cached training-only TESS TICs to publication-backed Catalina variability labels",
+  "inventory": {
+    "path": "metadata/representation_tess_unlabeled_cache_v1.jsonl",
+    "sha256": "38a869666269367480a1aa9d2a29d76a86fb2ec6d2259a23635ad44f257c155a",
+    "target_count": 2790,
+    "role": "training"
+  },
+  "source_evidence": {
+    "path": "artifacts/manifests/stellar_variability_label_source_verification_v1.json",
+    "sha256": "eb5d4bc6ae02065752e515fff19ed9b012d163f1d82a2be958796a65ba339b9a"
+  },
+  "catalog": {
+    "url": "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/213/9/table3.dat.gz",
+    "size_bytes": 1166660,
+    "sha256": "7b0d497f0e55bed76424140199474bc7aabf06d7df1901260bbd188f9caaeb60",
+    "row_count": 47055,
+    "class_counts": {
+      "1": 30745,
+      "2": 4683,
+      "3": 279,
+      "4": 2431,
+      "5": 5466,
+      "6": 502,
+      "7": 73,
+      "8": 1521,
+      "9": 64,
+      "10": 124,
+      "11": 228,
+      "12": 7,
+      "13": 512,
+      "14": 157,
+      "15": 25,
+      "16": 85,
+      "17": 153
+    },
+    "cache_path": ".cache/stellar_variability_labels/table3.dat.gz",
+    "cache_policy": "shared read-only hash-pinned input; one locked atomic download across all shards"
+  },
+  "tic_query": {
+    "library": "astroquery",
+    "validated_version": "0.4.11",
+    "service": "Mast.Catalogs.Filtered.Tic.Rows",
+    "filter": "exact discrete ID batches",
+    "columns": [
+      "ID",
+      "ra",
+      "dec",
+      "Tmag",
+      "Vmag",
+      "GAIA",
+      "pmRA",
+      "pmDEC",
+      "duplicate_id",
+      "objType"
+    ],
+    "batch_size": 6,
+    "max_batch_size": 25,
+    "retry_attempts": 3
+  },
+  "coordinate_contract": {
+    "frame": "ICRS/J2000",
+    "catalog_coordinates": "VizieR RAJ2000/DEJ2000 derived from the fixed-width J2000 fields",
+    "tic_coordinates": "MAST TIC ra/dec; proper motion retained for audit but not applied because both match coordinates are J2000",
+    "high_proper_motion_guard": "Any future epoch propagation requires a separately pinned epoch contract; this pilot does not infer one."
+  },
+  "match_policy": {
+    "candidate_radius_arcsec": 3.0,
+    "accept_radius_arcsec": 1.0,
+    "max_vmag_delta": 2.0,
+    "max_tmag_delta": 5.0,
+    "require_single_catalina_candidate": true,
+    "reject_tic_duplicate_entries": true,
+    "reject_non_stars": true,
+    "reject_catalina_flags": [
+      "f"
+    ],
+    "preserve_raw_class_code": true,
+    "global_one_to_one_reconciliation_required_before_training": true
+  },
+  "pilot": {
+    "max_targets": 216,
+    "selection_seed": "tess-catalina-pilot-v1",
+    "shape": "six modulo shards; six MAST batch workers per shard; six TIC IDs per request",
+    "expected_targets_per_shard": 36,
+    "expected_concurrent_requests": 36,
+    "full_run_authorized": false,
+    "scale_decision": "Compare aggregate TIC/s, missing rows, retries, timeouts, accepted/rejected matches, and cross-shard duplicate Catalina IDs before authorizing all 2790 TICs."
+  },
+  "label_mapping": {
+    "binary_false_positive_class_codes": [
+      1,
+      2,
+      3,
+      14,
+      16,
+      17
+    ],
+    "stellar_variability_class_codes": [
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      15
+    ],
+    "rule": "Preserve class_code and class_flag in every match; benchmark_family is a derived convenience field only."
+  },
+  "training_authorized": false,
+  "limitations": [
+    "This contract authorizes only a deterministic 216-TIC metadata/crossmatch pilot.",
+    "Pilot matches are not training labels until all six shards are globally reconciled for duplicate Catalina sources and the scientific overlap is accepted in a separate evidence gate.",
+    "No FITS light curve is opened, no embedding is extracted, and no model is trained or promoted.",
+    "The Catalina sky footprint and magnitude range may yield too few matches; a low overlap is an evidence result, not permission to relax safeguards after seeing labels."
+  ]
+}
