@@ -347,6 +347,20 @@ All six outputs require global one-to-one reconciliation before any label use.
 Full 2,790-TIC execution, FITS reads, embedding extraction, and training remain
 gated pending pilot throughput/error/overlap evidence. See
 `docs/TESS_CATALINA_CROSSMATCH.md`.
+The merged version 0.2.67 pilot found zero candidates among all 216 queried
+TICs, so Catalina is closed as evidence-limited and its full run remains
+unauthorized. Version 0.2.68 adds the next source gate:
+`Skills/preflight_tess_asassn_labels.py` and
+`metadata/asassn_variability_label_source_contract_v1.json`. It queries exact
+TIC identifiers from ASAS-SN Catalog X with the reviewed single-parent 6x6
+shape, writes disjoint one-row-per-TIC artifacts, and downloads zero full-
+catalog bytes. Shard zero must verify delivery, schema, total/TIC counts, class
+counts, and known/new counts before global reconciliation. ASAS-SN classes are
+automated random-forest outputs, not ground truth: even a PASS authorizes only
+follow-up benchmark design and keeps `training_authorized=false`. See
+`docs/ASASSN_VARIABILITY_LABEL_PREFLIGHT.md`.
+The version 0.2.68 release gate passed 2,772 default tests plus Ruff/mypy as
+8/8 supervised gates in 31.3 seconds under the canonical 6x6 topology.
 The version 0.2.62 release gate passed 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 34.3 seconds under the canonical 6×6 topology.
 Version 0.2.63 explicitly ignores the shared

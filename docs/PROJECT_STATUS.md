@@ -106,6 +106,16 @@ the precommitted 3-arcsecond search radius. Global reconciliation passes with
 zero accepted or duplicate sources; full execution/training stays blocked.
 The 0.2.67 release gate passed 2,763 tests plus Ruff/mypy as 8/8 supervised
 gates in 24.2 seconds under the canonical 6×6 topology.
+Version 0.2.68 adds the replacement source preflight for ASAS-SN Catalog X.
+Its immutable contract pins 378,861 VizieR rows, delivery/schema/distribution
+metadata, exact TIC joins, and the fact that catalog classes are automated ML
+outputs rather than ground truth. An exploratory zero-payload six-worker query
+found 48 matches among the full 2,790-TIC inventory in 7.86 seconds. The
+durable merged-main run uses six shards x six workers and must globally
+reconcile all TICs before it can authorize follow-up benchmark design. It
+cannot authorize training, extraction, promotion, or production scoring.
+The 0.2.68 release gate passed 2,772 default tests plus Ruff/mypy as 8/8
+supervised gates in 31.3 seconds under the canonical 6x6 topology.
 The 0.2.63 release gate passed the unchanged 2,759 tests plus Ruff/mypy as 8/8
 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 

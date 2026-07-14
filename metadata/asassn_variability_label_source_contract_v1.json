@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "contract_id": "asassn_variability_label_source_contract_v1",
+  "created_at_utc": "2026-07-14T22:05:00Z",
+  "purpose": "Reproduce a metadata-only exact-TIC overlap preflight for a publication-backed ASAS-SN variability benchmark candidate without accepting automated catalog classes as ground truth",
+  "catalog": {
+    "name": "ASAS-SN Catalog X",
+    "paper": "Christy et al. 2023, MNRAS 519, 5271-5287",
+    "paper_doi": "10.1093/mnras/stac3801",
+    "bibcode": "2023MNRAS.519.5271C",
+    "catalog_url": "https://cdsarc.cds.unistra.fr/viz-bin/cat/J/MNRAS/519/5271",
+    "tap_endpoint": "https://tapvizier.cds.unistra.fr/TAPVizieR/tap/sync",
+    "table": "J/MNRAS/519/5271/table",
+    "gzip_url": "https://cdsarc.cds.unistra.fr/ftp/J/MNRAS/519/5271/table.dat.gz",
+    "delivery": {
+      "content_length_bytes": 64258159,
+      "etag": "\"3d4806f-64cbfa4509cad\"",
+      "last_modified": "Wed, 11 Mar 2026 13:30:39 GMT",
+      "content_type": "application/x-gzip"
+    },
+    "row_count": 378861,
+    "tic_row_count": 378861,
+    "required_columns": {
+      "ASAS-SN": "CHAR(28)",
+      "RAJ2000": "DOUBLE",
+      "DEJ2000": "DOUBLE",
+      "Class": "VARCHAR",
+      "Prob": "DOUBLE",
+      "Discovery": "CHAR(5)",
+      "TIC": "CHAR(14)"
+    },
+    "class_counts": {
+      "CWA": 153,
+      "CWB": 74,
+      "DCEP": 434,
+      "DCEPS": 112,
+      "DSCT": 2395,
+      "EA": 21927,
+      "EB": 13371,
+      "EW": 47570,
+      "HADS": 2231,
+      "L": 13938,
+      "M": 6650,
+      "ROT": 53169,
+      "RRAB": 19035,
+      "RRC": 6968,
+      "RRD": 512,
+      "RVA": 3,
+      "SR": 189404,
+      "VAR": 559,
+      "YSO": 356
+    },
+    "discovery_counts": {
+      "False": 262834,
+      "True": 116027
+    },
+    "classification_basis": "ASAS-SN g-band light curves classified by an updated random-forest pipeline augmented with Citizen ASAS-SN data and publication quality control; catalog probabilities and the known/new flag must be preserved.",
+    "label_quality_limit": "The Class field is machine-learning output, not human ground truth. A gate pass authorizes only follow-up benchmark design and never supervised training, promotion, or a production scoring change."
+  },
+  "inventory": {
+    "path": "metadata/representation_tess_unlabeled_cache_v1.jsonl",
+    "sha256": "38a869666269367480a1aa9d2a29d76a86fb2ec6d2259a23635ad44f257c155a",
+    "target_count": 2790,
+    "role": "training"
+  },
+  "query": {
+    "selected_columns": [
+      "TIC",
+      "ASAS-SN",
+      "Class",
+      "Prob",
+      "Discovery",
+      "RAJ2000",
+      "DEJ2000"
+    ],
+    "match_key": "exact TIC identifier",
+    "batch_size": 50,
+    "max_batch_size": 50,
+    "retry_attempts": 3,
+    "full_catalog_payload_bytes": 0
+  },
+  "source_verification_required": true,
+  "parallel_shape": {
+    "process_shards": 6,
+    "workers_per_shard": 6,
+    "partition": "tic_id modulo shard_count",
+    "disjoint_outputs": true
+  },
+  "exploratory_observation": {
+    "observed_at_utc": "2026-07-14T21:56:00Z",
+    "purpose": "Bound the value of implementing a reproducible gate; this is explicitly exploratory and is not the durable evidence run.",
+    "inventory_tics": 2790,
+    "unique_exact_tic_matches": 48,
+    "known_variables": 44,
+    "minimum_probability": 0.902,
+    "workers": 6,
+    "requests": 56,
+    "elapsed_seconds": 7.86,
+    "catalog_payload_bytes_downloaded": 0
+  },
+  "evidence_gate": {
+    "minimum_unique_tic_matches": 24,
+    "minimum_known_variable_matches": 20,
+    "minimum_probability": 0.9,
+    "maximum_duplicate_tic_rows": 0,
+    "maximum_duplicate_source_ids": 0,
+    "threshold_basis": "Reproducibility floor set transparently after the exploratory preflight at half its observed exact-match and known-variable counts; it detects material source drift without presenting the exploratory result as blinded evidence.",
+    "training_authorized_on_pass": false
+  },
+  "limitations": [
+    "The preflight issues exact-ID TAP metadata queries only; it does not download the 64258159-byte table or any ASAS-SN light curve.",
+    "The ASAS-SN Class field is automated classifier output. Preserve Class, Prob, Discovery, and source identity; do not call these rows ground truth.",
+    "A pass does not authorize FITS reads, embedding extraction, model training, model promotion, or production scoring changes.",
+    "All six shard outputs must reconcile globally before the source can advance to a separately reviewed benchmark-design gate."
+  ],
+  "training_authorized": false
+}

@@ -189,6 +189,16 @@ by itself satisfy a master-guide evidence requirement.
    training are not authorized. The next roadmap item is a new immutable label
    source contract whose metadata-only preflight demonstrates materially
    better overlap with the frozen TESS inventory before any payload/training.
+   Version 0.2.68 implements that item for ASAS-SN Catalog X: its immutable
+   contract and exact-TIC preflight pin 378,861 rows and a zero-payload 6x6
+   reproduction. The exploratory implementation-decision probe found 48/2,790
+   exact matches, including 44 known variables at probability at least 0.902,
+   with no duplicate TIC rows. Durable evidence remains pending the merged-main
+   six-shard run and global reconciliation. Even a PASS authorizes only a
+   separately reviewed benchmark design because the catalog classes are
+   automated outputs, not human ground truth; training stays unauthorized.
+   The version 0.2.68 release gate passed 2,772 default tests plus Ruff/mypy as
+   8/8 supervised gates in 31.3 seconds under the canonical 6x6 topology.
    Embedding-aware injection recovery remains required before broad extraction
    or training. The 0.2.60 release passed 2,751 default tests plus Ruff/mypy as
    8/8 supervised gates under the 6×6 topology in 25.2 seconds.

@@ -188,6 +188,15 @@ workers.
   with no final service errors/timeouts; zero candidates were found.
 - Version 0.2.67 validation passed 2,763 tests plus Ruff/mypy as 8/8 supervised
   gates in 24.2 seconds with the canonical 6×6 test topology.
+- Version 0.2.68 applies the same single-parent 6x6 shape to the exact-TIC
+  ASAS-SN metadata preflight. A preliminary six-worker measurement completed
+  56 VizieR TAP requests for all 2,790 TICs in 7.86 seconds with zero failures,
+  zero catalog payload bytes, and 48 matches. The merged reproduction uses six
+  modulo shards with six workers each, 50 IDs per request, disjoint outputs,
+  and global reconciliation. Do not increase beyond 36 request workers unless
+  that run remains error-free and measured throughput justifies another step.
+- Version 0.2.68 validation passed 2,772 default tests plus Ruff/mypy as 8/8
+  supervised gates in 31.3 seconds under the canonical 6x6 test topology.
 - Version 0.2.63 validation passed the unchanged 2,759 tests plus Ruff/mypy as
   8/8 supervised gates in 27.3 seconds with the canonical 6×6 test topology.
 
