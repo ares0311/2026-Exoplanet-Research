@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.61 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.62 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -486,6 +486,20 @@ The version 0.2.61 evidence-release gate passed the unchanged 2,751 default
 tests plus Ruff/mypy as 8/8 supervised gates in 40.2 seconds. All six shards
 slowed without errors, timeouts, or a single-shard imbalance; retain the 6×6
 topology and do not scale test concurrency further from this run.
+
+Version 0.2.62 implements the next leakage-safe gate without authorizing the
+full corpus. `Skills/crossmatch_tess_catalina_labels.py` selects a frozen
+216-TIC pilot before modulo partitioning, batches exact TIC IDs through six
+MAST workers inside each of six supervised shards, shares one locked/hash-
+pinned 1,166,660-byte Catalina cache, and writes disjoint outputs plus shard
+Run Reports. The contract precommits 3/1-arcsecond candidate/acceptance radii,
+V/TESS magnitude checks, duplicate/non-star/blend rejection, raw class-code
+preservation, and global one-to-one reconciliation. Seven focused crossmatch
+tests plus one launcher test pass. Every row remains training-disabled; full
+2,790-TIC execution and embedding/injection evaluation await merged pilot
+throughput, error, overlap, and duplicate evidence.
+The version 0.2.62 release gate passed 2,759 default tests plus Ruff/mypy as
+8/8 supervised gates in 34.3 seconds under the canonical 6×6 topology.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of

@@ -175,6 +175,12 @@ by itself satisfy a master-guide evidence requirement.
    Report commit is `b0003bb`. Version 0.2.61 records source identity complete.
    Next design and evidence the leakage-safe 2,790-TIC coordinate crossmatch
    using the measured single-parent six-shard/six-worker shape.
+   Version 0.2.62 implements only a deterministic 216-TIC pilot under that
+   shape, with exact-ID MAST batches, one hash-pinned shared Catalina cache,
+   precommitted match safeguards, disjoint outputs, and training disabled. Run
+   it from merged clean `main`, reconcile all six shards globally, and use the
+   measured throughput/errors/overlap to decide whether a separate full-corpus
+   contract is scientifically and operationally justified.
    Embedding-aware injection recovery remains required before broad extraction
    or training. The 0.2.60 release passed 2,751 default tests plus Ruff/mypy as
    8/8 supervised gates under the 6×6 topology in 25.2 seconds.

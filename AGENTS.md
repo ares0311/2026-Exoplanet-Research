@@ -333,6 +333,23 @@ but remained balanced (25.1-40.1 seconds), with no errors or timeouts; this was
 not a single-shard serialization regression and does not justify scaling above
 36 test workers.
 
+**Phase 3 TESS-Catalina crossmatch pilot:** version 0.2.62 adds
+`metadata/tess_catalina_crossmatch_contract_v1.json` and
+`Skills/crossmatch_tess_catalina_labels.py`. Only the deterministic 216-TIC
+pilot is authorized. Use `Skills/run_six_shards.py` from clean merged `main`:
+six modulo process shards, six exact-ID MAST batch workers per shard, and six
+TICs per request. A locked atomic cache download shares the hash-pinned
+1,166,660-byte Catalina gzip across every shard; never download one copy per
+worker. Accept at most one source within 1 arcsecond, require the precommitted
+V/TESS magnitude safeguard, reject TIC duplicates/non-stars and Catalina blend
+flag `f`, preserve raw class codes, and keep `training_authorized=false`.
+All six outputs require global one-to-one reconciliation before any label use.
+Full 2,790-TIC execution, FITS reads, embedding extraction, and training remain
+gated pending pilot throughput/error/overlap evidence. See
+`docs/TESS_CATALINA_CROSSMATCH.md`.
+The version 0.2.62 release gate passed 2,759 default tests plus Ruff/mypy as
+8/8 supervised gates in 34.3 seconds under the canonical 6×6 topology.
+
 This optimized single-parent shard/worker shape is the standing default
 wherever work is safely partitionable: acquisition, processing, tests,
 evaluation sweeps, and similar independent units. Equivalent new supervisors

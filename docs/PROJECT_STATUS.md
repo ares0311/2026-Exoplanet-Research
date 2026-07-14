@@ -72,6 +72,14 @@ Report commit `b0003bb`. Version 0.2.61 records source identity complete. The
 The 0.2.61 evidence-release gate passed 2,751 tests plus Ruff/mypy as 8/8
 supervised gates in 40.2 seconds under the canonical 6×6 topology.
 
+Version 0.2.62 adds the next bounded gate: a deterministic 216-TIC
+TESS-Catalina crossmatch pilot using six shards × six exact-ID MAST batch
+workers, one locked 1.17 MB source cache, precommitted positional/magnitude/
+duplicate/blend safeguards, and training-disabled outputs. Full 2,790-TIC
+execution awaits merged pilot evidence and global one-to-one reconciliation.
+The 0.2.62 release gate passed 2,759 tests plus Ruff/mypy as 8/8 supervised
+gates in 34.3 seconds under the canonical 6×6 topology.
+
 ---
 
 ## What Is Complete
