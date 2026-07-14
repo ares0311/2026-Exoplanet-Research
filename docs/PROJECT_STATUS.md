@@ -82,6 +82,12 @@ gates in 34.3 seconds under the canonical 6×6 topology.
 Version 0.2.63 fixes the merged-main launch blocker by ignoring the shared
 Catalina runtime cache. The supervisor stopped before issuing MAST requests,
 so the authorized 216-TIC pilot remains pending a clean merged-main retry.
+Version 0.2.64 fixes the second fail-closed integration defect from that run:
+valid CDS rows without the optional class flag are 71 rather than 73 bytes.
+The bounded parser now accepts 71-73 bytes, pads only omitted trailing fields,
+and still rejects malformed shorter or longer rows before MAST access.
+The 0.2.64 release gate passed 2,760 tests plus Ruff/mypy as 8/8 supervised
+gates in 34.3 seconds under the canonical 6×6 topology.
 The 0.2.63 release gate passed the unchanged 2,759 tests plus Ruff/mypy as 8/8
 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 

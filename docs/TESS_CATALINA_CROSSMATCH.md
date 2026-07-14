@@ -21,6 +21,14 @@ SHA-256 `7b0d497f…aaeb60`, and atomically promotes it into the ignored in-repo
 cache. Other shards wait and then verify the same file. Downloading six copies
 would waste time and violate shared-input ownership.
 
+Version 0.2.64 parses both measured source row shapes: 44,538 unflagged rows
+end at the mandatory 71-byte core, while 2,517 flagged rows include the
+optional byte-73 inspection flag. Missing trailing flag bytes mean no flag;
+rows outside the supported 71- to 73-byte fixed-width range still fail closed
+before any MAST request.
+The version 0.2.64 release gate passed 2,760 default tests plus Ruff/mypy as
+8/8 supervised gates in 34.3 seconds under the canonical 6×6 topology.
+
 ## Match safeguards
 
 - Both source positions are treated as ICRS/J2000. TIC proper motion is

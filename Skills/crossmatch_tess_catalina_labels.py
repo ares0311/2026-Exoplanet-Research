@@ -276,13 +276,17 @@ def _optional_float(value: Any) -> float | None:
 
 
 def parse_catalog(path: Path, contract: Mapping[str, Any]) -> tuple[CatalinaRecord, ...]:
-    """Parse and validate the pinned 73-byte fixed-width catalog rows."""
+    """Parse and validate the pinned 71- to 73-byte fixed-width catalog rows."""
     records: list[CatalinaRecord] = []
     with gzip.open(path, "rt", encoding="ascii") as handle:
         for line_number, raw in enumerate(handle, 1):
             line = raw.rstrip("\n")
-            if len(line) < 73:
-                raise ValueError(f"Catalina row {line_number} is shorter than 73 bytes")
+            if not 71 <= len(line) <= 73:
+                raise ValueError(
+                    f"Catalina row {line_number} is outside the supported 71-73 byte range"
+                )
+            # CDS omits both trailing blanks when the optional class flag is absent.
+            line = line.ljust(73)
             ra = 15.0 * (int(line[21:23]) + int(line[24:26]) / 60 + float(line[27:32]) / 3600)
             dec_abs = int(line[34:36]) + int(line[37:39]) / 60 + float(line[40:44]) / 3600
             dec = -dec_abs if line[33] == "-" else dec_abs

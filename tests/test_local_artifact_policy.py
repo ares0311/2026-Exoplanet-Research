@@ -33,6 +33,7 @@ def test_git_add_dot_ignores_local_artifact_classes() -> None:
         "checkpoints/cnn_tess_finetuned/training.log",
         "models/cnn/best.pt",
         "models/cnn_tess_finetuned/best.pt",
+        ".cache/stellar_variability_labels/table3.dat.gz",
         "logs/background_search.sqlite3",
         "logs/background-search.cron.log",
         "reports/background/draft.md",

@@ -39,7 +39,8 @@ def _catalog_line(class_code: int, *, flag: str = " ") -> str:
 def _write_catalog(path: Path) -> None:
     with gzip.open(path, "wt", encoding="ascii") as handle:
         for class_code in range(1, 18):
-            handle.write(_catalog_line(class_code) + "\n")
+            line = _catalog_line(class_code)
+            handle.write((line.rstrip() if class_code == 2 else line) + "\n")
 
 
 def _write_inputs(tmp_path: Path) -> tuple[Path, Path, Path]:
@@ -140,7 +141,18 @@ def test_contract_and_catalog_parser_validate_counts(tmp_path: Path) -> None:
     records = parse_catalog(catalog, contract)
     assert len(records) == 17
     assert records[0].class_code == 1
+    assert records[1].class_flag is None
     assert records[-1].class_code == 17
+
+
+def test_catalog_parser_rejects_rows_shorter_than_required_fields(tmp_path: Path) -> None:
+    inventory, evidence, catalog = _write_inputs(tmp_path)
+    with gzip.open(catalog, "wt", encoding="ascii") as handle:
+        handle.write(_catalog_line(1)[:70] + "\n")
+    contract = load_contract(_contract(tmp_path, inventory, evidence, catalog))
+
+    with pytest.raises(ValueError, match="outside the supported 71-73 byte range"):
+        parse_catalog(catalog, contract)
 
 
 def test_select_tics_is_deterministic_and_shards_are_disjoint() -> None:
