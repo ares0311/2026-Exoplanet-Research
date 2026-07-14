@@ -14,13 +14,19 @@ The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit w
 - Bayesian log-score model over six hypotheses
 - Optional XGBoost and stacking scorer modes (Tier 1 model trained: Kepler KOI AUC=0.992)
 - SQLite-backed background automation with top-level logs
-- 118 standalone `Skills/` utility scripts (`rg --files Skills -g '*.py'`)
-- 138 top-level test files
+- 119 standalone `Skills/` utility scripts (`rg --files Skills -g '*.py'`)
+- 139 top-level test files
 - 27 package Python modules under `src/exo_toolkit/`
 - JWST time-series ingestion wired into the CLI with `--mission JWST`
 - Novel TESS target scanning that excludes TOI, CTOI, and confirmed-host catalogs
 
 Local validation note: validated on Python 3.14.3 in `.venv` with `xgboost` dependency restored and macOS OpenMP runtime (`libomp`) installed. System Python is never used.
+
+Phase 3 source gate: version 0.2.55 pins the 56,036,648-byte direct package and
+model footprint for Chronos-Bolt tiny plus Astromer2 and adds a metadata-only,
+fail-closed verifier. Merged-code verification is next; inference and training
+remain unauthorized. The canonical local 6×6 release gate passed 2,733 default
+tests plus Ruff/mypy in 31.1 seconds.
 
 ---
 

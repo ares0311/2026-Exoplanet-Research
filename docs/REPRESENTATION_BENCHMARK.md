@@ -33,9 +33,18 @@ intentionally smaller and does not claim architectural equivalence.
 - broad unlabeled Kepler and TESS pretraining data;
 - stellar-variability labels;
 - embedding-based injection-recovery comparison;
-- a TimesFM-style external foundation-model baseline;
+- measured inference and scientific comparison for the now-pinned external
+  foundation-model baselines (Chronos-Bolt tiny and Astromer2);
 - demonstrated improvement in grouped holdout, top-k review yield, or injection
-  recovery beyond the promoted benchmark.
+recovery beyond the promoted benchmark.
+
+Version 0.2.55 closes the source-identity and direct-footprint prerequisite for
+the external arm. The immutable contract pins Python 3.14-compatible wheels and
+exact ONNX commits/hashes for Chronos-Bolt tiny and Astromer2, totaling
+56,036,648 direct bytes. The metadata-only verifier downloads no payloads and
+must pass from merged code before dependencies or weights are introduced. This
+is not inference evidence and does not close any scientific comparison item;
+see `docs/REPRESENTATION_BASELINE_SOURCE_CONTRACT.md`.
 
 The training loop is a single stateful optimization and is not shardable.
 Batching uses the selected accelerator; `device=auto` prefers MPS, then CUDA,

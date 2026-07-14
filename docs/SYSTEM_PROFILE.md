@@ -132,6 +132,8 @@ For a single large numerical job, allow native libraries to use more threads, co
   focused-test and constrained-environment fallback.
 - Version 0.2.54 validation on the same date passed 2,726 default tests plus
   Ruff/mypy in 34.1s with the same six-shard × six-worker configuration.
+- Version 0.2.55 validation on 2026-07-14 passed 2,733 default tests plus
+  Ruff/mypy in 31.1s with the same six-shard × six-worker configuration.
 
 ### Cache-local representation preprocessing
 
@@ -145,6 +147,19 @@ For a single large numerical job, allow native libraries to use more threads, co
 - A six-product real-cache process smoke passed 6/6 with no derived-array
   persistence on 2026-07-13. Use the merged 36-product result—not the smoke—to
   decide whether the measured throughput and memory justify further scaling.
+
+### External representation baselines
+
+- Version 0.2.55's source contract selects the 13.9 MB Chronos-Bolt tiny ONNX
+  model and 16.0 MB Astromer2 ONNX model. With the three pinned direct wheels,
+  the bounded payload is 56,036,648 bytes before transitive dependency/cache
+  overhead.
+- Source verification is seven small metadata operations and intentionally
+  sequential; process startup would dominate. It downloads zero payload bytes.
+- After a separate inference smoke establishes memory and throughput, extract
+  embeddings across independent light curves with one parent, six shards, and
+  six workers per shard. Keep ONNX Runtime intra/inter-op thread counts bounded
+  so 36 workers do not create nested native-thread oversubscription.
 
 ### AI/ML Training
 
