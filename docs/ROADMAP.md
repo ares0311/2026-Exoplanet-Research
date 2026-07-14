@@ -217,6 +217,10 @@ by itself satisfy a master-guide evidence requirement.
    The evidence run is next; training and production changes remain blocked.
    The version 0.2.70 release gate passed 2,780 default tests plus Ruff/mypy as
    8/8 supervised gates in 33.3 seconds under the canonical 6x6 topology.
+   Version 0.2.71 hardens the pending run by verifying every aggregate-owned
+   ASAS-SN shard path/hash and rejecting incomplete, duplicate, or training-
+   authorized source rows before FITS access. Its 6x6 gate passed 2,781 tests
+   plus Ruff/mypy in 30.1 seconds.
    The 0.2.60 release passed 2,751 default tests plus Ruff/mypy as
    8/8 supervised gates under the 6×6 topology in 25.2 seconds.
 

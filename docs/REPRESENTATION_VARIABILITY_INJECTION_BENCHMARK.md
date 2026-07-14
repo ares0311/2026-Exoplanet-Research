@@ -2,9 +2,11 @@
 
 ## Status
 
-Version 0.2.70 defines the reviewed, cache-only execution gate. The merged-main
-evidence run is pending. This gate does not authorize training, broad embedding
-extraction, model promotion, or a production-scoring change.
+Version 0.2.70 defines the reviewed, cache-only execution gate. Version 0.2.71
+also verifies every aggregate-owned ASAS-SN shard path and SHA-256 before it
+loads the 48 labels. The merged-main evidence run is pending. This gate does
+not authorize training, broad embedding extraction, model promotion, or a
+production-scoring change.
 
 ## Production outcome
 

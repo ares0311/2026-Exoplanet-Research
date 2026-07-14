@@ -393,6 +393,11 @@ does not authorize training, extraction, promotion, or production scoring. See
 `docs/REPRESENTATION_VARIABILITY_INJECTION_BENCHMARK.md`.
 The version 0.2.70 release gate passed 2,780 default tests plus Ruff/mypy as
 8/8 supervised gates in 33.3 seconds under the canonical 6x6 topology.
+Version 0.2.71 binds the benchmark's 48 label rows to the six exact ASAS-SN
+shard paths and SHA-256 values already owned by the aggregate. Missing,
+duplicate, training-authorized, or hash-drifted source rows now fail before
+FITS reads, BLS, or model inference. Its 6x6 release gate passed 2,781 tests
+plus Ruff/mypy as 8/8 supervised gates in 30.1 seconds.
 
 The version 0.2.62 release gate passed 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 34.3 seconds under the canonical 6×6 topology.

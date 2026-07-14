@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.70 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.71 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -577,6 +577,11 @@ authorize training or a production change. See
 `docs/REPRESENTATION_VARIABILITY_INJECTION_BENCHMARK.md`.
 The version 0.2.70 release gate passed 2,780 default tests plus Ruff/mypy as
 8/8 supervised gates in 33.3 seconds under the canonical 6x6 topology.
+Version 0.2.71 closes a pre-execution evidence-integrity gap: the runner now
+verifies the exact path and SHA-256 of every ASAS-SN shard referenced by the
+pinned aggregate before loading its 48 matched rows. It also rejects duplicate
+TICs, incomplete shard indexes, and any row that authorizes training. The 6x6
+release gate passed 2,781 tests plus Ruff/mypy in 30.1 seconds.
 The version 0.2.63 release gate passed the unchanged 2,759 default tests plus
 Ruff/mypy as 8/8 supervised gates in 27.3 seconds under the canonical 6×6
 topology.

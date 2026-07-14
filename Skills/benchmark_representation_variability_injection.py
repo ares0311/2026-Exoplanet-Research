@@ -125,14 +125,34 @@ def validate_inputs(contract: Mapping[str, Any]) -> dict[str, Path]:
     return paths
 
 
-def load_matched_labels() -> dict[int, dict[str, Any]]:
+def load_matched_labels(overlap: Mapping[str, Any]) -> dict[int, dict[str, Any]]:
+    """Load matched rows only after verifying every aggregate-owned shard."""
     labels: dict[int, dict[str, Any]] = {}
-    pattern = "artifacts/manifests/tess_asassn_preflight_v1.shard*of6.jsonl"
-    for path in sorted(REPO_ROOT.glob(pattern)):
+    summaries = overlap.get("shard_summaries", [])
+    if len(summaries) != 6:
+        raise ValueError("ASAS-SN aggregate must own exactly six shard outputs")
+    shard_indexes: set[int] = set()
+    for summary in summaries:
+        shard_index = int(summary["shard_index"])
+        if shard_index in shard_indexes:
+            raise ValueError(f"duplicate ASAS-SN shard summary: {shard_index}")
+        shard_indexes.add(shard_index)
+        path = _repo_path(summary["output_path"])
+        if _sha256(path) != summary["output_sha256"]:
+            raise ValueError(f"ASAS-SN shard output hash changed: {path}")
         for line in path.read_text(encoding="utf-8").splitlines():
             row = json.loads(line)
             if row["status"] == "matched":
-                labels[int(row["tic_id"])] = row
+                tic_id = int(row["tic_id"])
+                if tic_id in labels:
+                    raise ValueError(f"duplicate matched TIC across ASAS-SN shards: {tic_id}")
+                if row.get("training_authorized") is not False:
+                    raise ValueError(
+                        f"ASAS-SN matched TIC unexpectedly authorizes training: {tic_id}"
+                    )
+                labels[tic_id] = row
+    if shard_indexes != set(range(6)):
+        raise ValueError(f"ASAS-SN shard indexes are incomplete: {sorted(shard_indexes)}")
     if len(labels) != 48:
         raise ValueError(f"expected 48 matched labels, found {len(labels)}")
     return labels
@@ -410,7 +430,8 @@ def run_shard(
             f"benchmark requires {required_shards} shards x {required_workers} workers"
         )
     paths = validate_inputs(contract)
-    labels = load_matched_labels()
+    overlap = json.loads(paths["asassn_overlap"].read_text(encoding="utf-8"))
+    labels = load_matched_labels(overlap)
     products = select_products(load_inventory(paths["inventory"]), labels)
     selected = select_shard(tuple(products), shard_index, shard_count)
     if not selected:

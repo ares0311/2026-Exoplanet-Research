@@ -1,6 +1,8 @@
 """Offline tests for the cache-only representation/injection benchmark."""
 from __future__ import annotations
 
+import copy
+import json
 from pathlib import Path
 
 import numpy as np
@@ -8,6 +10,7 @@ import pytest
 from Skills.benchmark_representation_variability_injection import (
     cosine_distance,
     load_contract,
+    load_matched_labels,
     select_products,
     select_shard,
     summarize_rows,
@@ -56,6 +59,20 @@ def test_shards_are_disjoint_and_complete() -> None:
         for index, left in enumerate(shards)
         for right in shards[index + 1 :]
     )
+
+
+def test_matched_labels_are_owned_by_pinned_aggregate_shards() -> None:
+    overlap = json.loads(
+        Path("artifacts/manifests/tess_asassn_preflight_aggregate_v1.json").read_text()
+    )
+    labels = load_matched_labels(overlap)
+    assert len(labels) == 48
+    assert {row["training_authorized"] for row in labels.values()} == {False}
+
+    tampered = copy.deepcopy(overlap)
+    tampered["shard_summaries"][0]["output_sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="shard output hash changed"):
+        load_matched_labels(tampered)
 
 
 def test_even_thinning_preserves_full_baseline_and_shared_median() -> None:
