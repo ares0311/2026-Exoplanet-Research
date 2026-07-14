@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.62 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.63 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -500,6 +500,13 @@ tests plus one launcher test pass. Every row remains training-disabled; full
 throughput, error, overlap, and duplicate evidence.
 The version 0.2.62 release gate passed 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 34.3 seconds under the canonical 6×6 topology.
+Version 0.2.63 closes the launch-time cache-containment defect found by the
+first merged-main pilot attempt: `.cache/stellar_variability_labels/` is now
+ignored, preserving a clean working tree for exact-path shard Run Report
+commits. No MAST requests were issued by the stopped attempt.
+The version 0.2.63 release gate passed the unchanged 2,759 default tests plus
+Ruff/mypy as 8/8 supervised gates in 27.3 seconds under the canonical 6×6
+topology.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of

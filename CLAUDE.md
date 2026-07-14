@@ -148,7 +148,12 @@ cache, and disjoint outputs/Run Reports. The pilot precommits 1-arcsecond,
 magnitude, duplicate, object-type, blend, and raw-class safeguards; every row
 remains training-disabled. Full 2,790-TIC execution is gated until merged pilot
 evidence shows clean throughput/errors and globally reconciled overlap. See
-`docs/TESS_CATALINA_CROSSMATCH.md`.
+`docs/TESS_CATALINA_CROSSMATCH.md`. Version 0.2.63 also contains the shared
+catalog under the ignored `.cache/stellar_variability_labels/` path so the
+launcher starts from a clean tree and shard Run Reports retain exact-file-only
+git ownership.
+Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
+8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.

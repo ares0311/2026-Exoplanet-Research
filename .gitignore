@@ -40,6 +40,9 @@ dmypy.json
 # Exact-revision external representation weights and Hugging Face local-dir metadata
 .cache/representation_models/
 
+# Hash-pinned shared Catalina catalog cache used by the 6x6 crossmatch pilot
+.cache/stellar_variability_labels/
+
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb_checkpoints
