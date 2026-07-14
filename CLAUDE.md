@@ -176,6 +176,19 @@ Full-corpus execution and training remain unauthorized; pursue a separately
 contracted label source with better TESS-inventory overlap.
 Its release gate passed 2,763 default tests plus Ruff/mypy as 8/8 supervised
 gates in 24.2 seconds under the canonical 6×6 topology.
+Version 0.2.68 implements that next bounded source gate with
+`metadata/asassn_variability_label_source_contract_v1.json` and
+`Skills/preflight_tess_asassn_labels.py`. ASAS-SN Catalog X provides exact TIC
+IDs for 378,861 publication-backed rows. An exploratory zero-payload query
+found 48 exact matches across the frozen 2,790-TIC inventory (44 known
+variables, four discoveries, minimum probability 0.902) in 7.86 seconds with
+six workers. The durable run remains pending merged `main` and must use the
+reviewed one-parent six-shard/six-worker launcher plus global reconciliation.
+Because `Class` is automated ML output, not human ground truth, every pass
+keeps training, extraction, promotion, and production scoring unauthorized.
+See `docs/ASASSN_VARIABILITY_LABEL_PREFLIGHT.md`.
+The version 0.2.68 release gate passed 2,772 default tests plus Ruff/mypy as
+8/8 supervised gates in 31.3 seconds under the canonical 6x6 topology.
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.

@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.67 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.68 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -536,6 +536,21 @@ inference, not evidence of matches). Full 2,790-TIC execution and training are
 not authorized; the next label-source gate needs materially better overlap.
 The version 0.2.67 release gate passed 2,763 default tests plus Ruff/mypy as
 8/8 supervised gates in 24.2 seconds under the canonical 6×6 topology.
+Version 0.2.68 adds the next fail-closed label-source preflight rather than
+relaxing Catalina safeguards. The immutable ASAS-SN Catalog X contract pins
+the 378,861-row VizieR schema, delivery metadata, exact TIC join key, class and
+known/new distributions, and the automated-label limitation. An exploratory
+metadata-only query found 48 exact matches across all 2,790 frozen TICs (44
+known variables, four discoveries, minimum probability 0.902) in 7.86 seconds
+with six workers and zero catalog payload bytes. The reproducible evidence run
+is pending merged `main`: one parent launches six modulo shards with six TAP
+workers each, shard zero re-verifies source metadata, and the aggregate must
+reconcile exactly 2,790 unique TICs and zero duplicate source IDs. A PASS can
+authorize only follow-up benchmark design because ASAS-SN classes are ML
+outputs, not ground truth; training and production changes remain blocked.
+See `docs/ASASSN_VARIABILITY_LABEL_PREFLIGHT.md`.
+The version 0.2.68 release gate passed 2,772 default tests plus Ruff/mypy as
+8/8 supervised gates in 31.3 seconds under the canonical 6x6 topology.
 The version 0.2.63 release gate passed the unchanged 2,759 default tests plus
 Ruff/mypy as 8/8 supervised gates in 27.3 seconds under the canonical 6×6
 topology.
