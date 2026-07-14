@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -129,6 +130,9 @@ def test_cache_pinned_model_uses_exact_revision_and_verifies_hash(tmp_path: Path
 
     def _download(**kwargs: Any) -> str:
         calls.append(kwargs)
+        assert Path(os.environ["HF_HOME"]).is_relative_to(tmp_path)
+        assert Path(os.environ["HF_XET_CACHE"]).is_relative_to(tmp_path)
+        assert Path(os.environ["HF_XET_CACHE"]).is_dir()
         path = Path(kwargs["local_dir"]) / kwargs["filename"]
         path.write_bytes(payload)
         return str(path)

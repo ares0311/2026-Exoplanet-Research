@@ -294,6 +294,9 @@ Version 0.2.56 passed 2,734 default tests plus Ruff/mypy in 26.1s with that
 same configuration after adding the Hugging Face redirect regression test.
 Version 0.2.57 passed 2,743 default tests plus Ruff/mypy in 24.2s with the same
 configuration; optional inference packages remained absent from default tests.
+Version 0.2.58 passed the same 2,743 tests plus Ruff/mypy in 26.2s after the
+optional representation group was installed and the Hub/Xet cache-containment
+regression was added.
 
 This optimized single-parent shard/worker shape is the standing default
 wherever work is safely partitionable: acquisition, processing, tests,
@@ -350,6 +353,10 @@ record peak RSS/timing. The two-model/one-product smoke is intentionally
 sequential for attributable memory; a later inventory extraction must use the
 single-parent 6×6 pattern. A smoke PASS still does not authorize training or a
 production model change. See `docs/REPRESENTATION_INFERENCE_SMOKE.md`.
+Version 0.2.58 also requires the smoke to set `HF_HOME` and `HF_XET_CACHE`
+inside `.cache/representation_models/` before importing `huggingface_hub`.
+This is a sandbox, secret-isolation, and `git add .` safety requirement: never
+let the runtime fall back to `~/.cache/huggingface`.
 
 **Ask, don't assume, when:**
 - The right shard/worker *count* (not whether to shard at all) depends on the operator's own tradeoffs — available machine capacity, concurrent work, and trust in the external service's rate limits.

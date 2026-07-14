@@ -77,6 +77,20 @@ def _repo_path(path: Path) -> Path:
     return resolved
 
 
+def configure_huggingface_cache_environment(model_cache: Path) -> tuple[Path, Path]:
+    """Keep Hub and Xet runtime state inside the ignored model cache."""
+    resolved_cache = model_cache.resolve()
+    hf_home = resolved_cache / ".huggingface"
+    xet_cache = hf_home / "xet"
+    xet_cache.mkdir(parents=True, exist_ok=True)
+    # huggingface_hub reads these at import time, so configure them before the
+    # downloader's lazy import. This also prevents accidental token/cache reads
+    # from the operator's home directory during the unauthenticated smoke.
+    os.environ["HF_HOME"] = str(hf_home)
+    os.environ["HF_XET_CACHE"] = str(xet_cache)
+    return hf_home, xet_cache
+
+
 def _write_json_atomic(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -210,6 +224,7 @@ def cache_pinned_model(
     downloader: DownloadFn = _default_downloader,
 ) -> tuple[Path, bool]:
     """Download one exact-revision model into the ignored in-repo cache."""
+    configure_huggingface_cache_environment(model_cache)
     repo = str(model["repo"])
     commit = str(model["commit"])
     filename = str(model["filename"])

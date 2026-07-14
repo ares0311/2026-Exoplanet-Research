@@ -161,6 +161,11 @@ by itself satisfy a master-guide evidence requirement.
    runtime integration only, not the variability/injection/scientific gates.
    The local 6×6 gate passed 2,743 default tests plus Ruff/mypy in 24.2 seconds
    with optional inference packages absent.
+   The first merged smoke then failed closed before payload download because
+   Xet attempted a sandbox-blocked home-cache log. Version 0.2.58 relocates
+   `HF_HOME` and `HF_XET_CACHE` into the ignored model cache before import; the
+   optional group is installed, `pip check` passes, and the 6×6 gate passed the
+   same 2,743 tests plus Ruff/mypy in 26.2 seconds. Rerun merged smoke next.
 
 ## Milestone 1 — Scoring and Classification Engine ✓ COMPLETE
 

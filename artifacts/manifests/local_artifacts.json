@@ -1713,7 +1713,7 @@
       "status": "expected_not_yet_materialized",
       "git_policy": "ignored",
       "last_known": {
-        "tool_version": "0.2.57",
+        "tool_version": "0.2.58",
         "expected_models": 2,
         "expected_weight_bytes": 29890844,
         "source_contract": "metadata/representation_baseline_source_contract_v1.json",

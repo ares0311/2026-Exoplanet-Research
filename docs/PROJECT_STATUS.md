@@ -42,6 +42,13 @@ smoke evidence are next; broad extraction and training remain unauthorized.
 The 0.2.57 full 6×6 gate passed 2,743 tests plus Ruff/mypy in 24.2 seconds with
 the optional packages absent.
 
+The first merged smoke failed closed before payload download because Xet tried
+to write a log below sandbox-blocked `~/.cache/huggingface`; only 8 KB of
+ignored metadata was created. Version 0.2.58 relocates Hub and Xet state into
+the ignored model cache before import. The pinned optional group is installed,
+`pip check` passes, and the 0.2.58 6×6 gate passed 2,743 tests plus Ruff/mypy in
+26.2 seconds. Merged smoke evidence remains next.
+
 ---
 
 ## What Is Complete
