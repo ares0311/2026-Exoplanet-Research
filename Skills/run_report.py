@@ -34,7 +34,7 @@ import json
 import os
 import subprocess
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -118,22 +118,32 @@ RunFn = Callable[..., subprocess.CompletedProcess[str]]
 
 
 @contextmanager
-def _optional_process_lock() -> Iterator[None]:
+def _optional_process_lock() -> Iterator[bool]:
     """Serialize report git operations when a multi-process launcher requests it."""
     lock_path = os.environ.get("EXO_RUN_REPORT_LOCK_PATH")
     if not lock_path:
-        yield
+        yield True
         return
     import fcntl
 
     path = Path(lock_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a+", encoding="utf-8") as handle:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        handle = path.open("a+", encoding="utf-8")
+    except OSError:
+        yield False
+        return
+    with handle:
         try:
-            yield
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        except OSError:
+            yield False
+            return
+        try:
+            yield True
         finally:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            with suppress(OSError):
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def _run(run_fn: RunFn, args: list[str]) -> subprocess.CompletedProcess[str]:
@@ -156,7 +166,9 @@ def commit_and_push_report(
     push failure can never crash the acquisition run that produced real data.
     """
     path_str = str(path)
-    with _optional_process_lock():
+    with _optional_process_lock() as lock_acquired:
+        if not lock_acquired:
+            return False
         add_result = _run(run_fn, ["git", "add", "--", path_str])
         if add_result.returncode != 0:
             return False

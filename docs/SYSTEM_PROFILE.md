@@ -179,6 +179,10 @@ workers.
   Validate one six-ID request before the next 6×6 merged-main retry.
 - The v2 six-ID probe returned all rows in 1.5 seconds. Version 0.2.65
   validation passed 2,761 tests plus Ruff/mypy as 8/8 gates in 26.2 seconds.
+- Version 0.2.66 treats denied `.git/exo-run-report.lock` acquisition as a
+  report-push failure: no unlocked git race, no data loss, warning plus exit 0.
+- Version 0.2.66 validation passed 2,762 tests plus Ruff/mypy as 8/8 supervised
+  gates in 34.3 seconds with the canonical 6×6 test topology.
 - Version 0.2.63 validation passed the unchanged 2,759 tests plus Ruff/mypy as
   8/8 supervised gates in 27.3 seconds with the canonical 6×6 test topology.
 

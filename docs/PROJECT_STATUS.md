@@ -95,6 +95,11 @@ retained for audit, v2 is active, and the request column list now comes from
 the contract. The failed attempt wrote no pilot artifacts.
 The v2 six-ID probe returned all rows in 1.5 seconds, and the 0.2.65 release
 gate passed 2,761 tests plus Ruff/mypy as 8/8 gates in 26.2 seconds.
+The merged pilot completed 216/216 queries and wrote every shard artifact.
+Version 0.2.66 fixes only the final sandbox-lock handling so Run Report git
+failure warns without converting successful data acquisition into exit 1.
+The 0.2.66 release gate passed 2,762 tests plus Ruff/mypy as 8/8 supervised
+gates in 34.3 seconds under the canonical 6×6 topology.
 The 0.2.63 release gate passed the unchanged 2,759 tests plus Ruff/mypy as 8/8
 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 

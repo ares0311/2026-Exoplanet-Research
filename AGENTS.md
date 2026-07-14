@@ -372,6 +372,12 @@ schema requests and wrote no pilot artifacts.
 The v2 single-batch probe returned all six requested TIC rows in 1.5 seconds
 with no schema error. The version 0.2.65 release gate passed 2,761 default
 tests plus Ruff/mypy as 8/8 supervised gates in 26.2 seconds under 6×6.
+The merged 216-TIC run then completed every query and wrote all 12 shard
+artifacts, but the approved sandbox denied `.git/exo-run-report.lock` after
+data completion. Version 0.2.66 makes lock acquisition fail soft: keep the
+ledger append, skip unsafe unlocked git operations, warn, and return success.
+The version 0.2.66 release gate passed 2,762 default tests plus Ruff/mypy as
+8/8 supervised gates in 34.3 seconds under the canonical 6×6 topology.
 The version 0.2.63 release gate passed the unchanged 2,759 default tests plus
 Ruff/mypy as 8/8 supervised gates in 27.3 seconds under the canonical 6×6
 topology.
