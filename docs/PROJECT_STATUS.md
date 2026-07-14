@@ -1,7 +1,7 @@
 # PROJECT STATUS
 
 ## Status: Active Development
-## Phase: Phase 3 bounded representation preprocessing gate
+## Phase: Phase 3 broad representation experiment design
 ## Last Updated: 2026-07-13
 
 ---

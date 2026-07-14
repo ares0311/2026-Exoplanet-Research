@@ -378,8 +378,14 @@ evidence, and discarded. The aggregate records throughput, child/parent memory,
 and projected full-inventory normalized-flux size; it performs no downloads.
 Eight focused tests, the real-inventory dry run, a six-subprocess real-cache
 smoke (6/6 successful), and the full 2,726-test/Ruff/mypy 6×6 gate pass. The
-merged-code 36-product evidence artifact is intentionally pending until this
-release reaches `main`.
+merged-code run then passed 36/36 products with zero failures, downloads, or
+persisted arrays in 0.4197 measured seconds (85.77 products/s). It projects the
+full 11,960-product normalized-flux-only transform at 97.98 MB and 139.44
+seconds. Artifact SHA-256 is `08c68fca…07fa49`; Run Report commit `9f1b9e8`.
+The preprocessing measurement gate is complete. Prefer streaming for the next
+experiment; broader training remains unauthorized until its plan supplies the
+still-missing stellar-variability labels, injection-recovery comparison, and
+external foundation-model baseline.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of

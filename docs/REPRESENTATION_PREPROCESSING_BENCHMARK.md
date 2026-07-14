@@ -62,8 +62,19 @@ supervised subprocesses.
 
 ## Evidence state
 
-The merged-code 36-product artifact is intentionally pending until version
-0.2.54 reaches `main`. Pre-merge validation passed eight focused tests, verified
-the real committed inventory and 36-product sector-spanning selection in dry
-run, and completed a read-only six-subprocess smoke over six real cached FITS
-products with 6/6 successes and no persisted derived arrays.
+The version 0.2.54 merged-code run passed all 36 products with zero failures,
+downloads, or persisted arrays. Measured preprocessing took 0.4197 seconds at
+85.77 products/s. The sample read 81.85 MB and retained 704,704 of 807,636
+cadences. Each 2,048-bin float32 vector is 8,192 bytes, projecting the full
+11,960-product flux-only transform at 97,976,320 bytes (97.98 MB) and 139.44
+seconds at the observed aggregate rate. Maximum shard-process high-water RSS
+was 83,591,168 bytes.
+
+The committed evidence is
+`artifacts/manifests/representation_preprocessing_benchmark_v1.json` (SHA-256
+`08c68fca194a6a5f515a17ab7e667cfd453d8f59abd8ba7bfccb13fcc207fa49`), with
+Run Report commit `9f1b9e8`. This closes the preprocessing measurement gate.
+Future representation experiments should stream the source instead of storing
+a durable derived corpus. The result does not authorize training by itself;
+the roadmap still requires stellar-variability labels, injection-recovery
+comparison, and an external foundation-model baseline.

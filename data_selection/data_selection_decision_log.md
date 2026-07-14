@@ -1,5 +1,39 @@
 # Data Selection Decision Log
 
+## 2026-07-13 — Cached TESS representation preprocessing benchmark v1
+
+**Repo:** 2026 Exoplanet Research
+**Data:** Deterministic 36-product/36-TIC sample from the committed 11,960-row
+`tess_cached_unlabeled_representation_v1` training inventory, spanning TESS
+sectors 1-98.
+**Role:** Training only; role and leakage restrictions are unchanged.
+**Execution:** Six supervised Python shard subprocesses with six cached-FITS
+workers each; zero archive queries, zero downloads, and zero persisted derived
+arrays.
+**Preprocessing:** Finite `TIME`/`PDCSAP_FLUX`, `QUALITY == 0`, per-product
+median/robust-MAD normalization, and linear resampling to 2,048 float32 flux
+bins.
+**Measured outcome:** 36/36 products succeeded with zero failures in 0.4197
+seconds of measured preprocessing (85.77 products/s). The sample read 81.85 MB
+and 807,636 cadences, retaining 704,704. Each normalized flux vector is 8,192
+bytes.
+**Projection:** The full 11,960-product normalized-flux-only footprint is
+97,976,320 bytes (0.09797632 GB), with 139.44 seconds projected at the observed
+aggregate rate. Maximum observed shard-process high-water RSS was 83,591,168
+bytes.
+**Storage decision:** Prefer streaming/on-demand preprocessing because the
+entire inventory projects to about 2.3 minutes and no derived-array persistence
+is needed for acceptable throughput. This benchmark does not authorize model
+training or move training arrays into the Dropbox repository while the shared
+Lightkurve cache remains above the 80 GB caution threshold.
+**Evidence:**
+`artifacts/manifests/representation_preprocessing_benchmark_v1.json`, SHA-256
+`08c68fca194a6a5f515a17ab7e667cfd453d8f59abd8ba7bfccb13fcc207fa49`;
+Run Report commit `9f1b9e8`.
+**Next action:** Design a materially broader Phase 3 experiment that streams
+this training-only source and adds the still-required stellar-variability
+labels, injection-recovery comparison, and external foundation-model baseline.
+
 ## 2026-07-12 — Cached TESS unlabeled representation source v1
 
 **Repo:** 2026 Exoplanet Research
