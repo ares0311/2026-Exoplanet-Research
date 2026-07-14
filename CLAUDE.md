@@ -58,6 +58,14 @@ single-parent optimized pattern is now the standing default for every safely
 partitionable workload, not just these two scripts.
 No live download was run because the completed T1-1/T1-2 manifests must not be
 reprocessed. See `docs/SIX_SHARD_LAUNCHER.md`.
+Version 0.2.54 applies that standing pattern to the active Phase 3 gate:
+`Skills/benchmark_representation_preprocessing.py` supervises six Python shard
+subprocesses with six cached-FITS workers each, downloads nothing, retains no
+derived arrays, and projects full-inventory preprocessing time and normalized-
+flux size from a deterministic 36-product sample. Tooling and a six-product
+real-cache process smoke are complete; run the merged 36-product benchmark
+before authorizing any representation training. See
+`docs/REPRESENTATION_PREPROCESSING_BENCHMARK.md`.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
@@ -121,8 +129,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 137 top-level test files. Local 6×6 validation on 2026-07-13 passed with 2,718 default tests and 2 `integration_live` tests deselected in 34.1s.
-**Skills:** 117 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
+**Current test surface:** 138 top-level test files. Version 0.2.54 local 6×6 validation passed 2,726 default tests plus Ruff/mypy in 34.1s; 2 `integration_live` tests remain excluded from the default suite.
+**Skills:** 118 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
 
 ---
 

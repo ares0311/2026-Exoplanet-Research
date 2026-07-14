@@ -9,7 +9,7 @@ Run any script with `--help` to see its full CLI options.
 
 ## Current inventory
 
-The repository currently has 117 standalone Python Skill scripts, plus
+The repository currently has 118 standalone Python Skill scripts, plus
 `Skills/__init__.py`. The exact script surface
 changes over time; do not copy a stale pasted inventory. Use this command for
 the authoritative local list:
@@ -80,6 +80,12 @@ after its clean-main identity and storage preflight. These single-parent
 supervisors are the standing default wherever independent units can be safely
 partitioned; see `AGENTS.md`, `docs/QUALITY_GATE_RUNNER.md`, and
 `docs/SIX_SHARD_LAUNCHER.md` for the binding safety rules.
+
+The active Phase 3 cache-local processing example is
+`Skills/benchmark_representation_preprocessing.py`: one parent launches six
+Python shard subprocesses with six FITS workers each, validates the committed
+training-only inventory, downloads nothing, and discards all derived arrays.
+See `docs/REPRESENTATION_PREPROCESSING_BENCHMARK.md`.
 
 ---
 

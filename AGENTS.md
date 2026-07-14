@@ -298,6 +298,15 @@ guards. Use sequential execution only for genuinely state-dependent work, a
 focused diagnosis, a constrained environment, or a measured parallel
 regression; record the reason rather than silently falling back.
 
+`Skills/benchmark_representation_preprocessing.py` is the current proven
+task-specific processing example: one parent supervises six ordinary Python
+shard subprocesses, each with six bounded FITS I/O/preprocessing threads. It
+validates the committed training-only inventory contract and cache containment,
+downloads nothing, discards every derived array, writes one small aggregate
+manifest, and emits one Run Report only after an accepted aggregate run. Use
+this process-plus-worker pattern for similar cache-local bounded processing
+when the generic acquisition launcher is not the right interface.
+
 **Ask, don't assume, when:**
 - The right shard/worker *count* (not whether to shard at all) depends on the operator's own tradeoffs — available machine capacity, concurrent work, and trust in the external service's rate limits.
 - It's unclear whether the task is I/O-bound, CPU-bound, or a mix (measuring first, then asking whether to push further, beats guessing a big number).

@@ -113,6 +113,16 @@ by itself satisfy a master-guide evidence requirement.
    failure status. Its optimized run passed 2,718 tests plus both static gates
    in 34.1s, about 58% faster than the earlier 81.57s xdist baseline.
    This is an operability improvement, not new scientific evidence.
+   Version 0.2.54 adds the bounded preprocessing benchmark that the inventory
+   gate requires: one parent supervises six Python shard subprocesses with six
+   FITS workers each, opens a deterministic 36-product/36-TIC sample spanning
+   sectors 1-98, filters `QUALITY == 0`, robustly normalizes and resamples to
+   2,048 float32 bins in memory, then discards every derived array. It verifies
+   the committed training-only inventory hash, paths, and file sizes, downloads
+   nothing, and projects full-corpus time/size from measured results. Tooling
+   and a 6/6 real-cache process smoke are complete; the merged-code 36-product
+   artifact remains the next evidence action before any training is authorized.
+   The release gate passed 2,726 tests plus Ruff/mypy in 34.1 seconds.
 
 ## Milestone 1 — Scoring and Classification Engine ✓ COMPLETE
 
