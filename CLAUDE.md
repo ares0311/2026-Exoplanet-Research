@@ -155,7 +155,8 @@ git ownership. Version 0.2.64 also accepts the catalog's 44,538 real 71-byte
 unflagged rows alongside 2,517 flagged 73-byte rows by padding only the omitted
 optional trailing fields; malformed rows outside the 71- to 73-byte source
 range still fail before MAST access. Its release gate passed 2,760 default
-tests plus Ruff/mypy as 8/8 supervised gates in 34.3 seconds under 6×6.
+tests plus Ruff/mypy as 8/8 supervised gates in 25.2 seconds under 6×6; the
+pinned gzip parsed all 47,055 rows exactly.
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.

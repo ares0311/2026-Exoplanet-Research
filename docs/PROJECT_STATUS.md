@@ -87,7 +87,8 @@ valid CDS rows without the optional class flag are 71 rather than 73 bytes.
 The bounded parser now accepts 71-73 bytes, pads only omitted trailing fields,
 and still rejects malformed shorter or longer rows before MAST access.
 The 0.2.64 release gate passed 2,760 tests plus Ruff/mypy as 8/8 supervised
-gates in 34.3 seconds under the canonical 6×6 topology.
+gates in 25.2 seconds under the canonical 6×6 topology; the real pinned
+catalog parsed all 47,055 rows.
 The 0.2.63 release gate passed the unchanged 2,759 tests plus Ruff/mypy as 8/8
 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 
