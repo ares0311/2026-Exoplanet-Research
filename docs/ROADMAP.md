@@ -156,8 +156,8 @@ by itself satisfy a master-guide evidence requirement.
    at most 2,048 cadences, two exact-revision models, isolated one-thread CPU
    sessions, finite 256-dimensional output checks, and structured timing/RSS
    evidence. The optional dependency group and ignored model-cache ledger keep
-   the default runtime and `git add .` safe. Next run a merged pip dry-run,
-   install only the optional group, and execute the smoke. A pass will close
+   the default runtime and `git add .` safe. The next planned step was a merged
+   pip dry-run, optional-group install, and smoke execution. A pass would close
    runtime integration only, not the variability/injection/scientific gates.
    The local 6×6 gate passed 2,743 default tests plus Ruff/mypy in 24.2 seconds
    with optional inference packages absent.
@@ -165,7 +165,13 @@ by itself satisfy a master-guide evidence requirement.
    Xet attempted a sandbox-blocked home-cache log. Version 0.2.58 relocates
    `HF_HOME` and `HF_XET_CACHE` into the ignored model cache before import; the
    optional group is installed, `pip check` passes, and the 6×6 gate passed the
-   same 2,743 tests plus Ruff/mypy in 26.2 seconds. Rerun merged smoke next.
+   same 2,743 tests plus Ruff/mypy in 26.2 seconds. The merged retry passed both
+   exact models in 26.875 seconds with finite `(1,1,1,256)` outputs and max
+   child RSS 186,204,160 bytes. Artifact SHA is `1cc59ab3…5de5d10`; Run Report
+   commit `f8a7207`. Version 0.2.59 closes runtime integration. Next define and
+   evidence the stellar-variability label and injection-recovery gates before
+   any broad extraction or training. The 0.2.59 evidence release passed 2,743
+   default tests plus Ruff/mypy under the 6×6 topology in 34.3 seconds.
 
 ## Milestone 1 — Scoring and Classification Engine ✓ COMPLETE
 

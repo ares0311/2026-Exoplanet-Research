@@ -93,9 +93,9 @@ The 0.2.56 full 6×6 gate passed 2,734 tests plus Ruff/mypy in 26.1s. The merged
 full verifier then passed 7/7 operations in 4.94s, verifying all five pinned
 sources and 56,036,648 projected direct bytes with zero payload downloads.
 Artifact SHA-256 is `5610bbb8…3042`; Run Report commit `ae4e659`. Source
-identity/footprint is now evidenced. Inference, dependencies, weights, and
-training remain unauthorized until a separate bounded inference smoke is
-designed and approved by the production gate sequence.
+identity/footprint is now evidenced. At that point inference, dependencies,
+weights, and training remained unauthorized pending the bounded smoke now
+completed below.
 Version 0.2.57 supplies that bounded smoke without changing default runtime
 dependencies: `Skills/smoke_representation_baseline_inference.py` verifies the
 source/inventory contracts, selects one deterministic cached SPOC product,
@@ -104,7 +104,8 @@ ONNX revisions into ignored in-repo cache, and runs isolated one-thread CPU
 sessions for Chronos-Bolt tiny and Astromer2. It requires finite
 `(1, 1, 1, 256)` mean embeddings and records per-model timing/RSS. Nine offline
 tests cover source drift, preprocessing, pinned downloads, thread/provider
-bounds, call signatures, and guardrails. The merged smoke remains next; no
+bounds, call signatures, and guardrails. At that point the merged smoke was
+next; no
 scientific comparison or full-inventory extraction is authorized. See
 `docs/REPRESENTATION_INFERENCE_SMOKE.md`.
 The first merged 0.2.57 invocation failed closed before downloading a model:
@@ -113,7 +114,14 @@ the Xet helper attempted to create its log below sandbox-blocked
 `HF_HOME` and `HF_XET_CACHE` to ignored repo-contained paths before the lazy
 Hub import. The partial cache is only 8 KB of metadata. The 0.2.58 6×6 gate
 passed 2,743 tests plus Ruff/mypy in 26.2 seconds with the optional group
-installed; merged smoke evidence remains next.
+installed; at that point merged smoke evidence remained next.
+The merged 0.2.58 retry passed both exact models in 26.875 seconds with finite
+`(1, 1, 1, 256)` outputs. Chronos peak RSS was 126,058,496 bytes and Astromer2
+was 186,204,160 bytes; exact weights total 29,890,844 bytes and the full ignored
+cache contains 29,960,842 bytes. Artifact SHA-256 is `1cc59ab3…5de5d10`; Run
+Report commit `f8a7207`. Version 0.2.59 records this evidence. Runtime
+integration is closed; variability-label and injection-recovery scientific
+gates remain before broad extraction or training.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
@@ -177,7 +185,7 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 140 top-level test files. Version 0.2.58 carries nine offline external-baseline inference-smoke tests; the full 6×6 run passed 2,743 default tests plus Ruff/mypy in 26.2s with the optional representation group installed.
+**Current test surface:** 140 top-level test files. Version 0.2.59 carries nine offline external-baseline inference-smoke tests; the full 6×6 evidence-release run passed 2,743 default tests plus Ruff/mypy in 34.3s with the optional representation group installed.
 **Skills:** 120 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
 
 ---

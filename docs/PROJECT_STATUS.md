@@ -37,8 +37,9 @@ training, stellar-variability labels, and injection comparison remain gated.
 Version 0.2.57 adds the next bounded gate: one cached TESS product, two exact
 ONNX revisions, isolated one-thread CPU inference, finite 256-dimensional
 output checks, and structured timing/memory evidence. The dependencies are an
-optional group and the model cache is ignored/ledgered. Merged installation and
-smoke evidence are next; broad extraction and training remain unauthorized.
+optional group and the model cache is ignored/ledgered. At that point merged
+installation and smoke evidence were next; broad extraction and training remain
+unauthorized.
 The 0.2.57 full 6×6 gate passed 2,743 tests plus Ruff/mypy in 24.2 seconds with
 the optional packages absent.
 
@@ -47,7 +48,13 @@ to write a log below sandbox-blocked `~/.cache/huggingface`; only 8 KB of
 ignored metadata was created. Version 0.2.58 relocates Hub and Xet state into
 the ignored model cache before import. The pinned optional group is installed,
 `pip check` passes, and the 0.2.58 6×6 gate passed 2,743 tests plus Ruff/mypy in
-26.2 seconds. Merged smoke evidence remains next.
+26.2 seconds. The merged retry passed both exact models in 26.875 seconds with
+finite `(1,1,1,256)` embeddings; max child RSS was 186,204,160 bytes and the
+ignored cache totals 29,960,842 file bytes. Artifact SHA-256 is
+`1cc59ab3…5de5d10`; Run Report commit `f8a7207`. Version 0.2.59 records the
+runtime PASS. Variability-label and injection-recovery scientific gates remain
+before broad extraction or training. The 0.2.59 6×6 evidence-release gate
+passed 2,743 tests plus Ruff/mypy in 34.3 seconds.
 
 ---
 
