@@ -34,6 +34,14 @@ downloaded. Artifact SHA-256 is `5610bbb8…3042`; Run Report commit `ae4e659`.
 Source identity/footprint is complete, while dependencies, weights, inference,
 training, stellar-variability labels, and injection comparison remain gated.
 
+Version 0.2.57 adds the next bounded gate: one cached TESS product, two exact
+ONNX revisions, isolated one-thread CPU inference, finite 256-dimensional
+output checks, and structured timing/memory evidence. The dependencies are an
+optional group and the model cache is ignored/ledgered. Merged installation and
+smoke evidence are next; broad extraction and training remain unauthorized.
+The 0.2.57 full 6×6 gate passed 2,743 tests plus Ruff/mypy in 24.2 seconds with
+the optional packages absent.
+
 ---
 
 ## What Is Complete

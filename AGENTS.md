@@ -292,6 +292,8 @@ The latest version 0.2.55 run on 2026-07-14 passed all 2,733 default tests plus
 Ruff/mypy in 31.1s with the same six-shard × six-worker configuration.
 Version 0.2.56 passed 2,734 default tests plus Ruff/mypy in 26.1s with that
 same configuration after adding the Hugging Face redirect regression test.
+Version 0.2.57 passed 2,743 default tests plus Ruff/mypy in 24.2s with the same
+configuration; optional inference packages remained absent from default tests.
 
 This optimized single-parent shard/worker shape is the standing default
 wherever work is safely partitionable: acquisition, processing, tests,
@@ -336,6 +338,18 @@ bytes, and zero payload bytes downloaded. Durable evidence is
 Run Report commit `ae4e659`. This closes source identity/footprint only. It
 still does not authorize dependency installation, weights, inference, or
 training.
+
+**Phase 3 external-baseline inference gate:** after the source evidence above,
+use `Skills/smoke_representation_baseline_inference.py` before any broader
+embedding extraction. Version 0.2.57 pins its dependencies in the optional
+`representation` group, downloads only the exact two ONNX revisions into
+ignored `.cache/representation_models/`, opens one deterministic inventory-
+owned TESS product, and runs each model in an isolated CPU child with ONNX
+intra/inter-op threads set to one. Require finite `(1, 1, 1, 256)` outputs and
+record peak RSS/timing. The two-model/one-product smoke is intentionally
+sequential for attributable memory; a later inventory extraction must use the
+single-parent 6×6 pattern. A smoke PASS still does not authorize training or a
+production model change. See `docs/REPRESENTATION_INFERENCE_SMOKE.md`.
 
 **Ask, don't assume, when:**
 - The right shard/worker *count* (not whether to shard at all) depends on the operator's own tradeoffs — available machine capacity, concurrent work, and trust in the external service's rate limits.

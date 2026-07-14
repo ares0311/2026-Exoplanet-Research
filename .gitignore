@@ -37,6 +37,9 @@ dmypy.json
 # Linters
 .ruff_cache/
 
+# Exact-revision external representation weights and Hugging Face local-dir metadata
+.cache/representation_models/
+
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb_checkpoints

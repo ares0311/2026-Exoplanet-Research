@@ -96,6 +96,17 @@ Artifact SHA-256 is `5610bbb8…3042`; Run Report commit `ae4e659`. Source
 identity/footprint is now evidenced. Inference, dependencies, weights, and
 training remain unauthorized until a separate bounded inference smoke is
 designed and approved by the production gate sequence.
+Version 0.2.57 supplies that bounded smoke without changing default runtime
+dependencies: `Skills/smoke_representation_baseline_inference.py` verifies the
+source/inventory contracts, selects one deterministic cached SPOC product,
+prepares at most 2,048 relative-magnitude cadences, downloads the two exact
+ONNX revisions into ignored in-repo cache, and runs isolated one-thread CPU
+sessions for Chronos-Bolt tiny and Astromer2. It requires finite
+`(1, 1, 1, 256)` mean embeddings and records per-model timing/RSS. Nine offline
+tests cover source drift, preprocessing, pinned downloads, thread/provider
+bounds, call signatures, and guardrails. The merged smoke remains next; no
+scientific comparison or full-inventory extraction is authorized. See
+`docs/REPRESENTATION_INFERENCE_SMOKE.md`.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
@@ -159,8 +170,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 139 top-level test files. Version 0.2.56 carries eight offline external-baseline source tests; the full 6×6 run passed 2,734 default tests plus Ruff/mypy in 26.1s.
-**Skills:** 119 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
+**Current test surface:** 140 top-level test files. Version 0.2.57 adds nine offline external-baseline inference-smoke tests; the full 6×6 run passed 2,743 default tests plus Ruff/mypy in 24.2s with optional inference packages absent.
+**Skills:** 120 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
 
 ---
 

@@ -77,6 +77,10 @@ This closes source identity and direct-footprint evidence only. It does not
 verify inference numerics or authorize dependency installation, weight
 download, model training, or production promotion.
 
+Version 0.2.57 implements the separately bounded runtime gate in
+`docs/REPRESENTATION_INFERENCE_SMOKE.md`; merged smoke evidence is still
+required before any broader extraction decision.
+
 ## Parallelism decision
 
 The verifier performs seven small metadata operations and is expected to

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "last_updated": "2026-07-12",
-  "production_gap": "Tier 1 and Tier 2 deployment gates are closed; tess_live_search_v1 retains one plausible but weak signal with evidence-limited follow-up complete; the Phase 3 compact masked-representation pilot did not beat benchmark_cnn_v1 and broader unlabeled Kepler/TESS, variability, injection, and foundation-model evidence remains open",
+  "last_updated": "2026-07-14",
+  "production_gap": "Tier 1 and Tier 2 deployment gates are closed; tess_live_search_v1 retains one plausible but weak signal with evidence-limited follow-up complete; Phase 3 external baseline sources and preprocessing are evidenced, while bounded inference, stellar-variability labels, injection comparison, and broader scientific evaluation remain open",
   "policy": {
     "standard_operator_cadence": "git add .",
     "git_add_dot_must_be_safe": true,
@@ -1706,6 +1706,22 @@
       },
       "validation_gate": "Embedding test AUC must strictly exceed benchmark_cnn_v1 AUC 0.957211; measured 0.832630, so the gate failed.",
       "next_action": "Retain for reproducibility only; do not promote, tune on the consumed frozen test, or rerun this compact architecture unchanged."
+    },
+    {
+      "path": ".cache/representation_models/",
+      "kind": "external_representation_model_cache",
+      "status": "expected_not_yet_materialized",
+      "git_policy": "ignored",
+      "last_known": {
+        "tool_version": "0.2.57",
+        "expected_models": 2,
+        "expected_weight_bytes": 29890844,
+        "source_contract": "metadata/representation_baseline_source_contract_v1.json",
+        "source_evidence": "artifacts/manifests/representation_baseline_source_verification_v1.json",
+        "verified_on": "2026-07-14"
+      },
+      "validation_gate": "Materialize only exact contract revisions through the merged one-product inference smoke; verify file sizes and SHA-256 before session creation.",
+      "next_action": "Run dependency dry-run after merge, install only the optional representation group, execute the bounded smoke, and record actual cache size/hashes. Do not commit weights or authorize full-inventory extraction from a smoke PASS."
     },
     {
       "path": "~/.lightkurve/cache/mastDownload/",
