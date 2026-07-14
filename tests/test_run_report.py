@@ -151,6 +151,21 @@ class TestFormatRunReport:
 
 
 class TestCommitAndPushReport:
+    def test_lock_open_failure_returns_false_without_git(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        blocked_parent = tmp_path / "not-a-directory"
+        blocked_parent.write_text("file", encoding="utf-8")
+        monkeypatch.setenv(
+            "EXO_RUN_REPORT_LOCK_PATH", str(blocked_parent / "report.lock")
+        )
+        fake = _FakeRun()
+
+        ok = commit_and_push_report(tmp_path / "report.jsonl", message="msg", run_fn=fake)
+
+        assert ok is False
+        assert fake.calls == []
+
     def test_stages_only_the_given_path(self, tmp_path: Path) -> None:
         fake = _FakeRun()
         path = tmp_path / "reports" / "script.jsonl"

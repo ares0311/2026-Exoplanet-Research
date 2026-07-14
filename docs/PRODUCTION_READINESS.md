@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.65 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.66 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -521,6 +521,12 @@ constructs the MAST column list from that contract. No pilot output was written.
 The v2 single-batch probe returned all six requested TIC rows in 1.5 seconds.
 The version 0.2.65 release gate passed 2,761 default tests plus Ruff/mypy as
 8/8 supervised gates in 26.2 seconds under the canonical 6×6 topology.
+The merged pilot queried all 216 TICs and wrote all 12 science artifacts, then
+the sandbox denied `.git/exo-run-report.lock`. Version 0.2.66 preserves the
+already-appended ledger and returns `False` on lock failure, allowing the
+caller to warn and exit zero without unsafe unlocked git operations.
+The version 0.2.66 release gate passed 2,762 default tests plus Ruff/mypy as
+8/8 supervised gates in 34.3 seconds under the canonical 6×6 topology.
 The version 0.2.63 release gate passed the unchanged 2,759 default tests plus
 Ruff/mypy as 8/8 supervised gates in 27.3 seconds under the canonical 6×6
 topology.

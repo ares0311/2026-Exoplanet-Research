@@ -163,6 +163,12 @@ single-request schema check proved `duplicate_id` is accepted while
 `duplicate_i` is rejected; selected columns now come from the active contract.
 The v2 six-ID probe returned all six rows in 1.5 seconds. Its release gate
 passed 2,761 default tests plus Ruff/mypy as 8/8 gates in 26.2 seconds.
+The merged run completed 216/216 TIC queries and wrote all shard artifacts;
+only the sandbox-blocked `.git/exo-run-report.lock` made children exit nonzero.
+Version 0.2.66 makes that lock failure return `False` so callers warn and exit
+successfully without attempting unlocked concurrent git operations.
+Its release gate passed 2,762 default tests plus Ruff/mypy as 8/8 supervised
+gates in 34.3 seconds under the canonical 6×6 topology.
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
