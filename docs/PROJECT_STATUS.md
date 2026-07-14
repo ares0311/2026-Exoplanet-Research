@@ -26,7 +26,11 @@ Phase 3 source gate: version 0.2.55 pins the 56,036,648-byte direct package and
 model footprint for Chronos-Bolt tiny plus Astromer2 and adds a metadata-only,
 fail-closed verifier. Merged-code verification is next; inference and training
 remain unauthorized. The canonical local 6×6 release gate passed 2,733 default
-tests plus Ruff/mypy in 31.1 seconds.
+tests plus Ruff/mypy in 31.1 seconds. The first merged verifier run then failed
+closed on followed Hugging Face HEAD redirects without writing evidence or
+downloading payloads. Version 0.2.56 preserves the authoritative resolver
+headers, passes a live HEAD smoke, and passes 2,734 tests plus Ruff/mypy in
+26.1 seconds. Merged full verification remains next.
 
 ---
 

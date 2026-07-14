@@ -134,6 +134,8 @@ For a single large numerical job, allow native libraries to use more threads, co
   Ruff/mypy in 34.1s with the same six-shard × six-worker configuration.
 - Version 0.2.55 validation on 2026-07-14 passed 2,733 default tests plus
   Ruff/mypy in 31.1s with the same six-shard × six-worker configuration.
+- Version 0.2.56 validation on 2026-07-14 passed 2,734 default tests plus
+  Ruff/mypy in 26.1s with the same six-shard × six-worker configuration.
 
 ### Cache-local representation preprocessing
 
