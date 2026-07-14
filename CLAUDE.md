@@ -62,9 +62,13 @@ Version 0.2.54 applies that standing pattern to the active Phase 3 gate:
 `Skills/benchmark_representation_preprocessing.py` supervises six Python shard
 subprocesses with six cached-FITS workers each, downloads nothing, retains no
 derived arrays, and projects full-inventory preprocessing time and normalized-
-flux size from a deterministic 36-product sample. Tooling and a six-product
-real-cache process smoke are complete; run the merged 36-product benchmark
-before authorizing any representation training. See
+flux size from a deterministic 36-product sample. The merged run passed 36/36
+with zero failures/downloads/persisted arrays at 85.77 products/s, projecting
+97.98 MB and 139.44 seconds for all 11,960 products. The preprocessing gate is
+complete and future experiments should stream this source. Representation
+training remains unauthorized until a materially broader plan adds
+stellar-variability labels, injection-recovery comparison, and an external
+foundation-model baseline. See
 `docs/REPRESENTATION_PREPROCESSING_BENCHMARK.md`.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not

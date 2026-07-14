@@ -120,9 +120,16 @@ by itself satisfy a master-guide evidence requirement.
    2,048 float32 bins in memory, then discards every derived array. It verifies
    the committed training-only inventory hash, paths, and file sizes, downloads
    nothing, and projects full-corpus time/size from measured results. Tooling
-   and a 6/6 real-cache process smoke are complete; the merged-code 36-product
-   artifact remains the next evidence action before any training is authorized.
-   The release gate passed 2,726 tests plus Ruff/mypy in 34.1 seconds.
+   and a 6/6 real-cache process smoke are complete. The merged-code 36-product
+   run then passed 36/36 with zero failures/downloads/persisted arrays at 85.77
+   products/s. It projects the full 11,960-product normalized-flux-only
+   transform at 97.98 MB and 139.44 seconds, so future work should stream it
+   rather than create a durable derived corpus. This closes the preprocessing
+   measurement gate, not Phase 3: stellar-variability labels,
+   injection-recovery comparison, and an external foundation-model baseline
+   remain required before a materially broader representation experiment can
+   support any production-model decision. The release gate passed 2,726 tests
+   plus Ruff/mypy in 34.1 seconds.
 
 ## Milestone 1 — Scoring and Classification Engine ✓ COMPLETE
 
