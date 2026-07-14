@@ -288,6 +288,8 @@ Ruff/mypy in 34.1s after limiting native numeric backends to one inner thread
 and removing redundant real BLS searches from unit tests whose assertions only
 exercise injection-grid orchestration. That is about 58% faster than the
 81.57s single-universe baseline.
+The latest version 0.2.55 run on 2026-07-14 passed all 2,733 default tests plus
+Ruff/mypy in 31.1s with the same six-shard × six-worker configuration.
 
 This optimized single-parent shard/worker shape is the standing default
 wherever work is safely partitionable: acquisition, processing, tests,
@@ -306,6 +308,20 @@ downloads nothing, discards every derived array, writes one small aggregate
 manifest, and emits one Run Report only after an accepted aggregate run. Use
 this process-plus-worker pattern for similar cache-local bounded processing
 when the generic acquisition launcher is not the right interface.
+
+**Phase 3 external-baseline source gate:** use the immutable
+`metadata/representation_baseline_source_contract_v1.json` and
+`Skills/verify_representation_baseline_sources.py` before installing or loading
+any external embedding model. The bounded first comparison is frozen to
+Chronos-Bolt tiny (general time-series foundation baseline) and Astromer2
+(astronomy-native comparator), at exact repository commits and hashes. The
+verifier is metadata-only and intentionally sequential because its seven small
+requests complete below the three-minute sharding threshold. A PASS verifies
+source identity and the 56,036,648-byte direct payload only; it does not
+authorize dependencies, weight downloads, model training, or promotion. Once
+inference is separately proven, per-light-curve embedding extraction must use
+the single-parent 6×6 pattern because those units are independently
+partitionable. See `docs/REPRESENTATION_BASELINE_SOURCE_CONTRACT.md`.
 
 **Ask, don't assume, when:**
 - The right shard/worker *count* (not whether to shard at all) depends on the operator's own tradeoffs — available machine capacity, concurrent work, and trust in the external service's rate limits.

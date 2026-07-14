@@ -130,6 +130,16 @@ by itself satisfy a master-guide evidence requirement.
    remain required before a materially broader representation experiment can
    support any production-model decision. The release gate passed 2,726 tests
    plus Ruff/mypy in 34.1 seconds.
+   Version 0.2.55 freezes the external-baseline source contract before any
+   dependency or weight download: Chronos-Bolt tiny and Astromer2 provide the
+   bounded general time-series and astronomy-native controls at exact commits,
+   hashes, and sizes. Three Python 3.14-compatible direct wheels plus both ONNX
+   files total 56,036,648 bytes. The metadata-only verifier fails closed and
+   downloads zero payload bytes. Next, run that verifier from merged `main` and
+   commit its evidence artifact; only then may a separate bounded inference
+   smoke consider optional dependency installation. Scientific Phase 3 still
+   requires variability labels and injection-recovery comparison. The local
+   release gate passed 2,733 tests plus Ruff/mypy in 31.1 seconds.
 
 ## Milestone 1 — Scoring and Classification Engine ✓ COMPLETE
 

@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.54 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.55 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -386,6 +386,22 @@ The preprocessing measurement gate is complete. Prefer streaming for the next
 experiment; broader training remains unauthorized until its plan supplies the
 still-missing stellar-variability labels, injection-recovery comparison, and
 external foundation-model baseline.
+0.2.55 closes the external-baseline source-identity and direct-footprint
+prerequisite without installing or downloading any payload. The immutable
+contract selects Chronos-Bolt tiny as the general time-series foundation
+baseline and Astromer2 as the astronomy-native comparator, pins exact Hugging
+Face commits/files/SHA-256 values, and pins Python 3.14-compatible wheels for
+`light-curve`, `onnxruntime`, and `huggingface-hub`. The two ONNX files and
+three direct wheels total exactly 56,036,648 bytes. Full Chronos2 is excluded
+from the first gate because its 463.8 MB ONNX file duplicates the bounded
+model's role. `Skills/verify_representation_baseline_sources.py` checks current
+primary metadata plus pinned-file HEAD headers, prints progress/ETA, fails
+closed on drift, writes structured evidence and a Run Report, and downloads
+zero package/model payload bytes. Seven offline tests cover success and drift
+failures. The merged-code live metadata verification remains the immediate next
+step; no dependency, model weight, inference, or training is authorized yet.
+The canonical local release gate passed 2,733 default tests plus Ruff/mypy in
+31.1 seconds using six disjoint test shards × six xdist workers.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of
@@ -595,7 +611,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 
 Run these before any live deployment or public announcement:
 
-- [x] `.venv/bin/python Skills/run_quality_gates.py` — six test shards × six xdist workers plus concurrent Ruff/mypy all pass (2026-07-13: 2,726 passed; 2 `integration_live` tests excluded; 34.1s wall time)
+- [x] `.venv/bin/python Skills/run_quality_gates.py` — six test shards × six xdist workers plus concurrent Ruff/mypy all pass (2026-07-14: 2,733 passed; 2 `integration_live` tests excluded; 31.1s wall time)
 - [x] `exo background-run-once --dry-run` — no config errors (2026-07-10: installed entry point exercised successfully; dry run wrote no ledger/outcome data)
 - [x] `.venv/bin/python Skills/tier2_progress_reporter.py` — 2026-07-11 reports READY from 15,649 committed-evidence examples/snippets, promoted checkpoint, calibration, and registry entry
 - [x] Verify `configs/background_search_v0.json` fingerprint matches expected value (2026-07-10: `exo sqlite-integrity` returned `ok: true` and `missing_config_fingerprint_count: 0`)

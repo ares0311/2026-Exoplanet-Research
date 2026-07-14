@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "contract_id": "representation_baseline_source_contract_v1",
+  "created_at_utc": "2026-07-14T04:12:50Z",
+  "purpose": "Bounded, reproducible external embedding baselines for the Phase 3 comparison gate",
+  "runtime_contract": {
+    "validated_python": "3.14.3",
+    "platform": "macOS 14+ arm64",
+    "installation_scope": "future optional representation dependency group only"
+  },
+  "packages": [
+    {
+      "name": "light-curve",
+      "version": "0.13.1",
+      "requires_python": ">=3.10",
+      "project_url": "https://pypi.org/project/light-curve/0.13.1/",
+      "wheel": {
+        "filename": "light_curve-0.13.1-cp310-abi3-macosx_14_0_arm64.whl",
+        "size_bytes": 6941527,
+        "sha256": "76074ef46ebd026c42fbaf07047ec6f12930c4ccf01759890612b07ff616a09d"
+      }
+    },
+    {
+      "name": "onnxruntime",
+      "version": "1.27.0",
+      "requires_python": ">=3.11",
+      "project_url": "https://pypi.org/project/onnxruntime/1.27.0/",
+      "wheel": {
+        "filename": "onnxruntime-1.27.0-cp314-cp314-macosx_14_0_arm64.whl",
+        "size_bytes": 18433941,
+        "sha256": "0874edc171f470fc4dd2bbb60bc0989612ed1a8b89b365cda016630a93227f13"
+      }
+    },
+    {
+      "name": "huggingface-hub",
+      "version": "1.23.0",
+      "requires_python": ">=3.10.0",
+      "project_url": "https://pypi.org/project/huggingface-hub/1.23.0/",
+      "wheel": {
+        "filename": "huggingface_hub-1.23.0-py3-none-any.whl",
+        "size_bytes": 770336,
+        "sha256": "b1d604788f5adc7f0eb246e03e0ec19011ca06e38400218c347dccc3dffa64a2"
+      }
+    }
+  ],
+  "models": [
+    {
+      "name": "Chronos-Bolt tiny",
+      "role": "general_time_series_foundation_baseline",
+      "repo": "light-curve/chronos-bolt-tiny",
+      "commit": "4f1a5566ae2358712e89fe9189a209a9190c7fca",
+      "filename": "chronos-bolt-tiny.onnx",
+      "size_bytes": 13901747,
+      "sha256": "67c02abc13cd46912314bee7e6651cccc5b0e17c8564a67db226f6e26da78245",
+      "license": "Apache-2.0",
+      "embedding_dimension": 256,
+      "max_observations": 2048,
+      "selected_output": "mean",
+      "upstream_reference": "https://huggingface.co/amazon/chronos-bolt-tiny"
+    },
+    {
+      "name": "Astromer2",
+      "role": "astronomy_native_foundation_comparator",
+      "repo": "light-curve/astromer2",
+      "commit": "17752a44aaaa1cd4a014be53e463ee06b61e68f0",
+      "filename": "astromer2.onnx",
+      "size_bytes": 15989097,
+      "sha256": "1791a71414cc6e1677774369643569a537a48631e897ae2c2de18e32d41d9987",
+      "license": "MIT",
+      "embedding_dimension": 256,
+      "max_observations": 200,
+      "selected_output": "mean",
+      "upstream_reference": "https://doi.org/10.1051/0004-6361/202554026"
+    }
+  ],
+  "excluded_initial_models": [
+    {
+      "name": "Chronos2 ONNX",
+      "repo": "light-curve/chronos2",
+      "commit": "3157e1f6244812c04fb99aead212ab5c754a7884",
+      "filename": "chronos2.onnx",
+      "size_bytes": 463834607,
+      "sha256": "e81ac82ba971d5bcf9ac34664ed120ea3b463594fb392f3ca43574666b6cafca",
+      "reason": "The 463.8 MB model adds storage and inference cost without improving the first gate's baseline coverage over the 13.9 MB Chronos-Bolt tiny encoder."
+    }
+  ],
+  "aggregate_download_bytes": 56036648,
+  "evaluation_contract": {
+    "weights": "frozen",
+    "probe": "identical leakage-safe linear probe per embedding source",
+    "grouping": "target identity; no TIC/KIC may cross train, validation, or test",
+    "selection": "validation only",
+    "test_access": "one versioned opening after preprocessing and probe choices are frozen",
+    "required_comparators": [
+      "benchmark_cnn_v1",
+      "BLS/TLS/statistical features",
+      "Chronos-Bolt tiny",
+      "Astromer2"
+    ],
+    "required_outcomes": [
+      "grouped holdout",
+      "top-k review yield",
+      "injection-recovery comparison"
+    ]
+  },
+  "limitations": [
+    "This contract verifies source identity and bounded footprint only; it does not verify inference numerics.",
+    "No package or model dependency is added to the default runtime by this contract.",
+    "No model training, checkpoint promotion, or production scoring change is authorized.",
+    "Stellar-variability labels and the injection-recovery comparison remain separate Phase 3 prerequisites."
+  ]
+}

@@ -9,7 +9,7 @@ Run any script with `--help` to see its full CLI options.
 
 ## Current inventory
 
-The repository currently has 118 standalone Python Skill scripts, plus
+The repository currently has 119 standalone Python Skill scripts, plus
 `Skills/__init__.py`. The exact script surface
 changes over time; do not copy a stale pasted inventory. Use this command for
 the authoritative local list:
@@ -31,6 +31,7 @@ This table is intentionally workflow-oriented rather than exhaustive.
 |--------|---------|--------------|
 | `run_six_shards.py` | Supervise reviewed acquisition/processing workloads as six shards × six workers from one terminal | `build_shard_commands`, `supervise_shards` |
 | `run_quality_gates.py` | Run Ruff/mypy plus six disjoint pytest shards × six xdist workers | `partition_test_files`, `supervise_gates` |
+| `verify_representation_baseline_sources.py` | Verify pinned PyPI wheels and ONNX sources from primary metadata without downloading payloads | `load_contract`, `verify_sources` |
 | `star_scanner.py` | Rank uncharacterised TIC targets, background scan | `priority_score`, `scan_star`, `run_background_scan` |
 | `batch_scan.py` | Scan a list of TIC IDs from text/CSV | `batch_scan`, `read_tic_ids` |
 | `rank_candidates.py` | Sort exo JSON outputs by composite rank score | `rank_candidates`, `compute_rank_score` |

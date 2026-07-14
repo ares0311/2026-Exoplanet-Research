@@ -70,6 +70,19 @@ training remains unauthorized until a materially broader plan adds
 stellar-variability labels, injection-recovery comparison, and an external
 foundation-model baseline. See
 `docs/REPRESENTATION_PREPROCESSING_BENCHMARK.md`.
+Version 0.2.55 freezes the next Phase 3 source gate without installing or
+downloading a model: `metadata/representation_baseline_source_contract_v1.json`
+pins Python 3.14-compatible PyPI wheels plus exact ONNX repository commits,
+sizes, and SHA-256 values for Chronos-Bolt tiny and Astromer2. The pair supplies
+a bounded general time-series foundation baseline and an astronomy-native
+control; full Chronos2 is excluded from the first pass because its 463.8 MB
+ONNX file duplicates the general-baseline role of the 13.9 MB tiny model.
+`Skills/verify_representation_baseline_sources.py` fails closed against current
+primary metadata and pinned HEAD headers while downloading zero payload bytes.
+The direct wheels plus models total 56,036,648 bytes. Source verification must
+pass from merged code before optional dependencies or model weights are
+introduced, and it still does not authorize training. See
+`docs/REPRESENTATION_BASELINE_SOURCE_CONTRACT.md`.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
@@ -133,8 +146,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 138 top-level test files. Version 0.2.54 local 6×6 validation passed 2,726 default tests plus Ruff/mypy in 34.1s; 2 `integration_live` tests remain excluded from the default suite.
-**Skills:** 118 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
+**Current test surface:** 139 top-level test files. Version 0.2.55 adds seven offline tests for the external-baseline source contract; the full 6×6 run passed 2,733 default tests plus Ruff/mypy in 31.1s.
+**Skills:** 119 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
 
 ---
 
