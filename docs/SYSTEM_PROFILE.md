@@ -183,6 +183,11 @@ workers.
   report-push failure: no unlocked git race, no data loss, warning plus exit 0.
 - Version 0.2.66 validation passed 2,762 tests plus Ruff/mypy as 8/8 supervised
   gates in 34.3 seconds with the canonical 6×6 test topology.
+- The merged Catalina pilot completed 216 TICs across 38 requests in 8.519s
+  observed wall time (25.36 TIC/s). All six shards completed in 3.06-3.83s
+  with no final service errors/timeouts; zero candidates were found.
+- Version 0.2.67 validation passed 2,763 tests plus Ruff/mypy as 8/8 supervised
+  gates in 24.2 seconds with the canonical 6×6 test topology.
 - Version 0.2.63 validation passed the unchanged 2,759 tests plus Ruff/mypy as
   8/8 supervised gates in 27.3 seconds with the canonical 6×6 test topology.
 

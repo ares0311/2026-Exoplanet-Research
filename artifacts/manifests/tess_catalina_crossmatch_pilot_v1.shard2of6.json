@@ -1,0 +1,32 @@
+{
+  "artifact_id": "tess_catalina_crossmatch_pilot_v1",
+  "batch_size": 6,
+  "catalog_sha256": "7b0d497f0e55bed76424140199474bc7aabf06d7df1901260bbd188f9caaeb60",
+  "completed_at_utc": "2026-07-14T21:38:09.399677+00:00",
+  "contract_path": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/metadata/tess_catalina_crossmatch_contract_v2.json",
+  "contract_sha256": "e0abf6b1505be46a7e150039c501c7479c6ccfff73867458211a3f4bced94827",
+  "elapsed_seconds": 3.2816124169621617,
+  "inventory_path": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/metadata/representation_tess_unlabeled_cache_v1.jsonl",
+  "limitations": [
+    "This contract authorizes only a deterministic 216-TIC metadata/crossmatch pilot.",
+    "Pilot matches are not training labels until all six shards are globally reconciled for duplicate Catalina sources and the scientific overlap is accepted in a separate evidence gate.",
+    "No FITS light curve is opened, no embedding is extracted, and no model is trained or promoted.",
+    "The Catalina sky footprint and magnitude range may yield too few matches; a low overlap is an evidence result, not permission to relax safeguards after seeing labels."
+  ],
+  "match_status_counts": {
+    "no_candidate_within_radius": 40
+  },
+  "output_path": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/artifacts/manifests/tess_catalina_crossmatch_pilot_v1.shard2of6.jsonl",
+  "output_sha256": "ef306d949fbcf9b38f6c79bd8200c3a8b04e63f9197863e0a5f321ac21ce841a",
+  "queried_tics": 40,
+  "rows_written": 40,
+  "schema_version": 1,
+  "selected_tics": 40,
+  "shard_count": 6,
+  "shard_index": 2,
+  "source_evidence_path": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/artifacts/manifests/stellar_variability_label_source_verification_v1.json",
+  "status": "success",
+  "tic_rate_per_second": 12.189129890308193,
+  "training_authorized": false,
+  "workers": 6
+}

@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "artifact_id": "tess_catalina_crossmatch_pilot_aggregate_v1",
+  "completed_at_utc": "2026-07-14T21:38:12.623557+00:00",
+  "status": "success_evidence_limited",
+  "contract_path": "metadata/tess_catalina_crossmatch_contract_v2.json",
+  "contract_sha256": "e0abf6b1505be46a7e150039c501c7479c6ccfff73867458211a3f4bced94827",
+  "run_code_commit": "1254676a956641f8815344f2768386b825ace456",
+  "run_report_commit": "0a7487c1aaaa6df70a7ce449306b198d14860f93",
+  "topology": {
+    "process_shards": 6,
+    "workers_per_shard": 6,
+    "total_workers": 36,
+    "batch_size": 6,
+    "completed_batch_requests": 38
+  },
+  "timing": {
+    "first_shard_started_at": "2026-07-14T21:38:04.104670+00:00",
+    "last_shard_completed_at": "2026-07-14T21:38:12.623557+00:00",
+    "observed_wall_seconds": 8.518887,
+    "aggregate_tic_rate_per_second": 25.35542495163981,
+    "per_shard_elapsed_seconds": [
+      3.8283910000463948,
+      3.7304444579640403,
+      3.2816124169621617,
+      3.2204732090467587,
+      3.0611587919993326,
+      3.4755083329509944
+    ]
+  },
+  "counts": {
+    "inventory_tics": 2790,
+    "pilot_tics": 216,
+    "queried_tics": 216,
+    "unique_tics": 216,
+    "rows_written": 216,
+    "no_candidate_within_radius": 216,
+    "rejected_matches": 0,
+    "accepted_labels": 0,
+    "final_service_errors": 0,
+    "timeouts": 0
+  },
+  "global_reconciliation": {
+    "duplicate_tic_ids": 0,
+    "accepted_catalina_sources": 0,
+    "cross_shard_duplicate_accepted_sources": 0,
+    "passed": true
+  },
+  "statistical_interpretation": {
+    "pilot_fraction_of_inventory": 0.07741935483870968,
+    "observed_match_fraction": 0.0,
+    "one_sided_95_percent_match_fraction_upper_bound": 0.01377339759046814,
+    "method": "Exact zero-success binomial bound: 1 - 0.05^(1/216)",
+    "projected_full_inventory_matches_at_upper_bound": 38.42777927740611,
+    "inference_only": true
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/manifests/tess_catalina_crossmatch_pilot_v1.shard0of6.json",
+      "sha256": "37ff6cda8e50762a69f42409e8a8b152749d51c62d068c31de7857901497d5cd"
+    },
+    {
+      "path": "artifacts/manifests/tess_catalina_crossmatch_pilot_v1.shard0of6.jsonl",
+      "sha256": "43eeaf50c8361b4001e6d0cc716d6409f92814acf02e1f69314713aa0343364d"
+    },
+    {
+      "path": "artifacts/manifests/tess_catalina_crossmatch_pilot_v1.shard1of6.json",
+      "sha256": "5430562d62b84439e9e38298c240bbe77a6eee1f0f3635b633e21de143f2bb7e"
+    },
+    {
+      "path": "artifacts/manifests/tess_catalina_crossmatch_pilot_v1.shard1of6.jsonl",
+      "sha256": "812e229a032c2b07588c0c879f10448aad5e87ec7862f7c1073442cd79a2ac28"
+    },
+    {
+      "path": "artifacts/manifests/tess_catalina_crossmatch_pilot_v1.shard2of6.json",
+      "sha256": "26677f2530f6c73393f31e9b0b7d3d3092e36c606cf94594ca952b19a09283a4"
+    },
+    {
+      "path": "artifacts/manifests/tess_catalina_crossmatch_pilot_v1.shard2of6.jsonl",
+      "sha256": "ef306d949fbcf9b38f6c79bd8200c3a8b04e63f9197863e0a5f321ac21ce841a"
+    },
+    {
+      "path": "artifacts/manifests/tess_catalina_crossmatch_pilot_v1.shard3of6.json",
+      "sha256": "1dcf92ffa0cdd25e357645770acca4c0467a96b5a282d7ff3fd87d13a9dbbb42"
+    },
+    {
+      "path": "artifacts/manifests/tess_catalina_crossmatch_pilot_v1.shard3of6.jsonl",
+      "sha256": "d46d9169d95b199821bb9d7668745d876f275e60082861e61711547e6eeee4ad"
+    },
+    {
+      "path": "artifacts/manifests/tess_catalina_crossmatch_pilot_v1.shard4of6.json",
+      "sha256": "821a267e278b5ab3a6e9e3aa14879625b9ec05759be72aeec1a35fa92faafa09"
+    },
+    {
+      "path": "artifacts/manifests/tess_catalina_crossmatch_pilot_v1.shard4of6.jsonl",
+      "sha256": "ceb691353cdb774b1a371c2b0772c6628dd80fb84724571e46b779ec60a458dd"
+    },
+    {
+      "path": "artifacts/manifests/tess_catalina_crossmatch_pilot_v1.shard5of6.json",
+      "sha256": "19f5969eb8e1915b983346ed8733ef45bd6af3932c2c38d22824aa05475000df"
+    },
+    {
+      "path": "artifacts/manifests/tess_catalina_crossmatch_pilot_v1.shard5of6.jsonl",
+      "sha256": "96ecfbc1101ed8ee03d0705ff1e5766c7493f8a251b62e6b553ce2f9afd7c018"
+    }
+  ],
+  "decision": {
+    "pilot_complete": true,
+    "full_2790_tic_execution_authorized": false,
+    "training_authorized": false,
+    "reason": "The service path is fast and complete, but zero of 216 frozen pilot TICs has a Catalina candidate within the precommitted 3-arcsecond radius. Low overlap is a stop signal, not permission to relax safeguards after inspecting labels."
+  },
+  "limitations": [
+    "The launcher returned nonzero only because the sandbox denied the post-data Run Report git lock; version 0.2.66 fixes that operability defect.",
+    "Retry counts were not separately instrumented; all 38 batches completed without a final service error or timeout.",
+    "The statistical upper bound is an inference about the frozen pilot sampling process, not evidence that any full-inventory matches exist."
+  ]
+}
