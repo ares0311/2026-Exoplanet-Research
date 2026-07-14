@@ -146,8 +146,10 @@ processed snippets to
 shard when sharded). Progress is tracked in
 `logs/t1_1_kepler_processing.sqlite3` and is resumable; raw FITS are deleted
 per-target so local storage never accumulates. Supports `--workers` (in-process
-concurrency) and `--shard-index`/`--shard-count` (multi-tab process-level
-concurrency, sharing one `--db-path`).
+concurrency) and `--shard-index`/`--shard-count` (supervised process-level
+concurrency, sharing one `--db-path`). For any future manifest, use
+`Skills/run_six_shards.py` to supervise the reviewed 6×6 shape from one
+terminal; the historical manifest is complete and must not be rerun.
 
 **Update (2026-07-04): the manifest is confirmed at 100% (6,515/6,515).**
 Final shard totals summed to exactly the manifest's target-group count

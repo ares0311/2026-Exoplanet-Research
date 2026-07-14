@@ -102,6 +102,17 @@ by itself satisfy a master-guide evidence requirement.
    totaling 29.79762048 GB already cached. The dataset is registered training-
    only. Next, benchmark streaming/bounded-sample preprocessing size and
    throughput before authorizing any derived arrays or new model training.
+   Version 0.2.53 removes the six-terminal operational burden for future
+   shard-capable acquisition: one fail-closed supervisor now launches the
+   measured six shards × six workers, isolates logs, enforces storage/repo
+   preflight, propagates shard failures, and serializes shard Run Report git
+   operations. It does not authorize a new download or change the next Phase 3
+   evidence gate. The same release replaces sequential local validation with a
+   single-parent quality runner: six disjoint pytest file shards × six xdist
+   workers execute beside Ruff and mypy, with per-gate logs and a combined
+   failure status. Its optimized run passed 2,718 tests plus both static gates
+   in 34.1s, about 58% faster than the earlier 81.57s xdist baseline.
+   This is an operability improvement, not new scientific evidence.
 
 ## Milestone 1 — Scoring and Classification Engine ✓ COMPLETE
 

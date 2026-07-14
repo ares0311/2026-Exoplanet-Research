@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
 
 from run_report import (  # noqa: E402
@@ -16,6 +18,17 @@ from run_report import (  # noqa: E402
     report_path_for,
     run_and_commit_report,
 )
+
+
+def test_optional_process_lock_creates_requested_lock_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from run_report import _optional_process_lock
+
+    lock_path = tmp_path / "report.lock"
+    monkeypatch.setenv("EXO_RUN_REPORT_LOCK_PATH", str(lock_path))
+    with _optional_process_lock():
+        assert lock_path.exists()
 
 
 def _report(**overrides) -> RunReport:

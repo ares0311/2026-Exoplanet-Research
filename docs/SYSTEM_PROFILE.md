@@ -114,8 +114,11 @@ For a single large numerical job, allow native libraries to use more threads, co
 
 ### Test Suite
 
-- Run pytest through `pytest-xdist` with all reported CPUs and the work-stealing
-  scheduler (`-n auto --dist=worksteal`).
+- Run the full local gate through `.venv/bin/python
+  Skills/run_quality_gates.py`. It partitions test modules across six pytest
+  shards, runs six xdist workers per shard with work stealing, and supervises
+  Ruff/mypy concurrently. It also caps native numeric backends at one inner
+  thread per test worker to avoid nested oversubscription.
 - Measured 2026-07-11 on this 16-CPU M4 Max: 2,630 tests took 226.45s serial,
   137.53s with 4 workers/load scheduling, 136.48s with 8 workers/load,
   138.88s with 16 workers/load, 81.54s with 8 workers/work stealing, and
@@ -123,6 +126,10 @@ For a single large numerical job, allow native libraries to use more threads, co
 - The 16-worker work-stealing default uses the maximum available parallelism
   with effectively identical best wall time; portable environments adapt via
   xdist's `auto` worker count.
+- Measured 2026-07-13: the optimized six-shard × six-worker supervisor passed
+  2,718 default tests plus Ruff/mypy in 34.1s, about 58% faster than the 81.57s
+  single-universe baseline. Direct `-n auto --dist=worksteal` remains the
+  focused-test and constrained-environment fallback.
 
 ### AI/ML Training
 

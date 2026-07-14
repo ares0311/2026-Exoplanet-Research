@@ -153,10 +153,11 @@ The guard must expose fixed commands only. It must not provide arbitrary shell a
 Allowed `exo_guard` commands:
 
 ```bash
-ruff check .
-python -m mypy src
-PYTHONPATH=src python -m pytest
-PYTHONPATH=src python -m pytest --cov=exo_toolkit --cov-report=term-missing
+.venv/bin/python Skills/run_quality_gates.py
+.venv/bin/python -m ruff check .
+.venv/bin/python -m mypy src
+PYTHONPATH=src .venv/bin/python -m pytest
+PYTHONPATH=src .venv/bin/python -m pytest --cov=exo_toolkit --cov-report=term-missing
 exo background-run-once --dry-run
 exo run-summary
 exo sqlite-integrity
@@ -294,10 +295,8 @@ Run the safest available checks in this order:
 
 ```bash
 git status --short --branch
-python --version
-ruff check .
-python -m mypy src
-PYTHONPATH=src python -m pytest
+.venv/bin/python --version
+.venv/bin/python Skills/run_quality_gates.py
 ```
 
 Then run the MCP-specific validation available locally, such as listing configured servers or starting each guard server in no-op mode.

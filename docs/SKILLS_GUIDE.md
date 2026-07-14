@@ -9,7 +9,8 @@ Run any script with `--help` to see its full CLI options.
 
 ## Current inventory
 
-The repository currently has 98 Python Skill files. The exact script surface
+The repository currently has 117 standalone Python Skill scripts, plus
+`Skills/__init__.py`. The exact script surface
 changes over time; do not copy a stale pasted inventory. Use this command for
 the authoritative local list:
 
@@ -28,6 +29,8 @@ This table is intentionally workflow-oriented rather than exhaustive.
 
 | Script | Purpose | Key function |
 |--------|---------|--------------|
+| `run_six_shards.py` | Supervise reviewed acquisition/processing workloads as six shards × six workers from one terminal | `build_shard_commands`, `supervise_shards` |
+| `run_quality_gates.py` | Run Ruff/mypy plus six disjoint pytest shards × six xdist workers | `partition_test_files`, `supervise_gates` |
 | `star_scanner.py` | Rank uncharacterised TIC targets, background scan | `priority_score`, `scan_star`, `run_background_scan` |
 | `batch_scan.py` | Scan a list of TIC IDs from text/CSV | `batch_scan`, `read_tic_ids` |
 | `rank_candidates.py` | Sort exo JSON outputs by composite rank score | `rank_candidates`, `compute_rank_score` |
@@ -66,6 +69,17 @@ This table is intentionally workflow-oriented rather than exhaustive.
 | `count_tess_labels.py` | Check CNN Tier-2 label gate (≥5,000 CP) | (script) |
 | `tess_label_check_summary.py` | Read-only summary of live label-check SQLite audit logs | `build_summary`, `format_summary` |
 | `tier2_progress_reporter.py` | Build offline Tier-2 readiness reports and expose the shared supervised-label counter | `count_supervised_labels`, `build_tier2_status`, `write_status_outputs` |
+
+---
+
+## Parallel supervisors
+
+Use `.venv/bin/python Skills/run_quality_gates.py` for the full local quality
+gate. Use `Skills/run_six_shards.py` for allowlisted 6×6 acquisition workloads
+after its clean-main identity and storage preflight. These single-parent
+supervisors are the standing default wherever independent units can be safely
+partitioned; see `AGENTS.md`, `docs/QUALITY_GATE_RUNNER.md`, and
+`docs/SIX_SHARD_LAUNCHER.md` for the binding safety rules.
 
 ---
 

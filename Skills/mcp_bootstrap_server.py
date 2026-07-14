@@ -177,10 +177,16 @@ def _exo_command(*args: str) -> tuple[str, ...]:
     return (_venv_python(), "-m", "exo_toolkit.cli", *args)
 
 
+def _quality_gate_command() -> tuple[str, ...]:
+    """Return the canonical single-parent local quality-gate command."""
+    return (_venv_python(), "Skills/run_quality_gates.py")
+
+
 def run_exo_guard_command(name: str) -> CommandResult:
     """Run one fixed validation command from the bootstrap policy."""
     py = _venv_python()
     commands: dict[str, tuple[tuple[str, ...], dict[str, str] | None]] = {
+        "quality_gates": (_quality_gate_command(), None),
         "ruff_check": (_ruff_command(), None),
         "mypy_src": ((py, "-m", "mypy", "src"), None),
         "pytest_default": ((py, "-m", "pytest"), {"PYTHONPATH": "src"}),
@@ -201,7 +207,7 @@ def run_exo_guard_command(name: str) -> CommandResult:
     return _run_fixed_command(command, env=env)
 
 
-def _text_response(text: str) -> dict[str, list[dict[str, str]]]:
+def _text_response(text: str) -> dict[str, object]:
     return {"content": [{"type": "text", "text": text}]}
 
 
@@ -262,6 +268,7 @@ def _tool_defs(mode: ServerMode) -> list[dict[str, object]]:
             "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
         }
         for name in (
+            "quality_gates",
             "ruff_check",
             "mypy_src",
             "pytest_default",
@@ -276,7 +283,10 @@ def _tool_defs(mode: ServerMode) -> list[dict[str, object]]:
 def _call_tool(mode: ServerMode, name: str, arguments: dict[str, object]) -> dict[str, object]:
     if mode == "project_files":
         if name == "list_project_files":
-            limit = int(arguments.get("limit", 200))
+            raw_limit = arguments.get("limit", 200)
+            if not isinstance(raw_limit, int):
+                raise ValueError("limit must be an integer")
+            limit = raw_limit
             return _text_response(json.dumps(list_project_files(limit=limit), indent=2))
         if name == "read_project_file":
             path = arguments.get("path")

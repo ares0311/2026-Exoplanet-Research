@@ -347,6 +347,16 @@ shrug off because nothing crashed — this project found exactly that twice
 (`_DOWNLOAD_PRODUCTS_LOCK` in `exo_toolkit/fetch.py`, fixed in version
 0.2.19). See CLAUDE.md's "Measure-then-scale cadence" for the full rule.
 
+**Single-parent launch rule**: for reviewed 6×6 acquisition workloads, use
+`.venv/bin/python Skills/run_six_shards.py` rather than asking the operator to
+open six terminal tabs. Its allowlist, clean-main identity check, storage
+projection, isolated logs, interruption cleanup, and serialized Run Report git
+transactions are mandatory safety properties for any equivalent supervisor.
+For full local validation, use `.venv/bin/python
+Skills/run_quality_gates.py`; it runs six disjoint test shards × six xdist
+workers plus Ruff/mypy under one parent. Use this optimized supervisor pattern
+for other safely partitionable work as it is added and measured.
+
 ---
 
 ## What Has Been Built (Capability Inventory)

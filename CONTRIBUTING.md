@@ -29,17 +29,16 @@ If pytest reports that `libxgboost.dylib` cannot load because `libomp.dylib` is 
 Run these before handing work to another agent or opening a pull request:
 
 ```bash
-pytest --cov=exo_toolkit --cov-report=term-missing
-ruff check .
-python -m mypy src
+.venv/bin/python Skills/run_quality_gates.py
 ```
 
-The local `.venv` invocation used for the latest validation was:
+This single parent runs Ruff, mypy, and six disjoint pytest file shards with six
+xdist workers each. Individual commands remain useful for focused diagnosis:
 
 ```bash
-.venv/bin/ruff check .
+.venv/bin/python -m ruff check .
 .venv/bin/python -m mypy src
-.venv/bin/python -m pytest
+PYTHONPATH=src .venv/bin/python -m pytest tests/test_target.py -n auto --dist=worksteal
 ```
 
 Default tests must not require live external services. Mark any live service test with `integration_live`.

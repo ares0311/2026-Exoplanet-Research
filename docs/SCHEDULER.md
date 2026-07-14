@@ -139,8 +139,6 @@ brew install libomp
 For local validation and scheduler smoke checks, these explicit commands match the current repository setup:
 
 ```bash
-.venv/bin/ruff check .
-.venv/bin/python -m mypy src
-.venv/bin/python -m pytest
+.venv/bin/python Skills/run_quality_gates.py
 .venv/bin/python -m exo_toolkit.cli background-run-once --dry-run
 ```

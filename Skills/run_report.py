@@ -31,8 +31,10 @@ run_and_commit_report(report, path, *, message, max_retries, run_fn) -> bool
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -115,6 +117,25 @@ def format_run_report(report: RunReport) -> str:
 RunFn = Callable[..., subprocess.CompletedProcess[str]]
 
 
+@contextmanager
+def _optional_process_lock() -> Iterator[None]:
+    """Serialize report git operations when a multi-process launcher requests it."""
+    lock_path = os.environ.get("EXO_RUN_REPORT_LOCK_PATH")
+    if not lock_path:
+        yield
+        return
+    import fcntl
+
+    path = Path(lock_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a+", encoding="utf-8") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
 def _run(run_fn: RunFn, args: list[str]) -> subprocess.CompletedProcess[str]:
     return run_fn(args, capture_output=True, text=True, check=False)
 
@@ -134,34 +155,34 @@ def commit_and_push_report(
     changes to commit), ``False`` on any failure -- never raises, so a report
     push failure can never crash the acquisition run that produced real data.
     """
-    path = str(path)
-
-    add_result = _run(run_fn, ["git", "add", "--", path])
-    if add_result.returncode != 0:
-        return False
-
-    commit_result = _run(run_fn, ["git", "commit", "-m", message, "--", path])
-    if commit_result.returncode != 0:
-        combined = f"{commit_result.stdout}\n{commit_result.stderr}".lower()
-        return "nothing to commit" in combined
-
-    branch_result = _run(run_fn, ["git", "rev-parse", "--abbrev-ref", "HEAD"])
-    branch = branch_result.stdout.strip() if branch_result.returncode == 0 else ""
-
-    for _attempt in range(max_retries):
-        push_result = _run(run_fn, ["git", "push"])
-        if push_result.returncode == 0:
-            return True
-
-        if not branch:
+    path_str = str(path)
+    with _optional_process_lock():
+        add_result = _run(run_fn, ["git", "add", "--", path_str])
+        if add_result.returncode != 0:
             return False
-        fetch_result = _run(run_fn, ["git", "fetch", "origin", branch])
-        if fetch_result.returncode != 0:
-            return False
-        rebase_result = _run(run_fn, ["git", "rebase", f"origin/{branch}"])
-        if rebase_result.returncode != 0:
-            _run(run_fn, ["git", "rebase", "--abort"])
-            return False
+
+        commit_result = _run(run_fn, ["git", "commit", "-m", message, "--", path_str])
+        if commit_result.returncode != 0:
+            combined = f"{commit_result.stdout}\n{commit_result.stderr}".lower()
+            return "nothing to commit" in combined
+
+        branch_result = _run(run_fn, ["git", "rev-parse", "--abbrev-ref", "HEAD"])
+        branch = branch_result.stdout.strip() if branch_result.returncode == 0 else ""
+
+        for _attempt in range(max_retries):
+            push_result = _run(run_fn, ["git", "push"])
+            if push_result.returncode == 0:
+                return True
+
+            if not branch:
+                return False
+            fetch_result = _run(run_fn, ["git", "fetch", "origin", branch])
+            if fetch_result.returncode != 0:
+                return False
+            rebase_result = _run(run_fn, ["git", "rebase", f"origin/{branch}"])
+            if rebase_result.returncode != 0:
+                _run(run_fn, ["git", "rebase", "--abort"])
+                return False
 
     return False
 
