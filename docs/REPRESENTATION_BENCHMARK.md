@@ -71,6 +71,13 @@ The contract and zero-full-payload metadata verifier are documented in
 next; a source PASS does not authorize the leakage-safe TIC crossmatch,
 embedding extraction, or training.
 
+The merged source verifier passed 5/5 operations in 3.334 seconds on
+2026-07-14, verifying 47,055 rows, all 17 class counts, the required schema,
+delivery metadata, and three labeled samples with zero full-catalog bytes.
+Artifact SHA-256 is `eb5d4bc6…39b9a`; Run Report commit `b0003bb`. Version
+0.2.61 closes source identity. The leakage-safe 2,790-TIC crossmatch and
+embedding-aware injection comparison remain open.
+
 The training loop is a single stateful optimization and is not shardable.
 Batching uses the selected accelerator; `device=auto` prefers MPS, then CUDA,
 then CPU. Every epoch prints loss, learning rate, patience state, and ETA. A

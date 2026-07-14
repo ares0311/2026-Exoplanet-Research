@@ -1,0 +1,130 @@
+{
+  "artifact_id": "stellar_variability_label_source_verification_v1",
+  "catalog": {
+    "class_counts": {
+      "1": 30745,
+      "10": 124,
+      "11": 228,
+      "12": 7,
+      "13": 512,
+      "14": 157,
+      "15": 25,
+      "16": 85,
+      "17": 153,
+      "2": 4683,
+      "3": 279,
+      "4": 2431,
+      "5": 5466,
+      "6": 502,
+      "7": 73,
+      "8": 1521,
+      "9": 64
+    },
+    "delivery": {
+      "content_length_bytes": 1166660,
+      "content_type": "application/x-gzip",
+      "etag": "\"11cd44-50202313facc0\"",
+      "last_modified": "Mon, 01 Sep 2014 14:55:23 GMT",
+      "status": "verified"
+    },
+    "ground_truth_basis": "Publication-backed classifications derived from the catalog light curves, with inspection flags and comparison against prior surveys; suitable as source labels subject to a future mission-footprint crossmatch and leakage audit.",
+    "name": "Catalina Surveys periodic variable star catalog",
+    "required_columns": [
+      {
+        "datatype": "CHAR(16)",
+        "name": "CRTS",
+        "status": "verified"
+      },
+      {
+        "datatype": "DOUBLE",
+        "name": "RAJ2000",
+        "status": "verified"
+      },
+      {
+        "datatype": "DOUBLE",
+        "name": "DEJ2000",
+        "status": "verified"
+      },
+      {
+        "datatype": "DOUBLE",
+        "name": "<Vmag>",
+        "status": "verified"
+      },
+      {
+        "datatype": "DOUBLE",
+        "name": "Per",
+        "status": "verified"
+      },
+      {
+        "datatype": "DOUBLE",
+        "name": "Vamp",
+        "status": "verified"
+      },
+      {
+        "datatype": "SMALLINT",
+        "name": "Cl",
+        "status": "verified"
+      },
+      {
+        "datatype": "CHAR(1)",
+        "name": "f_Cl",
+        "status": "verified"
+      }
+    ],
+    "row_count": 47055,
+    "sample_rows": [
+      {
+        "class_code": 1,
+        "class_flag": " ",
+        "dec_deg": 1.0613055555555555,
+        "period_days": 0.385853,
+        "ra_deg": 45.00854166666666,
+        "source_id": "J030002.0+010340"
+      },
+      {
+        "class_code": 1,
+        "class_flag": "a",
+        "dec_deg": 0.802611111111111,
+        "period_days": 0.441208,
+        "ra_deg": 45.76854166666666,
+        "source_id": "J030304.4+004809"
+      },
+      {
+        "class_code": 13,
+        "class_flag": " ",
+        "dec_deg": 0.9054999999999999,
+        "period_days": 224.05605,
+        "ra_deg": 45.804333333333325,
+        "source_id": "J030313.0+005419"
+      }
+    ],
+    "table": "J/ApJS/213/9/table3"
+  },
+  "contract_path": "metadata/stellar_variability_label_source_contract_v1.json",
+  "contract_sha256": "2c1e22fd3703bbd26ebbdc92d37fe93cbbeeccc4714df94defcd1b2d11914b84",
+  "crossmatch_authorized": false,
+  "full_catalog_payload_bytes_downloaded": 0,
+  "limitations": [
+    "This contract verifies source identity, schema, counts, and bounded delivery metadata only.",
+    "It does not download the full catalog, resolve TIC coordinates, perform a spatial crossmatch, open light curves, extract embeddings, train a model, or change production scoring.",
+    "Crossmatch and training remain unauthorized until separate leakage-safe design and evidence gates pass."
+  ],
+  "metadata_requests": 5,
+  "rejected_alternatives": [
+    {
+      "reason": "model_outputs_not_ground_truth: best_class_name is automated classifier output rather than a human or publication-review verdict; retain only as possible auxiliary metadata",
+      "source": "Gaia DR3 vari_classifier_result"
+    },
+    {
+      "reason": "gated_and_storage_exceeds_limit: the Hugging Face dataset requires access approval and is approximately 160 GB, exceeding the 100 GB pre-go-live project ceiling",
+      "source": "StarEmbed public benchmark dataset"
+    }
+  ],
+  "runtime_python": "3.14.3",
+  "schema_version": 1,
+  "source_identity_authorized": true,
+  "status": "success",
+  "training_authorized": false,
+  "verification_mode": "primary_metadata_and_three_row_sample",
+  "verified_at_utc": "2026-07-14T20:48:12.511927+00:00"
+}

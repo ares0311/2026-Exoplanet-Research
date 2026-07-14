@@ -170,9 +170,11 @@ by itself satisfy a master-guide evidence requirement.
    child RSS 186,204,160 bytes. Artifact SHA is `1cc59ab3…5de5d10`; Run Report
    commit `f8a7207`. Version 0.2.59 closes runtime integration. Version 0.2.60
    pins the 47,055-row Drake et al. Catalina variable-star catalog and adds a
-   fail-closed, zero-full-payload metadata verifier. Run that verifier from
-   merged code, then design and evidence the leakage-safe 2,790-TIC coordinate
-   crossmatch using the measured single-parent six-shard/six-worker shape.
+   fail-closed, zero-full-payload metadata verifier. The merged verifier passed
+   5/5 operations in 3.334 seconds; artifact SHA is `eb5d4bc6…39b9a` and Run
+   Report commit is `b0003bb`. Version 0.2.61 records source identity complete.
+   Next design and evidence the leakage-safe 2,790-TIC coordinate crossmatch
+   using the measured single-parent six-shard/six-worker shape.
    Embedding-aware injection recovery remains required before broad extraction
    or training. The 0.2.60 release passed 2,751 default tests plus Ruff/mypy as
    8/8 supervised gates under the 6×6 topology in 25.2 seconds.

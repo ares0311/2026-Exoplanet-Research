@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.60 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.61 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -472,6 +472,20 @@ will still leave the leakage-safe 2,790-TIC crossmatch and embedding-aware
 injection comparison open; the independent-TIC work must use the measured
 single-parent 6×6 shape. The version 0.2.60 release gate passed 2,751 default
 tests plus Ruff/mypy as 8/8 supervised gates in 25.2 seconds.
+
+The merged verifier passed all 5 primary-source operations on 2026-07-14 in
+3.334 seconds: 47,055 total rows and all 17 class counts matched, required
+schema and 1,166,660-byte delivery metadata were exact, and three labeled rows
+validated with zero full-catalog bytes downloaded. Durable artifact
+`stellar_variability_label_source_verification_v1.json` has SHA-256
+`eb5d4bc6ae02065752e515fff19ed9b012d163f1d82a2be958796a65ba339b9a`;
+Run Report commit `b0003bb`. Version 0.2.61 closes source identity only. The
+leakage-safe 2,790-TIC metadata/crossmatch and embedding-aware injection
+comparison remain the next scientific gates; training is still unauthorized.
+The version 0.2.61 evidence-release gate passed the unchanged 2,751 default
+tests plus Ruff/mypy as 8/8 supervised gates in 40.2 seconds. All six shards
+slowed without errors, timeouts, or a single-shard imbalance; retain the 6×6
+topology and do not scale test concurrency further from this run.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of

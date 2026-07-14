@@ -60,3 +60,16 @@ independent-TIC pass must then use the single-parent six-shard/six-worker shape,
 with disjoint outputs, progress/ETA, storage preflight, and one aggregate Run
 Report. Crossmatch and training remain unauthorized until that design and its
 evidence are committed.
+
+## Merged verification evidence
+
+The merged verifier passed all 5 operations on 2026-07-14 in 3.334 seconds.
+It verified 47,055 total rows, every one of the 17 pinned class counts, all
+required columns and datatypes, the 1,166,660-byte compressed delivery
+metadata, and three labeled sample rows. It downloaded zero full-catalog
+payload bytes. The durable artifact is
+`artifacts/manifests/stellar_variability_label_source_verification_v1.json`
+with SHA-256
+`eb5d4bc6ae02065752e515fff19ed9b012d163f1d82a2be958796a65ba339b9a`;
+Run Report commit `b0003bb`. This closes source identity only. Version 0.2.61
+does not authorize crossmatch, embedding extraction, or training.
