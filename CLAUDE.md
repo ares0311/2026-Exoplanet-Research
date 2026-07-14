@@ -203,6 +203,22 @@ are commit `78b7be6`.
 The version 0.2.69 evidence-release gate passed 2,773 default tests plus
 Ruff/mypy as 8/8 supervised gates in 32.3 seconds under the canonical 6x6
 topology.
+
+Version 0.2.70 implements the authorized follow-up design as a bounded,
+cache-only paired benchmark. The immutable contract selects one cached TESS
+product for each of the 48 ASAS-SN matches and freezes four 3/10-day,
+500/2,000-ppm injections. `Skills/benchmark_representation_variability_injection.py`
+compares blind BLS recovery with paired cosine/L2 shifts from the exact cached
+Chronos-Bolt tiny and Astromer2 ONNX models. Use the reviewed single-parent
+6x6 launcher from clean merged `main`; each shard uses six FITS/BLS workers but
+only one serialized session per model, avoiding 36 duplicated model sessions.
+The aggregate must reconcile 48 TICs, 192 trials, 384 unique model rows, zero
+downloads, and zero persisted embeddings. Results remain descriptive and both
+training and production changes stay unauthorized. See
+`docs/REPRESENTATION_VARIABILITY_INJECTION_BENCHMARK.md`.
+The version 0.2.70 release gate passed 2,780 default tests plus Ruff/mypy as
+8/8 supervised gates in 33.3 seconds under the canonical 6x6 topology.
+
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.

@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "contract_id": "representation_variability_injection_contract_v1",
+  "created_at_utc": "2026-07-14T22:28:00Z",
+  "purpose": "Cache-only paired comparison of blind BLS recovery and frozen external-embedding sensitivity to injected transits on 48 ASAS-SN-matched TESS variability backgrounds",
+  "inputs": {
+    "asassn_overlap": {
+      "path": "artifacts/manifests/tess_asassn_preflight_aggregate_v1.json",
+      "sha256": "36de00dce1935aa70b3fdafb7f343fd6fd43b03696c49db7336a7842d83da403",
+      "matched_tics": 48
+    },
+    "inventory": {
+      "path": "metadata/representation_tess_unlabeled_cache_v1.jsonl",
+      "sha256": "38a869666269367480a1aa9d2a29d76a86fb2ec6d2259a23635ad44f257c155a",
+      "target_count": 2790
+    },
+    "dataset_manifest": {
+      "path": "metadata/dataset_manifests/tess_cached_unlabeled_representation_v1.json",
+      "sha256": "6692c37509948fbdf460928dc550cce42539816824fa2a8b5ba6feae12c4d392"
+    },
+    "inventory_evidence": {
+      "path": "artifacts/manifests/representation_cache_inventory_v1.json",
+      "sha256": "2a1b876f8983d9493a6dd4831406af623a754db6e024029793527d60234ce0e3"
+    },
+    "model_source_contract": {
+      "path": "metadata/representation_baseline_source_contract_v1.json",
+      "sha256": "38793347a4f404f62aa46a086ad20cb358046a365393333710dd83fca93a3730"
+    },
+    "model_source_evidence": {
+      "path": "artifacts/manifests/representation_baseline_source_verification_v1.json",
+      "sha256": "5610bbb859463e180bd9ee65ee7317518458560421487253d272b2d3b5753042"
+    },
+    "inference_smoke_evidence": {
+      "path": "artifacts/manifests/representation_baseline_inference_smoke_v1.json",
+      "sha256": "1cc59ab32e3a8a57e7d966c7cb9b22af04185c0c45245547c853fae7e5de5d10"
+    }
+  },
+  "target_selection": {
+    "population": "all 48 exact-TIC ASAS-SN matches",
+    "product_rule": "largest expected byte size per TIC, then lowest sector, then lexical cache path",
+    "expected_products": 48,
+    "measured_baseline_days": {
+      "minimum": 23.752640570996846,
+      "median": 27.69766477019766,
+      "maximum": 28.200551856721177
+    },
+    "measured_clean_cadences": {
+      "minimum": 11241,
+      "median": 18932,
+      "maximum": 114232
+    }
+  },
+  "injection_scenarios": [
+    {"scenario_id": "short_low", "period_days": 3.0, "depth_ppm": 500.0, "duration_hours": 2.0},
+    {"scenario_id": "short_high", "period_days": 3.0, "depth_ppm": 2000.0, "duration_hours": 2.0},
+    {"scenario_id": "long_low", "period_days": 10.0, "depth_ppm": 500.0, "duration_hours": 4.0},
+    {"scenario_id": "long_high", "period_days": 10.0, "depth_ppm": 2000.0, "duration_hours": 4.0}
+  ],
+  "injection_policy": {
+    "epoch_phase": 0.25,
+    "flux_operation": "multiplicative box transit on full quality-filtered PDCSAP flux",
+    "minimum_events": 2,
+    "scenario_count_per_tic": 4,
+    "expected_trials": 192
+  },
+  "bls_comparator": {
+    "period_min_days": 0.5,
+    "period_max_days": 12.0,
+    "duration_min_hours": 0.5,
+    "duration_max_hours": 8.0,
+    "n_durations": 8,
+    "min_snr": 5.0,
+    "max_peaks": 3,
+    "max_period_grid_points": 2000,
+    "period_relative_tolerance": 0.02,
+    "aliases": [0.5, 1.0, 2.0]
+  },
+  "embedding_policy": {
+    "models": ["Chronos-Bolt tiny", "Astromer2"],
+    "weights": "frozen exact-revision ONNX files already present in .cache/representation_models",
+    "max_observations": 2048,
+    "sampling": "deterministic evenly spaced indices over the full quality-filtered sector baseline",
+    "normalization": "relative magnitude using one shared original-series median per TIC",
+    "persist_embeddings": false,
+    "metrics": ["paired cosine distance", "paired L2 distance", "depth-order fraction"],
+    "onnx_threads_per_session": 1
+  },
+  "parallel_shape": {
+    "process_shards": 6,
+    "workers_per_shard": 6,
+    "partition": "tic_id modulo shard_count",
+    "worker_scope": "FITS preparation and blind BLS trials",
+    "embedding_scope": "one frozen session per model per shard; inference serialized within the shard to avoid 36 duplicate model sessions"
+  },
+  "execution_gate": {
+    "required_tics": 48,
+    "required_trials": 192,
+    "required_models": 2,
+    "maximum_failed_trials": 0,
+    "maximum_duplicate_tics": 0,
+    "maximum_downloaded_bytes": 0,
+    "scientific_metrics_are_descriptive": true
+  },
+  "limitations": [
+    "ASAS-SN classes are automated outputs and remain training-disabled.",
+    "This is a paired sensitivity benchmark, not a classifier fit, survey-completeness estimate, or production promotion gate.",
+    "The four-cell injection grid reuses bounded regimes from production_sensitivity_v2 and does not cover long-period, TTV, single-transit, or image-level systematics.",
+    "No embedding array, modified light curve, FITS product, model weight, or catalog payload may be written or downloaded.",
+    "A successful execution authorizes scientific interpretation only; training, promotion, and production scoring remain unauthorized."
+  ],
+  "training_authorized": false,
+  "production_change_authorized": false
+}

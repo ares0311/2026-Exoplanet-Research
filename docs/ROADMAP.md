@@ -209,8 +209,15 @@ by itself satisfy a master-guide evidence requirement.
    The version 0.2.69 evidence-release gate passed 2,773 default tests plus
    Ruff/mypy as 8/8 supervised gates in 32.3 seconds under the canonical 6x6
    topology.
-   Embedding-aware injection recovery remains required before broad extraction
-   or training. The 0.2.60 release passed 2,751 default tests plus Ruff/mypy as
+   Version 0.2.70 completes that design gate with a hash-pinned, cache-only
+   48-TIC contract and harness: four frozen injection cells produce 192 unique
+   blind-BLS trials and 384 Chronos-Bolt tiny/Astromer2 model rows. Execute it
+   only from merged clean `main` via the reviewed 6x6 supervisor and globally
+   reconcile zero failures, duplicates, downloads, or persisted embeddings.
+   The evidence run is next; training and production changes remain blocked.
+   The version 0.2.70 release gate passed 2,780 default tests plus Ruff/mypy as
+   8/8 supervised gates in 33.3 seconds under the canonical 6x6 topology.
+   The 0.2.60 release passed 2,751 default tests plus Ruff/mypy as
    8/8 supervised gates under the 6×6 topology in 25.2 seconds.
 
 ## Milestone 1 — Scoring and Classification Engine ✓ COMPLETE

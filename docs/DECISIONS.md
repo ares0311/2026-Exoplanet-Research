@@ -722,3 +722,41 @@ The merged run processed 58 exact-ID batches plus six source-metadata
 operations with zero full-catalog bytes. First-shard-start to last-completion
 wall time was 6.762 seconds. All five aggregate checks passed; class counts are
 EA=26, EB=9, EW=2, ROT=10, and SR=1.
+
+---
+
+## DECISION-023: Use A Paired Cache-Only Variability/Injection Benchmark Before Broader Extraction
+
+**Date:** 2026-07-14
+**Status:** Accepted for merged-main evidence execution
+
+### Context
+
+The frozen external models have passed exact-source and one-product inference
+gates, and the ASAS-SN preflight supplies 48 real variability backgrounds in
+the existing TESS cache. The catalog classes cannot support supervised
+training, but paired transit injections can test representation sensitivity
+without treating those classes as ground truth.
+
+### Decision
+
+1. Evaluate all 48 matched TICs with four frozen 3/10-day,
+   500/2,000-ppm injection scenarios: 192 unique trials.
+2. Run the existing blind BLS search and both exact frozen models on every
+   trial, producing 384 unique model rows.
+3. Persist only descriptive BLS outcomes, embedding hashes, and paired
+   cosine/L2 distances; discard embeddings and modified light curves.
+4. Use one parent, six modulo shards, and six FITS/BLS workers per shard. Keep
+   one serialized session per model per shard and one native thread per
+   session/worker.
+5. Require zero failures, duplicate rows, downloads, or persisted embeddings.
+6. Keep `training_authorized=false` and
+   `production_change_authorized=false`; a PASS informs only the next
+   scientific decision.
+
+### Evidence before execution
+
+All 48 selected cache products meet the 20-day baseline requirement. A
+one-TIC runtime smoke read 12,508 clean cadences, constructed all four trials,
+ran the blind BLS comparator, and returned finite 256-element outputs from both
+exact cached ONNX models without downloading or persisting data.
