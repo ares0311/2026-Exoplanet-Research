@@ -12,6 +12,9 @@ The immutable expected metadata is
 `Skills/verify_representation_baseline_sources.py` to compare it with current
 primary PyPI and Hugging Face metadata. The verifier reads metadata and pinned
 file HEAD headers only; it installs nothing and downloads zero model bytes.
+Hugging Face resolver HEAD requests are intentionally not redirected: the
+authoritative commit, linked size, and linked SHA-256 headers are present on the
+initial 302 response and are absent after following it into Xet object storage.
 
 ## Selected bounded baselines
 

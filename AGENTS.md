@@ -290,6 +290,8 @@ exercise injection-grid orchestration. That is about 58% faster than the
 81.57s single-universe baseline.
 The latest version 0.2.55 run on 2026-07-14 passed all 2,733 default tests plus
 Ruff/mypy in 31.1s with the same six-shard × six-worker configuration.
+Version 0.2.56 passed 2,734 default tests plus Ruff/mypy in 26.1s with that
+same configuration after adding the Hugging Face redirect regression test.
 
 This optimized single-parent shard/worker shape is the standing default
 wherever work is safely partitionable: acquisition, processing, tests,
@@ -322,6 +324,10 @@ authorize dependencies, weight downloads, model training, or promotion. Once
 inference is separately proven, per-light-curve embedding extraction must use
 the single-parent 6×6 pattern because those units are independently
 partitionable. See `docs/REPRESENTATION_BASELINE_SOURCE_CONTRACT.md`.
+The verifier must inspect the initial Hugging Face resolver response without
+following its 302 redirect: commit, size, and content SHA live in
+`x-repo-commit`, `x-linked-size`, and `x-linked-etag` on that authoritative
+response, not on the final Xet object-store response.
 
 **Ask, don't assume, when:**
 - The right shard/worker *count* (not whether to shard at all) depends on the operator's own tradeoffs — available machine capacity, concurrent work, and trust in the external service's rate limits.

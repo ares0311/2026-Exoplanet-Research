@@ -83,6 +83,14 @@ The direct wheels plus models total 56,036,648 bytes. Source verification must
 pass from merged code before optional dependencies or model weights are
 introduced, and it still does not authorize training. See
 `docs/REPRESENTATION_BASELINE_SOURCE_CONTRACT.md`.
+The first merged 0.2.55 metadata run failed closed before artifact/report
+creation because Python's default URL opener followed Hugging Face's 302 into
+Xet and then could not see the resolver's `x-repo-commit`/`x-linked-*`
+headers. Version 0.2.56 disables redirects only for this HEAD check, captures
+the authoritative 302 headers, and adds an offline regression test. A live
+read-only HEAD smoke returned the exact pinned Chronos commit, size, and hash.
+The 0.2.56 full 6×6 gate passed 2,734 tests plus Ruff/mypy in 26.1s; rerun the
+merged verifier before treating the source gate as evidenced.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
@@ -146,7 +154,7 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 139 top-level test files. Version 0.2.55 adds seven offline tests for the external-baseline source contract; the full 6×6 run passed 2,733 default tests plus Ruff/mypy in 31.1s.
+**Current test surface:** 139 top-level test files. Version 0.2.56 carries eight offline external-baseline source tests; the full 6×6 run passed 2,734 default tests plus Ruff/mypy in 26.1s.
 **Skills:** 119 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
 
 ---

@@ -13,6 +13,7 @@ import json
 import ssl
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Callable, Mapping
@@ -38,6 +39,21 @@ HeadFn = Callable[[str], Mapping[str, str]]
 ReportFn = Callable[..., bool]
 
 
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Expose authoritative Hugging Face resolver headers before Xet redirect."""
+
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> None:
+        return None
+
+
 def _ssl_context() -> ssl.SSLContext | None:
     try:
         import certifi
@@ -57,11 +73,18 @@ def _default_fetch_json(url: str) -> dict[str, Any]:
 
 def _default_head(url: str) -> Mapping[str, str]:
     request = urllib.request.Request(url, method="HEAD")  # noqa: S310
-    with urllib.request.urlopen(  # noqa: S310
-        request,
-        timeout=60,
-        context=_ssl_context(),
-    ) as response:
+    handlers: list[Any] = [_NoRedirectHandler()]
+    context = _ssl_context()
+    if context is not None:
+        handlers.append(urllib.request.HTTPSHandler(context=context))
+    opener = urllib.request.build_opener(*handlers)
+    try:
+        response = opener.open(request, timeout=60)  # noqa: S310
+    except urllib.error.HTTPError as exc:
+        if 300 <= exc.code < 400:
+            return {key.lower(): value for key, value in exc.headers.items()}
+        raise
+    with response:
         return {key.lower(): value for key, value in response.headers.items()}
 
 

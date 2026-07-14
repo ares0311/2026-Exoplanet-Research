@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 import sys
+import urllib.error
+from email.message import Message
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +12,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
 
+import verify_representation_baseline_sources as source_verifier
 from verify_representation_baseline_sources import (
     format_status,
     load_contract,
@@ -100,6 +103,36 @@ def test_load_contract_rejects_incorrect_aggregate(tmp_path: Path) -> None:
     _write_contract(path, mutate=lambda value: value.update(aggregate_download_bytes=31))
     with pytest.raises(ValueError, match="aggregate_download_bytes mismatch"):
         load_contract(path)
+
+
+def test_default_head_preserves_authoritative_redirect_headers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    headers = Message()
+    headers["X-Repo-Commit"] = "b" * 40
+    headers["X-Linked-Size"] = "20"
+    headers["X-Linked-ETag"] = f'"{"c" * 64}"'
+
+    class _RedirectingOpener:
+        def open(self, request: Any, *, timeout: int) -> Any:
+            raise urllib.error.HTTPError(
+                request.full_url,
+                302,
+                "Found",
+                headers,
+                None,
+            )
+
+    monkeypatch.setattr(
+        source_verifier.urllib.request,
+        "build_opener",
+        lambda *_handlers: _RedirectingOpener(),
+    )
+
+    result = source_verifier._default_head("https://example.invalid/model.onnx")
+    assert result["x-repo-commit"] == "b" * 40
+    assert result["x-linked-size"] == "20"
+    assert result["x-linked-etag"] == f'"{"c" * 64}"'
 
 
 def test_verify_sources_writes_success_without_payload_downloads(tmp_path: Path) -> None:

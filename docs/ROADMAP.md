@@ -140,6 +140,12 @@ by itself satisfy a master-guide evidence requirement.
    smoke consider optional dependency installation. Scientific Phase 3 still
    requires variability labels and injection-recovery comparison. The local
    release gate passed 2,733 tests plus Ruff/mypy in 31.1 seconds.
+   The first merged verifier run failed closed because the default Python
+   opener followed Hugging Face's 302 into Xet and lost the resolver's pinned
+   commit/size/hash headers. Version 0.2.56 preserves the authoritative initial
+   HEAD response, covers it with an offline regression test, and passes a live
+   read-only header smoke. Its 6×6 gate passed 2,734 tests plus Ruff/mypy in
+   26.1 seconds. Rerun the full verifier from merged `main` next.
 
 ## Milestone 1 — Scoring and Classification Engine ✓ COMPLETE
 
