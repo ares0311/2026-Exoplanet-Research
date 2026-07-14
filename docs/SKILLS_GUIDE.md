@@ -33,6 +33,7 @@ This table is intentionally workflow-oriented rather than exhaustive.
 | `run_quality_gates.py` | Run Ruff/mypy plus six disjoint pytest shards × six xdist workers | `partition_test_files`, `supervise_gates` |
 | `verify_representation_baseline_sources.py` | Verify pinned PyPI wheels and ONNX sources from primary metadata without downloading payloads | `load_contract`, `verify_sources` |
 | `verify_stellar_variability_label_source.py` | Verify the pinned Catalina publication catalog schema, counts, samples, and delivery metadata without downloading its full payload | `load_contract`, `verify_source` |
+| `crossmatch_tess_catalina_labels.py` | Run the contract-bounded 216-TIC, 6×6-capable Catalina label crossmatch pilot with fail-closed safeguards | `select_tics`, `query_tic_metadata`, `crossmatch_records`, `run_crossmatch` |
 | `smoke_representation_baseline_inference.py` | Run pinned two-model CPU inference on one deterministic cached TESS product | `prepare_relative_magnitude`, `run_model_inference`, `run_smoke` |
 | `star_scanner.py` | Rank uncharacterised TIC targets, background scan | `priority_score`, `scan_star`, `run_background_scan` |
 | `batch_scan.py` | Scan a list of TIC IDs from text/CSV | `batch_scan`, `read_tic_ids` |

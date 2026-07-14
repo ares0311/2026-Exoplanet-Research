@@ -32,6 +32,16 @@ def test_build_commands_injects_exact_six_by_six() -> None:
         assert "--max-targets" in command
 
 
+def test_crossmatch_pilot_is_reviewed_for_six_by_six() -> None:
+    commands = build_shard_commands(
+        "crossmatch_tess_catalina_labels.py",
+        ["--", "--max-targets", "216", "--batch-size", "6"],
+        python_executable=".venv/bin/python",
+    )
+    assert len(commands) == 6
+    assert all("--max-targets" in command for command in commands)
+
+
 @pytest.mark.parametrize("flag", ["--workers", "--workers=3", "--shard-index"])
 def test_build_commands_rejects_launcher_owned_flags(flag: str) -> None:
     with pytest.raises(ValueError, match="controlled by this launcher"):

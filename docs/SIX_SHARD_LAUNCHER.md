@@ -24,6 +24,9 @@ must preserve the safety properties below.
 
 Supported scripts:
 
+- `crossmatch_tess_catalina_labels.py` (only the contract-bounded 216-TIC
+  metadata/crossmatch pilot is authorized; full 2,790-TIC execution remains
+  gated);
 - `process_t1_kepler_batch.py` (default; its historical 6×6 workload is already
   complete, so do not rerun it without a new manifest);
 - `fetch_t1_2_k2_calibration_snippets.py`;

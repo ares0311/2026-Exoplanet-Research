@@ -28,6 +28,7 @@ HARD_STORAGE_LIMIT_GB = 100.0
 _GB = 1_000_000_000
 _RESERVED_FLAGS = ("--workers", "--shard-index", "--shard-count")
 _ALLOWED_SCRIPTS = {
+    "crossmatch_tess_catalina_labels.py": "bounded TESS-Catalina metadata pilot",
     "process_t1_kepler_batch.py": "Kepler manifest processor (validated at 6x6)",
     "fetch_t1_2_k2_calibration_snippets.py": "native K2 calibration fetcher",
     "star_scanner.py": "prepared-batch live scanner",

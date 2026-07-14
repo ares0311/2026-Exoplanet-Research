@@ -151,7 +151,21 @@ For a single large numerical job, allow native libraries to use more threads, co
   and mypy as 8/8 gates in 40.2 seconds. All six test shards slowed broadly
   (25.1-40.1 seconds) without errors, timeouts, or a single-shard imbalance.
   Retain 6×6; this run does not justify increasing concurrency beyond 36 test
-  workers.
+workers.
+
+### TESS-Catalina metadata pilot
+
+- Version 0.2.62 uses six modulo process shards with six I/O-bound exact-ID
+  MAST batch workers each. The authorized 216-TIC pilot supplies about six
+  six-ID batches per shard, exercising 36 concurrent requests once.
+- The 1,166,660-byte Catalina gzip is a shared read-only input protected by a
+  cross-process lock and atomic promotion. Do not multiply this download by
+  shards or workers.
+- Compare the pilot's aggregate TIC/s and service errors before authorizing a
+  larger run. Back off on throttling/timeouts; do not scale beyond 6×6 from
+  assumption.
+- Version 0.2.62 validation passed 2,759 tests plus Ruff/mypy as 8/8 supervised
+  gates in 34.3 seconds with the canonical six-shard/six-worker test topology.
 
 ### Cache-local representation preprocessing
 

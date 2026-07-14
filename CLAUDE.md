@@ -140,6 +140,15 @@ three labeled sample rows matched with zero full-catalog bytes downloaded.
 Artifact SHA-256 is `eb5d4bc…39b9a`; Run Report commit `b0003bb`. Version
 0.2.61 records source identity complete. Crossmatch and training remain gated;
 the next step is the leakage-safe 2,790-TIC metadata/crossmatch design.
+Version 0.2.62 implements that design as a contract-bounded 216-TIC pilot.
+`Skills/crossmatch_tess_catalina_labels.py` is reviewed by the one-terminal
+`run_six_shards.py` allowlist: six modulo shards, six threaded MAST exact-ID
+batches per shard, six IDs per request, one locked hash-pinned 1.17 MB Catalina
+cache, and disjoint outputs/Run Reports. The pilot precommits 1-arcsecond,
+magnitude, duplicate, object-type, blend, and raw-class safeguards; every row
+remains training-disabled. Full 2,790-TIC execution is gated until merged pilot
+evidence shows clean throughput/errors and globally reconciled overlap. See
+`docs/TESS_CATALINA_CROSSMATCH.md`.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
@@ -203,8 +212,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 141 top-level test files. Version 0.2.60 adds eight offline stellar-variability label-source contract tests; its full release gate passed 2,751 default tests plus Ruff/mypy as 8/8 supervised gates in 25.2s with six pytest shards and six xdist workers each. Version 0.2.61 records the merged source evidence without changing the test surface; its evidence-release gate passed the same 2,751 tests plus Ruff/mypy as 8/8 gates in 40.2s. All six shards slowed without errors/timeouts or a single-shard imbalance, so retain 6×6 rather than scaling further.
-**Skills:** 121 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
+**Current test surface:** 142 top-level test files. Version 0.2.62 adds seven offline crossmatch tests plus one launcher-allowlist test; its canonical 6×6 release gate passed 2,759 default tests plus Ruff/mypy as 8/8 supervised gates in 34.3s.
+**Skills:** 122 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
 
 ---
 
