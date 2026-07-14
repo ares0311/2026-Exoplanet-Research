@@ -169,6 +169,13 @@ Version 0.2.66 makes that lock failure return `False` so callers warn and exit
 successfully without attempting unlocked concurrent git operations.
 Its release gate passed 2,762 default tests plus Ruff/mypy as 8/8 supervised
 gates in 34.3 seconds under the canonical 6×6 topology.
+Version 0.2.67 commits the six shard outputs and aggregate reconciliation:
+216/216 unique TICs, 38 completed batches, 8.519s observed wall time, zero
+Catalina candidates within 3 arcseconds, and zero accepted/duplicate sources.
+Full-corpus execution and training remain unauthorized; pursue a separately
+contracted label source with better TESS-inventory overlap.
+Its release gate passed 2,763 default tests plus Ruff/mypy as 8/8 supervised
+gates in 24.2 seconds under the canonical 6×6 topology.
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.

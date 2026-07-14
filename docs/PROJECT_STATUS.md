@@ -100,6 +100,12 @@ Version 0.2.66 fixes only the final sandbox-lock handling so Run Report git
 failure warns without converting successful data acquisition into exit 1.
 The 0.2.66 release gate passed 2,762 tests plus Ruff/mypy as 8/8 supervised
 gates in 34.3 seconds under the canonical 6×6 topology.
+Version 0.2.67 closes the Catalina pilot as evidence-limited: 216/216 unique
+TICs, 38 completed batches, 8.519s observed wall, and zero candidates within
+the precommitted 3-arcsecond search radius. Global reconciliation passes with
+zero accepted or duplicate sources; full execution/training stays blocked.
+The 0.2.67 release gate passed 2,763 tests plus Ruff/mypy as 8/8 supervised
+gates in 24.2 seconds under the canonical 6×6 topology.
 The 0.2.63 release gate passed the unchanged 2,759 tests plus Ruff/mypy as 8/8
 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 

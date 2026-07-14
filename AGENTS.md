@@ -378,6 +378,14 @@ data completion. Version 0.2.66 makes lock acquisition fail soft: keep the
 ledger append, skip unsafe unlocked git operations, warn, and return success.
 The version 0.2.66 release gate passed 2,762 default tests plus Ruff/mypy as
 8/8 supervised gates in 34.3 seconds under the canonical 6×6 topology.
+Version 0.2.67 records the globally reconciled pilot: 216/216 unique TICs,
+38 completed MAST batches, 8.519 seconds observed wall time (25.36 TIC/s), and
+216 `no_candidate_within_radius` outcomes. There are zero accepted Catalina
+sources, zero duplicate TICs/sources, and every row remains training-disabled.
+Low overlap is the precommitted stop signal: full 2,790-TIC execution and
+training are not authorized, and match safeguards must not be relaxed.
+The version 0.2.67 release gate passed 2,763 default tests plus Ruff/mypy as
+8/8 supervised gates in 24.2 seconds under the canonical 6×6 topology.
 The version 0.2.63 release gate passed the unchanged 2,759 default tests plus
 Ruff/mypy as 8/8 supervised gates in 27.3 seconds under the canonical 6×6
 topology.

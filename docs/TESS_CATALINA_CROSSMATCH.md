@@ -55,6 +55,25 @@ The version 0.2.64 release gate passed 2,760 default tests plus Ruff/mypy as
 Every pilot row remains `role=training` with `training_authorized=false`.
 No FITS file is opened, no embedding is extracted, and no model is trained.
 
+## Completed pilot evidence
+
+Version 0.2.67 commits all six outputs and
+`artifacts/manifests/tess_catalina_crossmatch_pilot_aggregate_v1.json`.
+The run queried 216/216 unique TICs in 38 completed MAST batches. From first
+shard start through last shard completion it took 8.519 seconds (25.36 TIC/s);
+individual shards took 3.06-3.83 seconds. Every row is
+`no_candidate_within_radius`: zero accepted labels, zero duplicate TICs, and
+zero accepted Catalina sources to reconcile across shards.
+
+The exact zero-success one-sided 95% match-fraction upper bound is 1.377%,
+which is an inference rather than evidence that any of the remaining TICs
+match. This low overlap is the contract's stop signal. Do not run all 2,790
+TICs, train on these rows, or relax the positional/magnitude/quality guards.
+The next label-source contract must demonstrate materially better overlap with
+the frozen TESS inventory.
+The 0.2.67 release gate passed 2,763 tests plus Ruff/mypy as 8/8 supervised
+gates in 24.2 seconds under the canonical 6×6 topology.
+
 ## Merged execution sequence
 
 After version 0.2.62 is merged and `main` is clean, first validate all commands

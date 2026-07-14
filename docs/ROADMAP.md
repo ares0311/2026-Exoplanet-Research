@@ -184,6 +184,11 @@ by itself satisfy a master-guide evidence requirement.
    Version 0.2.65 supersedes the failed MAST-column v1 contract with immutable
    v2 (`duplicate_id`, live verified) while preserving the same frozen pilot
    population and all scientific safeguards.
+   Version 0.2.67 closes the pilot evidence gate: all 216 TICs queried cleanly,
+   but none has a Catalina candidate within 3 arcseconds. Full execution and
+   training are not authorized. The next roadmap item is a new immutable label
+   source contract whose metadata-only preflight demonstrates materially
+   better overlap with the frozen TESS inventory before any payload/training.
    Embedding-aware injection recovery remains required before broad extraction
    or training. The 0.2.60 release passed 2,751 default tests plus Ruff/mypy as
    8/8 supervised gates under the 6×6 topology in 25.2 seconds.

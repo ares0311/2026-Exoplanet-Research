@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.66 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.67 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -527,6 +527,15 @@ already-appended ledger and returns `False` on lock failure, allowing the
 caller to warn and exit zero without unsafe unlocked git operations.
 The version 0.2.66 release gate passed 2,762 default tests plus Ruff/mypy as
 8/8 supervised gates in 34.3 seconds under the canonical 6×6 topology.
+Version 0.2.67 commits all six outputs and global reconciliation. The pilot
+queried 216/216 unique TICs in 38 completed batches over 8.519 seconds observed
+wall time (25.36 TIC/s), but all 216 rows are `no_candidate_within_radius`.
+There are zero accepted labels and zero duplicate TIC/Catalina sources. The
+exact zero-success one-sided 95% match-fraction upper bound is 1.377% (an
+inference, not evidence of matches). Full 2,790-TIC execution and training are
+not authorized; the next label-source gate needs materially better overlap.
+The version 0.2.67 release gate passed 2,763 default tests plus Ruff/mypy as
+8/8 supervised gates in 24.2 seconds under the canonical 6×6 topology.
 The version 0.2.63 release gate passed the unchanged 2,759 default tests plus
 Ruff/mypy as 8/8 supervised gates in 27.3 seconds under the canonical 6×6
 topology.
