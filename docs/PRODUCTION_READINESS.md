@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.68 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.69 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -551,6 +551,20 @@ outputs, not ground truth; training and production changes remain blocked.
 See `docs/ASASSN_VARIABILITY_LABEL_PREFLIGHT.md`.
 The version 0.2.68 release gate passed 2,772 default tests plus Ruff/mypy as
 8/8 supervised gates in 31.3 seconds under the canonical 6x6 topology.
+The merged 6x6 preflight passed all source and overlap checks. Across 58 exact-
+TIC batches plus six source-metadata operations it reconciled 2,790 unique TICs
+to 48 unique ASAS-SN rows: 44 known variables, four discoveries, EA=26, EB=9,
+EW=2, ROT=10, SR=1, and minimum probability 0.902. There are zero duplicate
+TIC/source IDs and zero full-catalog payload bytes. Observed wall time from the
+first shard start to the last completion was 6.762 seconds (412.6 TIC/s);
+per-shard elapsed was 1.665-5.876 seconds, with shard zero intentionally owning
+the sequential source checks. Version 0.2.69 commits all evidence and an
+integrity test. The follow-up benchmark-design gate is unblocked, but automated
+ASAS-SN classes still do not authorize training or a production model change.
+Aggregate SHA-256 is `36de00dc…da403`; Run Report commit is `78b7be6`.
+The version 0.2.69 evidence-release gate passed 2,773 default tests plus
+Ruff/mypy as 8/8 supervised gates in 32.3 seconds under the canonical 6x6
+topology.
 The version 0.2.63 release gate passed the unchanged 2,759 default tests plus
 Ruff/mypy as 8/8 supervised gates in 27.3 seconds under the canonical 6×6
 topology.

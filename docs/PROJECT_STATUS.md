@@ -116,6 +116,14 @@ reconcile all TICs before it can authorize follow-up benchmark design. It
 cannot authorize training, extraction, promotion, or production scoring.
 The 0.2.68 release gate passed 2,772 default tests plus Ruff/mypy as 8/8
 supervised gates in 31.3 seconds under the canonical 6x6 topology.
+The merged run passed all six shards and the global gate: 2,790 unique TICs,
+48 unique ASAS-SN matches (44 known variables, four discoveries), minimum
+probability 0.902, no duplicate TIC/source IDs, and no catalog payload bytes.
+Observed wall time was 6.762 seconds. Version 0.2.69 commits the shard outputs,
+summaries, aggregate, and integrity test. Follow-up embedding-aware benchmark
+design is now the active scientific gate; training remains unauthorized.
+The 0.2.69 evidence-release gate passed 2,773 default tests plus Ruff/mypy as
+8/8 supervised gates in 32.3 seconds under the canonical 6x6 topology.
 The 0.2.63 release gate passed the unchanged 2,759 tests plus Ruff/mypy as 8/8
 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 

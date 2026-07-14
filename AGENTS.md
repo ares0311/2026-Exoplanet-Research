@@ -361,6 +361,20 @@ follow-up benchmark design and keeps `training_authorized=false`. See
 `docs/ASASSN_VARIABILITY_LABEL_PREFLIGHT.md`.
 The version 0.2.68 release gate passed 2,772 default tests plus Ruff/mypy as
 8/8 supervised gates in 31.3 seconds under the canonical 6x6 topology.
+The merged preflight then passed all six shards and global reconciliation:
+2,790/2,790 unique TICs, 58 exact-ID batches plus six source-metadata
+operations, 48 unique ASAS-SN matches (44 known variables and four discoveries),
+zero duplicate TIC/source IDs, and zero full-catalog bytes in 6.762 seconds
+observed wall time. Version 0.2.69 commits and integrity-tests all shard outputs,
+summaries, and the aggregate. This authorizes only the next embedding-aware
+benchmark design; ASAS-SN classes remain automated outputs and training stays
+unauthorized.
+Aggregate SHA-256 is
+`36de00dce1935aa70b3fdafb7f343fd6fd43b03696c49db7336a7842d83da403`;
+the seven exact-path Run Report ledgers are commit `78b7be6`.
+The version 0.2.69 evidence-release gate passed 2,773 default tests plus
+Ruff/mypy as 8/8 supervised gates in 32.3 seconds under the canonical 6x6
+topology.
 The version 0.2.62 release gate passed 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 34.3 seconds under the canonical 6×6 topology.
 Version 0.2.63 explicitly ignores the shared

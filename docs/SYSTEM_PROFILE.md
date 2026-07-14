@@ -197,6 +197,15 @@ workers.
   that run remains error-free and measured throughput justifies another step.
 - Version 0.2.68 validation passed 2,772 default tests plus Ruff/mypy as 8/8
   supervised gates in 31.3 seconds under the canonical 6x6 test topology.
+- The merged ASAS-SN preflight processed 2,790 TICs in 58 exact-ID batches plus
+  six sequential source checks. First-shard-start to last-shard-completion wall
+  time was 6.762 seconds (412.6 TIC/s); shard elapsed times were 1.665-5.876
+  seconds. The one-second process staggering and shard-zero source checks
+  explain the sub-linear improvement over the 7.86-second preliminary six-
+  worker probe. All shards passed without final errors. Retain 6x6 and do not
+  scale higher for this already-sub-10-second workload.
+- Version 0.2.69 validation passed 2,773 default tests plus Ruff/mypy as 8/8
+  supervised gates in 32.3 seconds under the canonical 6x6 test topology.
 - Version 0.2.63 validation passed the unchanged 2,759 tests plus Ruff/mypy as
   8/8 supervised gates in 27.3 seconds with the canonical 6×6 test topology.
 

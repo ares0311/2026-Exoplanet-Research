@@ -1,0 +1,33 @@
+{
+  "artifact_id": "tess_asassn_preflight_shard_v1",
+  "batch_size": 50,
+  "batches": 10,
+  "catalog_payload_bytes_downloaded": 0,
+  "class_counts": {
+    "EA": 4,
+    "EB": 2,
+    "ROT": 2
+  },
+  "contract_path": "metadata/asassn_variability_label_source_contract_v1.json",
+  "contract_sha256": "1239ba626f0f3c66e4e8c16003fa4089bc4acb3415f3bd9976ae249d862c8248",
+  "discoveries": 0,
+  "elapsed_seconds": 1.6714805829105899,
+  "inventory_sha256": "38a869666269367480a1aa9d2a29d76a86fb2ec6d2259a23635ad44f257c155a",
+  "known_variables": 8,
+  "matched_rows": 8,
+  "matched_unique_tics": 8,
+  "median_probability": 0.975,
+  "minimum_probability": 0.902,
+  "output_path": "artifacts/manifests/tess_asassn_preflight_v1.shard5of6.jsonl",
+  "output_sha256": "77264d7af2d7909f6c46352dcd93d27075a413af267b52e4e1209f8cc408b478",
+  "schema_version": 1,
+  "selected_tics": 468,
+  "shard_count": 6,
+  "shard_index": 4,
+  "source_verification": {
+    "status": "not_repeated_on_this_shard"
+  },
+  "status": "success",
+  "training_authorized": false,
+  "workers": 6
+}

@@ -199,6 +199,16 @@ by itself satisfy a master-guide evidence requirement.
    automated outputs, not human ground truth; training stays unauthorized.
    The version 0.2.68 release gate passed 2,772 default tests plus Ruff/mypy as
    8/8 supervised gates in 31.3 seconds under the canonical 6x6 topology.
+   The merged preflight reproduced 48/2,790 unique exact-TIC matches in 6.762
+   seconds observed wall time: 44 known variables, four discoveries, minimum
+   probability 0.902, zero duplicate TIC/source IDs, and zero catalog payload
+   bytes. Version 0.2.69 commits and integrity-tests every shard artifact and
+   the passing aggregate. The source-overlap item is complete. Next design the
+   bounded embedding-aware variability/injection benchmark around these 48
+   training-disabled rows; do not train on the automated ASAS-SN classes.
+   The version 0.2.69 evidence-release gate passed 2,773 default tests plus
+   Ruff/mypy as 8/8 supervised gates in 32.3 seconds under the canonical 6x6
+   topology.
    Embedding-aware injection recovery remains required before broad extraction
    or training. The 0.2.60 release passed 2,751 default tests plus Ruff/mypy as
    8/8 supervised gates under the 6×6 topology in 25.2 seconds.

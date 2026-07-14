@@ -35,7 +35,7 @@ minimum probability 0.90, and zero duplicate TIC or ASAS-SN identifiers. The
 floor is transparently set at half the exploratory match/known counts so source
 drift fails closed. Passing it authorizes follow-up benchmark design only.
 
-## Merged-main run
+## Merged-main evidence
 
 The reviewed preflight uses one parent, six modulo process shards, and six TAP
 workers per shard. Each shard writes one row for every owned TIC, so missing
@@ -44,7 +44,27 @@ Shard zero also verifies the compressed delivery headers, VizieR schema, row
 count, TIC count, class distribution, and known/new distribution. The 64.26 MB
 catalog and all ASAS-SN light curves remain undownloaded.
 
-Run only after version 0.2.68 is merged:
+The merged version 0.2.68 run passed on 2026-07-14. All six shards processed
+2,790 unique TICs in 58 exact-ID batches. Shard zero also passed all six source
+metadata operations. The first shard started at 22:14:59.645 UTC and the last
+completed at 22:15:06.407 UTC: 6.762 seconds observed wall time, or 412.6
+TICs/s. Per-shard elapsed time was 1.665-5.876 seconds; shard zero is expected
+to be slower because it owns the sequential source-identity checks. The
+supervisor's deliberate one-second start staggering and those six source
+checks explain why overall scaling from the preliminary six-worker probe is
+sub-linear; there were no final errors or duplicate rows.
+
+The durable aggregate reproduces 48 exact matches (1.7204%): 44 known
+variables and four ASAS-SN discoveries. Classes are EA=26, EB=9, EW=2, ROT=10,
+and SR=1; probabilities range from 0.902 upward. All five evidence checks pass,
+all ASAS-SN identifiers are globally unique, catalog payload bytes remain zero,
+and `training_authorized=false`. Version 0.2.69 commits and integrity-tests the
+evidence. Follow-up benchmark design is authorized; training is not.
+Aggregate SHA-256 is
+`36de00dce1935aa70b3fdafb7f343fd6fd43b03696c49db7336a7842d83da403`;
+the exact-path Run Report commit is `78b7be6`.
+
+Reproduction command retained for audit:
 
 ```bash
 git switch main
