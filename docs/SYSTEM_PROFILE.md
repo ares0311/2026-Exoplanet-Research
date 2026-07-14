@@ -169,6 +169,11 @@ workers.
 - Version 0.2.63 ignores the shared `.cache/stellar_variability_labels/`
   runtime cache so the single-parent launcher sees a clean tree and its six
   child Run Reports can retain exact-file-only git ownership.
+- Version 0.2.64 accepts the pinned Catalina payload's valid 71-byte unflagged
+  records while retaining strict 71- to 73-byte bounds. The merged 6x6 pilot
+  retry remains the next throughput and service-error measurement.
+- Version 0.2.64 validation passed 2,760 tests plus Ruff/mypy as 8/8 supervised
+  gates in 25.2 seconds with the canonical 6×6 test topology.
 - Version 0.2.63 validation passed the unchanged 2,759 tests plus Ruff/mypy as
   8/8 supervised gates in 27.3 seconds with the canonical 6×6 test topology.
 

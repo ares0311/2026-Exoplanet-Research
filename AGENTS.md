@@ -353,6 +353,16 @@ Version 0.2.63 explicitly ignores the shared
 `.cache/stellar_variability_labels/` runtime cache. This keeps merged `main`
 clean so the six shard-local Run Reports can safely commit only their own
 ledger files; do not remove that ignore rule or force-add the cached catalog.
+Version 0.2.64 fixes the other fail-closed defect exposed by that first live
+pilot: CDS legitimately omits the two trailing blank bytes on 44,538 rows when
+the optional Catalina class flag is absent; 2,517 flagged rows retain byte 73.
+The parser accepts only the documented 71- to 73-byte forms, pads omitted
+optional bytes before fixed-width slicing, and
+continues to reject any shorter or longer row before MAST queries begin.
+The version 0.2.64 release gate passed 2,760 default tests plus Ruff/mypy as
+8/8 supervised gates in 25.2 seconds under the canonical 6×6 topology; a
+direct parse of the pinned gzip validated all 47,055 rows and the exact flag
+distribution.
 The version 0.2.63 release gate passed the unchanged 2,759 default tests plus
 Ruff/mypy as 8/8 supervised gates in 27.3 seconds under the canonical 6×6
 topology.
