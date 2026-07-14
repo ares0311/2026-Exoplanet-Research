@@ -237,15 +237,15 @@ handoff.
 
 ## Latest Local Validation
 
-Validated on 2026-06-30:
+Validated on 2026-07-13:
 
 ```bash
-.venv/bin/ruff check .
-.venv/bin/python -m mypy src
-.venv/bin/python -m pytest
+.venv/bin/python Skills/run_quality_gates.py
 ```
 
-Result: ruff passed, mypy passed, pytest passed with 2,355 passed, 2 deselected, and 3 package warnings.
+Result: Ruff and mypy passed; six disjoint pytest shards × six xdist workers
+passed 2,718 default tests in 34.1 seconds total. Two `integration_live` tests
+remain excluded by default.
 
 ---
 

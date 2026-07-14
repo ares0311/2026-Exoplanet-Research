@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -160,7 +161,18 @@ class TestRunInjectionRecovery:
     def _lc(self) -> object:
         return make_mock_lc(baseline_days=30.0, noise_ppm=200.0, rng=np.random.default_rng(1))
 
-    def test_returns_injection_grid(self) -> None:
+    @staticmethod
+    def _stub_search(
+        monkeypatch: pytest.MonkeyPatch, signals: list[object] | None = None
+    ) -> None:
+        results = list(signals or [])
+        monkeypatch.setattr(
+            "Skills.injection_recovery.search_lightcurve",
+            lambda *_args, **_kwargs: results,
+        )
+
+    def test_returns_injection_grid(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._stub_search(monkeypatch)
         lc = self._lc()
         grid = run_injection_recovery(
             lc,
@@ -172,7 +184,8 @@ class TestRunInjectionRecovery:
         )
         assert isinstance(grid, InjectionGrid)
 
-    def test_grid_shape(self) -> None:
+    def test_grid_shape(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._stub_search(monkeypatch)
         lc = self._lc()
         grid = run_injection_recovery(
             lc,
@@ -184,7 +197,8 @@ class TestRunInjectionRecovery:
         )
         assert grid.recovery_rate.shape == (2, 2)
 
-    def test_recovery_rate_bounded(self) -> None:
+    def test_recovery_rate_bounded(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._stub_search(monkeypatch)
         lc = self._lc()
         grid = run_injection_recovery(
             lc,
@@ -197,7 +211,8 @@ class TestRunInjectionRecovery:
         assert np.all(grid.recovery_rate >= 0.0)
         assert np.all(grid.recovery_rate <= 1.0)
 
-    def test_results_count(self) -> None:
+    def test_results_count(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._stub_search(monkeypatch)
         lc = self._lc()
         n_p, n_d, n_t = 2, 3, 2
         grid = run_injection_recovery(
@@ -222,8 +237,10 @@ class TestRunInjectionRecovery:
         )
         assert grid.recovery_rate[0, 0] == 0.0
 
-    def test_deep_short_period_high_recovery(self) -> None:
-        """A very deep, short-period transit on a quiet LC should be recoverable."""
+    def test_deep_short_period_high_recovery(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A matching high-SNR search result should count as recovered."""
+        signal = SimpleNamespace(period_days=3.0, depth_ppm=10000.0, snr=20.0)
+        self._stub_search(monkeypatch, [signal])
         lc = make_mock_lc(baseline_days=27.0, noise_ppm=100.0, rng=np.random.default_rng(3))
         grid = run_injection_recovery(
             lc,
@@ -234,7 +251,7 @@ class TestRunInjectionRecovery:
             n_trials=3,
             min_snr=5.0,
         )
-        assert grid.recovery_rate[0, 0] >= 0.0  # sanity: at minimum it ran
+        assert grid.recovery_rate[0, 0] == 1.0
 
 
 # ---------------------------------------------------------------------------

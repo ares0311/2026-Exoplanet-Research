@@ -756,23 +756,19 @@ python Skills/evaluate_scorer.py \
 All three quality gates must pass before any commit is considered complete:
 
 ```bash
-# Lint (PEP 8, import order, complexity, security)
-ruff check .
-
-# Static type checking — always use python -m mypy, not bare mypy
-python -m mypy src
-
-# Full test suite
-PYTHONPATH=src python -m pytest
-
-# All three together
-ruff check . && python -m mypy src && PYTHONPATH=src python -m pytest
+# Ruff + mypy + six disjoint pytest shards x six xdist workers
+.venv/bin/python Skills/run_quality_gates.py
 ```
+
+See `docs/QUALITY_GATE_RUNNER.md` for logs, dry-run behavior, and focused-test
+fallbacks. The acquisition equivalent is `Skills/run_six_shards.py`, which
+supervises reviewed six-shard × six-worker download/processing workloads from
+one terminal after repo-identity and storage preflight.
 
 Continuous integration runs all three gates on every pull request via GitHub Actions. Live integration tests (requiring MAST network access) are excluded from CI and must be run manually:
 
 ```bash
-PYTHONPATH=src python -m pytest -m integration_live
+PYTHONPATH=src .venv/bin/python -m pytest -m integration_live -n auto --dist=worksteal
 ```
 
 ### Test Coverage Summary

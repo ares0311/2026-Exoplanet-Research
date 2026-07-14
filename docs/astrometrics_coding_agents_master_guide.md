@@ -19,6 +19,9 @@ The coding agent should read this file before modifying any model, dataset, scor
 5. Implement from Phase 1 forward unless the user explicitly chooses a later experiment.
 6. When adding a feature, reference the relevant section and citation in PR notes, model cards, or dataset cards.
 7. If a repo already has equivalent functionality, do not duplicate it. Map the existing implementation to the section below and improve gaps.
+8. Follow the active repo's `AGENTS.md` for its tested shard/worker supervisors;
+   prefer one parent supervising disjoint parallel units over manual terminals
+   or sequential execution whenever the measured workload benefits.
 
 ## Non-Negotiable Decisions
 
@@ -38,6 +41,9 @@ These decisions are already made for coding agents:
 12. Do not mirror public raw archives locally. Public raw TESS, Kepler, JWST, Breakthrough Listen, and survey-image data is disposable cache unless promoted by policy.
 13. Cloud/object storage is optional infrastructure for overflow, durability, collaboration, and cloud compute. It is not required for day-one local work.
 14. A working SSD is not a backup. Back up manifests, ledgers, configs, reports, candidate evidence, and frozen eval/calibration artifacts separately.
+15. Use maximum safe measured parallelism for independent acquisition,
+    processing, evaluation, and validation units. Require disjoint ownership,
+    bounded resources, progress/ETA, failure propagation, and clean interruption.
 
 ## Local Storage Stance
 

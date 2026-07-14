@@ -41,6 +41,23 @@ live-search TIC, records exact MAST URIs/cache-relative paths/sizes, and never
 opens FITS payloads or downloads data. The committed inventory contains 11,960
 products across 2,790 TICs (29.79762048 GB already cached); no derived arrays
 are authorized until a bounded preprocessing size/throughput benchmark exists.
+Version 0.2.53 adds `Skills/run_six_shards.py`, so one parent process can run
+the measured six-shard/six-worker cadence without six terminal tabs. It is
+fail-closed to reviewed shard-capable scripts, clean `main`, authoritative repo
+identity, and the 100 GB projection; writes six logs plus heartbeats/ETA; and
+serializes only shard Run Report git operations through a shared process lock.
+The same release adds `Skills/run_quality_gates.py`: every test module is
+assigned exactly once across six pytest shards, each shard gets six xdist
+workers, and Ruff/mypy run concurrently under the same parent. This 6×6 runner
+is the canonical full local quality gate; direct pytest is retained for focused
+diagnosis or constrained-machine fallback. With numeric libraries capped at
+one inner thread per worker, the optimized full run passed 2,718 tests plus
+both static gates in 34.1s, about 58% faster than the 81.57s single-xdist
+baseline. The same
+single-parent optimized pattern is now the standing default for every safely
+partitionable workload, not just these two scripts.
+No live download was run because the completed T1-1/T1-2 manifests must not be
+reprocessed. See `docs/SIX_SHARD_LAUNCHER.md`.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
@@ -104,8 +121,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 135 top-level test files. Local validation on 2026-07-12 passed with 2,705 default tests and 2 `integration_live` tests deselected.
-**Skills:** 115 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
+**Current test surface:** 137 top-level test files. Local 6×6 validation on 2026-07-13 passed with 2,718 default tests and 2 `integration_live` tests deselected in 34.1s.
+**Skills:** 117 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
 
 ---
 
@@ -489,24 +506,24 @@ and therefore block `tfop_ready` conservatively.
 Canonical commands and rationale: `AGENTS.md` Quality Gates. Quick copy-paste:
 
 ```bash
-# Run tests (package not pip-installed — use PYTHONPATH)
-PYTHONPATH=src python -m pytest
+# Full gates: Ruff + mypy + six test shards x six xdist workers
+.venv/bin/python Skills/run_quality_gates.py
 
-# Lint
-ruff check .
-ruff check . --fix
+# Focused test diagnosis
+PYTHONPATH=src .venv/bin/python -m pytest tests/test_target.py -n auto --dist=worksteal
 
-# Type-check (must use python -m mypy so stubs from site-packages are visible)
-python -m mypy src
+# Individual static checks
+.venv/bin/python -m ruff check .
+.venv/bin/python -m mypy src
 
-# All three together
-ruff check . && python -m mypy src && PYTHONPATH=src python -m pytest
+# Apply safe Ruff fixes
+.venv/bin/python -m ruff check . --fix
 ```
 
 If pytest fails with `ModuleNotFoundError: No module named 'exo_toolkit'`, add `PYTHONPATH=src`.
 
 `mypy` (bare binary) sees a different package path and reports false import errors for pydantic/numpy.
-Always use `python -m mypy src` locally.
+Always use `.venv/bin/python -m mypy src` locally.
 
 ---
 

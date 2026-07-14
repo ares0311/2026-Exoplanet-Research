@@ -239,37 +239,69 @@ worker counts are baselines to exceed when measurements remain clean, not caps.
 For any embarrassingly-parallel-across-independent-units workload (targets,
 files, folds, sectors, EPIC/TIC/KIC IDs, anything with a `--max-*`/`-n`/count-
 style bound), process-level sharding (`--shard-index`/`--shard-count`, one
-process per console tab) is the default shape, not merely something to weigh.
+process per supervisor child) is the default shape, not merely something to weigh.
 If a target acquisition/processing script doesn't yet support it, that is a
 gap to close (mirroring the proven pattern below) before recommending a
-multi-tab live run — not a reason to fall back to a single-process recipe.
+live run — not a reason to fall back to a single-process recipe.
+
+**Single-parent orchestration is the default.** When a reviewed workload can
+use six independent shards with six workers each, run it through
+`Skills/run_six_shards.py` (or a task-specific supervisor with the same safety
+properties) from one terminal. Do not make the operator open six terminals for
+work the agent can supervise itself. A workload may be added to that launcher's
+allowlist only after its native shard flags, disjoint outputs, Run Reports,
+storage behavior, and interruption handling are verified. Use separate tabs
+only when cross-terminal coordination materially helps a large operation and
+the operator approves that plan.
 
 **Before giving the user any recipe expected to take longer than 3 minutes, always consider sharding, multiprocessing/multithreading, or other parallelism — do not default to a purely sequential recipe without first checking whether a faster shape exists.**
 This applies to every recipe, not just Kepler/TESS batch processing: training runs, injection-recovery sweeps, catalog downloads, evaluation/validation passes, anything with a `--max-*`/`-n`/count-style bound.
 
 **Before proposing a recipe:**
 1. Estimate the wall-clock time. If it's over ~3 minutes, explicitly work through whether the task is:
-   - **Embarrassingly parallel across independent units** (targets, files, folds, sectors) → sharding (`--shard-index`/`--shard-count`, one process per console tab) is the default, per the pattern in `Skills/process_t1_kepler_batch.py` (version 0.2.18). Add it to the target script if missing rather than settling for `--workers`-only.
+   - **Embarrassingly parallel across independent units** (targets, files, folds, sectors) → sharding (`--shard-index`/`--shard-count`, one process per supervisor child) is the default, per the pattern in `Skills/process_t1_kepler_batch.py` (version 0.2.18). Add it to the target script if missing rather than settling for `--workers`-only.
    - **I/O-bound within one process** (network/catalog calls) → in-process worker concurrency (`--workers`, `ThreadPoolExecutor`) *within each shard*; sharding and per-shard workers compose and should scale upward until throughput stops improving or errors/throttling appear.
    - **CPU-bound** (local computation, no external service) → multiprocessing or vectorization using all available CPUs by default, then retain a lower measured count only when it is demonstrably faster or required by memory limits.
    - Genuinely sequential (state must build incrementally, e.g. O-C ephemeris refinement across epochs) → say so explicitly rather than silently defaulting to slow.
-2. When a target script lacks sharding support, add it before recommending a multi-tab live run — mirroring the pattern already proven in `Skills/process_t1_kepler_batch.py` and `Skills/fetch_t1_2_k2_calibration_snippets.py` (sharding added 2026-07-10): partition by `id % shard_count`, auto-suffix each shard's output/failure files so concurrent processes never race on one file, wire `shard_index`/`shard_count` into the Run Report. The only exception is a genuinely trivial one-off task that will not clear the 3-minute bar even sequentially — say so explicitly rather than silently skipping sharding.
+2. When a target script lacks sharding support, add it before recommending a live parallel run — mirroring the pattern already proven in `Skills/process_t1_kepler_batch.py` and `Skills/fetch_t1_2_k2_calibration_snippets.py` (sharding added 2026-07-10): partition by `id % shard_count`, auto-suffix each shard's output/failure files so concurrent processes never race on one file, wire `shard_index`/`shard_count` into the Run Report. The only exception is a genuinely trivial one-off task that will not clear the 3-minute bar even sequentially — say so explicitly rather than silently skipping sharding.
    - **Shard-capable scripts today**: `Skills/process_t1_kepler_batch.py` (`--shard-index`/`--shard-count`, version 0.2.18) and `Skills/fetch_t1_2_k2_calibration_snippets.py` (partitions by `epic_id % shard_count`, auto-suffixed per-shard output/failure files). Any other acquisition/processing script (see the Run Report Policy retrofit list above) still needs this pattern added the first time a live multi-target recipe for it would clear the 3-minute bar.
 3. Every parallel/sharded recipe must use the Run Report Policy above so
 progress is self-reporting across shards. For live services, start from the
 highest previously clean measurement and scale further while throughput
 improves; back off immediately on throttling, timeouts, or increased failures.
 
-4. Pytest runs use `pytest-xdist` with `-n auto --dist=worksteal` by default.
-On the recorded 16-CPU Mac this reduced the 2,630-test suite from 226.45s to
-81.57s while preserving the exact pass count. Override worker count only for
-a documented diagnosis or when a constrained environment cannot support its
-reported CPU count.
+4. Full local quality-gate runs use
+`Skills/run_quality_gates.py`: it partitions every `tests/test_*.py` module
+exactly once across six pytest shards, gives each shard six pytest-xdist workers
+with `--dist=worksteal` (36 test workers total), and concurrently supervises
+Ruff and mypy. Scientific numeric backends are held to one inner thread per
+pytest worker so BLAS/OpenMP cannot multiply the intended 36-way concurrency.
+The six shard logs and combined summary remain under ignored
+`logs/quality_gates/`. Do not start six unpartitioned full-suite pytest runs;
+that would duplicate tests rather than shard them. Direct pytest remains valid
+for a focused diagnosis, or when a constrained environment cannot safely run
+the canonical 6×6 supervisor. The earlier single-universe xdist baseline on the
+recorded 16-CPU Mac reduced 2,630 tests from 226.45s serial to 81.57s; compare
+the 6×6 measurement against that baseline and investigate any regression.
+The optimized 6×6 run on 2026-07-13 passed all 2,718 default tests plus
+Ruff/mypy in 34.1s after limiting native numeric backends to one inner thread
+and removing redundant real BLS searches from unit tests whose assertions only
+exercise injection-grid orchestration. That is about 58% faster than the
+81.57s single-universe baseline.
+
+This optimized single-parent shard/worker shape is the standing default
+wherever work is safely partitionable: acquisition, processing, tests,
+evaluation sweeps, and similar independent units. Equivalent new supervisors
+must preserve disjoint ownership, bounded resources, progress/ETA, failure
+propagation, interruption cleanup, and any applicable storage/Run Report
+guards. Use sequential execution only for genuinely state-dependent work, a
+focused diagnosis, a constrained environment, or a measured parallel
+regression; record the reason rather than silently falling back.
 
 **Ask, don't assume, when:**
-- The right shard/worker *count* (not whether to shard at all) depends on the operator's own tradeoffs — how many console tabs they're willing to dedicate, whether they want a tab free for other work, how much they trust the external service's rate limits at higher concurrency.
+- The right shard/worker *count* (not whether to shard at all) depends on the operator's own tradeoffs — available machine capacity, concurrent work, and trust in the external service's rate limits.
 - It's unclear whether the task is I/O-bound, CPU-bound, or a mix (measuring first, then asking whether to push further, beats guessing a big number).
-- Two people, one Mac: if a task is already running, ask before recommending starting more concurrent tabs.
+- Two people, one Mac: if a task is already running, ask before starting more concurrent supervisors.
 
 The 3-minute bar governs whether to shard at all for a given one-off task; it is not license to skip adding sharding to a script that will be reused for future multi-target batches just because today's invocation happens to be small.
 
@@ -277,7 +309,7 @@ The 3-minute bar governs whether to shard at all for a given one-off task; it is
 - After any parallel/sharded run completes, compute its real per-item rate (from the run report or console output) and compare it against the last known baseline (sequential, prior worker count, or prior shard count) before proposing the next step up.
 - A rate close to or better than the prior baseline, with no new errors/timeouts, is what justifies scaling further (more shards, more workers). A regressed rate, new `ERROR:`/timeout flags, or any sign of throttling is a stop signal — back off, don't push harder.
 - Sub-linear scaling (e.g., 2 shards giving nowhere near ~2x throughput) is itself a bug worth investigating, not just a result to accept because nothing crashed. Check the code for an artificial bottleneck (a lock, a shared mutable global, a serialized third-party call) before concluding the external service itself is the ceiling — this project has twice found a real in-process serialization bug this way (`_DOWNLOAD_PRODUCTS_LOCK` in `exo_toolkit/fetch.py`, fixed in version 0.2.19) rather than the bottleneck being MAST/Astroquery itself.
-- Never recommend "try more tabs" as a bare escalation without this comparison — ground the next recommended shard/worker count in the last real measurement, not in optimism.
+- Never recommend "try more workers/shards" as a bare escalation without this comparison — ground the next recommended count in the last real measurement, not in optimism.
 
 ---
 
@@ -466,17 +498,26 @@ whatever mission/domain is in scope:
 
 ## Quality Gates
 
-Run these before every commit when the local environment supports them:
+Run the single-parent 6×6 gate supervisor before every commit when the local
+environment supports it:
 
 ```bash
-ruff check .
-python -m mypy src
-PYTHONPATH=src python -m pytest
+.venv/bin/python Skills/run_quality_gates.py
 ```
+
+It runs these logically independent gates concurrently: `.venv/bin/python -m
+ruff check .`, `.venv/bin/python -m mypy src`, and six disjoint pytest file
+shards with six xdist workers each. Use `--tests-only` only when Ruff and mypy
+have already passed unchanged code in the current work cycle. Use direct
+`.venv/bin/python -m pytest ... -n auto --dist=worksteal` only for focused
+diagnosis or a documented constrained-environment fallback.
 
 If a gate cannot run because of a local environment issue, record the exact blocker in the handoff or commit message. Default tests must not require live external services.
 
-If pytest fails with `ModuleNotFoundError: No module named 'exo_toolkit'`, add `PYTHONPATH=src`. `mypy` (bare binary) sees a different package path and reports false import errors for pydantic/numpy — always use `python -m mypy src`.
+If pytest fails with `ModuleNotFoundError: No module named 'exo_toolkit'`, add
+`PYTHONPATH=src`. `mypy` (bare binary) sees a different package path and reports
+false import errors for pydantic/numpy — always use `.venv/bin/python -m mypy
+src`.
 
 ## Code Standards
 

@@ -648,3 +648,40 @@ schemas, synthetic positives, or opaque pretrained weights.
   and training manifests before another local run.
 - Makes future human-run commands safer: no long download or training command
   should rely on a URL, schema, or assumption the agent could have verified.
+
+---
+
+## DECISION-021: Use Single-Parent Shard/Worker Supervisors By Default
+
+**Date:** 2026-07-13
+**Status:** Accepted
+
+### Context
+
+The project had proven six acquisition shards with six in-process workers, but
+operating them required six terminal tabs. Local validation also ran Ruff,
+mypy, and one pytest-xdist universe in sequence. Both patterns imposed avoidable
+operator work or wall time.
+
+### Decision
+
+1. Use `Skills/run_six_shards.py` for reviewed acquisition/processing workloads
+   that implement isolated native shard flags and benefit from the measured
+   6×6 cadence.
+2. Use `Skills/run_quality_gates.py` for full local validation: six disjoint
+   test-file shards, six xdist workers per shard, and concurrent Ruff/mypy.
+3. Apply the same single-parent supervisor pattern wherever future acquisition,
+   processing, evaluation, training-sweep, or validation work is safely
+   partitionable.
+4. Require disjoint work ownership, bounded resources, progress/ETA, failure
+   propagation, interruption cleanup, and applicable storage and Run Report
+   guards before enabling a workload.
+5. Keep direct/sequential execution only for focused diagnosis, genuine state
+   dependency, constrained environments, or a measured parallel regression.
+
+### Evidence
+
+With native numeric libraries limited to one thread per test worker, the first
+optimized 6×6 quality run passed 2,718 default tests plus Ruff and mypy in 34.1
+seconds. The prior single-universe xdist baseline was 81.57 seconds, so the new
+shape reduced measured wall time by about 58% without duplicating tests.

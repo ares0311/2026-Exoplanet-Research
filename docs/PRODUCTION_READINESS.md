@@ -1,13 +1,13 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-07-11 (formal production-ensemble acceptance PASS: the
+Last reviewed: 2026-07-13 (formal production-ensemble acceptance PASS: the
 catalog ephemeris for pi Mensae c was recovered within 0.005% with ensemble
 FPP 0.4405, while the TOI-146.01 false-positive control produced no signal.
 No Tier 1 gaps remain open.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
-Branch: `main` (87 production-critical Skills; non-production fluff removed)
-Test baseline: 2,705 default tests passing; 2 `integration_live` tests excluded by
-the configured marker expression (2026-07-12)
+Branch: `main` (89 production-critical Skills; non-production fluff removed)
+Test baseline: 2,718 default tests passing; 2 `integration_live` tests excluded by
+the configured marker expression (2026-07-13)
 
 ---
 
@@ -29,7 +29,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.52 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.53 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -346,6 +346,27 @@ TICs overlapped this SPOC cache. The 6.1 MB row inventory has SHA-256
 `38a86966…c155a`; Run Report commit `2016811`. The source is training-only and
 does not close Phase 3. Derived-array creation remains gated on a bounded
 streaming/preprocessing size and throughput benchmark.
+0.2.53 adds the single-terminal 6×6 acquisition supervisor requested by the
+operator. `Skills/run_six_shards.py` constructs exactly six native shard
+commands with six workers each, permits only reviewed shard-capable Skills,
+rejects caller overrides of shard flags, requires authoritative clean `main`,
+preflights repo plus shared-cache storage against the 100 GB ceiling, staggers
+starts, writes separate logs, emits heartbeat/ETA, terminates children on
+interrupt, and fails if any shard fails. A shared file lock serializes only the
+six child Run Report git transactions, preventing `.git/index.lock` races while
+all acquisition work remains concurrent. No live download was executed because
+the existing T1-1 and T1-2 manifests are complete. The same release adds
+`Skills/run_quality_gates.py`, which assigns every test module exactly once
+across six pytest shards with six xdist workers each and supervises Ruff/mypy
+beside them. Per-gate logs and a combined JSON result make full validation
+single-command and fail-closed. Native numeric backends are capped at one inner
+thread per worker; the optimized full run passed all 2,718 default tests and
+both static gates in 34.1s versus the prior 81.57s single-xdist baseline. Unit
+tests that only assert injection-grid orchestration now stub the separately
+covered BLS layer instead of repeating expensive real searches. This
+single-parent optimized pattern is now the default for every safely
+partitionable workload. The acquisition launcher's merged-code
+validation remains a no-download dry run.
 
 **TESS live-search v1 evidence (2026-07-11): COMPLETE / REVIEW EVIDENCE-LIMITED.** Three
 shards at six workers each processed all 18 frozen targets in 72.79 seconds of
@@ -545,8 +566,8 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 | Bounded short-period real-background production sensitivity v1 | ✅ 23/36 recovered; zero failures |
 | Expanded Q1-Q4 production sensitivity v2 | ✅ 8/16 recovered; zero failures |
 | Empirical full-ensemble candidate context | ✅ 588-row K2 reference; no invented threshold |
-| 87 production-critical Skills/ | ✅ |
-| 2,705 default tests, ruff clean, mypy clean | ✅ |
+| 89 production-critical Skills/ | ✅ |
+| 2,718 default tests, ruff clean, mypy clean | ✅ |
 | All scientific guardrails enforced in code | ✅ |
 
 ---
@@ -555,9 +576,7 @@ Full module inventory: `docs/PROJECT_STATUS.md §What Is Complete`
 
 Run these before any live deployment or public announcement:
 
-- [x] `PYTHONPATH=src .venv/bin/python -m pytest` — all default tests pass, 0 failures (2026-07-12: 2,705 passed; 2 `integration_live` tests excluded by configuration)
-- [x] `.venv/bin/ruff check .` — no lint errors (2026-07-12: clean)
-- [x] `.venv/bin/python -m mypy src` — no type errors (2026-07-12: clean, 33 source files)
+- [x] `.venv/bin/python Skills/run_quality_gates.py` — six test shards × six xdist workers plus concurrent Ruff/mypy all pass (2026-07-13: 2,718 passed; 2 `integration_live` tests excluded; 34.1s wall time)
 - [x] `exo background-run-once --dry-run` — no config errors (2026-07-10: installed entry point exercised successfully; dry run wrote no ledger/outcome data)
 - [x] `.venv/bin/python Skills/tier2_progress_reporter.py` — 2026-07-11 reports READY from 15,649 committed-evidence examples/snippets, promoted checkpoint, calibration, and registry entry
 - [x] Verify `configs/background_search_v0.json` fingerprint matches expected value (2026-07-10: `exo sqlite-integrity` returned `ok: true` and `missing_config_fingerprint_count: 0`)
