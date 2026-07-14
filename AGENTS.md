@@ -300,6 +300,25 @@ regression was added.
 Version 0.2.59 passed 2,743 tests plus Ruff/mypy in 34.3s while recording the
 successful merged inference artifact and closing the bounded runtime gate.
 
+**Phase 3 stellar-variability label-source gate:** version 0.2.60 pins the
+publication-backed Drake et al. (2014) Catalina catalog in
+`metadata/stellar_variability_label_source_contract_v1.json` and verifies it
+with `Skills/verify_stellar_variability_label_source.py`. The source has 47,055
+machine-readable rows, 17 published classes, inspection flags, and a 1,166,660
+byte compressed table. The verifier performs five primary-source metadata/TAP
+checks, reads only three sample rows, and downloads zero full-catalog payload
+bytes. This bounded gate is intentionally sequential because it completes
+below the three-minute threshold. Gaia DR3 automated class predictions are
+not ground truth; the gated approximately 160 GB StarEmbed corpus is outside
+the current auth/storage boundary. A PASS authorizes only source identity.
+Crossmatch and training remain gated. The later independent-TIC metadata
+resolution/crossmatch must use the single-parent six-shard/six-worker pattern
+after a small live-service throughput measurement. See
+`docs/STELLAR_VARIABILITY_LABEL_SOURCE_CONTRACT.md`.
+The version 0.2.60 release gate passed 2,751 default tests plus Ruff/mypy as
+8/8 supervised gates in 25.2 seconds using six pytest shards with six xdist
+workers each.
+
 This optimized single-parent shard/worker shape is the standing default
 wherever work is safely partitionable: acquisition, processing, tests,
 evaluation sweeps, and similar independent units. Equivalent new supervisors

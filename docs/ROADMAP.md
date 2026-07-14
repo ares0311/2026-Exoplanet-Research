@@ -168,10 +168,14 @@ by itself satisfy a master-guide evidence requirement.
    same 2,743 tests plus Ruff/mypy in 26.2 seconds. The merged retry passed both
    exact models in 26.875 seconds with finite `(1,1,1,256)` outputs and max
    child RSS 186,204,160 bytes. Artifact SHA is `1cc59ab3…5de5d10`; Run Report
-   commit `f8a7207`. Version 0.2.59 closes runtime integration. Next define and
-   evidence the stellar-variability label and injection-recovery gates before
-   any broad extraction or training. The 0.2.59 evidence release passed 2,743
-   default tests plus Ruff/mypy under the 6×6 topology in 34.3 seconds.
+   commit `f8a7207`. Version 0.2.59 closes runtime integration. Version 0.2.60
+   pins the 47,055-row Drake et al. Catalina variable-star catalog and adds a
+   fail-closed, zero-full-payload metadata verifier. Run that verifier from
+   merged code, then design and evidence the leakage-safe 2,790-TIC coordinate
+   crossmatch using the measured single-parent six-shard/six-worker shape.
+   Embedding-aware injection recovery remains required before broad extraction
+   or training. The 0.2.60 release passed 2,751 default tests plus Ruff/mypy as
+   8/8 supervised gates under the 6×6 topology in 25.2 seconds.
 
 ## Milestone 1 — Scoring and Classification Engine ✓ COMPLETE
 

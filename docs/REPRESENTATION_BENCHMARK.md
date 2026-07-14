@@ -63,6 +63,14 @@ injection-recovery comparison. The merged retry passed both exact models in
 `f8a7207`. Version 0.2.59 records runtime integration complete while every
 scientific comparison item above remains open.
 
+Version 0.2.60 selects Drake et al. (2014), CDS/VizieR
+`J/ApJS/213/9/table3`, for the missing variability-label source gate: 47,055
+publication-backed rows, 17 classes, and a 1,166,660-byte compressed table.
+The contract and zero-full-payload metadata verifier are documented in
+`docs/STELLAR_VARIABILITY_LABEL_SOURCE_CONTRACT.md`. Merged verification is
+next; a source PASS does not authorize the leakage-safe TIC crossmatch,
+embedding extraction, or training.
+
 The training loop is a single stateful optimization and is not shardable.
 Batching uses the selected accelerator; `device=auto` prefers MPS, then CUDA,
 then CPU. Every epoch prints loss, learning rate, patience state, and ETA. A

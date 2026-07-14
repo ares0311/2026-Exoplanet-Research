@@ -56,6 +56,14 @@ runtime PASS. Variability-label and injection-recovery scientific gates remain
 before broad extraction or training. The 0.2.59 6×6 evidence-release gate
 passed 2,743 tests plus Ruff/mypy in 34.3 seconds.
 
+Version 0.2.60 pins the publication-backed Drake et al. Catalina
+stellar-variability source (47,055 rows, 17 classes, 1,166,660 compressed
+bytes) and adds a five-operation, zero-full-payload verifier with eight offline
+tests. Merged-code verification is next. The later 2,790-TIC metadata
+crossmatch and embedding-aware injection comparison remain gated; independent
+TIC work uses the single-parent six-shard/six-worker pattern. The version
+0.2.60 release gate passed 2,751 default tests plus Ruff/mypy in 25.2 seconds.
+
 ---
 
 ## What Is Complete

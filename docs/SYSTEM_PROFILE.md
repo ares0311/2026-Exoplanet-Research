@@ -143,6 +143,10 @@ For a single large numerical job, allow native libraries to use more threads, co
   representation dependencies installed.
 - Version 0.2.59 evidence-release validation on 2026-07-14 passed 2,743 default
   tests plus Ruff/mypy in 34.3s with the same configuration.
+- Version 0.2.60 validation on 2026-07-14 passed 2,751 default tests plus Ruff
+  and mypy as 8/8 supervised gates in 25.2 seconds using six pytest shards and
+  six xdist workers per shard. This remains the canonical full local release
+  topology.
 
 ### Cache-local representation preprocessing
 
@@ -182,6 +186,9 @@ For a single large numerical job, allow native libraries to use more threads, co
   126,058,496 bytes peak RSS and Astromer2 used 186,204,160 bytes; both emitted
   finite `(1,1,1,256)` embeddings with one ONNX intra/inter-op thread. Version
   0.2.59 records this runtime baseline for later 6×6 extraction sizing.
+
+- The five-request variability-source verifier remains sequential because it
+  is a sub-three-minute dependent metadata gate.
 
 ### AI/ML Training
 

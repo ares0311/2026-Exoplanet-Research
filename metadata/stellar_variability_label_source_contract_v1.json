@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "contract_id": "stellar_variability_label_source_contract_v1",
+  "created_at_utc": "2026-07-14T05:25:00Z",
+  "purpose": "Pin one publication-backed, machine-readable stellar-variability label source before any Phase 3 crossmatch or representation training",
+  "catalog": {
+    "name": "Catalina Surveys periodic variable star catalog",
+    "paper": "Drake et al. 2014, ApJS 213, 9",
+    "paper_doi": "10.1088/0067-0049/213/1/9",
+    "catalog_doi": "10.26093/cds/vizier.22130009",
+    "tap_endpoint": "https://tapvizier.cds.unistra.fr/TAPVizieR/tap/sync",
+    "table": "J/ApJS/213/9/table3",
+    "gzip_url": "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/213/9/table3.dat.gz",
+    "delivery": {
+      "content_length_bytes": 1166660,
+      "etag": "\"11cd44-50202313facc0\"",
+      "last_modified": "Mon, 01 Sep 2014 14:55:23 GMT",
+      "content_type": "application/x-gzip"
+    },
+    "row_count": 47055,
+    "required_columns": {
+      "CRTS": "CHAR(16)",
+      "RAJ2000": "DOUBLE",
+      "DEJ2000": "DOUBLE",
+      "<Vmag>": "DOUBLE",
+      "Per": "DOUBLE",
+      "Vamp": "DOUBLE",
+      "Cl": "SMALLINT",
+      "f_Cl": "CHAR(1)"
+    },
+    "classes": {
+      "1": "EW_contact_binary",
+      "2": "EA_detached_binary",
+      "3": "beta_lyrae_binary",
+      "4": "RRab",
+      "5": "RRc",
+      "6": "RRd",
+      "7": "Blazhko",
+      "8": "RS_CVn",
+      "9": "anomalous_cepheid",
+      "10": "type_II_cepheid",
+      "11": "high_amplitude_delta_scuti",
+      "12": "low_amplitude_delta_scuti",
+      "13": "long_period_variable",
+      "14": "ellipsoidal_variable",
+      "15": "hump_variable",
+      "16": "post_common_envelope_binary",
+      "17": "EA_unknown_period"
+    },
+    "class_counts": {
+      "1": 30745,
+      "2": 4683,
+      "3": 279,
+      "4": 2431,
+      "5": 5466,
+      "6": 502,
+      "7": 73,
+      "8": 1521,
+      "9": 64,
+      "10": 124,
+      "11": 228,
+      "12": 7,
+      "13": 512,
+      "14": 157,
+      "15": 25,
+      "16": 85,
+      "17": 153
+    },
+    "classification_flags": {
+      "a": "period inexact after light-curve inspection",
+      "b": "starspot baseline variation",
+      "c": "candidate ultra-short ellipsoidal variable",
+      "d": "deep eclipsing binary",
+      "e": "unusual light-curve morphology",
+      "f": "blend"
+    },
+    "ground_truth_basis": "Publication-backed classifications derived from the catalog light curves, with inspection flags and comparison against prior surveys; suitable as source labels subject to a future mission-footprint crossmatch and leakage audit.",
+    "known_label_limitations": [
+      "The publication reports a few-percent ambiguity between RRc and contact-binary classifications.",
+      "Catalog class codes include eclipsing-binary subclasses as well as intrinsic stellar variables; the future benchmark must preserve class identity rather than collapse every row into one undifferentiated label.",
+      "Sky-coordinate matching alone is not authorization to use a row; the future crossmatch must define angular, magnitude, duplicate, and target-group safeguards."
+    ]
+  },
+  "rejected_alternatives": [
+    {
+      "source": "Gaia DR3 vari_classifier_result",
+      "reason": "model_outputs_not_ground_truth: best_class_name is automated classifier output rather than a human or publication-review verdict; retain only as possible auxiliary metadata"
+    },
+    {
+      "source": "StarEmbed public benchmark dataset",
+      "reason": "gated_and_storage_exceeds_limit: the Hugging Face dataset requires access approval and is approximately 160 GB, exceeding the 100 GB pre-go-live project ceiling"
+    }
+  ],
+  "next_gate": {
+    "task": "Design and verify a bounded coordinate/identity crossmatch against the 2790-TIC cached TESS representation inventory",
+    "parallel_shape": "Use the single-parent six-shard/six-worker pattern for independent TIC metadata resolution after a small live-service throughput measurement.",
+    "storage_policy": "Remain metadata-only until expected overlap and payload size are measured; the full Catalina gzip itself is only 1166660 bytes but is not downloaded by this contract gate."
+  },
+  "limitations": [
+    "This contract verifies source identity, schema, counts, and bounded delivery metadata only.",
+    "It does not download the full catalog, resolve TIC coordinates, perform a spatial crossmatch, open light curves, extract embeddings, train a model, or change production scoring.",
+    "Crossmatch and training remain unauthorized until separate leakage-safe design and evidence gates pass."
+  ]
+}

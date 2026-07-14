@@ -122,6 +122,18 @@ cache contains 29,960,842 bytes. Artifact SHA-256 is `1cc59ab3…5de5d10`; Run
 Report commit `f8a7207`. Version 0.2.59 records this evidence. Runtime
 integration is closed; variability-label and injection-recovery scientific
 gates remain before broad extraction or training.
+Version 0.2.60 pins the publication-backed 47,055-row, 17-class Drake et al.
+Catalina variable-star table and its 1,166,660-byte CDS delivery metadata in
+`metadata/stellar_variability_label_source_contract_v1.json`.
+`Skills/verify_stellar_variability_label_source.py` checks headers, the live
+VizieR schema, total/class counts, and three sample rows while downloading zero
+full-catalog bytes. Eight offline tests cover success and fail-closed drift.
+Gaia automated labels are rejected as ground truth and the gated approximately
+160 GB StarEmbed corpus remains outside the auth/storage boundary. Merged-code
+verification is next and does not authorize crossmatch or training. The later
+independent-TIC pass must use the single-parent six-shard/six-worker shape after
+a small service-throughput measurement. See
+`docs/STELLAR_VARIABILITY_LABEL_SOURCE_CONTRACT.md`.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
@@ -185,8 +197,8 @@ CI: `.github/workflows/ci.yml`
 | `ml/cnn_scorer.py` | **done** | `test_cnn_scorer.py` (21) — injectable model_fn, no PyTorch required |
 | `background/` module | **done** | `test_background_automation.py` (16) |
 
-**Current test surface:** 140 top-level test files. Version 0.2.59 carries nine offline external-baseline inference-smoke tests; the full 6×6 evidence-release run passed 2,743 default tests plus Ruff/mypy in 34.3s with the optional representation group installed.
-**Skills:** 120 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
+**Current test surface:** 141 top-level test files. Version 0.2.60 adds eight offline stellar-variability label-source contract tests; its full release gate passed 2,751 default tests plus Ruff/mypy as 8/8 supervised gates in 25.2s with six pytest shards and six xdist workers each.
+**Skills:** 121 standalone utility scripts live in `Skills/` (plus the package marker `Skills/__init__.py`). Use `rg --files Skills -g '*.py' | sort` for the authoritative current list, and see `docs/SKILLS_GUIDE.md` for workflow-oriented quick reference.
 
 ---
 
