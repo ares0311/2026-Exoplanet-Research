@@ -349,6 +349,13 @@ gated pending pilot throughput/error/overlap evidence. See
 `docs/TESS_CATALINA_CROSSMATCH.md`.
 The version 0.2.62 release gate passed 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 34.3 seconds under the canonical 6×6 topology.
+Version 0.2.63 explicitly ignores the shared
+`.cache/stellar_variability_labels/` runtime cache. This keeps merged `main`
+clean so the six shard-local Run Reports can safely commit only their own
+ledger files; do not remove that ignore rule or force-add the cached catalog.
+The version 0.2.63 release gate passed the unchanged 2,759 default tests plus
+Ruff/mypy as 8/8 supervised gates in 27.3 seconds under the canonical 6×6
+topology.
 
 This optimized single-parent shard/worker shape is the standing default
 wherever work is safely partitionable: acquisition, processing, tests,
