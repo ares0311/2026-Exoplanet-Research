@@ -134,6 +134,10 @@ remain unauthorized. See
 `docs/REPRESENTATION_VARIABILITY_INJECTION_BENCHMARK.md`.
 The 0.2.70 release gate passed 2,780 default tests plus Ruff/mypy as 8/8
 supervised gates in 33.3 seconds under the canonical 6x6 topology.
+Version 0.2.71 requires the benchmark's label rows to match all six paths and
+hashes pinned by the ASAS-SN aggregate before any FITS/model work. The 6x6
+release gate passed 2,781 tests plus Ruff/mypy in 30.1 seconds; the merged-main
+evidence run remains next and training remains unauthorized.
 The 0.2.63 release gate passed the unchanged 2,759 tests plus Ruff/mypy as 8/8
 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 
