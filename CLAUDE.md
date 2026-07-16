@@ -232,6 +232,17 @@ Run Report commits end at `f0f1645`.
 The version 0.2.72 evidence-release gate passed 2,782 default tests plus
 Ruff/mypy as 8/8 supervised gates in 37.2 seconds under the canonical 6x6
 topology.
+Version 0.2.73 defines the next bounded Phase 3 grouped benchmark over 1,536
+unique cache-local Kepler KICs. It compares frozen Chronos-Bolt tiny and
+Astromer2 probes with the frozen calibrated CNN and a statistical ephemeris
+baseline under predefined grouped train/validation/test separation. Run only
+from clean merged `main` with the reviewed single-parent 6x6 launcher; the
+10.398 GB selected cache inventory is read-only, and aggregate reconciliation
+must delete all temporary embedding arrays. Training, broad extraction,
+promotion, and production scoring remain unauthorized. See
+`docs/GROUPED_EXTERNAL_REPRESENTATION_BENCHMARK.md`.
+The version 0.2.73 release gate passed 2,789 default tests plus Ruff/mypy as
+8/8 supervised gates in 34.1 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.

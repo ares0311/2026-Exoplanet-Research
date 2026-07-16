@@ -409,6 +409,21 @@ the seven exact-path Run Report commits end at `f0f1645`.
 The version 0.2.72 evidence-release gate passed 2,782 default tests plus
 Ruff/mypy as 8/8 supervised gates in 37.2 seconds under the canonical 6x6
 topology.
+Version 0.2.73 freezes the next Phase 3 gate in
+`metadata/grouped_external_representation_contract_v1.json` and
+`Skills/benchmark_grouped_external_representations.py`: 1,536 unique
+cache-local Kepler KICs, balanced predefined train/validation/test labels, exact
+corpus/cache/model identities, identical validation-selected linear probes,
+the frozen `benchmark_cnn_v1`, and a statistical ephemeris baseline. Execute
+only from clean merged `main` through `Skills/run_six_shards.py`: six modulo
+KIC shards, six FITS workers per shard, and one serialized one-thread session
+per frozen external model per shard. The test subset opens once after all
+rules are frozen. Aggregate reconciliation must remove all temporary embedding
+arrays and prove zero downloads or persisted embeddings. Training, broad
+extraction, promotion, and production scoring remain unauthorized. See
+`docs/GROUPED_EXTERNAL_REPRESENTATION_BENCHMARK.md`.
+The version 0.2.73 release gate passed 2,789 default tests plus Ruff/mypy as
+8/8 supervised gates in 34.1 seconds under the canonical 6x6 topology.
 
 The version 0.2.62 release gate passed 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 34.3 seconds under the canonical 6×6 topology.

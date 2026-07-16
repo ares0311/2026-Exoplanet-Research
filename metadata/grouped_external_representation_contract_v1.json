@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "contract_id": "grouped_external_representation_contract_v1",
+  "created_at_utc": "2026-07-16T00:00:00Z",
+  "purpose": "Bounded grouped-holdout comparison of frozen external representations against the frozen production CNN and a statistical ephemeris baseline on real labeled cache-local Kepler signals",
+  "inputs": {
+    "corpus": {
+      "path": "data/processed/t1_1_kepler_master_combined.jsonl",
+      "sha256": "2bd3eb1e928942f3f4059fdf2de037ca2ac32fab05c74d41a24d227f06600eb2"
+    },
+    "model_source_contract": {
+      "path": "metadata/representation_baseline_source_contract_v1.json",
+      "sha256": "38793347a4f404f62aa46a086ad20cb358046a365393333710dd83fca93a3730"
+    },
+    "inference_smoke_evidence": {
+      "path": "artifacts/manifests/representation_baseline_inference_smoke_v1.json",
+      "sha256": "1cc59ab32e3a8a57e7d966c7cb9b22af04185c0c45245547c853fae7e5de5d10"
+    },
+    "variability_injection_evidence": {
+      "path": "artifacts/manifests/representation_variability_injection_aggregate_v1.json",
+      "sha256": "93ae6fb818054947ecfd485b3e74ec5cef1f88d1d5e18fd232e5aebd8303f59f"
+    },
+    "cnn_checkpoint": {
+      "path": "models/cnn/benchmark_cnn_v1/best.pt",
+      "sha256": "f29e6891c255289fa1e2eddad1fb6ca131c063cf11c24b8113e0e29d049441c5"
+    },
+    "cnn_calibration": {
+      "path": "models/cnn/benchmark_cnn_v1/calibration.json",
+      "sha256": "357bab520edc183ea5917dee7561525a55c5f0f71ca399ad4acbf501ecc96c0d"
+    },
+    "cnn_config": {
+      "path": "models/cnn/benchmark_cnn_v1/config.json",
+      "sha256": "6a7593a7133eb6d02845d259ef6a5420249e8588644cbecd8bf901ba198abd2e"
+    }
+  },
+  "population": {
+    "mission": "Kepler",
+    "selection_seed": "external-representation-v1",
+    "selection_rule": "Within the corpus's predefined train, val, and test splits, retain the lexically lowest source_row_id per KIC, then select the lowest SHA-256 of selection_seed plus group_key independently within each split and label.",
+    "rows_per_label": {
+      "train": 512,
+      "val": 128,
+      "test": 128
+    },
+    "required_unique_kics": 1536,
+    "selection_sha256": "4b24511355532aeeeaa634273d2b6421fbe37fdd5217791bce45c44bfc741b76",
+    "cache_inventory": {
+      "root": "~/.lightkurve/cache/mastDownload/Kepler",
+      "files": 24036,
+      "bytes": 10398406656,
+      "sha256": "39bfdbc8ab2f62aa74539f6ee6b135a321885382e53c1be73c25a5aaff794648"
+    }
+  },
+  "preprocessing": {
+    "source_columns": [
+      "TIME",
+      "PDCSAP_FLUX",
+      "QUALITY"
+    ],
+    "cadence_filter": "finite TIME and PDCSAP_FLUX, positive PDCSAP_FLUX, QUALITY equals zero",
+    "folding": "Committed period_days and epoch_bjd; phase range [-0.5, 0.5)",
+    "binning": "Median physical flux per phase bin with circular interpolation of missing bins",
+    "magnitude": "-2.5 log10(binned_flux / median_unbinned_flux)",
+    "chronos_phase_bins": 2048,
+    "astromer_phase_bins": 200,
+    "cnn_bins": 201,
+    "minimum_filled_fraction": 0.95,
+    "classical_features": [
+      "log1p_period_days",
+      "log1p_duration_hours",
+      "mean_relative_magnitude",
+      "std_relative_magnitude",
+      "p01_relative_magnitude",
+      "p05_relative_magnitude",
+      "minimum_relative_magnitude"
+    ]
+  },
+  "probe": {
+    "kind": "deterministic_numpy_l2_logistic",
+    "training_split": "train",
+    "selection_split": "val",
+    "test_access": "one versioned opening after all feature, probe, threshold, and decision rules are frozen",
+    "epochs": 200,
+    "learning_rate": 0.05,
+    "weight_decay": 0.001,
+    "patience": 20,
+    "threshold_rule": "Maximum validation F1 with ties broken toward the higher threshold",
+    "top_k": 100,
+    "decision_metrics": [
+      "roc_auc",
+      "average_precision",
+      "top_k_positive_fraction"
+    ],
+    "required_comparators": [
+      "benchmark_cnn_v1",
+      "statistical_ephemeris_baseline"
+    ],
+    "minimum_absolute_improvement": 0.01,
+    "external_adds_value_rule": "At least one frozen external representation must exceed the better of both required comparators by at least 0.01 on at least one precommitted decision metric."
+  },
+  "parallel_shape": {
+    "supervisor": "Skills/run_six_shards.py",
+    "process_shards": 6,
+    "partition": "target_id modulo 6",
+    "fits_workers_per_shard": 6,
+    "model_sessions_per_shard": 2,
+    "model_inference": "serialized within each shard with one ONNX thread per session",
+    "expected_new_gb": 0.05
+  },
+  "execution_gate": {
+    "required_rows": 1536,
+    "required_split_rows": {
+      "train": 1024,
+      "val": 256,
+      "test": 256
+    },
+    "required_split_label_rows": {
+      "train": {
+        "0": 512,
+        "1": 512
+      },
+      "val": {
+        "0": 128,
+        "1": 128
+      },
+      "test": {
+        "0": 128,
+        "1": 128
+      }
+    },
+    "required_failures": 0,
+    "required_downloaded_bytes": 0,
+    "required_persisted_embeddings": 0,
+    "required_test_open_count": 1
+  },
+  "storage": {
+    "raw_cache_mode": "read_only",
+    "temporary_embeddings": "Compressed shard-local arrays under ignored logs/; deleted only after successful aggregate evidence is written.",
+    "persistent_output": "Small JSON shard summaries, aggregate evidence, and Run Reports only.",
+    "downloads_authorized": false
+  },
+  "limitations": [
+    "The balanced frozen subset is a capability benchmark, not a deployment-prevalence sample; its false-discovery rate is sample-conditional.",
+    "Periods and epochs come from the labeled DR25 corpus, so this gate measures representation quality after candidate ephemerides exist rather than blind search performance.",
+    "One signal per KIC prevents group leakage but omits multi-signal system behavior.",
+    "A PASS is descriptive scientific evidence only and does not authorize model training, broad embedding extraction, checkpoint promotion, or production scoring changes."
+  ],
+  "broad_extraction_authorized": false,
+  "training_authorized": false,
+  "production_change_authorized": false
+}

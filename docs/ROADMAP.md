@@ -231,6 +231,16 @@ by itself satisfy a master-guide evidence requirement.
    The version 0.2.72 evidence-release gate passed 2,782 default tests plus
    Ruff/mypy as 8/8 supervised gates in 37.2 seconds under the canonical 6x6
    topology.
+   Version 0.2.73 defines that next grouped gate over 1,536 unique cache-local
+   Kepler KICs. It freezes balanced predefined train/validation/test subsets,
+   exact cache and model identities, identical validation-selected linear
+   probes, the frozen CNN and statistical comparators, and a one-time test
+   opening. An external representation must beat the better required comparator
+   by at least 0.01 on a precommitted ranking metric. Execute only from merged
+   clean `main` through the reviewed cache-only 6x6 supervisor; training, broad
+   extraction, promotion, and production changes remain unauthorized.
+   The version 0.2.73 release gate passed 2,789 default tests plus Ruff/mypy as
+   8/8 supervised gates in 34.1 seconds under the canonical 6x6 topology.
    The 0.2.60 release passed 2,751 default tests plus Ruff/mypy as
    8/8 supervised gates under the 6×6 topology in 25.2 seconds.
 

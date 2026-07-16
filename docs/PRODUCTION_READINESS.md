@@ -4,11 +4,12 @@ Last reviewed: 2026-07-16 (formal production-ensemble acceptance remains PASS: t
 catalog ephemeris for pi Mensae c was recovered within 0.005% with ensemble
 FPP 0.4405, while the TOI-146.01 false-positive control produced no signal.
 No Tier 1 gaps remain open; the bounded Phase 3 representation variability/
-injection evidence gate also passed.)
+injection evidence gate passed and the separately contracted grouped external-
+representation execution gate is pending merged-main evidence.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
-Test baseline: 2,782 default tests passing; 2 `integration_live` tests excluded by
-the configured marker expression (2026-07-16; 6×6 gate: 37.2s)
+Test baseline: 2,789 default tests passing; 2 `integration_live` tests excluded by
+the configured marker expression (2026-07-16; 6×6 gate: 34.1s)
 
 ---
 
@@ -30,7 +31,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.72 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.73 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -597,6 +598,17 @@ scoring remain unauthorized.
 The version 0.2.72 evidence-release gate passed 2,782 default tests plus
 Ruff/mypy as 8/8 supervised gates in 37.2 seconds under the canonical 6x6
 topology.
+Version 0.2.73 freezes the next production-advancing Phase 3 gate: a bounded,
+cache-only grouped comparison on 1,536 unique Kepler KICs. Exact corpus, cache,
+model, calibration, and prerequisite-evidence hashes fail closed. Identical
+linear probes use training rows and validation-only selection before the frozen
+test subset opens once against both `benchmark_cnn_v1` and a statistical
+ephemeris baseline. The reviewed six-shard/six-worker run writes only small
+summaries and temporary arrays that aggregate reconciliation must delete. The
+merged-main evidence run is pending; no download, broad extraction, training,
+promotion, or production scoring change is authorized.
+The version 0.2.73 release gate passed 2,789 default tests plus Ruff/mypy as
+8/8 supervised gates in 34.1 seconds under the canonical 6x6 topology.
 The version 0.2.63 release gate passed the unchanged 2,759 default tests plus
 Ruff/mypy as 8/8 supervised gates in 27.3 seconds under the canonical 6×6
 topology.
