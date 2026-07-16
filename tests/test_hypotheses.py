@@ -410,6 +410,26 @@ class TestTransitTimingVariationWiring:
         assert log_score_instrumental(null_ttv) == pytest.approx(log_score_instrumental(base))
 
 
+class TestMissingTransitFractionWiring:
+    def test_high_missing_fraction_lowers_planet_score(self) -> None:
+        base = CandidateFeatures()
+        mostly_missing = CandidateFeatures(missing_transit_fraction_score=1.0)
+        assert log_score_planet(mostly_missing) < log_score_planet(base)
+
+    def test_high_missing_fraction_raises_instrumental_score(self) -> None:
+        base = CandidateFeatures()
+        mostly_missing = CandidateFeatures(missing_transit_fraction_score=1.0)
+        assert log_score_instrumental(mostly_missing) > log_score_instrumental(base)
+
+    def test_none_missing_fraction_is_neutral(self) -> None:
+        base = CandidateFeatures()
+        null_missing = CandidateFeatures(missing_transit_fraction_score=None)
+        assert log_score_planet(null_missing) == pytest.approx(log_score_planet(base))
+        assert log_score_instrumental(null_missing) == pytest.approx(
+            log_score_instrumental(base)
+        )
+
+
 # ---------------------------------------------------------------------------
 # New feature wiring tests (Milestones 12a-12e)
 # ---------------------------------------------------------------------------

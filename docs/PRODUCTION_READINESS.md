@@ -9,8 +9,8 @@ was `no_external_added_value`. Phase 4 individual-transit diagnostics are now
 the active bounded improvement.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
-Test baseline: 2,801 default tests passing; 2 `integration_live` tests excluded by
-the configured marker expression (2026-07-16; 6×6 gate: 35.3s)
+Test baseline: 2,813 default tests passing; 2 `integration_live` tests excluded by
+the configured marker expression (2026-07-16; 6×6 gate: 28.2s)
 
 ---
 
@@ -32,7 +32,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.77 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.78 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -651,6 +651,19 @@ transit while rejecting flat noise. This advances Phase 4 individual anomaly
 triage without downloads, training, or storage impact.
 The version 0.2.77 release gate passed 2,801 default tests plus Ruff/mypy as
 8/8 supervised gates in 35.3 seconds under the canonical 6x6 topology.
+Version 0.2.78 adds `missing_transit_fraction`, the diagnostic named as the
+next bounded increment in 0.2.77's roadmap note. It reuses the existing
+per-window resolution test (local sideband baseline, twice-noise half-depth
+gate) already used for duration/midpoint measurement to count, among
+predicted windows with sufficient cadence coverage, the fraction that never
+resolved a significant dip — evidence against genuine periodicity distinct
+from the pre-existing data-gap-fraction diagnostic (absent coverage, not
+unresolved coverage). Wired into `log_score_planet()` (−0.70) and
+`log_score_instrumental()` (+0.60); `None` unless at least two windows have
+coverage to test. See `docs/SCORING_MODEL.md §23`. Depth/asymmetry and
+extra-event ranking remain future bounded increments of the same item.
+The version 0.2.78 release gate passed 2,813 default tests plus Ruff/mypy as
+8/8 supervised gates in 28.2 seconds under the canonical 6x6 topology.
 The version 0.2.63 release gate passed the unchanged 2,759 default tests plus
 Ruff/mypy as 8/8 supervised gates in 27.3 seconds under the canonical 6×6
 topology.

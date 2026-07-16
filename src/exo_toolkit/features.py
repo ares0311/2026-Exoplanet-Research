@@ -33,6 +33,7 @@ class RawDiagnostics:
     individual_durations: tuple[float, ...] | None = None
     individual_duration_errors: tuple[float, ...] | None = None
     individual_transit_midpoints: tuple[float, ...] | None = None  # BJD
+    missing_transit_fraction: float | None = None  # covered windows with no resolved event
 
     # Per-sector measurements
     sector_depths: tuple[float, ...] | None = None        # per-sector mean transit depths (ppm)
@@ -188,6 +189,19 @@ def transit_timing_variation_score(
     oc_minutes = (arr - predicted) * 1440.0  # days → minutes
     rms = float(np.sqrt(np.mean(oc_minutes**2)))
     return _clip(rms / rms_threshold_minutes)
+
+
+def missing_transit_fraction_score(missing_transit_fraction: float) -> float:
+    """
+    Fraction of data-covered expected transit windows with no resolved event.
+
+    A real periodic transit should resolve at every window with enough
+    coverage to try; a high fraction of unresolved-despite-covered windows
+    argues against genuine periodicity even though the direct evidence
+    (missing data) has been ruled out. Already bounded to [0, 1] by
+    construction, so this is an identity clip.
+    """
+    return _clip(missing_transit_fraction)
 
 
 def out_of_transit_scatter_score(
@@ -721,6 +735,10 @@ def extract_features(
             d.individual_transit_midpoints, signal.period_days, signal.epoch_bjd
         )
 
+    missing_s: float | None = None
+    if d.missing_transit_fraction is not None:
+        missing_s = missing_transit_fraction_score(d.missing_transit_fraction)
+
     # --- transit morphology ---
     shape_s: float | None = None
     v_s: float | None = None
@@ -890,6 +908,7 @@ def extract_features(
         transit_shape_score=shape_s,
         data_gap_overlap_score=dg_s,
         transit_timing_variation_score=ttv_s,
+        missing_transit_fraction_score=missing_s,
         out_of_transit_scatter_score=oot_s,
         multi_sector_depth_consistency_score=ms_depth_s,
         stellar_density_consistency_score=density_s,

@@ -1078,3 +1078,50 @@ window after a local sideband baseline and twice-noise half-depth gate. It also
 records the half-depth cadence span as the individual duration and one cadence
 as its resolution. Both timing and duration sequences remain unavailable unless
 at least two events resolve.
+
+---
+
+## §23 Missing Transit Fraction Score
+
+**Function**: `missing_transit_fraction_score(missing_transit_fraction)`
+
+Measures the fraction of expected transit windows that had enough cadence
+coverage to test for a dip but never resolved one, using the same per-window
+resolution test as §22 (local sideband baseline, twice-noise half-depth gate):
+
+$$\phi_\mathrm{missing} = \mathrm{clip}\!\left(\frac{N_\mathrm{covered} - N_\mathrm{resolved}}{N_\mathrm{covered}},\; 0,\; 1\right)$$
+
+The ratio is already bounded to $[0, 1]$ by construction, so the score is an
+identity clip of the input.
+
+**Interpretation**:
+- $\phi_\mathrm{missing} \approx 0$: nearly every window with enough data to
+  check shows a resolved dip — consistent with a genuine periodic signal.
+- $\phi_\mathrm{missing} \approx 1$: data covers most predicted windows but
+  the signal fails to resolve at most of them — evidence against genuine
+  periodicity even though the direct "no data" explanation (§ data gap
+  fraction) has been ruled out.
+
+**Hypothesis weights**:
+
+| Hypothesis | Weight | Direction |
+|---|---|---|
+| `planet_candidate` | 0.70 | Negative (high missing-fraction penalises planet hypothesis) |
+| `instrumental_artifact` | 0.60 | Positive (high missing-fraction supports instrumental hypothesis) |
+
+**Returns**: `None` when fewer than two predicted windows have at least five
+cadences of coverage — one window cannot distinguish periodicity from bad
+luck.
+
+**Implementation**: `src/exo_toolkit/features.py` — `missing_transit_fraction_score()`
+
+Input field: `RawDiagnostics.missing_transit_fraction` (fraction in `[0, 1]`).
+
+Production measurement (version 0.2.78): `vet_signal()`'s per-event shape
+measurement (§22) counts, for every predicted transit number with at least
+five cadences in its search window, whether that window resolved a
+significant dip. `missing_transit_fraction` is the unresolved share of those
+data-covered windows. This shares the exact resolution test already used for
+duration/midpoint measurement rather than introducing a second detection
+threshold, so the two diagnostics cannot silently disagree about what counts
+as "resolved".
