@@ -233,6 +233,12 @@ workers.
   remain under ignored `logs/` and aggregate reconciliation deletes them.
 - Version 0.2.73 validation passed 2,789 default tests plus Ruff/mypy as 8/8
   supervised gates in 34.1 seconds under the canonical 6x6 test topology.
+- Version 0.2.74's active grouped-benchmark v2 reads Kepler `SAP_QUALITY` and
+  may skip only the exact hash-pinned 111-file / 7,274,496-byte known truncated
+  set. Every affected KIC must retain readable data; all other FITS failures
+  remain fatal.
+- Version 0.2.74 validation passed 2,790 default tests plus Ruff/mypy as 8/8
+  supervised gates in 36.3 seconds under the canonical 6x6 test topology.
 - Version 0.2.63 validation passed the unchanged 2,759 tests plus Ruff/mypy as
   8/8 supervised gates in 27.3 seconds with the canonical 6×6 test topology.
 

@@ -155,6 +155,14 @@ array. Merged-main execution is next; all training and production authorization
 flags remain false.
 The 0.2.73 release gate passed 2,789 default tests plus Ruff/mypy as 8/8
 supervised gates in 34.1 seconds under the canonical 6x6 topology.
+The first merged v1 benchmark launch failed closed before processing because
+Kepler files expose `SAP_QUALITY`, not v1's TESS-style `QUALITY`. No benchmark
+data was downloaded or persisted. Version 0.2.74 preserves v1 and activates
+immutable v2 with the corrected column and a hash-pinned exception for exactly
+111 known truncated cache products. All other FITS errors remain fatal; the
+merged v2 evidence run is pending.
+The 0.2.74 release gate passed 2,790 default tests plus Ruff/mypy as 8/8
+supervised gates in 36.3 seconds under the canonical 6x6 topology.
 The 0.2.63 release gate passed the unchanged 2,759 tests plus Ruff/mypy as 8/8
 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 

@@ -7,7 +7,9 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from astropy.io import fits
 from Skills.benchmark_grouped_external_representations import (
+    _read_phase_flux,
     aggregate_shards,
     choose_threshold,
     evaluate_scores,
@@ -27,9 +29,20 @@ def _canonical_sha256(rows: list[dict[str, object]]) -> str:
 
 
 def test_merged_contract_is_bounded_grouped_and_training_disabled() -> None:
-    contract = load_contract(Path("metadata/grouped_external_representation_contract_v1.json"))
+    contract = load_contract(Path("metadata/grouped_external_representation_contract_v2.json"))
     assert contract["population"]["required_unique_kics"] == 1536
     assert contract["population"]["cache_inventory"]["bytes"] == 10_398_406_656
+    assert contract["population"]["cache_inventory"]["known_unreadable_products"] == {
+        "reason": (
+            "Known 65,536-byte truncated cache products have no readable binary table. "
+            "Only this exact fingerprinted set may be skipped; every affected KIC must "
+            "retain at least one readable product."
+        ),
+        "exact_size_bytes": 65_536,
+        "files": 111,
+        "bytes": 7_274_496,
+        "sha256": "c9e1556e023aa98d694f027dc8293c70292c78d6fcd7397feab98c0595402245",
+    }
     assert contract["parallel_shape"]["process_shards"] == 6
     assert contract["parallel_shape"]["fits_workers_per_shard"] == 6
     assert contract["probe"]["minimum_absolute_improvement"] == pytest.approx(0.01)
@@ -119,6 +132,30 @@ def test_phase_binning_produces_finite_relative_magnitude() -> None:
     assert float(np.max(magnitude)) > 0.0
 
 
+def test_kepler_reader_uses_sap_quality_and_skips_only_pinned_path(tmp_path: Path) -> None:
+    valid = tmp_path / "valid.fits"
+    skipped = tmp_path / "known-truncated.fits"
+    table = fits.BinTableHDU.from_columns(
+        [
+            fits.Column(name="TIME", format="D", array=np.array([1.0, 2.0, 3.0])),
+            fits.Column(
+                name="PDCSAP_FLUX", format="E", array=np.array([1.0, 0.5, 1.0])
+            ),
+            fits.Column(name="SAP_QUALITY", format="J", array=np.array([0, 1, 0])),
+        ]
+    )
+    table.header["BJDREFI"] = 2_454_833
+    fits.HDUList([fits.PrimaryHDU(), table]).writeto(valid)
+    phase, flux, skipped_count = _read_phase_flux(
+        [skipped, valid],
+        {"target_id": 1, "period_days": 10.0, "epoch_bjd": 2_454_833.0},
+        {skipped},
+    )
+    assert skipped_count == 1
+    assert phase.shape == flux.shape == (2,)
+    assert np.all(flux == 1.0)
+
+
 def test_probe_threshold_and_metrics_use_validation_only() -> None:
     train_x = np.array([[-2.0], [-1.0], [1.0], [2.0]])
     train_y = np.array([0.0, 0.0, 1.0, 1.0])
@@ -150,7 +187,9 @@ def test_aggregate_reconciles_and_removes_temporary_embeddings(tmp_path: Path) -
     contract = {
         "schema_version": 1,
         "inputs": {},
-        "population": {},
+        "population": {
+            "cache_inventory": {"known_unreadable_products": {"files": 0}}
+        },
         "preprocessing": {},
         "probe": {
             "epochs": 30,
@@ -204,6 +243,7 @@ def test_aggregate_reconciles_and_removes_temporary_embeddings(tmp_path: Path) -
                     "contract_sha256": hashlib.sha256(contract_path.read_bytes()).hexdigest(),
                     "temp_sha256": digest,
                     "downloaded_bytes": 0,
+                    "known_unreadable_cache_files_skipped": 0,
                     "production_change_authorized": False,
                 }
             )

@@ -241,6 +241,14 @@ by itself satisfy a master-guide evidence requirement.
    extraction, promotion, and production changes remain unauthorized.
    The version 0.2.73 release gate passed 2,789 default tests plus Ruff/mypy as
    8/8 supervised gates in 34.1 seconds under the canonical 6x6 topology.
+   The first merged v1 execution failed closed before processing because
+   Kepler uses `SAP_QUALITY`, not v1's TESS-style `QUALITY`; zero benchmark data
+   was downloaded or persisted. Version 0.2.74 preserves v1 and activates
+   immutable v2 with the corrected schema plus an exact fingerprint of 111
+   known truncated products. Only those paths may be skipped, every KIC must
+   retain readable data, and every other FITS/schema error remains fatal.
+   The version 0.2.74 release gate passed 2,790 default tests plus Ruff/mypy as
+   8/8 supervised gates in 36.3 seconds under the canonical 6x6 topology.
    The 0.2.60 release passed 2,751 default tests plus Ruff/mypy as
    8/8 supervised gates under the 6×6 topology in 25.2 seconds.
 

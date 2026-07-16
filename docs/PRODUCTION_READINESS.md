@@ -8,8 +8,8 @@ injection evidence gate passed and the separately contracted grouped external-
 representation execution gate is pending merged-main evidence.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
-Test baseline: 2,789 default tests passing; 2 `integration_live` tests excluded by
-the configured marker expression (2026-07-16; 6×6 gate: 34.1s)
+Test baseline: 2,790 default tests passing; 2 `integration_live` tests excluded by
+the configured marker expression (2026-07-16; 6×6 gate: 36.3s)
 
 ---
 
@@ -31,7 +31,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.73 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.74 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -609,6 +609,15 @@ merged-main evidence run is pending; no download, broad extraction, training,
 promotion, or production scoring change is authorized.
 The version 0.2.73 release gate passed 2,789 default tests plus Ruff/mypy as
 8/8 supervised gates in 34.1 seconds under the canonical 6x6 topology.
+The first merged v1 run failed closed before processing because Kepler products
+use `SAP_QUALITY`, not the TESS-style `QUALITY` named by v1. It downloaded and
+persisted no benchmark data. Version 0.2.74 preserves v1 as failed-schema
+evidence and activates immutable v2. V2 pins the corrected column and the exact
+111 known 65,536-byte truncated products; only that fingerprinted set may be
+skipped, every affected KIC must retain readable data, and all other FITS or
+schema failures remain fatal.
+The version 0.2.74 release gate passed 2,790 default tests plus Ruff/mypy as
+8/8 supervised gates in 36.3 seconds under the canonical 6x6 topology.
 The version 0.2.63 release gate passed the unchanged 2,759 default tests plus
 Ruff/mypy as 8/8 supervised gates in 27.3 seconds under the canonical 6×6
 topology.

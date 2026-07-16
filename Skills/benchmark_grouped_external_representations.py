@@ -45,7 +45,7 @@ from exo_toolkit.ml.cnn_scorer import CnnScorer  # noqa: E402
 from Skills.run_report import RunReport, report_path_for, run_and_commit_report  # noqa: E402
 from Skills.train_cnn import _compute_auc  # noqa: E402
 
-DEFAULT_CONTRACT = REPO_ROOT / "metadata/grouped_external_representation_contract_v1.json"
+DEFAULT_CONTRACT = REPO_ROOT / "metadata/grouped_external_representation_contract_v2.json"
 DEFAULT_CACHE_ROOT = Path.home() / ".lightkurve/cache/mastDownload/Kepler"
 DEFAULT_MODEL_CACHE = REPO_ROOT / ".cache/representation_models"
 DEFAULT_TEMP_ROOT = REPO_ROOT / "logs/grouped_external_representation_benchmark_v1"
@@ -67,6 +67,7 @@ class PreparedRow:
     split: str
     label: int
     target_id: int
+    skipped_cache_files: int
     chronos_magnitude: np.ndarray
     astromer_phase: np.ndarray
     astromer_magnitude: np.ndarray
@@ -222,7 +223,7 @@ def validate_selected_inventory(
     cache: Mapping[int, Sequence[Path]],
     cache_root: Path,
     contract: Mapping[str, Any],
-) -> None:
+) -> set[Path]:
     """Validate the exact selected cache path/size inventory fingerprint."""
     root = cache_root.expanduser().resolve(strict=True)
     records: list[dict[str, Any]] = []
@@ -246,6 +247,40 @@ def validate_selected_inventory(
     fingerprint = _canonical_sha256(records)
     if fingerprint != inventory["sha256"]:
         raise ValueError(f"selected cache inventory fingerprint changed: {fingerprint}")
+    unreadable = inventory["known_unreadable_products"]
+    exact_size = int(unreadable["exact_size_bytes"])
+    unreadable_paths = {
+        path
+        for row in selected
+        for path in cache[int(row["target_id"])]
+        if path.stat().st_size == exact_size
+    }
+    unreadable_records = [
+        {
+            "relative_path": str(path.relative_to(root)),
+            "size_bytes": path.stat().st_size,
+        }
+        for path in sorted(unreadable_paths, key=lambda value: str(value.relative_to(root)))
+    ]
+    if len(unreadable_records) != int(unreadable["files"]):
+        raise ValueError(f"known unreadable cache file count changed: {len(unreadable_records)}")
+    unreadable_bytes = sum(int(record["size_bytes"]) for record in unreadable_records)
+    if unreadable_bytes != int(unreadable["bytes"]):
+        raise ValueError(f"known unreadable cache byte count changed: {unreadable_bytes}")
+    unreadable_fingerprint = _canonical_sha256(unreadable_records)
+    if unreadable_fingerprint != unreadable["sha256"]:
+        raise ValueError(
+            f"known unreadable cache inventory changed: {unreadable_fingerprint}"
+        )
+    selected_targets = {int(row["target_id"]) for row in selected}
+    unusable_targets = [
+        target_id
+        for target_id in selected_targets
+        if all(path in unreadable_paths for path in cache[target_id])
+    ]
+    if unusable_targets:
+        raise ValueError(f"selected targets have no readable cache product: {unusable_targets[:3]}")
+    return unreadable_paths
 
 
 def select_shard(
@@ -262,15 +297,21 @@ def _shard_path(path: Path, shard_index: int, shard_count: int) -> Path:
 
 
 def _read_phase_flux(
-    paths: Sequence[Path], row: Mapping[str, Any]
-) -> tuple[np.ndarray, np.ndarray]:
+    paths: Sequence[Path],
+    row: Mapping[str, Any],
+    known_unreadable_paths: set[Path],
+) -> tuple[np.ndarray, np.ndarray, int]:
     times_parts: list[np.ndarray] = []
     flux_parts: list[np.ndarray] = []
+    skipped = 0
     for path in paths:
+        if path in known_unreadable_paths:
+            skipped += 1
+            continue
         with fits.open(path, mode="readonly", memmap=True) as hdul:
             table = hdul[1].data
             names = set(table.names or ())
-            required = {"TIME", "PDCSAP_FLUX", "QUALITY"}
+            required = {"TIME", "PDCSAP_FLUX", "SAP_QUALITY"}
             if not required.issubset(names):
                 raise ValueError(f"{path.name} missing FITS columns: {sorted(required - names)}")
             header = hdul[1].header
@@ -281,7 +322,7 @@ def _read_phase_flux(
                 raise ValueError(f"{path.name} has no BJD reference")
             time_values = np.asarray(table["TIME"], dtype=np.float64) + float(ref_i) + float(ref_f)
             flux_values = np.asarray(table["PDCSAP_FLUX"], dtype=np.float64)
-            quality = np.asarray(table["QUALITY"])
+            quality = np.asarray(table["SAP_QUALITY"])
         keep = (
             np.isfinite(time_values)
             & np.isfinite(flux_values)
@@ -301,7 +342,7 @@ def _read_phase_flux(
         raise ValueError(f"KIC {row['target_id']} has invalid ephemeris")
     phase = ((times - epoch + 0.5 * period) % period) / period - 0.5
     order = np.argsort(phase, kind="stable")
-    return phase[order], flux[order]
+    return phase[order], flux[order], skipped
 
 
 def phase_bin_relative_magnitude(
@@ -336,8 +377,9 @@ def _prepare_row(
     row: Mapping[str, Any],
     paths: Sequence[Path],
     contract: Mapping[str, Any],
+    known_unreadable_paths: set[Path],
 ) -> PreparedRow:
-    phase, flux = _read_phase_flux(paths, row)
+    phase, flux, skipped = _read_phase_flux(paths, row, known_unreadable_paths)
     preprocessing = contract["preprocessing"]
     minimum = float(preprocessing["minimum_filled_fraction"])
     chronos_phase, chronos_mag = phase_bin_relative_magnitude(
@@ -375,6 +417,7 @@ def _prepare_row(
         split=str(row["split"]),
         label=int(row["label"]),
         target_id=int(row["target_id"]),
+        skipped_cache_files=skipped,
         chronos_magnitude=chronos_mag,
         astromer_phase=astromer_phase,
         astromer_magnitude=astromer_mag,
@@ -459,7 +502,9 @@ def run_shard(
     paths = validate_inputs(contract)
     cache = discover_cache(cache_root)
     selected = select_population(paths["corpus"], set(cache), contract)
-    validate_selected_inventory(selected, cache, cache_root, contract)
+    known_unreadable_paths = validate_selected_inventory(
+        selected, cache, cache_root, contract
+    )
     shard_rows = select_shard(selected, shard_index, shard_count)
     if not shard_rows:
         raise ValueError(f"shard {shard_index}/{shard_count} has no selected rows")
@@ -481,7 +526,13 @@ def run_shard(
     prepared: list[PreparedRow] = []
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {
-            pool.submit(_prepare_row, row, cache[int(row["target_id"])], contract): row
+            pool.submit(
+                _prepare_row,
+                row,
+                cache[int(row["target_id"])],
+                contract,
+                known_unreadable_paths,
+            ): row
             for row in shard_rows
         }
         for completed, future in enumerate(as_completed(futures), 1):
@@ -551,6 +602,9 @@ def run_shard(
         "temp_bytes": temp_path.stat().st_size,
         "elapsed_seconds": elapsed,
         "downloaded_bytes": 0,
+        "known_unreadable_cache_files_skipped": sum(
+            row.skipped_cache_files for row in prepared
+        ),
         "production_change_authorized": False,
     }
     summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -743,6 +797,7 @@ def aggregate_shards(
             or int(summary.get("shard_count", -1)) != shard_count
             or summary.get("contract_sha256") != _sha256(contract_path)
             or int(summary.get("downloaded_bytes", -1)) != 0
+            or int(summary.get("known_unreadable_cache_files_skipped", -1)) < 0
             or summary.get("production_change_authorized") is not False
         ):
             raise ValueError(f"invalid shard summary: {summary_i}")
@@ -772,6 +827,16 @@ def aggregate_shards(
         for label in (0, 1):
             if label_counts[label] != int(expected_labels[str(label)]):
                 raise ValueError(f"aggregate {name} label={label} count changed")
+    skipped_cache_files = sum(
+        int(summary["known_unreadable_cache_files_skipped"]) for summary in summaries
+    )
+    expected_skipped = int(
+        contract["population"]["cache_inventory"]["known_unreadable_products"]["files"]
+    )
+    if skipped_cache_files != expected_skipped:
+        raise ValueError(
+            f"known unreadable cache skip count changed: {skipped_cache_files}"
+        )
     top_k = int(contract["probe"]["top_k"])
     results: dict[str, Any] = {}
     for name, key in (
@@ -849,6 +914,7 @@ def aggregate_shards(
         "minimum_absolute_improvement": minimum_improvement,
         "shard_summaries": summaries,
         "downloaded_bytes": 0,
+        "known_unreadable_cache_files_skipped": skipped_cache_files,
         "temporary_embedding_files_removed": len(temp_paths),
         "persisted_embeddings": 0,
         "test_opened_once": True,

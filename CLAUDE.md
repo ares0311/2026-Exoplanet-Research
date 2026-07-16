@@ -243,6 +243,14 @@ promotion, and production scoring remain unauthorized. See
 `docs/GROUPED_EXTERNAL_REPRESENTATION_BENCHMARK.md`.
 The version 0.2.73 release gate passed 2,789 default tests plus Ruff/mypy as
 8/8 supervised gates in 34.1 seconds under the canonical 6x6 topology.
+The first merged execution failed closed before processing because v1 requested
+TESS-style `QUALITY` from Kepler products. Version 0.2.74 preserves v1 as
+failed evidence and activates immutable v2 with the correct `SAP_QUALITY`
+column plus an exact fingerprint of the 111 known 65,536-byte truncated cache
+products. Only those paths may be skipped; all other FITS/schema errors remain
+fatal and every selected KIC must retain readable data.
+The version 0.2.74 release gate passed 2,790 default tests plus Ruff/mypy as
+8/8 supervised gates in 36.3 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
