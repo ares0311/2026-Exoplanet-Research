@@ -306,6 +306,26 @@ unless at least two events resolve. See `docs/SCORING_MODEL.md §24`.
 Extra-event ranking remains the last named increment of this roadmap item.
 The version 0.2.79 release gate passed 2,828 default tests plus Ruff/mypy as
 8/8 supervised gates in 25.2 seconds under the canonical 6x6 topology.
+Version 0.2.80 adds verifiable-agent-reliability controls, not a scientific
+Phase deliverable: `Skills/check_incomplete_implementations.py` (AST-based
+stub/`NotImplementedError`/TODO-FIXME scanner over `src/`+`Skills/`, with an
+automatic exemption for `@abstractmethod`/`Protocol` and a narrow documented
+`# allow-stub:` escape hatch) and `Skills/check_directive_integrity.py`
+(verifies AGENTS.md is intact and CLAUDE.md still contains the literal
+pointer phrase that is Claude Code's only path to AGENTS.md, since Codex
+reads AGENTS.md natively while Claude Code does not). Both are wired into
+`Skills/run_quality_gates.py` as two new static gates (ten total), which now
+also records `git_head_sha`/`git_dirty` in its summary JSON so a passing
+result can be checked for staleness against the current tree. AGENTS.md
+gains "Fail Loudly" / "No Fake Completion" / "No Unsupported Completion
+Claims" sections. Both new checkers ship with fixture-based negative-control
+tests (known-good/known-bad/malformed cases, never touching real repo files)
+that ran and passed as part of this release gate — see
+`docs/RELIABILITY_CONTROLS.md` for the full design/verification report.
+The version 0.2.80 release gate passed 2,866 default tests plus Ruff/mypy,
+the two new static gates, and the directive-integrity/incomplete-
+implementation checks as 10/10 supervised gates in 27.1 seconds under the
+canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
@@ -783,7 +803,8 @@ and therefore block `tfop_ready` conservatively.
 Canonical commands and rationale: `AGENTS.md` Quality Gates. Quick copy-paste:
 
 ```bash
-# Full gates: Ruff + mypy + six test shards x six xdist workers
+# Full gates: Ruff + mypy + incomplete-implementation scan + directive-integrity
+# check + six test shards x six xdist workers (ten gates total)
 .venv/bin/python Skills/run_quality_gates.py
 
 # Focused test diagnosis

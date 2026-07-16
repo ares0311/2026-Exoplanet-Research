@@ -92,6 +92,75 @@ When the user must take an action to unblock a gap:
 
 ---
 
+## Fail Loudly — MANDATORY
+
+- Never silently swallow a material failure. If code catches an exception to
+  fall back safely (e.g. `fetch_tic_stellar_params()` failing open to all-
+  `None`, or `_measure_missing_events`-style diagnostics returning `None`
+  when data is insufficient), that fallback must be an explicit, documented,
+  intentional design choice — not a bare `except: pass` hiding a bug. See
+  `Skills/check_incomplete_implementations.py` for the automated check.
+- Never report success when a required operation failed. A script's exit
+  code, Run Report `status` field, and console output must agree; do not
+  print "done" and then exit non-zero, or vice versa.
+- Missing required dependencies, configuration, credentials, inputs, or
+  artifacts must produce an explicit, readable failure — not a silent
+  no-op or a quietly-empty result set standing in for "nothing to do."
+- Partial success must not be represented as complete success. If N of M
+  items succeeded, say so explicitly (this repo's Run Report Policy already
+  requires `items_processed`/`items_written`/`items_failed` for exactly this
+  reason — reuse it rather than collapsing to a single boolean).
+- Required CLI/automation entry points must return non-zero status on
+  failure. `Skills/run_quality_gates.py`'s pattern (aggregate every gate's
+  return code, exit non-zero if any failed) is the template.
+- A fallback that conceals failure is only acceptable when it is explicitly
+  intended and covered by a test asserting the fallback path itself (e.g.
+  `_extract_arrays()`'s MAD-based error fallback in `vet.py` has
+  `test_fallback_err_when_flux_err_missing`). An untested fallback is not
+  a verified fallback.
+
+## No Fake Completion — MANDATORY
+
+- Never represent incomplete required work as complete.
+- Production paths (`src/`, `Skills/`) must not silently contain: stubs or
+  placeholders standing in for required behavior; hard-coded fake results;
+  unfinished `TODO`/`FIXME` work on a required path; a bare `pass` or
+  `raise NotImplementedError` standing in for required concrete behavior;
+  a mock replacing behavior that production is supposed to actually perform;
+  or a function that reports success without performing the required
+  operation.
+- Legitimate test doubles, abstract interfaces (`@abstractmethod`,
+  `Protocol`), and intentional extension points are allowed. Mark any other
+  deliberate, temporary exception inline with `# allow-stub: <reason>` on
+  the offending line — narrow and documented, never a blanket suppression.
+- `Skills/check_incomplete_implementations.py` is the automated check for
+  this; it is wired into `Skills/run_quality_gates.py` and must pass.
+  A passing scan is necessary, not sufficient — it detects conspicuous
+  incompleteness, not correctness (see "Verify Behavior, Not Presence"
+  in Quality Gates below).
+
+## No Unsupported Completion Claims — MANDATORY
+
+- Do not claim work is implemented, fixed, working, tested, compliant, or
+  complete without supporting evidence (a passing test, a real command's
+  output, an actual file diff).
+- Explicitly distinguish **IMPLEMENTED BUT NOT VERIFIED** from **VERIFIED**
+  in any status report, commit message, or run summary. Unknown or
+  unexecuted verification is not success — say "not yet run" rather than
+  implying a pass.
+- A verification result is only current evidence for the exact repository
+  state it was run against. After further code changes (including
+  uncommitted working-tree changes), a prior passing quality-gate run is
+  stale — rerun it. `Skills/run_quality_gates.py`'s summary JSON records
+  `git_head_sha` and `git_dirty` for exactly this reason: to make it
+  possible to tell, from the artifact alone, whether a given pass result
+  still describes the current tree.
+- Treat this as: `COMPLETE = IMPLEMENTED AND VERIFIED AND VERIFICATION_CURRENT
+  AND SPEC_CONFORMANT`. If any term is false or unknown, do not report
+  completion.
+
+---
+
 ## Branch Naming Rule — MANDATORY
 
 **All feature branches MUST use the `claude/` prefix** (e.g., `claude/fix-ssl-cert`, `claude/add-training-config`).
@@ -902,11 +971,20 @@ environment supports it:
 ```
 
 It runs these logically independent gates concurrently: `.venv/bin/python -m
-ruff check .`, `.venv/bin/python -m mypy src`, and six disjoint pytest file
-shards with six xdist workers each. Use `--tests-only` only when Ruff and mypy
-have already passed unchanged code in the current work cycle. Use direct
-`.venv/bin/python -m pytest ... -n auto --dist=worksteal` only for focused
-diagnosis or a documented constrained-environment fallback.
+ruff check .`, `.venv/bin/python -m mypy src`,
+`Skills/check_incomplete_implementations.py` (no-fake-completion stub/TODO
+scan of `src/`+`Skills/`), `Skills/check_directive_integrity.py`
+(AGENTS.md/CLAUDE.md/Codex-exposure integrity), and six disjoint pytest file
+shards with six xdist workers each — ten gates total. Use `--tests-only` only
+when Ruff and mypy have already passed unchanged code in the current work
+cycle (this also skips the two new static checks, which are cheap enough
+that skipping them should be rare). Use direct `.venv/bin/python -m pytest
+... -n auto --dist=worksteal` only for focused diagnosis or a documented
+constrained-environment fallback. The summary JSON
+(`logs/quality_gates/<run_id>/quality_gate_summary.json`) records
+`git_head_sha`/`git_dirty` — treat any summary whose recorded SHA does not
+match current `git rev-parse HEAD`, or whose `git_dirty` is `true`, as
+**stale**, not as current evidence of a passing state.
 
 If a gate cannot run because of a local environment issue, record the exact blocker in the handoff or commit message. Default tests must not require live external services.
 
