@@ -112,7 +112,7 @@ def vet_signal(
     depths, depth_errs, n_transits_observed = _measure_individual_transits(
         time_bjd, flux, flux_err, signal=signal
     )
-    durations, duration_errs, midpoints, missing_transit_fraction = (
+    durations, duration_errs, midpoints, missing_transit_fraction, asymmetries = (
         _measure_individual_transit_shapes(time_bjd, flux, flux_err, signal=signal)
     )
 
@@ -131,6 +131,7 @@ def vet_signal(
         individual_duration_errors=duration_errs,
         individual_transit_midpoints=midpoints,
         missing_transit_fraction=missing_transit_fraction,
+        individual_transit_asymmetries=asymmetries,
         depth_odd_ppm=depth_odd,
         err_odd_ppm=err_odd,
         depth_even_ppm=depth_even,
@@ -256,9 +257,11 @@ def _measure_individual_transit_shapes(
     tuple[float, ...] | None,
     tuple[float, ...] | None,
     float | None,
+    tuple[float, ...] | None,
 ]:
-    """Measure per-event duration, flux-deficit-weighted midpoint, and the
-    fraction of data-covered expected events that failed to resolve.
+    """Measure per-event duration, flux-deficit-weighted midpoint, the
+    fraction of data-covered expected events that failed to resolve, and
+    per-event temporal asymmetry.
 
     Each event uses a local sideband baseline and requires at least two
     half-depth cadences above twice the local noise to "resolve". Durations
@@ -270,22 +273,29 @@ def _measure_individual_transit_shapes(
     to try, so a high value argues against genuine periodicity even when data
     exists to check. It is `None` when fewer than two windows have coverage,
     since one window cannot distinguish periodicity from bad luck.
+    `individual_asymmetries` is, for each resolved event, the normalized
+    imbalance of in-dip flux deficit before vs. after the *predicted* center
+    (not the weighted midpoint) — `(after - before) / (after + before)` in
+    `[-1, 1]`. A symmetric box/trapezoid transit scores near zero; large
+    magnitudes indicate a lopsided event (e.g. a ramp or a blended source),
+    same-length as durations/midpoints and unavailable under the same
+    condition.
     """
     period = signal.period_days
     epoch = signal.epoch_bjd
     half_duration = signal.duration_hours / 48.0
     if period <= 0.0 or half_duration <= 0.0 or len(time_bjd) < 5:
-        return None, None, None, None
+        return None, None, None, None, None
 
     ordered_time = np.sort(np.unique(time_bjd[np.isfinite(time_bjd)]))
     cadence_deltas = np.diff(ordered_time)
     cadence_deltas = cadence_deltas[cadence_deltas > 0.0]
     if cadence_deltas.size == 0:
-        return None, None, None, None
+        return None, None, None, None, None
     cadence_days = float(np.median(cadence_deltas))
     search_half = min(max(1.5 * half_duration, 2.0 * cadence_days), 0.2 * period)
     if search_half <= 0.0:
-        return None, None, None, None
+        return None, None, None, None, None
 
     global_baseline = float(np.median(flux))
     t_start = float(np.min(time_bjd))
@@ -295,6 +305,7 @@ def _measure_individual_transit_shapes(
     durations: list[float] = []
     duration_errors: list[float] = []
     midpoints: list[float] = []
+    asymmetries: list[float] = []
     n_windows_with_data = 0
     n_windows_resolved = 0
 
@@ -340,6 +351,12 @@ def _measure_individual_transit_shapes(
             continue
         if duration_hours <= 0.0 or duration_hours > 2.0 * search_half * 24.0:
             continue
+        resolved_offsets = local_offsets[resolved]
+        before_sum = float(np.sum(weights[resolved_offsets < 0.0]))
+        after_sum = float(np.sum(weights[resolved_offsets >= 0.0]))
+        half_sum = before_sum + after_sum
+        if np.isfinite(half_sum) and half_sum > 0.0:
+            asymmetries.append((after_sum - before_sum) / half_sum)
         n_windows_resolved += 1
         midpoints.append(midpoint)
         durations.append(duration_hours)
@@ -352,12 +369,13 @@ def _measure_individual_transit_shapes(
     )
 
     if len(midpoints) < 2:
-        return None, None, None, missing_transit_fraction
+        return None, None, None, missing_transit_fraction, None
     return (
         tuple(durations),
         tuple(duration_errors),
         tuple(midpoints),
         missing_transit_fraction,
+        tuple(asymmetries) if len(asymmetries) >= 2 else None,
     )
 
 

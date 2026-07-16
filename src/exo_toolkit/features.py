@@ -34,6 +34,7 @@ class RawDiagnostics:
     individual_duration_errors: tuple[float, ...] | None = None
     individual_transit_midpoints: tuple[float, ...] | None = None  # BJD
     missing_transit_fraction: float | None = None  # covered windows with no resolved event
+    individual_transit_asymmetries: tuple[float, ...] | None = None  # per-event dip asymmetry
 
     # Per-sector measurements
     sector_depths: tuple[float, ...] | None = None        # per-sector mean transit depths (ppm)
@@ -202,6 +203,30 @@ def missing_transit_fraction_score(missing_transit_fraction: float) -> float:
     construction, so this is an identity clip.
     """
     return _clip(missing_transit_fraction)
+
+
+def transit_asymmetry_score(
+    asymmetries: tuple[float, ...],
+    rms_threshold: float = 0.30,
+) -> float | None:
+    """
+    RMS of per-event before/after flux-deficit imbalance around the predicted
+    transit center.
+
+    Each element of `asymmetries` is `(after - before) / (after + before)` in
+    `[-1, 1]`; a symmetric box/trapezoid transit scores near zero for every
+    event.  High RMS scatter across events indicates a temporally lopsided
+    signal (e.g. an instrumental ramp or a blended source) rather than a
+    clean, repeatable transit shape.
+
+    Score = clip(RMS(asymmetries) / rms_threshold).
+    Returns None when fewer than two events are available.
+    """
+    if len(asymmetries) < 2:
+        return None
+    arr = np.array(asymmetries, dtype=float)
+    rms = float(np.sqrt(np.mean(arr**2)))
+    return _clip(rms / rms_threshold)
 
 
 def out_of_transit_scatter_score(
@@ -739,6 +764,10 @@ def extract_features(
     if d.missing_transit_fraction is not None:
         missing_s = missing_transit_fraction_score(d.missing_transit_fraction)
 
+    asym_s: float | None = None
+    if d.individual_transit_asymmetries is not None:
+        asym_s = transit_asymmetry_score(d.individual_transit_asymmetries)
+
     # --- transit morphology ---
     shape_s: float | None = None
     v_s: float | None = None
@@ -909,6 +938,7 @@ def extract_features(
         data_gap_overlap_score=dg_s,
         transit_timing_variation_score=ttv_s,
         missing_transit_fraction_score=missing_s,
+        transit_asymmetry_score=asym_s,
         out_of_transit_scatter_score=oot_s,
         multi_sector_depth_consistency_score=ms_depth_s,
         stellar_density_consistency_score=density_s,

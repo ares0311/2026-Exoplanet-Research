@@ -69,6 +69,7 @@ class CandidateFeatures(BaseModel):
     data_gap_overlap_score: OptScore = None
     transit_timing_variation_score: OptScore = None
     missing_transit_fraction_score: OptScore = None
+    transit_asymmetry_score: OptScore = None
     out_of_transit_scatter_score: OptScore = None
     multi_sector_depth_consistency_score: OptScore = None
     stellar_density_consistency_score: OptScore = None

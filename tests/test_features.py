@@ -43,6 +43,7 @@ from exo_toolkit.features import (
     stellar_variability_score,
     systematics_overlap_score,
     target_id_match_score,
+    transit_asymmetry_score,
     transit_count_score,
     transit_shape_score,
     transit_timing_variation_score,
@@ -842,6 +843,56 @@ class TestMissingTransitFractionScore:
     ) -> None:
         f = extract_features(base_signal, RawDiagnostics())
         assert f.missing_transit_fraction_score is None
+
+
+# ---------------------------------------------------------------------------
+# transit_asymmetry_score
+# ---------------------------------------------------------------------------
+
+
+class TestTransitAsymmetryScore:
+    def test_zero_asymmetry_gives_zero(self) -> None:
+        s = transit_asymmetry_score((0.0, 0.0, 0.0))
+        assert s is not None and s == pytest.approx(0.0)
+
+    def test_large_scatter_clips_to_one(self) -> None:
+        s = transit_asymmetry_score((1.0, -1.0, 1.0))
+        assert s is not None and s == pytest.approx(1.0)
+
+    def test_none_when_single_value(self) -> None:
+        assert transit_asymmetry_score((0.2,)) is None
+
+    def test_none_when_empty(self) -> None:
+        assert transit_asymmetry_score(()) is None
+
+    def test_moderate_scatter_in_range(self) -> None:
+        # rms = 0.15 / 0.30 threshold -> 0.5
+        s = transit_asymmetry_score((0.15, -0.15), rms_threshold=0.30)
+        assert s is not None and pytest.approx(s, abs=0.01) == 0.5
+
+    def test_custom_threshold_scales_score(self) -> None:
+        s_default = transit_asymmetry_score((0.15, -0.15), rms_threshold=0.30)
+        s_tight = transit_asymmetry_score((0.15, -0.15), rms_threshold=0.15)
+        assert s_tight is not None and s_default is not None
+        assert s_tight > s_default
+
+    def test_output_in_zero_one(self) -> None:
+        s = transit_asymmetry_score((0.1, -0.2, 0.05))
+        assert s is not None and 0.0 <= s <= 1.0
+
+    def test_extract_features_propagates_asymmetry(
+        self, base_signal: CandidateSignal
+    ) -> None:
+        diag = RawDiagnostics(individual_transit_asymmetries=(0.0, 0.0))
+        f = extract_features(base_signal, diag)
+        assert f.transit_asymmetry_score is not None
+        assert f.transit_asymmetry_score == pytest.approx(0.0)
+
+    def test_none_asymmetries_gives_none_feature(
+        self, base_signal: CandidateSignal
+    ) -> None:
+        f = extract_features(base_signal, RawDiagnostics())
+        assert f.transit_asymmetry_score is None
 
 
 # ---------------------------------------------------------------------------

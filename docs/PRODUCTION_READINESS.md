@@ -9,8 +9,8 @@ was `no_external_added_value`. Phase 4 individual-transit diagnostics are now
 the active bounded improvement.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
-Test baseline: 2,813 default tests passing; 2 `integration_live` tests excluded by
-the configured marker expression (2026-07-16; 6×6 gate: 28.2s)
+Test baseline: 2,828 default tests passing; 2 `integration_live` tests excluded by
+the configured marker expression (2026-07-16; 6×6 gate: 25.2s)
 
 ---
 
@@ -32,7 +32,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.78 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.79 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -664,6 +664,19 @@ coverage to test. See `docs/SCORING_MODEL.md §23`. Depth/asymmetry and
 extra-event ranking remain future bounded increments of the same item.
 The version 0.2.78 release gate passed 2,813 default tests plus Ruff/mypy as
 8/8 supervised gates in 28.2 seconds under the canonical 6x6 topology.
+Version 0.2.79 adds the second named Phase 4 extension, `transit_asymmetry`.
+For each event that already resolves a significant dip,
+`_measure_individual_transit_shapes()` splits its resolved-cadence deficit
+sum by sign of offset from the predicted center and records the normalized
+before/after imbalance, reusing the same resolved-cadence set already
+produced for duration/midpoint measurement rather than a second significance
+pass. `transit_asymmetry_score()` is the RMS of these imbalances relative to
+a 0.30 threshold; wired into `log_score_planet()` (−0.50) and
+`log_score_instrumental()` (+0.50); `None` unless at least two events
+resolve. See `docs/SCORING_MODEL.md §24`. Extra-event ranking remains the
+last named increment of this roadmap item.
+The version 0.2.79 release gate passed 2,828 default tests plus Ruff/mypy as
+8/8 supervised gates in 25.2 seconds under the canonical 6x6 topology.
 The version 0.2.63 release gate passed the unchanged 2,759 default tests plus
 Ruff/mypy as 8/8 supervised gates in 27.3 seconds under the canonical 6×6
 topology.

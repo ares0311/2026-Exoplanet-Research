@@ -430,6 +430,26 @@ class TestMissingTransitFractionWiring:
         )
 
 
+class TestTransitAsymmetryWiring:
+    def test_high_asymmetry_lowers_planet_score(self) -> None:
+        base = CandidateFeatures()
+        lopsided = CandidateFeatures(transit_asymmetry_score=1.0)
+        assert log_score_planet(lopsided) < log_score_planet(base)
+
+    def test_high_asymmetry_raises_instrumental_score(self) -> None:
+        base = CandidateFeatures()
+        lopsided = CandidateFeatures(transit_asymmetry_score=1.0)
+        assert log_score_instrumental(lopsided) > log_score_instrumental(base)
+
+    def test_none_asymmetry_is_neutral(self) -> None:
+        base = CandidateFeatures()
+        null_asym = CandidateFeatures(transit_asymmetry_score=None)
+        assert log_score_planet(null_asym) == pytest.approx(log_score_planet(base))
+        assert log_score_instrumental(null_asym) == pytest.approx(
+            log_score_instrumental(base)
+        )
+
+
 # ---------------------------------------------------------------------------
 # New feature wiring tests (Milestones 12a-12e)
 # ---------------------------------------------------------------------------

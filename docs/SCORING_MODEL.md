@@ -1125,3 +1125,55 @@ data-covered windows. This shares the exact resolution test already used for
 duration/midpoint measurement rather than introducing a second detection
 threshold, so the two diagnostics cannot silently disagree about what counts
 as "resolved".
+
+---
+
+## §24 Transit Asymmetry Score
+
+**Function**: `transit_asymmetry_score(asymmetries, rms_threshold=0.30)`
+
+Measures the RMS of per-event before/after imbalance in in-dip flux deficit,
+where each element of `asymmetries` is computed relative to the *predicted*
+transit center (not the resolved weighted midpoint used in §22, so a shifted
+but still-symmetric dip is not penalised):
+
+$$a_i = \frac{D_{\mathrm{after},i} - D_{\mathrm{before},i}}{D_{\mathrm{after},i} + D_{\mathrm{before},i}} \in [-1, 1]$$
+
+where $D_{\mathrm{before},i}$/$D_{\mathrm{after},i}$ are the summed flux
+deficit of resolved cadences before/after the predicted center for event $i$.
+
+$$\phi_\mathrm{asym} = \mathrm{clip}\!\left(\frac{\mathrm{RMS}(a_i)}{a_\mathrm{thresh}},\; 0,\; 1\right)$$
+
+where the default threshold is $a_\mathrm{thresh} = 0.30$.
+
+**Interpretation**:
+- $\phi_\mathrm{asym} \approx 0$: events are temporally symmetric around
+  their predicted centers — consistent with a clean box/trapezoid transit.
+- $\phi_\mathrm{asym} \approx 1$: events are consistently lopsided — evidence
+  for an instrumental ramp, ingress/egress contamination from a blended
+  source, or another non-transit temporal structure.
+
+**Hypothesis weights**:
+
+| Hypothesis | Weight | Direction |
+|---|---|---|
+| `planet_candidate` | 0.50 | Negative (high asymmetry penalises planet hypothesis) |
+| `instrumental_artifact` | 0.50 | Positive (high asymmetry supports instrumental hypothesis) |
+
+**Returns**: `None` when fewer than two events resolve — one event cannot
+distinguish systematic asymmetry from noise.
+
+**Implementation**: `src/exo_toolkit/features.py` — `transit_asymmetry_score()`
+
+Input field: `RawDiagnostics.individual_transit_asymmetries` (tuple of
+per-event imbalance ratios in `[-1, 1]`, same length and indexing as
+`individual_durations`/`individual_transit_midpoints`).
+
+Production measurement (version 0.2.79): `vet_signal()`'s per-event shape
+measurement (§22) computes, for each event that already resolves a
+significant dip, the summed deficit of its resolved cadences split by sign of
+offset from the predicted center. This reuses the exact same resolved-cadence
+set already computed for duration/midpoint measurement rather than a second
+significance pass, so the three per-event diagnostics (duration, midpoint,
+asymmetry) can never silently disagree about which cadences constitute the
+event.
