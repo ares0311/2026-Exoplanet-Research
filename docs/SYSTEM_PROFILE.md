@@ -239,6 +239,12 @@ workers.
   remain fatal.
 - Version 0.2.74 validation passed 2,790 default tests plus Ruff/mypy as 8/8
   supervised gates in 36.3 seconds under the canonical 6x6 test topology.
+- Version 0.2.75's active v3 keeps the same 6x6 topology but fills empty phase
+  bins with neutral median physical flux. A 36-worker cache-only preflight
+  prepared all 1,536 contracted KICs in 158.4 seconds with exactly 111 pinned
+  skips and zero writes/downloads; both model smoke embeddings were finite.
+- Version 0.2.75 validation passed 2,791 default tests plus Ruff/mypy as 8/8
+  supervised gates in 36.3 seconds under the canonical 6x6 test topology.
 - Version 0.2.63 validation passed the unchanged 2,759 tests plus Ruff/mypy as
   8/8 supervised gates in 27.3 seconds with the canonical 6×6 test topology.
 

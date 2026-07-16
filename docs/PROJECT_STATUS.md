@@ -163,6 +163,14 @@ immutable v2 with the corrected column and a hash-pinned exception for exactly
 merged v2 evidence run is pending.
 The 0.2.74 release gate passed 2,790 default tests plus Ruff/mypy as 8/8
 supervised gates in 36.3 seconds under the canonical 6x6 topology.
+The first merged v2 run failed closed on its over-strict 95% 2,048-bin
+occupancy rule before embeddings or durable output. Version 0.2.75 preserves
+v2 and activates immutable v3 with neutral median physical-flux fill for empty
+phase bins. A full cache-only 1,536-KIC preparation preflight passed in 158.4
+seconds with exactly 111 pinned skips, zero writes/downloads, and finite smoke
+embeddings from both external models. Merged v3 evidence remains pending.
+The 0.2.75 release gate passed 2,791 default tests plus Ruff/mypy as 8/8
+supervised gates in 36.3 seconds under the canonical 6x6 topology.
 The 0.2.63 release gate passed the unchanged 2,759 tests plus Ruff/mypy as 8/8
 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 

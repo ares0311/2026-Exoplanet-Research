@@ -434,6 +434,19 @@ those paths may be skipped, and every affected KIC must retain a readable
 quarter. Any other FITS/schema failure remains fatal.
 The version 0.2.74 release gate passed 2,790 default tests plus Ruff/mypy as
 8/8 supervised gates in 36.3 seconds under the canonical 6x6 topology.
+The first merged v2 execution then failed closed during preparation because
+its 95%-occupied 2,048-bin rule was incompatible with real frozen KIC phase
+coverage; no embedding or durable output was written. Version 0.2.75 preserves
+v2 and activates immutable
+`metadata/grouped_external_representation_contract_v3.json`. V3 mirrors the
+established production snippet policy: empty phase bins receive neutral median
+physical flux rather than interpolated transit structure. A full cache-only
+36-worker preflight prepared all 1,536 KICs, skipped exactly the 111 pinned
+truncated products, wrote/downloaded nothing, and returned exact `(2048,)` and
+`(200,)` inputs; both frozen models then returned finite 256-element smoke
+embeddings.
+The version 0.2.75 release gate passed 2,791 default tests plus Ruff/mypy as
+8/8 supervised gates in 36.3 seconds under the canonical 6x6 topology.
 
 The version 0.2.62 release gate passed 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 34.3 seconds under the canonical 6×6 topology.

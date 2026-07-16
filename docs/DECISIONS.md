@@ -815,3 +815,11 @@ uses `SAP_QUALITY`. No benchmark data was downloaded or persisted. Version
 0.2.74 preserves v1 and activates immutable v2 with the corrected column plus
 the exact fingerprinted 111-file truncated-product exception; arbitrary FITS
 skips remain prohibited.
+
+The first merged v2 run then failed closed because its 95%-occupancy rule over
+2,048 phase bins did not match real frozen KIC coverage; no embeddings or
+durable outputs were written. Version 0.2.75 preserves v2 and activates
+immutable v3. Empty bins use neutral median physical flux, matching established
+production snippet handling without interpolating invented transit structure.
+A full 1,536-row cache-only preparation audit and both-model smoke passed before
+v3 publication.

@@ -5,14 +5,19 @@
 Version 0.2.73 defined the reviewed, cache-only execution gate. Its first
 merged-main run failed closed before processing: v1 incorrectly requested the
 TESS-style `QUALITY` column from Kepler files, which use `SAP_QUALITY`.
-Version 0.2.74 preserves v1 as failed-schema evidence and activates immutable
-v2 with the corrected column. The evidence run remains pending. This gate does
-not authorize training, broad embedding extraction, checkpoint promotion, or
-a production-scoring change.
+Version 0.2.74 preserved v1 as failed-schema evidence and activated immutable
+v2 with the corrected column. Its first merged run failed closed during
+preparation because 95% occupancy across 2,048 bins was not supported by every
+frozen KIC. Version 0.2.75 preserves v2 and activates immutable v3, which fills
+empty bins with neutral median physical flux. The evidence run remains pending.
+This gate does not authorize training, broad embedding extraction, checkpoint
+promotion, or a production-scoring change.
 Its release validation passed 2,789 default tests plus Ruff and mypy as 8/8
 supervised gates in 34.1 seconds under the canonical 6x6 test topology.
 Version 0.2.74's corrected gate passed 2,790 default tests plus Ruff and mypy
 as 8/8 supervised gates in 36.3 seconds under the same topology.
+Version 0.2.75's v3 gate passed 2,791 default tests plus Ruff and mypy as 8/8
+supervised gates in 36.3 seconds under the same topology.
 
 ## Production outcome
 
@@ -24,8 +29,8 @@ variability, and injection-sensitivity prerequisites passed.
 
 ## Frozen population
 
-`metadata/grouped_external_representation_contract_v1.json` is retained for
-the failed attempt; active v2 pins every input by SHA-256. From the predefined
+Contracts v1 and v2 are retained for their failed attempts; active v3 pins
+every input by SHA-256. From the predefined
 KIC-grouped master-corpus splits, it keeps the lexically first signal per KIC
 and deterministically selects a balanced subset:
 
@@ -53,6 +58,14 @@ receives 2,048 bins and Astromer2 receives 200 bins. Their exact cached ONNX
 weights remain frozen. Identical deterministic L2 logistic probes train only
 on `train`, use validation AUC for early stopping, and select the classification
 threshold by validation F1.
+Empty bins receive the unbinned median physical flux, which becomes neutral
+zero relative magnitude. This mirrors the established production snippet
+policy while avoiding interpolation that could invent transit structure.
+
+A pre-execution cache-only audit prepared all 1,536 rows with 36 workers in
+158.4 seconds, skipped exactly the 111 pinned products, wrote and downloaded
+nothing, and returned exact `(2048,)` and `(200,)` inputs. Both frozen models
+returned finite 256-element embeddings in a one-row smoke.
 
 The required comparators are:
 

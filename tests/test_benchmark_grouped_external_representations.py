@@ -29,7 +29,7 @@ def _canonical_sha256(rows: list[dict[str, object]]) -> str:
 
 
 def test_merged_contract_is_bounded_grouped_and_training_disabled() -> None:
-    contract = load_contract(Path("metadata/grouped_external_representation_contract_v2.json"))
+    contract = load_contract(Path("metadata/grouped_external_representation_contract_v3.json"))
     assert contract["population"]["required_unique_kics"] == 1536
     assert contract["population"]["cache_inventory"]["bytes"] == 10_398_406_656
     assert contract["population"]["cache_inventory"]["known_unreadable_products"] == {
@@ -45,6 +45,7 @@ def test_merged_contract_is_bounded_grouped_and_training_disabled() -> None:
     }
     assert contract["parallel_shape"]["process_shards"] == 6
     assert contract["parallel_shape"]["fits_workers_per_shard"] == 6
+    assert contract["preprocessing"]["empty_bin_fill"] == "median_unbinned_flux"
     assert contract["probe"]["minimum_absolute_improvement"] == pytest.approx(0.01)
     assert contract["storage"]["downloads_authorized"] is False
     assert contract["broad_extraction_authorized"] is False
@@ -125,11 +126,18 @@ def test_phase_binning_produces_finite_relative_magnitude() -> None:
     phase = np.linspace(-0.5, 0.5, 1000, endpoint=False)
     flux = 1.0 - 0.01 * (np.abs(phase) < 0.05)
     centers, magnitude = phase_bin_relative_magnitude(
-        phase, flux, n_bins=100, minimum_filled_fraction=0.95
+        phase, flux, n_bins=100
     )
     assert centers.shape == magnitude.shape == (100,)
     assert np.all(np.isfinite(magnitude))
     assert float(np.max(magnitude)) > 0.0
+
+
+def test_phase_binning_fills_missing_bins_with_neutral_magnitude() -> None:
+    phase = np.linspace(-0.1, 0.1, 100, endpoint=False)
+    flux = np.ones_like(phase)
+    _centers, magnitude = phase_bin_relative_magnitude(phase, flux, n_bins=20)
+    assert np.all(magnitude == 0.0)
 
 
 def test_kepler_reader_uses_sap_quality_and_skips_only_pinned_path(tmp_path: Path) -> None:

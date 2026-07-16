@@ -249,6 +249,13 @@ by itself satisfy a master-guide evidence requirement.
    retain readable data, and every other FITS/schema error remains fatal.
    The version 0.2.74 release gate passed 2,790 default tests plus Ruff/mypy as
    8/8 supervised gates in 36.3 seconds under the canonical 6x6 topology.
+   The first merged v2 run failed closed because its 95%-occupied 2,048-bin
+   rule did not match all frozen KIC phase coverage; zero embeddings or durable
+   outputs were written. Version 0.2.75 preserves v2 and activates immutable v3
+   with neutral median physical-flux fill for empty bins. The full cache-only
+   1,536-KIC preparation preflight and both-model smoke passed before release.
+   The version 0.2.75 release gate passed 2,791 default tests plus Ruff/mypy as
+   8/8 supervised gates in 36.3 seconds under the canonical 6x6 topology.
    The 0.2.60 release passed 2,751 default tests plus Ruff/mypy as
    8/8 supervised gates under the 6×6 topology in 25.2 seconds.
 
