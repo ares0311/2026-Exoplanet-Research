@@ -18,6 +18,7 @@ from exo_toolkit.vet import (
     VetResult,
     _extract_arrays,
     _measure_data_gap_fraction,
+    _measure_individual_transit_shapes,
     _measure_individual_transits,
     _measure_odd_even,
     _measure_secondary_eclipse,
@@ -217,6 +218,59 @@ class TestMeasureIndividualTransits:
         _, errs, _ = _measure_individual_transits(t, f, e, signal=_signal())
         if errs is not None:
             assert all(err > 0.0 for err in errs)
+
+
+class TestMeasureIndividualTransitShapes:
+    def test_resolves_multiple_durations_and_midpoints(self) -> None:
+        lc = _lc_with_transit(depth=0.005, noise=0.0002)
+        t, f, e = _extract_arrays(lc, flux_shape=None)
+        durations, errors, midpoints = _measure_individual_transit_shapes(
+            t, f, e, signal=_signal()
+        )
+        assert durations is not None and errors is not None and midpoints is not None
+        assert len(durations) == len(errors) == len(midpoints) >= 2
+        assert all(duration > 0.0 for duration in durations)
+        assert all(error > 0.0 for error in errors)
+        assert all(
+            abs((midpoint - _EPOCH) / _PERIOD - round((midpoint - _EPOCH) / _PERIOD))
+            < 0.01
+            for midpoint in midpoints
+        )
+
+    def test_returns_none_for_flat_noise(self) -> None:
+        lc = _flat_lc(noise=0.0002)
+        t, f, e = _extract_arrays(lc, flux_shape=None)
+        assert _measure_individual_transit_shapes(t, f, e, signal=_signal()) == (
+            None,
+            None,
+            None,
+        )
+
+    def test_recovers_a_shifted_transit_midpoint(self) -> None:
+        rng = np.random.default_rng(123)
+        time_bjd = np.linspace(_EPOCH, _EPOCH + 27.0, 10_000)
+        flux = np.ones_like(time_bjd) + rng.normal(0.0, 0.0001, time_bjd.size)
+        half_duration = _DURATION_H / 48.0
+        centers = [_EPOCH + index * _PERIOD for index in range(6)]
+        centers[2] += 30.0 / 1440.0
+        for center in centers:
+            flux[np.abs(time_bjd - center) <= half_duration] -= 0.005
+        errors = np.full_like(flux, 0.0001)
+        _durations, _duration_errors, midpoints = _measure_individual_transit_shapes(
+            time_bjd, flux, errors, signal=_signal()
+        )
+        assert midpoints is not None
+        oc_minutes = [
+            abs(
+                (
+                    midpoint
+                    - (_EPOCH + round((midpoint - _EPOCH) / _PERIOD) * _PERIOD)
+                )
+                * 1440.0
+            )
+            for midpoint in midpoints
+        ]
+        assert max(oc_minutes) > 20.0
 
 
 # ---------------------------------------------------------------------------
@@ -466,6 +520,16 @@ class TestVetSignal:
         result = vet_signal(_lc_with_transit(t_span_days=27.0), _signal())
         assert result.diagnostics.individual_depths is not None
         assert len(result.diagnostics.individual_depths) >= 2
+
+    def test_individual_shape_diagnostics_populated(self) -> None:
+        result = vet_signal(
+            _lc_with_transit(depth=0.005, noise=0.0002), _signal()
+        )
+        assert result.diagnostics.individual_durations is not None
+        assert result.diagnostics.individual_duration_errors is not None
+        assert result.diagnostics.individual_transit_midpoints is not None
+        assert result.features.duration_consistency_score is not None
+        assert result.features.transit_timing_variation_score is not None
 
     def test_data_gap_fraction_near_zero(self) -> None:
         result = vet_signal(_lc_with_transit(n_points=2000, t_span_days=27.0), _signal())

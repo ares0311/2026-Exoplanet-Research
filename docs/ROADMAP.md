@@ -265,6 +265,19 @@ by itself satisfy a master-guide evidence requirement.
    The version 0.2.76 evidence-release gate passed 2,797 default tests plus
    Ruff/mypy as 8/8 supervised gates in 36.3 seconds under the canonical 6x6
    topology.
+7. **Phase 4 — individual anomalous-transit detector (CORE DIAGNOSTICS
+   IMPLEMENTED):** version 0.2.77 fixes the production vetter's hard-coded
+   missing per-transit durations and midpoints. Each expected event now uses a
+   local sideband baseline, a twice-noise half-depth gate, a flux-deficit-
+   weighted midpoint, and cadence-resolved duration. At least two events must
+   resolve; otherwise duration and timing diagnostics remain unavailable.
+   This activates the existing duration-consistency and TTV feature paths,
+   rejects flat noise, and recovers a tested 30-minute shifted event without
+   adding data acquisition or model training. Future Phase 4 work may extend
+   this bounded core to depth/asymmetry/missing/extra-event ranking, but must
+   validate against real or frozen injected controls before production claims.
+   The version 0.2.77 release gate passed 2,801 default tests plus Ruff/mypy as
+   8/8 supervised gates in 35.3 seconds under the canonical 6x6 topology.
    The 0.2.60 release passed 2,751 default tests plus Ruff/mypy as
    8/8 supervised gates under the 6×6 topology in 25.2 seconds.
 

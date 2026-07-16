@@ -272,6 +272,14 @@ production changes remain unauthorized. Aggregate SHA-256 is
 The version 0.2.76 evidence-release gate passed 2,797 default tests plus
 Ruff/mypy as 8/8 supervised gates in 36.3 seconds under the canonical 6x6
 topology.
+Version 0.2.77 starts Phase 4's individual anomalous-transit path by replacing
+`vet_signal()`'s hard-coded `None` duration/midpoint diagnostics with bounded
+per-event measurements. Local sidebands, twice-noise/half-depth gates,
+flux-deficit-weighted midpoints, and cadence-resolved durations fail closed
+unless at least two events resolve. This activates existing duration-
+consistency and TTV features without new data or model training.
+The version 0.2.77 release gate passed 2,801 default tests plus Ruff/mypy as
+8/8 supervised gates in 35.3 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
