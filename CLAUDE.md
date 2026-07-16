@@ -251,6 +251,15 @@ products. Only those paths may be skipped; all other FITS/schema errors remain
 fatal and every selected KIC must retain readable data.
 The version 0.2.74 release gate passed 2,790 default tests plus Ruff/mypy as
 8/8 supervised gates in 36.3 seconds under the canonical 6x6 topology.
+The first merged v2 execution failed closed during preparation because its 95%
+occupancy requirement did not match real frozen KIC phase coverage. Version
+0.2.75 preserves v2 and activates immutable v3, filling empty phase bins with
+neutral median physical flux to mirror established production snippet policy
+without inventing transit structure. The cache-only 36-worker preflight passed
+all 1,536 KICs with exactly 111 pinned skips and finite inputs; one-product
+smoke inference returned 256-element outputs from both frozen models.
+The version 0.2.75 release gate passed 2,791 default tests plus Ruff/mypy as
+8/8 supervised gates in 36.3 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.

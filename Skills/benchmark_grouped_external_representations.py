@@ -45,7 +45,7 @@ from exo_toolkit.ml.cnn_scorer import CnnScorer  # noqa: E402
 from Skills.run_report import RunReport, report_path_for, run_and_commit_report  # noqa: E402
 from Skills.train_cnn import _compute_auc  # noqa: E402
 
-DEFAULT_CONTRACT = REPO_ROOT / "metadata/grouped_external_representation_contract_v2.json"
+DEFAULT_CONTRACT = REPO_ROOT / "metadata/grouped_external_representation_contract_v3.json"
 DEFAULT_CACHE_ROOT = Path.home() / ".lightkurve/cache/mastDownload/Kepler"
 DEFAULT_MODEL_CACHE = REPO_ROOT / ".cache/representation_models"
 DEFAULT_TEMP_ROOT = REPO_ROOT / "logs/grouped_external_representation_benchmark_v1"
@@ -350,9 +350,8 @@ def phase_bin_relative_magnitude(
     flux: np.ndarray,
     *,
     n_bins: int,
-    minimum_filled_fraction: float,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Median-bin physical flux by phase and convert to relative magnitude."""
+    """Median-bin physical flux and fill empty bins with neutral median flux."""
     if phase.size != flux.size or phase.size < n_bins:
         raise ValueError("phase and flux must be aligned with at least n_bins cadences")
     edges = np.linspace(-0.5, 0.5, n_bins + 1)
@@ -361,11 +360,10 @@ def phase_bin_relative_magnitude(
     for index in np.unique(indices):
         binned[index] = float(np.median(flux[indices == index]))
     valid = np.flatnonzero(np.isfinite(binned) & (binned > 0))
-    if valid.size / n_bins < minimum_filled_fraction:
-        raise ValueError(f"phase coverage is too sparse: {valid.size}/{n_bins} bins")
-    if valid.size != n_bins:
-        binned = np.interp(np.arange(n_bins), valid, binned[valid], period=n_bins)
     reference = float(np.median(flux))
+    if valid.size == 0 or not math.isfinite(reference) or reference <= 0.0:
+        raise ValueError("phase bins contain no valid physical flux")
+    binned[~np.isfinite(binned) | (binned <= 0)] = reference
     magnitude = -2.5 * np.log10(binned / reference)
     if not np.all(np.isfinite(magnitude)):
         raise ValueError("relative magnitude contains non-finite values")
@@ -381,18 +379,15 @@ def _prepare_row(
 ) -> PreparedRow:
     phase, flux, skipped = _read_phase_flux(paths, row, known_unreadable_paths)
     preprocessing = contract["preprocessing"]
-    minimum = float(preprocessing["minimum_filled_fraction"])
     chronos_phase, chronos_mag = phase_bin_relative_magnitude(
         phase,
         flux,
         n_bins=int(preprocessing["chronos_phase_bins"]),
-        minimum_filled_fraction=minimum,
     )
     astromer_phase, astromer_mag = phase_bin_relative_magnitude(
         phase,
         flux,
         n_bins=int(preprocessing["astromer_phase_bins"]),
-        minimum_filled_fraction=minimum,
     )
     del chronos_phase
     ordered = np.sort(astromer_mag.astype(np.float64))
