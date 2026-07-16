@@ -808,3 +808,10 @@ and cache support a bounded real-label comparison without new downloads.
 The frozen selection resolves to 1,536 unique KICs and an exact 24,036-file,
 10,398,406,656-byte read-only cache inventory. Contract, selection, inventory,
 shard, preprocessing, probe, aggregate-cleanup, and launcher tests pass locally.
+
+The first merged v1 execution failed closed before processing because the
+contract used TESS-style `QUALITY` against Kepler files, whose mission schema
+uses `SAP_QUALITY`. No benchmark data was downloaded or persisted. Version
+0.2.74 preserves v1 and activates immutable v2 with the corrected column plus
+the exact fingerprinted 111-file truncated-product exception; arbitrary FITS
+skips remain prohibited.

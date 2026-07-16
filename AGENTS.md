@@ -424,6 +424,16 @@ extraction, promotion, and production scoring remain unauthorized. See
 `docs/GROUPED_EXTERNAL_REPRESENTATION_BENCHMARK.md`.
 The version 0.2.73 release gate passed 2,789 default tests plus Ruff/mypy as
 8/8 supervised gates in 34.1 seconds under the canonical 6x6 topology.
+The first merged execution failed closed before processing because v1 used the
+TESS-style `QUALITY` column against Kepler files, whose mission schema uses
+`SAP_QUALITY`; it downloaded and persisted no benchmark data. Version 0.2.74
+preserves v1 as failed-schema evidence and supersedes it with immutable
+`metadata/grouped_external_representation_contract_v2.json`. V2 also pins the
+exact 111-file, 7,274,496-byte set of known truncated cache products; only
+those paths may be skipped, and every affected KIC must retain a readable
+quarter. Any other FITS/schema failure remains fatal.
+The version 0.2.74 release gate passed 2,790 default tests plus Ruff/mypy as
+8/8 supervised gates in 36.3 seconds under the canonical 6x6 topology.
 
 The version 0.2.62 release gate passed 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 34.3 seconds under the canonical 6×6 topology.

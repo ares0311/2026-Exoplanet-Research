@@ -2,11 +2,17 @@
 
 ## Status
 
-Version 0.2.73 defines the reviewed, cache-only execution gate. The merged-main
-evidence run remains pending. This gate does not authorize training, broad
-embedding extraction, checkpoint promotion, or a production-scoring change.
+Version 0.2.73 defined the reviewed, cache-only execution gate. Its first
+merged-main run failed closed before processing: v1 incorrectly requested the
+TESS-style `QUALITY` column from Kepler files, which use `SAP_QUALITY`.
+Version 0.2.74 preserves v1 as failed-schema evidence and activates immutable
+v2 with the corrected column. The evidence run remains pending. This gate does
+not authorize training, broad embedding extraction, checkpoint promotion, or
+a production-scoring change.
 Its release validation passed 2,789 default tests plus Ruff and mypy as 8/8
 supervised gates in 34.1 seconds under the canonical 6x6 test topology.
+Version 0.2.74's corrected gate passed 2,790 default tests plus Ruff and mypy
+as 8/8 supervised gates in 36.3 seconds under the same topology.
 
 ## Production outcome
 
@@ -18,9 +24,10 @@ variability, and injection-sensitivity prerequisites passed.
 
 ## Frozen population
 
-`metadata/grouped_external_representation_contract_v1.json` pins every input
-by SHA-256. From the predefined KIC-grouped master-corpus splits, it keeps the
-lexically first signal per KIC and deterministically selects a balanced subset:
+`metadata/grouped_external_representation_contract_v1.json` is retained for
+the failed attempt; active v2 pins every input by SHA-256. From the predefined
+KIC-grouped master-corpus splits, it keeps the lexically first signal per KIC
+and deterministically selects a balanced subset:
 
 | Split | Negative | Positive | Total |
 |---|---:|---:|---:|
@@ -32,11 +39,15 @@ All 1,536 KICs are unique. The exact selected population has SHA-256
 `4b245113…741b76`. Its read-only Kepler cache inventory is 24,036 FITS files
 and 10,398,406,656 bytes with canonical inventory SHA-256
 `39bfdbc8…94648`. No archive access or cache population is permitted.
+V2 also pins the exact 111 known 65,536-byte truncated products (7,274,496
+bytes total, inventory SHA-256 `c9e1556e…02245`). Only those exact paths may be
+skipped, and every affected KIC must still contribute at least one readable
+quarter. Any other FITS or schema error fails the run.
 
 ## Preprocessing and comparators
 
 Each KIC's cache-local `PDCSAP_FLUX` cadences are filtered to finite positive
-flux with `QUALITY == 0`, folded on the committed DR25 candidate ephemeris,
+flux with Kepler `SAP_QUALITY == 0`, folded on the committed DR25 ephemeris,
 median-binned by phase, and converted to relative magnitude. Chronos-Bolt tiny
 receives 2,048 bins and Astromer2 receives 200 bins. Their exact cached ONNX
 weights remain frozen. Identical deterministic L2 logistic probes train only
