@@ -1,13 +1,14 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-07-13 (formal production-ensemble acceptance PASS: the
+Last reviewed: 2026-07-16 (formal production-ensemble acceptance remains PASS: the
 catalog ephemeris for pi Mensae c was recovered within 0.005% with ensemble
 FPP 0.4405, while the TOI-146.01 false-positive control produced no signal.
-No Tier 1 gaps remain open.)
+No Tier 1 gaps remain open; the bounded Phase 3 representation variability/
+injection evidence gate also passed.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
-Test baseline: 2,726 default tests passing; 2 `integration_live` tests excluded by
-the configured marker expression (2026-07-13; 6×6 gate: 34.1s)
+Test baseline: 2,782 default tests passing; 2 `integration_live` tests excluded by
+the configured marker expression (2026-07-16; 6×6 gate: 37.2s)
 
 ---
 
@@ -29,7 +30,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.71 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.72 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -571,7 +572,7 @@ benchmark harness. It selects all 48 matched TICs, freezes four bounded
 3/10-day and 500/2,000-ppm scenarios, and requires 192 unique BLS trials plus
 384 unique paired frozen-model rows. Chronos-Bolt tiny and Astromer2 use their
 already-verified exact ONNX cache files; only hashes and cosine/L2 distances
-may be written. The merged-main execution remains pending. A PASS must include
+may be written. A PASS must include
 zero failures, duplicates, downloads, or persisted embeddings and cannot
 authorize training or a production change. See
 `docs/REPRESENTATION_VARIABILITY_INJECTION_BENCHMARK.md`.
@@ -582,6 +583,20 @@ verifies the exact path and SHA-256 of every ASAS-SN shard referenced by the
 pinned aggregate before loading its 48 matched rows. It also rejects duplicate
 TICs, incomplete shard indexes, and any row that authorizes training. The 6x6
 release gate passed 2,781 tests plus Ruff/mypy in 30.1 seconds.
+The merged benchmark then passed all six shards and seven global checks:
+48 unique TICs, 192 trials, 384 unique model rows, and zero failures,
+duplicates, downloads, or persisted embeddings. Both models produced a larger
+cosine shift at 2,000 ppm than at 500 ppm in all 96 paired TIC/period
+comparisons. Blind BLS recovered 13/192 trials; that bounded result is not a
+survey-completeness estimate. Observed first-start to last-completion wall time
+was 15.854 seconds, with shard elapsed times of 3.452-10.476 seconds. Version
+0.2.72 commits and integrity-tests every shard output, summary, and the passing
+aggregate. Aggregate SHA-256 is `93ae6fb8…59f`; the seven exact-path Run Report
+commits end at `f0f1645`. Training, broad extraction, promotion, and production
+scoring remain unauthorized.
+The version 0.2.72 evidence-release gate passed 2,782 default tests plus
+Ruff/mypy as 8/8 supervised gates in 37.2 seconds under the canonical 6x6
+topology.
 The version 0.2.63 release gate passed the unchanged 2,759 default tests plus
 Ruff/mypy as 8/8 supervised gates in 27.3 seconds under the canonical 6×6
 topology.

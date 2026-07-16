@@ -214,13 +214,23 @@ by itself satisfy a master-guide evidence requirement.
    blind-BLS trials and 384 Chronos-Bolt tiny/Astromer2 model rows. Execute it
    only from merged clean `main` via the reviewed 6x6 supervisor and globally
    reconcile zero failures, duplicates, downloads, or persisted embeddings.
-   The evidence run is next; training and production changes remain blocked.
    The version 0.2.70 release gate passed 2,780 default tests plus Ruff/mypy as
    8/8 supervised gates in 33.3 seconds under the canonical 6x6 topology.
    Version 0.2.71 hardens the pending run by verifying every aggregate-owned
    ASAS-SN shard path/hash and rejecting incomplete, duplicate, or training-
    authorized source rows before FITS access. Its 6x6 gate passed 2,781 tests
    plus Ruff/mypy in 30.1 seconds.
+   The merged run passed all seven global checks over 48 TICs, 192 trials, and
+   384 model rows, with zero failures, duplicates, downloads, or persisted
+   embeddings. Both models showed 96/96 higher-depth larger-shift comparisons;
+   blind BLS recovered 13/192 trials. Version 0.2.72 commits and integrity-tests
+   the evidence. This closes the bounded variability/injection gate but does
+   not authorize training or a production change. The next Phase 3 item is a
+   separately contracted grouped benchmark on labeled planet/false-positive
+   data that retains the frozen CNN and classical baselines.
+   The version 0.2.72 evidence-release gate passed 2,782 default tests plus
+   Ruff/mypy as 8/8 supervised gates in 37.2 seconds under the canonical 6x6
+   topology.
    The 0.2.60 release passed 2,751 default tests plus Ruff/mypy as
    8/8 supervised gates under the 6×6 topology in 25.2 seconds.
 

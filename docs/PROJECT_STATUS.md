@@ -2,7 +2,7 @@
 
 ## Status: Active Development
 ## Phase: Phase 3 broad representation experiment design
-## Last Updated: 2026-07-13
+## Last Updated: 2026-07-16
 
 ---
 
@@ -14,9 +14,9 @@ The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit w
 - Bayesian log-score model over six hypotheses
 - Optional XGBoost and stacking scorer modes (Tier 1 model trained: Kepler KOI AUC=0.992)
 - SQLite-backed background automation with top-level logs
-- 119 standalone `Skills/` utility scripts (`rg --files Skills -g '*.py'`)
-- 139 top-level test files
-- 27 package Python modules under `src/exo_toolkit/`
+- 125 standalone `Skills/` Python files (`rg --files Skills -g '*.py'`)
+- 147 top-level test files
+- 32 package Python modules under `src/exo_toolkit/`
 - JWST time-series ingestion wired into the CLI with `--mission JWST`
 - Novel TESS target scanning that excludes TOI, CTOI, and confirmed-host catalogs
 
@@ -128,7 +128,7 @@ Version 0.2.70 freezes the next cache-only gate: all 48 matched TICs, four
 bounded injection cells, 192 unique blind-BLS trials, and 384 paired rows from
 the exact cached Chronos-Bolt tiny and Astromer2 models. The implementation is
 allowlisted in the single-parent 6x6 launcher and persists no embeddings or
-modified light curves. The merged-main evidence run is next. Its results are
+modified light curves. Its results are
 descriptive only; training, broad extraction, promotion, and production scoring
 remain unauthorized. See
 `docs/REPRESENTATION_VARIABILITY_INJECTION_BENCHMARK.md`.
@@ -136,8 +136,15 @@ The 0.2.70 release gate passed 2,780 default tests plus Ruff/mypy as 8/8
 supervised gates in 33.3 seconds under the canonical 6x6 topology.
 Version 0.2.71 requires the benchmark's label rows to match all six paths and
 hashes pinned by the ASAS-SN aggregate before any FITS/model work. The 6x6
-release gate passed 2,781 tests plus Ruff/mypy in 30.1 seconds; the merged-main
-evidence run remains next and training remains unauthorized.
+release gate passed 2,781 tests plus Ruff/mypy in 30.1 seconds.
+The merged run passed all six shards and global reconciliation: 48 TICs,
+192 trials, 384 unique model rows, 96/96 higher-depth larger-shift comparisons
+for each frozen model, 13/192 blind-BLS recoveries, and zero failures,
+duplicates, downloads, or persisted embeddings. Version 0.2.72 commits the
+evidence and integrity regression. The bounded gate is complete; training,
+broad extraction, promotion, and production scoring remain unauthorized.
+The 0.2.72 evidence-release gate passed 2,782 default tests plus Ruff/mypy as
+8/8 supervised gates in 37.2 seconds under the canonical 6x6 topology.
 The 0.2.63 release gate passed the unchanged 2,759 tests plus Ruff/mypy as 8/8
 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 
