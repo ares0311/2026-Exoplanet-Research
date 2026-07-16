@@ -615,6 +615,17 @@ unless at least two windows have coverage to test. See
 future bounded increments of the same roadmap item.
 The version 0.2.78 release gate passed 2,813 default tests plus Ruff/mypy as
 8/8 supervised gates in 28.2 seconds under the canonical 6x6 topology.
+Version 0.2.81 closes the "depth/asymmetry/missing/extra-event ranking"
+Phase 4 extension with its third and final increment: `extra_event_count`
+masks cadences near any predicted transit center across the full baseline,
+flags remaining out-of-transit cadences ≥3σ below the OOT median (MAD-based
+robust sigma), and clusters contiguous flags into events — a cluster counts
+only if it spans ≥2 cadences and ≤2× the transit duration. Wired against
+`planet_candidate` (−0.60) and for `instrumental_artifact` (+0.50); `None`
+unless ≥20 out-of-transit cadences are available. See
+`docs/SCORING_MODEL.md §25`.
+The version 0.2.81 release gate passed 2,883 default tests plus Ruff/mypy as
+10/10 supervised gates in 26.1 seconds under the canonical 6x6 topology.
 Version 0.2.79 adds the second named Phase 4 extension, `transit_asymmetry`:
 for each event already resolving a significant dip,
 `_measure_individual_transit_shapes()` splits its resolved-cadence deficit

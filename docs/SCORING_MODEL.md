@@ -1177,3 +1177,54 @@ set already computed for duration/midpoint measurement rather than a second
 significance pass, so the three per-event diagnostics (duration, midpoint,
 asymmetry) can never silently disagree about which cadences constitute the
 event.
+
+---
+
+## §25 Extra Event Score
+
+**Function**: `extra_event_score(extra_event_count, count_threshold=3)`
+
+Counts compact, significant flux dips that fall entirely outside every
+predicted transit window — structure a genuinely periodic single signal
+should not have in its out-of-transit (OOT) baseline:
+
+$$\phi_\mathrm{extra} = \mathrm{clip}\!\left(\frac{N_\mathrm{extra}}{N_\mathrm{thresh}},\; 0,\; 1\right)$$
+
+where the default threshold is $N_\mathrm{thresh} = 3$ extra events.
+
+**Interpretation**:
+- $\phi_\mathrm{extra} \approx 0$: no anomalous structure outside the
+  predicted transit windows — consistent with a single clean periodic
+  signal.
+- $\phi_\mathrm{extra} \approx 1$: three or more compact OOT excursions —
+  evidence of a second periodicity, a blended contaminating source, or an
+  instrumental glitch unrelated to the candidate signal.
+
+**Hypothesis weights**:
+
+| Hypothesis | Weight | Direction |
+|---|---|---|
+| `planet_candidate` | 0.60 | Negative (extra events penalise planet hypothesis) |
+| `instrumental_artifact` | 0.50 | Positive (extra events support instrumental hypothesis) |
+
+**Returns**: `None` when fewer than 20 out-of-transit cadences are available
+— too little baseline to distinguish an anomaly from noise.
+
+**Implementation**: `src/exo_toolkit/features.py` — `extra_event_score()`
+
+Input field: `RawDiagnostics.extra_event_count` (non-negative integer).
+
+Production measurement (version 0.2.81): `vet_signal()`'s
+`_measure_extra_events()` masks out every cadence within the signal's own
+half-duration of any predicted transit center (across the full observed
+baseline), then flags remaining out-of-transit cadences at least 3-sigma
+below the OOT median (MAD-based robust sigma, the same estimator used by
+`_extract_arrays()`'s flux-error fallback). Contiguous flagged cadences
+group into clusters; a cluster counts as one extra event only if it spans at
+least two cadences (excludes single-point noise) and no more than twice the
+signal's own transit duration (excludes broad low-frequency trends, which
+`background_excursion_score`/`systematics_overlap_score` already cover). This
+is the third and final increment of the "depth/asymmetry/missing/extra-event
+ranking" extension named in the version 0.2.77 roadmap note — §23
+(missing), §24 (asymmetry), and this section (extra-event) together close
+that item.

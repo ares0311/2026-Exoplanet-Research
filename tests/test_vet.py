@@ -18,6 +18,7 @@ from exo_toolkit.vet import (
     VetResult,
     _extract_arrays,
     _measure_data_gap_fraction,
+    _measure_extra_events,
     _measure_individual_transit_shapes,
     _measure_individual_transits,
     _measure_odd_even,
@@ -362,6 +363,96 @@ class TestMeasureIndividualTransitShapes:
             t, f, e, signal=_signal(period_days=100.0, epoch_bjd=_EPOCH + 200.0)
         )
         assert asymmetries is None
+
+
+# ---------------------------------------------------------------------------
+# _measure_extra_events
+# ---------------------------------------------------------------------------
+
+
+def _dense_baseline(
+    *, n_points: int = 20_000, span_days: float = 21.0, noise: float = 0.0001, seed: int = 1
+):
+    rng = np.random.default_rng(seed)
+    time_bjd = np.linspace(_EPOCH - 1.0, _EPOCH - 1.0 + span_days, n_points)
+    flux = np.ones_like(time_bjd) + rng.normal(0.0, noise, time_bjd.size)
+    return time_bjd, flux, np.full_like(flux, noise)
+
+
+def _inject_periodic_transits(time_bjd, flux, *, period=_PERIOD, depth=0.006, n_transits=4):
+    half_duration = _DURATION_H / 48.0
+    for index in range(n_transits):
+        center = _EPOCH + index * period
+        flux[np.abs(time_bjd - center) <= half_duration] -= depth
+    return flux
+
+
+def _inject_extra_dip(time_bjd, flux, *, center, depth=0.01, half_width_days=0.02):
+    flux[np.abs(time_bjd - center) <= half_width_days] -= depth
+    return flux
+
+
+class TestMeasureExtraEvents:
+    def test_returns_none_for_too_few_total_points(self) -> None:
+        t = np.linspace(_EPOCH, _EPOCH + 1.0, 8)
+        f = np.ones_like(t)
+        count = _measure_extra_events(t, f, signal=_signal())
+        assert count is None
+
+    def test_returns_none_when_almost_everything_is_in_transit(self) -> None:
+        # A period comparable to the transit duration itself, densely
+        # sampled, leaves too few out-of-transit cadences to judge.
+        rng = np.random.default_rng(5)
+        short_period = _DURATION_H / 24.0 * 1.02  # barely longer than duration
+        time_bjd = np.linspace(_EPOCH, _EPOCH + 1.0, 500)
+        flux = np.ones_like(time_bjd) + rng.normal(0.0, 0.0001, time_bjd.size)
+        count = _measure_extra_events(
+            time_bjd, flux, signal=_signal(period_days=short_period)
+        )
+        assert count is None
+
+    def test_clean_light_curve_has_zero_extra_events(self) -> None:
+        time_bjd, flux, _err = _dense_baseline()
+        flux = _inject_periodic_transits(time_bjd, flux)
+        count = _measure_extra_events(time_bjd, flux, signal=_signal())
+        assert count == 0
+
+    def test_single_injected_dip_is_detected(self) -> None:
+        time_bjd, flux, _err = _dense_baseline()
+        flux = _inject_periodic_transits(time_bjd, flux)
+        # Roughly halfway between the first two periodic transits.
+        flux = _inject_extra_dip(time_bjd, flux, center=_EPOCH + _PERIOD / 2.0)
+        count = _measure_extra_events(time_bjd, flux, signal=_signal())
+        assert count == 1
+
+    def test_two_separated_dips_counted_separately(self) -> None:
+        time_bjd, flux, _err = _dense_baseline()
+        flux = _inject_periodic_transits(time_bjd, flux)
+        flux = _inject_extra_dip(time_bjd, flux, center=_EPOCH + 0.5 * _PERIOD)
+        flux = _inject_extra_dip(time_bjd, flux, center=_EPOCH + 1.5 * _PERIOD)
+        count = _measure_extra_events(time_bjd, flux, signal=_signal())
+        assert count == 2
+
+    def test_single_cadence_outlier_is_not_counted(self) -> None:
+        time_bjd, flux, _err = _dense_baseline()
+        flux = _inject_periodic_transits(time_bjd, flux)
+        # A single isolated cadence deficit, not a >=2-cadence cluster.
+        nearest = int(np.argmin(np.abs(time_bjd - (_EPOCH + 0.5 * _PERIOD))))
+        flux[nearest] -= 0.01
+        count = _measure_extra_events(time_bjd, flux, signal=_signal())
+        assert count == 0
+
+    def test_wide_trend_is_not_counted_as_an_extra_event(self) -> None:
+        time_bjd, flux, _err = _dense_baseline()
+        flux = _inject_periodic_transits(time_bjd, flux)
+        # 10-hour-wide depression, far longer than the 4-hour cluster-span cap.
+        center = _EPOCH + 0.5 * _PERIOD
+        wide_half_width_days = (10.0 / 24.0) / 2.0
+        flux = _inject_extra_dip(
+            time_bjd, flux, center=center, depth=0.01, half_width_days=wide_half_width_days
+        )
+        count = _measure_extra_events(time_bjd, flux, signal=_signal())
+        assert count == 0
 
 
 # ---------------------------------------------------------------------------

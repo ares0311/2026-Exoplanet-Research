@@ -115,6 +115,7 @@ def vet_signal(
     durations, duration_errs, midpoints, missing_transit_fraction, asymmetries = (
         _measure_individual_transit_shapes(time_bjd, flux, flux_err, signal=signal)
     )
+    extra_event_count = _measure_extra_events(time_bjd, flux, signal=signal)
 
     depth_odd, err_odd, depth_even, err_even = _measure_odd_even(
         depths, depth_errs
@@ -132,6 +133,7 @@ def vet_signal(
         individual_transit_midpoints=midpoints,
         missing_transit_fraction=missing_transit_fraction,
         individual_transit_asymmetries=asymmetries,
+        extra_event_count=extra_event_count,
         depth_odd_ppm=depth_odd,
         err_odd_ppm=err_odd,
         depth_even_ppm=depth_even,
@@ -377,6 +379,101 @@ def _measure_individual_transit_shapes(
         missing_transit_fraction,
         tuple(asymmetries) if len(asymmetries) >= 2 else None,
     )
+
+
+def _measure_extra_events(
+    time_bjd: np.ndarray,
+    flux: np.ndarray,
+    *,
+    signal: CandidateSignal,
+) -> int | None:
+    """Count compact, significant flux dips that fall outside every predicted
+    transit window.
+
+    A genuinely periodic transit signal should have no extra structure in its
+    out-of-transit (OOT) baseline. A cluster of OOT cadences at least
+    3-sigma below the OOT median (using the same MAD-based robust sigma as
+    `_extract_arrays()`'s fallback), at least two cadences long, and no wider
+    than twice the signal's own transit duration, counts as one "extra
+    event" — evidence of a second periodicity, a blended source, or an
+    instrumental glitch unrelated to the candidate signal. Wide low-frequency
+    trends are deliberately excluded by the span cap; those are already
+    covered by `background_excursion_score`/`systematics_overlap_score`.
+
+    Returns None when fewer than 20 OOT cadences are available — too little
+    baseline to distinguish an anomaly from noise.
+    """
+    period = signal.period_days
+    epoch = signal.epoch_bjd
+    half_duration = signal.duration_hours / 48.0
+    if period <= 0.0 or half_duration <= 0.0 or len(time_bjd) < 10:
+        return None
+
+    ordered_time = np.sort(np.unique(time_bjd[np.isfinite(time_bjd)]))
+    cadence_deltas = np.diff(ordered_time)
+    cadence_deltas = cadence_deltas[cadence_deltas > 0.0]
+    if cadence_deltas.size == 0:
+        return None
+    cadence_days = float(np.median(cadence_deltas))
+
+    t_start = float(np.min(time_bjd))
+    t_end = float(np.max(time_bjd))
+    n_first = int(np.floor((t_start - epoch) / period))
+    n_last = int(np.ceil((t_end - epoch) / period))
+
+    near_any_transit = np.zeros(time_bjd.shape, dtype=bool)
+    for transit_number in range(n_first - 1, n_last + 2):
+        center = epoch + transit_number * period
+        if center < t_start - half_duration or center > t_end + half_duration:
+            continue
+        near_any_transit |= np.abs(time_bjd - center) <= half_duration
+    oot_mask = ~near_any_transit
+
+    if int(np.sum(oot_mask)) < 20:
+        return None
+
+    order = np.argsort(time_bjd[oot_mask])
+    oot_time = time_bjd[oot_mask][order]
+    oot_flux = flux[oot_mask][order]
+
+    baseline = float(np.median(oot_flux))
+    mad = float(np.median(np.abs(oot_flux - baseline)))
+    noise = 1.4826 * mad if mad > 0.0 else float(np.std(oot_flux))
+    if not np.isfinite(noise) or noise <= 0.0:
+        return None
+
+    deficit = baseline - oot_flux
+    significant = deficit >= 3.0 * noise
+    indices = np.nonzero(significant)[0]
+    if indices.size == 0:
+        return 0
+
+    max_cluster_span_days = max(4.0 * half_duration, 4.0 * cadence_days)
+    max_gap_days = 3.0 * cadence_days
+
+    clusters: list[tuple[int, int]] = []
+    run_start = int(indices[0])
+    run_prev = int(indices[0])
+    for idx in indices[1:]:
+        idx = int(idx)
+        contiguous = idx == run_prev + 1
+        close_in_time = (oot_time[idx] - oot_time[run_prev]) <= max_gap_days
+        if contiguous and close_in_time:
+            run_prev = idx
+            continue
+        clusters.append((run_start, run_prev))
+        run_start = idx
+        run_prev = idx
+    clusters.append((run_start, run_prev))
+
+    valid_cluster_count = 0
+    for start_idx, end_idx in clusters:
+        length = end_idx - start_idx + 1
+        span_days = oot_time[end_idx] - oot_time[start_idx]
+        if length >= 2 and span_days <= max_cluster_span_days:
+            valid_cluster_count += 1
+
+    return valid_cluster_count
 
 
 def _measure_odd_even(

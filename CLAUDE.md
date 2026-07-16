@@ -326,6 +326,18 @@ The version 0.2.80 release gate passed 2,866 default tests plus Ruff/mypy,
 the two new static gates, and the directive-integrity/incomplete-
 implementation checks as 10/10 supervised gates in 27.1 seconds under the
 canonical 6x6 topology.
+Version 0.2.81 closes the "depth/asymmetry/missing/extra-event ranking"
+Phase 4 extension with its third and final increment, `extra_event_count`:
+`_measure_extra_events()` masks every cadence near a predicted transit
+center across the full baseline, flags remaining out-of-transit cadences
+≥3σ below the OOT median (MAD-based robust sigma), and clusters contiguous
+flags — a cluster counts only if it spans ≥2 cadences and ≤2× the transit
+duration, excluding single-point noise and broad low-frequency trends.
+`extra_event_score()` wires this into `log_score_planet()` (−0.60) and
+`log_score_instrumental()` (+0.50); `None` unless ≥20 out-of-transit
+cadences are available. See `docs/SCORING_MODEL.md §25`.
+The version 0.2.81 release gate passed 2,883 default tests plus Ruff/mypy as
+10/10 supervised gates in 26.1 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
@@ -606,6 +618,19 @@ New feature in `features.py`, `schemas.py`, `hypotheses.py`, and `vet.py` (versi
 
 ---
 
+## Extra Event Score
+
+New feature in `features.py`, `schemas.py`, `hypotheses.py`, and `vet.py` (version 0.2.81):
+
+- `extra_event_score(extra_event_count, count_threshold=3) -> float` — clip(count / threshold)
+- `RawDiagnostics.extra_event_count`: count of compact, significant flux dips outside every predicted transit window. `_measure_extra_events()` masks out cadences near any predicted center, flags remaining out-of-transit cadences ≥3σ below the OOT median (MAD-based robust sigma), and clusters contiguous flags — a cluster counts only if it spans ≥2 cadences and ≤2× the transit duration
+- High score → anomalous structure outside the transit windows → evidence for a second periodicity, a blended source, or an instrumental glitch
+- Wired into `log_score_planet()` (−0.60 weight) and `log_score_instrumental()` (+0.50 weight)
+- `None` if fewer than 20 out-of-transit cadences are available
+- Spec: `docs/SCORING_MODEL.md §25` — this is the third and final increment of the "depth/asymmetry/missing/extra-event ranking" extension named in the 0.2.77 roadmap note
+
+---
+
 ## Milestone 12 Features (features.py + schemas.py + hypotheses.py)
 
 Five new diagnostic scores added (Milestone 12a–12e):
@@ -738,7 +763,7 @@ SubmissionPathway = Literal[
 ]
 
 CandidateSignal      # raw BLS output
-CandidateFeatures    # 45 OptScore fields, all default None
+CandidateFeatures    # 46 OptScore fields, all default None
 HypothesisPosterior  # 6 Score fields, validator enforces sum ≈ 1.0 ±0.01
 CandidateScores      # 6 Score fields (fpp, detection_confidence, novelty_score, …)
 CandidateExplanation # tuple[str, ...] fields for positive/negative/blocking evidence
