@@ -771,3 +771,40 @@ paired 500-ppm injection in all 96 TIC/period comparisons. Blind BLS recovered
 13/192 trials. This accepts the benchmark as bounded descriptive sensitivity
 evidence only; it does not authorize extraction, training, promotion, or a
 production-scoring change.
+
+---
+
+## DECISION-024: Require Grouped External Representations To Beat Both Frozen Baselines
+
+**Date:** 2026-07-16
+**Status:** Accepted for bounded execution; evidence pending
+
+### Context
+
+Exact Chronos-Bolt tiny and Astromer2 weights have passed source, inference,
+and paired injection-sensitivity gates. Those checks do not establish useful
+planet/false-positive ranking performance. The existing master Kepler corpus
+and cache support a bounded real-label comparison without new downloads.
+
+### Decision
+
+1. Freeze 1,536 unique KICs from the existing predefined grouped splits: 512
+   rows per label for training and 128 per label for validation and test.
+2. Fit identical deterministic linear probes on frozen Chronos-Bolt tiny and
+   Astromer2 representations; fit the statistical baseline with the same
+   train/validation discipline and keep `benchmark_cnn_v1` frozen.
+3. Open the test subset once after all probe, threshold, and decision rules are
+   frozen. Do not tune against this versioned test result.
+4. Call an external representation additive only if it beats the better of the
+   CNN and statistical baseline by at least 0.01 absolute on ROC AUC, average
+   precision, or top-100 positive fraction.
+5. Use the single-parent 6x6 cache-only shape, delete temporary embeddings after
+   aggregate reconciliation, and require zero downloads or persisted arrays.
+6. Keep broad extraction, training, promotion, and production changes disabled
+   regardless of the descriptive outcome.
+
+### Evidence before execution
+
+The frozen selection resolves to 1,536 unique KICs and an exact 24,036-file,
+10,398,406,656-byte read-only cache inventory. Contract, selection, inventory,
+shard, preprocessing, probe, aggregate-cleanup, and launcher tests pass locally.

@@ -28,6 +28,9 @@ HARD_STORAGE_LIMIT_GB = 100.0
 _GB = 1_000_000_000
 _RESERVED_FLAGS = ("--workers", "--shard-index", "--shard-count")
 _ALLOWED_SCRIPTS = {
+    "benchmark_grouped_external_representations.py": (
+        "cache-only grouped frozen-representation benchmark"
+    ),
     "benchmark_representation_variability_injection.py": (
         "cache-only paired BLS and frozen-embedding benchmark"
     ),

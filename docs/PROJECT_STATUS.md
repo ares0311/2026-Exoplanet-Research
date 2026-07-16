@@ -14,8 +14,8 @@ The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit w
 - Bayesian log-score model over six hypotheses
 - Optional XGBoost and stacking scorer modes (Tier 1 model trained: Kepler KOI AUC=0.992)
 - SQLite-backed background automation with top-level logs
-- 125 standalone `Skills/` Python files (`rg --files Skills -g '*.py'`)
-- 147 top-level test files
+- 126 standalone `Skills/` Python files (`rg --files Skills -g '*.py'`)
+- 148 top-level test files
 - 32 package Python modules under `src/exo_toolkit/`
 - JWST time-series ingestion wired into the CLI with `--mission JWST`
 - Novel TESS target scanning that excludes TOI, CTOI, and confirmed-host catalogs
@@ -145,6 +145,16 @@ evidence and integrity regression. The bounded gate is complete; training,
 broad extraction, promotion, and production scoring remain unauthorized.
 The 0.2.72 evidence-release gate passed 2,782 default tests plus Ruff/mypy as
 8/8 supervised gates in 37.2 seconds under the canonical 6x6 topology.
+Version 0.2.73 implements the next separately contracted grouped benchmark on
+1,536 unique cache-local Kepler KICs. It compares frozen Chronos-Bolt tiny and
+Astromer2 linear probes with the frozen calibrated CNN and a statistical
+ephemeris baseline under train/validation/test separation. The exact selected
+10.398 GB cache inventory is read-only, the run is allowlisted for the 6x6
+supervisor, and aggregate reconciliation must remove every temporary embedding
+array. Merged-main execution is next; all training and production authorization
+flags remain false.
+The 0.2.73 release gate passed 2,789 default tests plus Ruff/mypy as 8/8
+supervised gates in 34.1 seconds under the canonical 6x6 topology.
 The 0.2.63 release gate passed the unchanged 2,759 tests plus Ruff/mypy as 8/8
 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 

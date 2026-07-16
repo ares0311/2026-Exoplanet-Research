@@ -226,6 +226,13 @@ workers.
   processes or workers.
 - Version 0.2.72 validation passed 2,782 default tests plus Ruff/mypy as 8/8
   supervised gates in 37.2 seconds under the canonical 6x6 test topology.
+- Version 0.2.73's grouped external-representation runner uses six KIC-modulo
+  processes with six FITS preparation threads each. Every shard owns one
+  one-thread session per frozen ONNX model and serializes inference. The exact
+  10.398 GB selected cache inventory is read-only; temporary compressed arrays
+  remain under ignored `logs/` and aggregate reconciliation deletes them.
+- Version 0.2.73 validation passed 2,789 default tests plus Ruff/mypy as 8/8
+  supervised gates in 34.1 seconds under the canonical 6x6 test topology.
 - Version 0.2.63 validation passed the unchanged 2,759 tests plus Ruff/mypy as
   8/8 supervised gates in 27.3 seconds with the canonical 6×6 test topology.
 
