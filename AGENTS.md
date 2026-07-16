@@ -487,6 +487,20 @@ unless at least two windows have coverage to test. See
 future bounded increments of the same roadmap item.
 The version 0.2.78 release gate passed 2,813 default tests plus Ruff/mypy as
 8/8 supervised gates in 28.2 seconds under the canonical 6x6 topology.
+Version 0.2.79 adds the second named Phase 4 extension, `transit_asymmetry`:
+for each event already resolving a significant dip,
+`_measure_individual_transit_shapes()` splits its resolved-cadence deficit
+sum by sign of offset from the predicted center (not the resolved weighted
+midpoint, so a genuinely shifted-but-symmetric event is not penalised) and
+records the normalized before/after imbalance, reusing the same
+resolved-cadence set already produced for duration/midpoint measurement.
+`transit_asymmetry_score()` is the RMS of these imbalances relative to a 0.30
+threshold; wired into `log_score_planet()` (−0.50) and
+`log_score_instrumental()` (+0.50); `None` unless at least two events
+resolve. See `docs/SCORING_MODEL.md §24`. Extra-event ranking remains the
+last named increment of this roadmap item.
+The version 0.2.79 release gate passed 2,828 default tests plus Ruff/mypy as
+8/8 supervised gates in 25.2 seconds under the canonical 6x6 topology.
 
 The version 0.2.62 release gate passed 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 34.3 seconds under the canonical 6×6 topology.
@@ -794,6 +808,28 @@ whatever mission/domain is in scope:
 ## Standing Rules
 
 - **Skills directory**: Any standalone `.py` utility script created to perform a task (data processing, report generation, injection-recovery, etc.) must be saved in `Skills/` at the project root. Create the directory if it does not exist. This allows scripts to be discovered and reused across sessions rather than recreated.
+
+---
+
+## Maintenance TODO — Process/Tooling Directives (Pending Design)
+
+Recorded verbatim from the human on 2026-07-16 as durable backlog, not yet
+scoped into enforceable rules or implemented. Any agent picking these up must
+first turn each into a concrete, testable mechanism (a lint rule, a CI check,
+a doc convention, etc.) before claiming it done — do not mark any of these
+complete just because a plausible-looking script exists.
+
+- Assert that everything should fail loudly.
+- Losslessly factor System Directives so they can be read and reread
+  effectively (i.e. reduce duplication/drift across `AGENTS.md`/`CLAUDE.md`/
+  `docs/*.md` without losing information).
+- Add a system directive to prevent stubbing (placeholder/fake
+  implementations presented as done).
+- Add provenance stamping to ensure that code actually does what the spec
+  says it does, and what an LLM claims it does.
+- Fidelity tests to ensure that code does what it says it does.
+- Spec conformance checks.
+- Assert a linter when something fails.
 
 ---
 

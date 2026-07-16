@@ -224,7 +224,7 @@ class TestMeasureIndividualTransitShapes:
     def test_resolves_multiple_durations_and_midpoints(self) -> None:
         lc = _lc_with_transit(depth=0.005, noise=0.0002)
         t, f, e = _extract_arrays(lc, flux_shape=None)
-        durations, errors, midpoints, missing_fraction = (
+        durations, errors, midpoints, missing_fraction, asymmetries = (
             _measure_individual_transit_shapes(t, f, e, signal=_signal())
         )
         assert durations is not None and errors is not None and midpoints is not None
@@ -239,21 +239,23 @@ class TestMeasureIndividualTransitShapes:
         # Clean injected transit: nearly every covered window should resolve.
         assert missing_fraction is not None
         assert missing_fraction < 0.2
+        assert asymmetries is not None
+        assert len(asymmetries) == len(midpoints)
 
     def test_returns_none_for_flat_noise(self) -> None:
         lc = _flat_lc(noise=0.0002)
         t, f, e = _extract_arrays(lc, flux_shape=None)
-        durations, errors, midpoints, _missing_fraction = (
+        durations, errors, midpoints, _missing_fraction, asymmetries = (
             _measure_individual_transit_shapes(t, f, e, signal=_signal())
         )
-        assert (durations, errors, midpoints) == (None, None, None)
+        assert (durations, errors, midpoints, asymmetries) == (None, None, None, None)
 
     def test_all_windows_missing_for_densely_sampled_flat_noise(self) -> None:
         # Dense enough sampling that every predicted window clears the
         # 5-cadence coverage floor, but no dip is present anywhere.
         lc = _flat_lc(n_points=2000, noise=0.0002)
         t, f, e = _extract_arrays(lc, flux_shape=None)
-        _durations, _errors, _midpoints, missing_fraction = (
+        _durations, _errors, _midpoints, missing_fraction, _asymmetries = (
             _measure_individual_transit_shapes(t, f, e, signal=_signal())
         )
         assert missing_fraction == 1.0
@@ -268,7 +270,7 @@ class TestMeasureIndividualTransitShapes:
         for center in centers:
             flux[np.abs(time_bjd - center) <= half_duration] -= 0.005
         errors = np.full_like(flux, 0.0001)
-        _durations, _duration_errors, midpoints, _missing_fraction = (
+        _durations, _duration_errors, midpoints, _missing_fraction, _asymmetries = (
             _measure_individual_transit_shapes(
                 time_bjd, flux, errors, signal=_signal()
             )
@@ -290,7 +292,7 @@ class TestMeasureIndividualTransitShapes:
         # Long period, short baseline → at most one window can have coverage.
         lc = _lc_with_transit(t_span_days=5.0)
         t, f, e = _extract_arrays(lc, flux_shape=None)
-        _d, _e, _m, missing_fraction = _measure_individual_transit_shapes(
+        _d, _e, _m, missing_fraction, _a = _measure_individual_transit_shapes(
             t, f, e, signal=_signal(period_days=100.0, epoch_bjd=_EPOCH + 200.0)
         )
         assert missing_fraction is None
@@ -306,11 +308,60 @@ class TestMeasureIndividualTransitShapes:
             center = _EPOCH + index * period
             flux[np.abs(time_bjd - center) <= half_duration] -= 0.006
         errors = np.full_like(flux, 0.0001)
-        _d, _e, _m, missing_fraction = _measure_individual_transit_shapes(
+        _d, _e, _m, missing_fraction, _a = _measure_individual_transit_shapes(
             time_bjd, flux, errors, signal=_signal(period_days=period)
         )
         assert missing_fraction is not None
         assert 0.4 < missing_fraction < 0.8
+
+    def test_symmetric_events_give_near_zero_asymmetry(self) -> None:
+        # Dense sampling so per-event point counts are large enough that
+        # grid-alignment and noise fluctuations average out. Pad well before
+        # the first event and after the last so every window has full
+        # before/after coverage (an event flush against the baseline edge
+        # is inherently one-sided regardless of true symmetry).
+        rng = np.random.default_rng(99)
+        period = 5.0
+        time_bjd = np.linspace(_EPOCH - 1.0, _EPOCH + 4.0 * period + 1.0, 20_000)
+        flux = np.ones_like(time_bjd) + rng.normal(0.0, 0.0001, time_bjd.size)
+        half_duration = _DURATION_H / 48.0
+        for index in range(5):
+            center = _EPOCH + index * period
+            flux[np.abs(time_bjd - center) <= half_duration] -= 0.006
+        errors = np.full_like(flux, 0.0001)
+        _d, _e, _m, _mf, asymmetries = _measure_individual_transit_shapes(
+            time_bjd, flux, errors, signal=_signal(period_days=period)
+        )
+        assert asymmetries is not None
+        assert all(abs(a) < 0.3 for a in asymmetries)
+
+    def test_lopsided_events_give_large_asymmetry(self) -> None:
+        # Deficit concentrated entirely after the predicted center each event
+        # (e.g. an asymmetric ramp) -> asymmetry should be strongly positive.
+        rng = np.random.default_rng(11)
+        period = 5.0
+        time_bjd = np.linspace(_EPOCH, _EPOCH + 4.0 * period + 1.0, 8000)
+        flux = np.ones_like(time_bjd) + rng.normal(0.0, 0.0001, time_bjd.size)
+        half_duration = _DURATION_H / 48.0
+        for index in range(5):
+            center = _EPOCH + index * period
+            offsets = time_bjd - center
+            lopsided = (offsets >= 0.0) & (offsets <= half_duration)
+            flux[lopsided] -= 0.006
+        errors = np.full_like(flux, 0.0001)
+        _d, _e, _m, _mf, asymmetries = _measure_individual_transit_shapes(
+            time_bjd, flux, errors, signal=_signal(period_days=period)
+        )
+        assert asymmetries is not None
+        assert all(a > 0.7 for a in asymmetries)
+
+    def test_none_asymmetries_when_fewer_than_two_events_resolve(self) -> None:
+        lc = _lc_with_transit(t_span_days=5.0)
+        t, f, e = _extract_arrays(lc, flux_shape=None)
+        _d, _e2, _m, _mf, asymmetries = _measure_individual_transit_shapes(
+            t, f, e, signal=_signal(period_days=100.0, epoch_bjd=_EPOCH + 200.0)
+        )
+        assert asymmetries is None
 
 
 # ---------------------------------------------------------------------------

@@ -294,6 +294,18 @@ Phase 4 roadmap note ("depth/asymmetry/missing/extra-event ranking");
 asymmetry and extra-event ranking remain future bounded increments.
 The version 0.2.78 release gate passed 2,813 default tests plus Ruff/mypy as
 8/8 supervised gates in 28.2 seconds under the canonical 6x6 topology.
+Version 0.2.79 adds the second named Phase 4 extension, `transit_asymmetry`:
+for each event that already resolves a significant dip,
+`_measure_individual_transit_shapes()` splits its resolved-cadence deficit
+sum by sign of offset from the predicted center and records the normalized
+before/after imbalance, reusing the same resolved-cadence set already
+produced for duration/midpoint measurement. `transit_asymmetry_score()` is
+the RMS of these imbalances relative to a 0.30 threshold, wired into
+`log_score_planet()` (−0.50) and `log_score_instrumental()` (+0.50); `None`
+unless at least two events resolve. See `docs/SCORING_MODEL.md §24`.
+Extra-event ranking remains the last named increment of this roadmap item.
+The version 0.2.79 release gate passed 2,828 default tests plus Ruff/mypy as
+8/8 supervised gates in 25.2 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
@@ -561,6 +573,19 @@ New feature in `features.py`, `schemas.py`, `hypotheses.py`, and `vet.py` (versi
 
 ---
 
+## Transit Asymmetry Score
+
+New feature in `features.py`, `schemas.py`, `hypotheses.py`, and `vet.py` (version 0.2.79):
+
+- `transit_asymmetry_score(asymmetries, rms_threshold=0.30) -> float | None` — RMS of per-event imbalance relative to threshold, same pattern as `transit_timing_variation_score()`
+- `RawDiagnostics.individual_transit_asymmetries`: per-event `(after − before) / (after + before)` in `[-1, 1]`, computed from the same resolved-cadence set `_measure_individual_transit_shapes()` already produces for durations/midpoints, split by sign of offset from the *predicted* transit center
+- High score → events are consistently lopsided around their predicted centers → evidence for an instrumental ramp or blended-source contamination, not a clean box/trapezoid transit
+- Wired into `log_score_planet()` (−0.50 weight) and `log_score_instrumental()` (+0.50 weight)
+- `None` if fewer than 2 events resolve
+- Spec: `docs/SCORING_MODEL.md §24`
+
+---
+
 ## Milestone 12 Features (features.py + schemas.py + hypotheses.py)
 
 Five new diagnostic scores added (Milestone 12a–12e):
@@ -693,7 +718,7 @@ SubmissionPathway = Literal[
 ]
 
 CandidateSignal      # raw BLS output
-CandidateFeatures    # 44 OptScore fields, all default None
+CandidateFeatures    # 45 OptScore fields, all default None
 HypothesisPosterior  # 6 Score fields, validator enforces sum ≈ 1.0 ±0.01
 CandidateScores      # 6 Score fields (fpp, detection_confidence, novelty_score, …)
 CandidateExplanation # tuple[str, ...] fields for positive/negative/blocking evidence

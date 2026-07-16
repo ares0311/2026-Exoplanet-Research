@@ -288,6 +288,18 @@ by itself satisfy a master-guide evidence requirement.
    the next bounded increments of this roadmap item.
    The version 0.2.78 release gate passed 2,813 default tests plus Ruff/mypy as
    8/8 supervised gates in 28.2 seconds under the canonical 6x6 topology.
+   Version 0.2.79 adds the second named increment, `transit_asymmetry`: for
+   each event that already resolves a significant dip, the resolved-cadence
+   deficit sum is split by sign of offset from the predicted center (not the
+   resolved weighted midpoint) and recorded as a normalized before/after
+   imbalance, reusing the exact resolved-cadence set already produced for
+   duration/midpoint measurement. `transit_asymmetry_score()` is the RMS of
+   these imbalances relative to a 0.30 threshold; wired against
+   `planet_candidate` (−0.50) and for `instrumental_artifact` (+0.50); `None`
+   unless at least two events resolve. See `docs/SCORING_MODEL.md §24`.
+   Extra-event ranking remains the last named increment of this item.
+   The version 0.2.79 release gate passed 2,828 default tests plus Ruff/mypy as
+   8/8 supervised gates in 25.2 seconds under the canonical 6x6 topology.
    The 0.2.60 release passed 2,751 default tests plus Ruff/mypy as
    8/8 supervised gates under the 6×6 topology in 25.2 seconds.
 
