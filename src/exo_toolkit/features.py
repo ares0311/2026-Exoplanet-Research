@@ -35,6 +35,7 @@ class RawDiagnostics:
     individual_transit_midpoints: tuple[float, ...] | None = None  # BJD
     missing_transit_fraction: float | None = None  # covered windows with no resolved event
     individual_transit_asymmetries: tuple[float, ...] | None = None  # per-event dip asymmetry
+    extra_event_count: int | None = None  # significant dips outside every predicted window
 
     # Per-sector measurements
     sector_depths: tuple[float, ...] | None = None        # per-sector mean transit depths (ppm)
@@ -227,6 +228,21 @@ def transit_asymmetry_score(
     arr = np.array(asymmetries, dtype=float)
     rms = float(np.sqrt(np.mean(arr**2)))
     return _clip(rms / rms_threshold)
+
+
+def extra_event_score(extra_event_count: int, count_threshold: int = 3) -> float:
+    """
+    Count of compact, significant flux dips outside every predicted transit
+    window.
+
+    A genuinely periodic single signal has no extra structure in its
+    out-of-transit baseline. A nonzero count is evidence of a second
+    periodicity, a blended source, or an instrumental glitch.
+
+    Score = clip(extra_event_count / count_threshold) — saturates at
+    `count_threshold` extra events.
+    """
+    return _clip(extra_event_count / count_threshold)
 
 
 def out_of_transit_scatter_score(
@@ -768,6 +784,10 @@ def extract_features(
     if d.individual_transit_asymmetries is not None:
         asym_s = transit_asymmetry_score(d.individual_transit_asymmetries)
 
+    extra_event_s: float | None = None
+    if d.extra_event_count is not None:
+        extra_event_s = extra_event_score(d.extra_event_count)
+
     # --- transit morphology ---
     shape_s: float | None = None
     v_s: float | None = None
@@ -939,6 +959,7 @@ def extract_features(
         transit_timing_variation_score=ttv_s,
         missing_transit_fraction_score=missing_s,
         transit_asymmetry_score=asym_s,
+        extra_event_score=extra_event_s,
         out_of_transit_scatter_score=oot_s,
         multi_sector_depth_consistency_score=ms_depth_s,
         stellar_density_consistency_score=density_s,

@@ -18,6 +18,7 @@ from exo_toolkit.features import (
     duration_implausibility_score,
     duration_plausibility_score,
     epoch_match_score,
+    extra_event_score,
     extract_features,
     flare_score,
     harmonic_score,
@@ -893,6 +894,42 @@ class TestTransitAsymmetryScore:
     ) -> None:
         f = extract_features(base_signal, RawDiagnostics())
         assert f.transit_asymmetry_score is None
+
+
+# ---------------------------------------------------------------------------
+# extra_event_score
+# ---------------------------------------------------------------------------
+
+
+class TestExtraEventScore:
+    def test_zero_count_gives_zero(self) -> None:
+        assert extra_event_score(0) == pytest.approx(0.0)
+
+    def test_at_threshold_gives_one(self) -> None:
+        assert extra_event_score(3, count_threshold=3) == pytest.approx(1.0)
+
+    def test_above_threshold_clips_to_one(self) -> None:
+        assert extra_event_score(10, count_threshold=3) == pytest.approx(1.0)
+
+    def test_partial_count_passes_through(self) -> None:
+        assert extra_event_score(1, count_threshold=2) == pytest.approx(0.5)
+
+    def test_output_in_zero_one(self) -> None:
+        assert 0.0 <= extra_event_score(2) <= 1.0
+
+    def test_extract_features_propagates_extra_event_count(
+        self, base_signal: CandidateSignal
+    ) -> None:
+        diag = RawDiagnostics(extra_event_count=0)
+        f = extract_features(base_signal, diag)
+        assert f.extra_event_score is not None
+        assert f.extra_event_score == pytest.approx(0.0)
+
+    def test_none_extra_event_count_gives_none_feature(
+        self, base_signal: CandidateSignal
+    ) -> None:
+        f = extract_features(base_signal, RawDiagnostics())
+        assert f.extra_event_score is None
 
 
 # ---------------------------------------------------------------------------

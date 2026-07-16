@@ -265,8 +265,9 @@ by itself satisfy a master-guide evidence requirement.
    The version 0.2.76 evidence-release gate passed 2,797 default tests plus
    Ruff/mypy as 8/8 supervised gates in 36.3 seconds under the canonical 6x6
    topology.
-7. **Phase 4 — individual anomalous-transit detector (CORE DIAGNOSTICS
-   IMPLEMENTED):** version 0.2.77 fixes the production vetter's hard-coded
+7. **Phase 4 — individual anomalous-transit detector (BOUNDED CORE +
+   DEPTH/ASYMMETRY/MISSING/EXTRA-EVENT EXTENSION COMPLETE):** version 0.2.77
+   fixes the production vetter's hard-coded
    missing per-transit durations and midpoints. Each expected event now uses a
    local sideband baseline, a twice-noise half-depth gate, a flux-deficit-
    weighted midpoint, and cadence-resolved duration. At least two events must
@@ -300,6 +301,17 @@ by itself satisfy a master-guide evidence requirement.
    Extra-event ranking remains the last named increment of this item.
    The version 0.2.79 release gate passed 2,828 default tests plus Ruff/mypy as
    8/8 supervised gates in 25.2 seconds under the canonical 6x6 topology.
+   Version 0.2.81 closes the item with its third and final increment:
+   `_measure_extra_events()` masks cadences near any predicted transit center
+   across the full baseline, flags remaining out-of-transit cadences ≥3σ
+   below the OOT median (MAD-based robust sigma), and clusters contiguous
+   flags into events — a cluster counts only if it spans ≥2 cadences and
+   ≤2× the transit duration. `extra_event_score()` is wired against
+   `planet_candidate` (−0.60) and for `instrumental_artifact` (+0.50); `None`
+   unless ≥20 out-of-transit cadences are available. See
+   `docs/SCORING_MODEL.md §25`. The version 0.2.81 release gate passed
+   2,883 default tests plus Ruff/mypy as 10/10 supervised gates in
+   26.1 seconds under the canonical 6x6 topology.
    The 0.2.60 release passed 2,751 default tests plus Ruff/mypy as
    8/8 supervised gates under the 6×6 topology in 25.2 seconds.
 

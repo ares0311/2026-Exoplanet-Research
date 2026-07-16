@@ -450,6 +450,26 @@ class TestTransitAsymmetryWiring:
         )
 
 
+class TestExtraEventWiring:
+    def test_extra_events_lower_planet_score(self) -> None:
+        base = CandidateFeatures()
+        anomalous = CandidateFeatures(extra_event_score=1.0)
+        assert log_score_planet(anomalous) < log_score_planet(base)
+
+    def test_extra_events_raise_instrumental_score(self) -> None:
+        base = CandidateFeatures()
+        anomalous = CandidateFeatures(extra_event_score=1.0)
+        assert log_score_instrumental(anomalous) > log_score_instrumental(base)
+
+    def test_none_extra_event_score_is_neutral(self) -> None:
+        base = CandidateFeatures()
+        null_extra = CandidateFeatures(extra_event_score=None)
+        assert log_score_planet(null_extra) == pytest.approx(log_score_planet(base))
+        assert log_score_instrumental(null_extra) == pytest.approx(
+            log_score_instrumental(base)
+        )
+
+
 # ---------------------------------------------------------------------------
 # New feature wiring tests (Milestones 12a-12e)
 # ---------------------------------------------------------------------------

@@ -5,13 +5,16 @@ catalog ephemeris for pi Mensae c was recovered within 0.005% with ensemble
 FPP 0.4405, while the TOI-146.01 false-positive control produced no signal.
 No Tier 1 gaps remain open; the bounded Phase 3 representation variability/
 injection and grouped external-representation gates passed; the grouped result
-was `no_external_added_value`. Phase 4 individual-transit diagnostics are now
-the active bounded improvement.)
+was `no_external_added_value`. Phase 4 individual-transit diagnostics'
+depth/asymmetry/missing/extra-event bounded core is now complete
+(missing_transit_fraction, transit_asymmetry, extra_event_count); the next
+production task should be chosen fresh from readiness checks and roadmap
+state, not assumed to still be Phase 4.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
-Test baseline: 2,866 default tests passing; 2 `integration_live` tests excluded by
-the configured marker expression (2026-07-16; 6×6 gate: 27.1s, 10/10 gates
-including two new verifiable-agent-reliability checks — see
+Test baseline: 2,883 default tests passing; 2 `integration_live` tests excluded by
+the configured marker expression (2026-07-16; 6×6 gate: 26.1s, 10/10 gates
+including two verifiable-agent-reliability checks — see
 `docs/RELIABILITY_CONTROLS.md`)
 
 ---
@@ -34,7 +37,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.79 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.81 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -679,6 +682,21 @@ resolve. See `docs/SCORING_MODEL.md §24`. Extra-event ranking remains the
 last named increment of this roadmap item.
 The version 0.2.79 release gate passed 2,828 default tests plus Ruff/mypy as
 8/8 supervised gates in 25.2 seconds under the canonical 6x6 topology.
+Version 0.2.81 closes this roadmap item with its third and final increment,
+`extra_event_count`. `_measure_extra_events()` masks cadences near any
+predicted transit center across the full baseline, flags remaining
+out-of-transit cadences ≥3σ below the OOT median (MAD-based robust sigma),
+and clusters contiguous flags into events — a cluster counts only if it
+spans ≥2 cadences and ≤2× the transit duration, excluding single-point
+noise and broad low-frequency trends already covered by
+`background_excursion_score`/`systematics_overlap_score`. Wired against
+`planet_candidate` (−0.60) and for `instrumental_artifact` (+0.50); `None`
+unless ≥20 out-of-transit cadences are available. See
+`docs/SCORING_MODEL.md §25`. The version 0.2.80 release (verifiable-agent-
+reliability controls) is orthogonal tooling infrastructure, not a Phase
+deliverable — see `docs/RELIABILITY_CONTROLS.md`.
+The version 0.2.81 release gate passed 2,883 default tests plus Ruff/mypy as
+10/10 supervised gates in 26.1 seconds under the canonical 6x6 topology.
 The version 0.2.63 release gate passed the unchanged 2,759 default tests plus
 Ruff/mypy as 8/8 supervised gates in 27.3 seconds under the canonical 6×6
 topology.
