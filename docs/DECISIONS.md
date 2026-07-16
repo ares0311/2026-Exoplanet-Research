@@ -728,7 +728,7 @@ EA=26, EB=9, EW=2, ROT=10, and SR=1.
 ## DECISION-023: Use A Paired Cache-Only Variability/Injection Benchmark Before Broader Extraction
 
 **Date:** 2026-07-14
-**Status:** Accepted for merged-main evidence execution
+**Status:** Accepted; merged evidence passed, training remains unauthorized
 
 ### Context
 
@@ -760,3 +760,14 @@ All 48 selected cache products meet the 20-day baseline requirement. A
 one-TIC runtime smoke read 12,508 clean cadences, constructed all four trials,
 ran the blind BLS comparator, and returned finite 256-element outputs from both
 exact cached ONNX models without downloading or persisting data.
+
+### Merged evidence outcome
+
+The 2026-07-16 single-parent 6x6 run passed all six shards and all seven global
+checks: 48 TICs, 192 trials, 384 unique model rows, zero failures or duplicate
+model trials, zero downloaded bytes, and zero persisted embeddings. Both
+models produced a larger cosine shift for the 2,000-ppm injection than the
+paired 500-ppm injection in all 96 TIC/period comparisons. Blind BLS recovered
+13/192 trials. This accepts the benchmark as bounded descriptive sensitivity
+evidence only; it does not authorize extraction, training, promotion, or a
+production-scoring change.

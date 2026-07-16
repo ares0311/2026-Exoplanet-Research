@@ -1,0 +1,20 @@
+{
+  "artifact_id": "representation_variability_injection_shard_v1",
+  "bls_recovered_trials": 4,
+  "contract_sha256": "ea4a8839348cc6e07f893fc5acb73118cced5e966ec119ef75434a8a96ea7e3e",
+  "downloaded_bytes": 0,
+  "elapsed_seconds": 8.47306008299347,
+  "model_rows": 64,
+  "output_path": "artifacts/manifests/representation_variability_injection_v1.shard4of6.jsonl",
+  "output_sha256": "2afa026b125d20d59dfa99cd744df9b3d93a8e04b56091677a76adb6aa336e25",
+  "persisted_embeddings": 0,
+  "production_change_authorized": false,
+  "schema_version": 1,
+  "selected_tics": 8,
+  "shard_count": 6,
+  "shard_index": 3,
+  "status": "success",
+  "training_authorized": false,
+  "unique_trials": 32,
+  "workers": 6
+}

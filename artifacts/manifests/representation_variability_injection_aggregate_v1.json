@@ -1,0 +1,246 @@
+{
+  "artifact_id": "representation_variability_injection_aggregate_v1",
+  "by_scenario": [
+    {
+      "bls_recovered": 3,
+      "bls_recovery_rate": 0.0625,
+      "embedding_metrics": {
+        "Astromer2": {
+          "mean_cosine_distance": 1.0219413278574526e-11,
+          "median_cosine_distance": 7.29200033688926e-12
+        },
+        "Chronos-Bolt tiny": {
+          "mean_cosine_distance": 1.5235862101455055e-05,
+          "median_cosine_distance": 9.739612100712058e-07
+        }
+      },
+      "scenario_id": "long_high",
+      "trials": 48
+    },
+    {
+      "bls_recovered": 2,
+      "bls_recovery_rate": 0.041666666666666664,
+      "embedding_metrics": {
+        "Astromer2": {
+          "mean_cosine_distance": 6.418153046065337e-13,
+          "median_cosine_distance": 4.1455727739503345e-13
+        },
+        "Chronos-Bolt tiny": {
+          "mean_cosine_distance": 9.582118228138963e-07,
+          "median_cosine_distance": 6.064763646840277e-08
+        }
+      },
+      "scenario_id": "long_low",
+      "trials": 48
+    },
+    {
+      "bls_recovered": 4,
+      "bls_recovery_rate": 0.08333333333333333,
+      "embedding_metrics": {
+        "Astromer2": {
+          "mean_cosine_distance": 2.391925315222328e-11,
+          "median_cosine_distance": 8.068545831463325e-12
+        },
+        "Chronos-Bolt tiny": {
+          "mean_cosine_distance": 4.102124622440186e-05,
+          "median_cosine_distance": 3.4055334087734757e-06
+        }
+      },
+      "scenario_id": "short_high",
+      "trials": 48
+    },
+    {
+      "bls_recovered": 4,
+      "bls_recovery_rate": 0.08333333333333333,
+      "embedding_metrics": {
+        "Astromer2": {
+          "mean_cosine_distance": 1.3974238433078767e-12,
+          "median_cosine_distance": 5.204725539442734e-13
+        },
+        "Chronos-Bolt tiny": {
+          "mean_cosine_distance": 2.6815223894485762e-06,
+          "median_cosine_distance": 2.1553357343329083e-07
+        }
+      },
+      "scenario_id": "short_low",
+      "trials": 48
+    }
+  ],
+  "checks": {
+    "required_model_rows": true,
+    "required_models": true,
+    "required_tics": true,
+    "required_trials": true,
+    "zero_downloaded_bytes": true,
+    "zero_duplicate_model_trials": true,
+    "zero_persisted_embeddings": true
+  },
+  "class_counts": {
+    "EA": 26,
+    "EB": 9,
+    "EW": 2,
+    "ROT": 10,
+    "SR": 1
+  },
+  "completed_at_utc": "2026-07-16T09:45:45.336653+00:00",
+  "contract_path": "metadata/representation_variability_injection_contract_v1.json",
+  "contract_sha256": "ea4a8839348cc6e07f893fc5acb73118cced5e966ec119ef75434a8a96ea7e3e",
+  "depth_order": {
+    "Astromer2": {
+      "comparisons": 96,
+      "fraction": 1.0,
+      "higher_depth_larger_shift": 96
+    },
+    "Chronos-Bolt tiny": {
+      "comparisons": 96,
+      "fraction": 1.0,
+      "higher_depth_larger_shift": 96
+    }
+  },
+  "downloaded_bytes": 0,
+  "duplicate_model_trials": 0,
+  "limitations": [
+    "ASAS-SN classes are automated outputs and remain training-disabled.",
+    "This is a paired sensitivity benchmark, not a classifier fit, survey-completeness estimate, or production promotion gate.",
+    "The four-cell injection grid reuses bounded regimes from production_sensitivity_v2 and does not cover long-period, TTV, single-transit, or image-level systematics.",
+    "No embedding array, modified light curve, FITS product, model weight, or catalog payload may be written or downloaded.",
+    "A successful execution authorizes scientific interpretation only; training, promotion, and production scoring remain unauthorized."
+  ],
+  "model_rows": 384,
+  "models": [
+    "Astromer2",
+    "Chronos-Bolt tiny"
+  ],
+  "persisted_embeddings": 0,
+  "production_change_authorized": false,
+  "schema_version": 1,
+  "scientific_metrics_are_descriptive": true,
+  "shard_count": 6,
+  "shard_summaries": [
+    {
+      "artifact_id": "representation_variability_injection_shard_v1",
+      "bls_recovered_trials": 4,
+      "contract_sha256": "ea4a8839348cc6e07f893fc5acb73118cced5e966ec119ef75434a8a96ea7e3e",
+      "downloaded_bytes": 0,
+      "elapsed_seconds": 10.475582999992184,
+      "model_rows": 72,
+      "output_path": "artifacts/manifests/representation_variability_injection_v1.shard1of6.jsonl",
+      "output_sha256": "cf05dfeaf728a5a5441ba204d81294e666759d239f0a9c1824a1d22fa621a87a",
+      "persisted_embeddings": 0,
+      "production_change_authorized": false,
+      "schema_version": 1,
+      "selected_tics": 9,
+      "shard_count": 6,
+      "shard_index": 0,
+      "status": "success",
+      "training_authorized": false,
+      "unique_trials": 36,
+      "workers": 6
+    },
+    {
+      "artifact_id": "representation_variability_injection_shard_v1",
+      "bls_recovered_trials": 1,
+      "contract_sha256": "ea4a8839348cc6e07f893fc5acb73118cced5e966ec119ef75434a8a96ea7e3e",
+      "downloaded_bytes": 0,
+      "elapsed_seconds": 8.508030291064642,
+      "model_rows": 56,
+      "output_path": "artifacts/manifests/representation_variability_injection_v1.shard2of6.jsonl",
+      "output_sha256": "2b7ef1013c2e57cc61541a34ac0dce631881598b261745fe0133f25f04d5a25b",
+      "persisted_embeddings": 0,
+      "production_change_authorized": false,
+      "schema_version": 1,
+      "selected_tics": 7,
+      "shard_count": 6,
+      "shard_index": 1,
+      "status": "success",
+      "training_authorized": false,
+      "unique_trials": 28,
+      "workers": 6
+    },
+    {
+      "artifact_id": "representation_variability_injection_shard_v1",
+      "bls_recovered_trials": 4,
+      "contract_sha256": "ea4a8839348cc6e07f893fc5acb73118cced5e966ec119ef75434a8a96ea7e3e",
+      "downloaded_bytes": 0,
+      "elapsed_seconds": 3.4604070419445634,
+      "model_rows": 56,
+      "output_path": "artifacts/manifests/representation_variability_injection_v1.shard3of6.jsonl",
+      "output_sha256": "365ec55c960e8ea2303b81b787417b73479c7940d0a32047de588a66fd6b461f",
+      "persisted_embeddings": 0,
+      "production_change_authorized": false,
+      "schema_version": 1,
+      "selected_tics": 7,
+      "shard_count": 6,
+      "shard_index": 2,
+      "status": "success",
+      "training_authorized": false,
+      "unique_trials": 28,
+      "workers": 6
+    },
+    {
+      "artifact_id": "representation_variability_injection_shard_v1",
+      "bls_recovered_trials": 4,
+      "contract_sha256": "ea4a8839348cc6e07f893fc5acb73118cced5e966ec119ef75434a8a96ea7e3e",
+      "downloaded_bytes": 0,
+      "elapsed_seconds": 8.47306008299347,
+      "model_rows": 64,
+      "output_path": "artifacts/manifests/representation_variability_injection_v1.shard4of6.jsonl",
+      "output_sha256": "2afa026b125d20d59dfa99cd744df9b3d93a8e04b56091677a76adb6aa336e25",
+      "persisted_embeddings": 0,
+      "production_change_authorized": false,
+      "schema_version": 1,
+      "selected_tics": 8,
+      "shard_count": 6,
+      "shard_index": 3,
+      "status": "success",
+      "training_authorized": false,
+      "unique_trials": 32,
+      "workers": 6
+    },
+    {
+      "artifact_id": "representation_variability_injection_shard_v1",
+      "bls_recovered_trials": 0,
+      "contract_sha256": "ea4a8839348cc6e07f893fc5acb73118cced5e966ec119ef75434a8a96ea7e3e",
+      "downloaded_bytes": 0,
+      "elapsed_seconds": 3.4515717920148745,
+      "model_rows": 64,
+      "output_path": "artifacts/manifests/representation_variability_injection_v1.shard5of6.jsonl",
+      "output_sha256": "d5e4f7e1ae7a98bcc52c0ab0002e3350b9fc93b650057298c404187e33222fcd",
+      "persisted_embeddings": 0,
+      "production_change_authorized": false,
+      "schema_version": 1,
+      "selected_tics": 8,
+      "shard_count": 6,
+      "shard_index": 4,
+      "status": "success",
+      "training_authorized": false,
+      "unique_trials": 32,
+      "workers": 6
+    },
+    {
+      "artifact_id": "representation_variability_injection_shard_v1",
+      "bls_recovered_trials": 0,
+      "contract_sha256": "ea4a8839348cc6e07f893fc5acb73118cced5e966ec119ef75434a8a96ea7e3e",
+      "downloaded_bytes": 0,
+      "elapsed_seconds": 9.97990883293096,
+      "model_rows": 72,
+      "output_path": "artifacts/manifests/representation_variability_injection_v1.shard6of6.jsonl",
+      "output_sha256": "b87d9b9e5f50cce0276c49711eb5ffd1b30b5db810768ceb0374e7feab8d6fae",
+      "persisted_embeddings": 0,
+      "production_change_authorized": false,
+      "schema_version": 1,
+      "selected_tics": 9,
+      "shard_count": 6,
+      "shard_index": 5,
+      "status": "success",
+      "training_authorized": false,
+      "unique_trials": 36,
+      "workers": 6
+    }
+  ],
+  "status": "pass",
+  "training_authorized": false,
+  "unique_tics": 48,
+  "unique_trials": 192,
+  "workers_per_shard": 6
+}

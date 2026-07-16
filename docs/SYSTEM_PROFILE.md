@@ -219,6 +219,13 @@ workers.
 - Version 0.2.71 adds only pre-execution ASAS-SN shard-integrity checks; it
   retains the same six-shard/six-worker runtime shape. Validation passed 2,781
   tests plus Ruff/mypy as 8/8 supervised gates in 30.1 seconds.
+- The merged representation variability/injection run completed all 48 TICs,
+  192 BLS trials, and 384 frozen-model rows in 15.854 seconds observed wall
+  time. Shards completed in 3.452-10.476 seconds with zero failures. Retain the
+  reviewed 6x6 shape; this already-sub-20-second workload does not justify more
+  processes or workers.
+- Version 0.2.72 validation passed 2,782 default tests plus Ruff/mypy as 8/8
+  supervised gates in 37.2 seconds under the canonical 6x6 test topology.
 - Version 0.2.63 validation passed the unchanged 2,759 tests plus Ruff/mypy as
   8/8 supervised gates in 27.3 seconds with the canonical 6×6 test topology.
 

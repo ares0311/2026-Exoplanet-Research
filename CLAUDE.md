@@ -222,6 +222,16 @@ Version 0.2.71 verifies all six aggregate-owned ASAS-SN shard paths and hashes
 before loading the 48 benchmark labels; any drift, duplicate TIC, incomplete
 shard set, or training-authorized row fails before scientific processing. Its
 6x6 release gate passed 2,781 tests plus Ruff/mypy in 30.1 seconds.
+The merged run passed all six shards and global reconciliation: 48 TICs,
+192 trials, 384 unique model rows, zero failures/duplicates/downloads/persisted
+embeddings, and 96/96 higher-depth larger-shift comparisons for both models.
+Blind BLS recovered 13/192 trials. Version 0.2.72 commits and integrity-tests
+the evidence; training, broad extraction, promotion, and production scoring
+remain unauthorized. Aggregate SHA-256 is `93ae6fb8…59f`; the seven exact-path
+Run Report commits end at `f0f1645`.
+The version 0.2.72 evidence-release gate passed 2,782 default tests plus
+Ruff/mypy as 8/8 supervised gates in 37.2 seconds under the canonical 6x6
+topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.

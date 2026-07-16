@@ -4,9 +4,9 @@
 
 Version 0.2.70 defines the reviewed, cache-only execution gate. Version 0.2.71
 also verifies every aggregate-owned ASAS-SN shard path and SHA-256 before it
-loads the 48 labels. The merged-main evidence run is pending. This gate does
-not authorize training, broad embedding extraction, model promotion, or a
-production-scoring change.
+loads the 48 labels. The merged-main evidence run passed on 2026-07-16 and is
+preserved by version 0.2.72. This gate does not authorize training, broad
+embedding extraction, model promotion, or a production-scoring change.
 
 ## Production outcome
 
@@ -72,6 +72,32 @@ Global reconciliation must prove all of the following:
 A passing run supports scientific interpretation of the paired sensitivity
 metrics only. It is not evidence of classifier accuracy, survey completeness,
 or production superiority.
+
+## Merged evidence
+
+The single-parent 6x6 run passed all six shards and global reconciliation:
+48 unique TICs, 192 unique injection trials, 384 unique model rows, and zero
+failures, duplicates, downloads, or persisted embeddings. First-shard-start to
+last-shard-completion wall time was 15.854 seconds; shard elapsed times were
+3.452-10.476 seconds. The aggregate SHA-256 is
+`93ae6fb818054947ecfd485b3e74ec5cef1f88d1d5e18fd232e5aebd8303f59f`.
+
+Both frozen models produced a larger cosine shift for the 2,000-ppm injection
+than the paired 500-ppm injection for all 96 TIC/period comparisons. Median
+cosine shifts increased by about 16x at 4x depth for both 3-day and 10-day
+scenarios, consistent with a stable depth-sensitive response in this bounded
+grid. Blind BLS recovered 13/192 trials: 4/48 short-low, 4/48 short-high, 2/48
+long-low, and 3/48 long-high. These low, non-monotonic recovery counts are
+descriptive evidence on variable-star backgrounds, not completeness estimates.
+
+The next Phase 3 decision may use this result to design a separately contracted
+grouped benchmark against labeled planet/false-positive data. It must retain
+the frozen CNN and classical baselines, keep ASAS-SN rows training-disabled,
+and obtain a new authorization before broad extraction or model fitting.
+
+Version 0.2.72's evidence-release validation passed 2,782 default tests plus
+Ruff and mypy as 8/8 supervised gates in 37.2 seconds under the canonical 6x6
+test topology.
 
 ## Validation evidence before merge
 
