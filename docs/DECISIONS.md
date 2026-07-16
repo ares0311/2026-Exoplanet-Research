@@ -777,7 +777,7 @@ production-scoring change.
 ## DECISION-024: Require Grouped External Representations To Beat Both Frozen Baselines
 
 **Date:** 2026-07-16
-**Status:** Accepted for bounded execution; evidence pending
+**Status:** Accepted; merged evidence found no external added value
 
 ### Context
 
@@ -823,3 +823,12 @@ immutable v3. Empty bins use neutral median physical flux, matching established
 production snippet handling without interpolating invented transit structure.
 A full 1,536-row cache-only preparation audit and both-model smoke passed before
 v3 publication.
+
+### Merged evidence outcome
+
+The v3 run passed all six shards and opened the frozen test once. The CNN's
+test AUC/AP/top-100 yield were 0.923096/0.899184/91. Chronos-Bolt tiny reached
+0.722778/0.696344/71 and Astromer2 reached 0.708984/0.659679/67; neither beat
+the better required comparator by 0.01 on any decision metric. The accepted
+outcome is `no_external_added_value`. Do not authorize broad extraction,
+training, promotion, or production changes for these external baselines.

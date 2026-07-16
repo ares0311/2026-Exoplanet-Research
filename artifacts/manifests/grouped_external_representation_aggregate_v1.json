@@ -1,0 +1,289 @@
+{
+  "artifact_id": "grouped_external_representation_aggregate_v1",
+  "completed_at_utc": "2026-07-16T11:02:22.103543+00:00",
+  "contract_path": "metadata/grouped_external_representation_contract_v3.json",
+  "contract_sha256": "24a42035490c79dfbd255e40a80d75d479b9f5830ae9bf3f016b36f20413279e",
+  "downloaded_bytes": 0,
+  "external_improvement_over_best_required_comparator": {
+    "Astromer2": {
+      "average_precision": -0.23950575325777845,
+      "roc_auc": -0.214111328125,
+      "top_k_positive_fraction": -0.24
+    },
+    "Chronos-Bolt tiny": {
+      "average_precision": -0.20284023577675336,
+      "roc_auc": -0.2003173828125,
+      "top_k_positive_fraction": -0.20000000000000007
+    }
+  },
+  "known_unreadable_cache_files_skipped": 111,
+  "limitations": [
+    "The balanced frozen subset is a capability benchmark, not a deployment-prevalence sample; its false-discovery rate is sample-conditional.",
+    "Periods and epochs come from the labeled DR25 corpus, so this gate measures representation quality after candidate ephemerides exist rather than blind search performance.",
+    "One signal per KIC prevents group leakage but omits multi-signal system behavior.",
+    "A PASS is descriptive scientific evidence only and does not authorize model training, broad embedding extraction, checkpoint promotion, or production scoring changes."
+  ],
+  "minimum_absolute_improvement": 0.01,
+  "persisted_embeddings": 0,
+  "production_change_authorized": false,
+  "results": {
+    "Astromer2": {
+      "probe_best_epoch": 18,
+      "test": {
+        "average_precision": 0.659678655171027,
+        "confusion": {
+          "fn": 13,
+          "fp": 72,
+          "tn": 56,
+          "tp": 115
+        },
+        "f1": 0.7301587301587301,
+        "false_discovery_rate": 0.3850267379679144,
+        "precision": 0.6149732620320856,
+        "recall": 0.8984375,
+        "roc_auc": 0.708984375,
+        "threshold_from_validation": 0.5602766613242621,
+        "top_k": 100,
+        "top_k_positive_fraction": 0.67,
+        "top_k_positives": 67
+      },
+      "validation_roc_auc": 0.7021484375
+    },
+    "Chronos-Bolt tiny": {
+      "probe_best_epoch": 200,
+      "test": {
+        "average_precision": 0.6963441726520521,
+        "confusion": {
+          "fn": 19,
+          "fp": 79,
+          "tn": 49,
+          "tp": 109
+        },
+        "f1": 0.689873417721519,
+        "false_discovery_rate": 0.42021276595744683,
+        "precision": 0.5797872340425532,
+        "recall": 0.8515625,
+        "roc_auc": 0.7227783203125,
+        "threshold_from_validation": 0.3796638935254587,
+        "top_k": 100,
+        "top_k_positive_fraction": 0.71,
+        "top_k_positives": 71
+      },
+      "validation_roc_auc": 0.70556640625
+    },
+    "benchmark_cnn_v1": {
+      "probe_best_epoch": null,
+      "test": {
+        "average_precision": 0.8991844084288054,
+        "confusion": {
+          "fn": 14,
+          "fp": 17,
+          "tn": 111,
+          "tp": 114
+        },
+        "f1": 0.8803088803088803,
+        "false_discovery_rate": 0.1297709923664122,
+        "precision": 0.8702290076335878,
+        "recall": 0.890625,
+        "roc_auc": 0.923095703125,
+        "threshold_from_validation": 0.511673092842102,
+        "top_k": 100,
+        "top_k_positive_fraction": 0.91,
+        "top_k_positives": 91
+      },
+      "validation_roc_auc": 0.924560546875
+    },
+    "statistical_ephemeris_baseline": {
+      "probe_best_epoch": 2,
+      "test": {
+        "average_precision": 0.6077804734905494,
+        "confusion": {
+          "fn": 20,
+          "fp": 63,
+          "tn": 65,
+          "tp": 108
+        },
+        "f1": 0.7224080267558528,
+        "false_discovery_rate": 0.3684210526315789,
+        "precision": 0.631578947368421,
+        "recall": 0.84375,
+        "roc_auc": 0.69940185546875,
+        "threshold_from_validation": 0.5003085031914553,
+        "top_k": 100,
+        "top_k_positive_fraction": 0.67,
+        "top_k_positives": 67
+      },
+      "validation_roc_auc": 0.74761962890625
+    }
+  },
+  "rows": 1536,
+  "schema_version": 1,
+  "scientific_outcome": "no_external_added_value",
+  "shard_summaries": [
+    {
+      "artifact_id": "grouped_external_representation_shard_v1",
+      "contract_sha256": "24a42035490c79dfbd255e40a80d75d479b9f5830ae9bf3f016b36f20413279e",
+      "downloaded_bytes": 0,
+      "elapsed_seconds": 65.01857079192996,
+      "known_unreadable_cache_files_skipped": 21,
+      "label_counts": {
+        "0": 131,
+        "1": 120
+      },
+      "production_change_authorized": false,
+      "rows": 251,
+      "schema_version": 1,
+      "shard_count": 6,
+      "shard_index": 0,
+      "split_counts": {
+        "test": 35,
+        "train": 173,
+        "val": 43
+      },
+      "status": "success",
+      "temp_bytes": 483294,
+      "temp_path": "logs/grouped_external_representation_benchmark_v1/features_v1.shard1of6.npz",
+      "temp_sha256": "94b69a49c2732795b8af870c000cf942799f682ee799880386b9b9beaee324b2",
+      "workers": 6
+    },
+    {
+      "artifact_id": "grouped_external_representation_shard_v1",
+      "contract_sha256": "24a42035490c79dfbd255e40a80d75d479b9f5830ae9bf3f016b36f20413279e",
+      "downloaded_bytes": 0,
+      "elapsed_seconds": 60.679518999997526,
+      "known_unreadable_cache_files_skipped": 18,
+      "label_counts": {
+        "0": 117,
+        "1": 115
+      },
+      "production_change_authorized": false,
+      "rows": 232,
+      "schema_version": 1,
+      "shard_count": 6,
+      "shard_index": 1,
+      "split_counts": {
+        "test": 41,
+        "train": 156,
+        "val": 35
+      },
+      "status": "success",
+      "temp_bytes": 447391,
+      "temp_path": "logs/grouped_external_representation_benchmark_v1/features_v1.shard2of6.npz",
+      "temp_sha256": "a7b237fd1ddaace8e9a92bc6fb6c043957735390cf6c7c33242c58f1902e02d5",
+      "workers": 6
+    },
+    {
+      "artifact_id": "grouped_external_representation_shard_v1",
+      "contract_sha256": "24a42035490c79dfbd255e40a80d75d479b9f5830ae9bf3f016b36f20413279e",
+      "downloaded_bytes": 0,
+      "elapsed_seconds": 67.8514841250144,
+      "known_unreadable_cache_files_skipped": 18,
+      "label_counts": {
+        "0": 119,
+        "1": 132
+      },
+      "production_change_authorized": false,
+      "rows": 251,
+      "schema_version": 1,
+      "shard_count": 6,
+      "shard_index": 2,
+      "split_counts": {
+        "test": 44,
+        "train": 162,
+        "val": 45
+      },
+      "status": "success",
+      "temp_bytes": 482303,
+      "temp_path": "logs/grouped_external_representation_benchmark_v1/features_v1.shard3of6.npz",
+      "temp_sha256": "50a696575a75997f8c81134d662591157a5cc4b3d80fa1af3981178f35fcba3d",
+      "workers": 6
+    },
+    {
+      "artifact_id": "grouped_external_representation_shard_v1",
+      "contract_sha256": "24a42035490c79dfbd255e40a80d75d479b9f5830ae9bf3f016b36f20413279e",
+      "downloaded_bytes": 0,
+      "elapsed_seconds": 71.8089787500212,
+      "known_unreadable_cache_files_skipped": 15,
+      "label_counts": {
+        "0": 138,
+        "1": 135
+      },
+      "production_change_authorized": false,
+      "rows": 273,
+      "schema_version": 1,
+      "shard_count": 6,
+      "shard_index": 3,
+      "split_counts": {
+        "test": 43,
+        "train": 192,
+        "val": 38
+      },
+      "status": "success",
+      "temp_bytes": 524958,
+      "temp_path": "logs/grouped_external_representation_benchmark_v1/features_v1.shard4of6.npz",
+      "temp_sha256": "84a95265be07fbf182db2f2850939f5f0e158a4100c416a87a0ff42d5882f21b",
+      "workers": 6
+    },
+    {
+      "artifact_id": "grouped_external_representation_shard_v1",
+      "contract_sha256": "24a42035490c79dfbd255e40a80d75d479b9f5830ae9bf3f016b36f20413279e",
+      "downloaded_bytes": 0,
+      "elapsed_seconds": 71.12236308294814,
+      "known_unreadable_cache_files_skipped": 21,
+      "label_counts": {
+        "0": 142,
+        "1": 132
+      },
+      "production_change_authorized": false,
+      "rows": 274,
+      "schema_version": 1,
+      "shard_count": 6,
+      "shard_index": 4,
+      "split_counts": {
+        "test": 42,
+        "train": 179,
+        "val": 53
+      },
+      "status": "success",
+      "temp_bytes": 526581,
+      "temp_path": "logs/grouped_external_representation_benchmark_v1/features_v1.shard5of6.npz",
+      "temp_sha256": "ef5ce8a138ab83c0cace4068609d698c725d77710e60a5825e5bea8db05b4683",
+      "workers": 6
+    },
+    {
+      "artifact_id": "grouped_external_representation_shard_v1",
+      "contract_sha256": "24a42035490c79dfbd255e40a80d75d479b9f5830ae9bf3f016b36f20413279e",
+      "downloaded_bytes": 0,
+      "elapsed_seconds": 65.07787329202984,
+      "known_unreadable_cache_files_skipped": 18,
+      "label_counts": {
+        "0": 121,
+        "1": 134
+      },
+      "production_change_authorized": false,
+      "rows": 255,
+      "schema_version": 1,
+      "shard_count": 6,
+      "shard_index": 5,
+      "split_counts": {
+        "test": 51,
+        "train": 162,
+        "val": 42
+      },
+      "status": "success",
+      "temp_bytes": 491540,
+      "temp_path": "logs/grouped_external_representation_benchmark_v1/features_v1.shard6of6.npz",
+      "temp_sha256": "06c73ebe7bee35bcd4e78b72a897fb4b61a8b0e572c94eafd5b3fbe1e6768427",
+      "workers": 6
+    }
+  ],
+  "split_rows": {
+    "test": 256,
+    "train": 1024,
+    "val": 256
+  },
+  "status": "pass",
+  "temporary_embedding_files_removed": 6,
+  "test_opened_once": true,
+  "training_authorized": false
+}

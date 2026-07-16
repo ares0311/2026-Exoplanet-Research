@@ -1,0 +1,26 @@
+{
+  "artifact_id": "grouped_external_representation_shard_v1",
+  "contract_sha256": "24a42035490c79dfbd255e40a80d75d479b9f5830ae9bf3f016b36f20413279e",
+  "downloaded_bytes": 0,
+  "elapsed_seconds": 65.07787329202984,
+  "known_unreadable_cache_files_skipped": 18,
+  "label_counts": {
+    "0": 121,
+    "1": 134
+  },
+  "production_change_authorized": false,
+  "rows": 255,
+  "schema_version": 1,
+  "shard_count": 6,
+  "shard_index": 5,
+  "split_counts": {
+    "test": 51,
+    "train": 162,
+    "val": 42
+  },
+  "status": "success",
+  "temp_bytes": 491540,
+  "temp_path": "logs/grouped_external_representation_benchmark_v1/features_v1.shard6of6.npz",
+  "temp_sha256": "06c73ebe7bee35bcd4e78b72a897fb4b61a8b0e572c94eafd5b3fbe1e6768427",
+  "workers": 6
+}

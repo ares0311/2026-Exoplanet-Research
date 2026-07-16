@@ -8,7 +8,7 @@ injection evidence gate passed and the separately contracted grouped external-
 representation execution gate is pending merged-main evidence.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
-Test baseline: 2,791 default tests passing; 2 `integration_live` tests excluded by
+Test baseline: 2,797 default tests passing; 2 `integration_live` tests excluded by
 the configured marker expression (2026-07-16; 6×6 gate: 36.3s)
 
 ---
@@ -31,7 +31,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.75 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.76 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
@@ -628,6 +628,18 @@ seconds with exactly 111 pinned skips, zero writes/downloads, exact model input
 shapes, and finite 256-element smoke embeddings from both frozen models.
 The version 0.2.75 release gate passed 2,791 default tests plus Ruff/mypy as
 8/8 supervised gates in 36.3 seconds under the canonical 6x6 topology.
+The merged v3 run passed all six shards and global reconciliation: 1,536 unique
+KICs, 111 exact pinned skips, zero failures/downloads/persisted embeddings, six
+temporary arrays removed, and one frozen test opening. The CNN retained a wide
+held-out lead (AUC/AP/top-100 0.923096/0.899184/91) over Chronos-Bolt tiny
+(0.722778/0.696344/71), Astromer2 (0.708984/0.659679/67), and the statistical
+baseline (0.699402/0.607780/67). Version 0.2.76 records the precommitted
+`no_external_added_value` outcome. Broad extraction, training, promotion, and
+production scoring remain unauthorized. Aggregate SHA-256 is
+`3d24363b…4952bd`; seven Run Report commits end at `1200612`.
+The version 0.2.76 evidence-release gate passed 2,797 default tests plus
+Ruff/mypy as 8/8 supervised gates in 36.3 seconds under the canonical 6x6
+topology.
 The version 0.2.63 release gate passed the unchanged 2,759 default tests plus
 Ruff/mypy as 8/8 supervised gates in 27.3 seconds under the canonical 6×6
 topology.

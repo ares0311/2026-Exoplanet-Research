@@ -256,6 +256,15 @@ by itself satisfy a master-guide evidence requirement.
    1,536-KIC preparation preflight and both-model smoke passed before release.
    The version 0.2.75 release gate passed 2,791 default tests plus Ruff/mypy as
    8/8 supervised gates in 36.3 seconds under the canonical 6x6 topology.
+   The merged v3 run passed all 1,536 grouped KICs with 111 exact skips and zero
+   failures/downloads/persisted embeddings. The CNN retained test AUC/AP/top-100
+   0.923096/0.899184/91 versus Chronos-Bolt tiny 0.722778/0.696344/71 and
+   Astromer2 0.708984/0.659679/67. Version 0.2.76 records the precommitted
+   `no_external_added_value` outcome. Do not begin broad extraction or training
+   with these models; this external-baseline branch of Phase 3 is closed.
+   The version 0.2.76 evidence-release gate passed 2,797 default tests plus
+   Ruff/mypy as 8/8 supervised gates in 36.3 seconds under the canonical 6x6
+   topology.
    The 0.2.60 release passed 2,751 default tests plus Ruff/mypy as
    8/8 supervised gates under the 6×6 topology in 25.2 seconds.
 
