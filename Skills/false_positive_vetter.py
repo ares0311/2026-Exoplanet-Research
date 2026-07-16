@@ -78,8 +78,8 @@ _MISSING_REASON_BY_FEATURE = {
         "needs enough phase-0.5 coverage and out-of-eclipse baseline to measure a "
         "secondary eclipse"
     ),
-    "duration_consistency_score": "needs per-transit duration fitting",
-    "transit_timing_variation_score": "needs per-transit midpoint fitting",
+    "duration_consistency_score": "needs at least two individually resolved transit durations",
+    "transit_timing_variation_score": "needs at least two individually resolved transit midpoints",
     "out_of_transit_scatter_score": "needs expected photon-noise or OOT scatter diagnostics",
     "multi_sector_depth_consistency_score": "needs per-sector transit depth measurements",
     "stellar_density_consistency_score": "needs host-star radius and mass diagnostics",

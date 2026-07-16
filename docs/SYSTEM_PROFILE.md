@@ -251,6 +251,11 @@ workers.
   `no_external_added_value`; keep the frozen CNN and do not scale extraction.
 - Version 0.2.76 validation passed 2,797 default tests plus Ruff/mypy as 8/8
   supervised gates in 36.3 seconds under the canonical 6x6 test topology.
+- Version 0.2.77 adds only vectorized/local per-transit calculations inside the
+  existing vetting call. It creates no files, downloads no data, and preserves
+  `None` when fewer than two events satisfy the noise/coverage gates.
+- Version 0.2.77 validation passed 2,801 default tests plus Ruff/mypy as 8/8
+  supervised gates in 35.3 seconds under the canonical 6x6 test topology.
 - Version 0.2.63 validation passed the unchanged 2,759 tests plus Ruff/mypy as
   8/8 supervised gates in 27.3 seconds with the canonical 6×6 test topology.
 

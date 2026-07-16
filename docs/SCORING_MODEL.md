@@ -1071,3 +1071,10 @@ where the default threshold is $\sigma_\mathrm{thresh} = 10$ minutes.
 **Implementation**: `src/exo_toolkit/features.py` — `transit_timing_variation_score()`
 
 Input field: `RawDiagnostics.individual_transit_midpoints` (tuple of BJD times, one per observed transit).
+
+Production measurement (version 0.2.77): `vet_signal()` resolves each midpoint
+as a positive flux-deficit-weighted center inside a bounded predicted-event
+window after a local sideband baseline and twice-noise half-depth gate. It also
+records the half-depth cadence span as the individual duration and one cadence
+as its resolution. Both timing and duration sequences remain unavailable unless
+at least two events resolve.

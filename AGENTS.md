@@ -462,6 +462,17 @@ the seven Run Report commits end at `1200612`.
 The version 0.2.76 evidence-release gate passed 2,797 default tests plus
 Ruff/mypy as 8/8 supervised gates in 36.3 seconds under the canonical 6x6
 topology.
+Version 0.2.77 begins the highest-impact bounded Phase 4 task by closing a real
+production-vetting defect: `vet_signal()` previously hard-coded every
+per-transit duration and midpoint to `None`, so duration-consistency and TTV
+features could never populate. It now uses local sideband baselines,
+twice-noise/half-depth cadence gates, flux-deficit-weighted midpoints, and
+cadence-resolved durations. At least two events must resolve or all three
+diagnostics remain `None`. Flat noise stays unavailable, while a tested
+30-minute shifted transit is recovered. No data acquisition, model training,
+or external action is involved.
+The version 0.2.77 release gate passed 2,801 default tests plus Ruff/mypy as
+8/8 supervised gates in 35.3 seconds under the canonical 6x6 topology.
 
 The version 0.2.62 release gate passed 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 34.3 seconds under the canonical 6×6 topology.

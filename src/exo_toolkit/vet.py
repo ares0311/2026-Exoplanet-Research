@@ -112,6 +112,9 @@ def vet_signal(
     depths, depth_errs, n_transits_observed = _measure_individual_transits(
         time_bjd, flux, flux_err, signal=signal
     )
+    durations, duration_errs, midpoints = _measure_individual_transit_shapes(
+        time_bjd, flux, flux_err, signal=signal
+    )
 
     depth_odd, err_odd, depth_even, err_even = _measure_odd_even(
         depths, depth_errs
@@ -124,8 +127,9 @@ def vet_signal(
     diagnostics = RawDiagnostics(
         individual_depths=depths,
         individual_depth_errors=depth_errs,
-        individual_durations=None,       # per-transit duration fitting not in v0
-        individual_duration_errors=None,
+        individual_durations=durations,
+        individual_duration_errors=duration_errs,
+        individual_transit_midpoints=midpoints,
         depth_odd_ppm=depth_odd,
         err_odd_ppm=err_odd,
         depth_even_ppm=depth_even,
@@ -238,6 +242,99 @@ def _measure_individual_transits(
         return None, None, len(depths)
 
     return tuple(depths), tuple(errs), len(depths)
+
+
+def _measure_individual_transit_shapes(
+    time_bjd: np.ndarray,
+    flux: np.ndarray,
+    flux_err: np.ndarray,
+    *,
+    signal: CandidateSignal,
+) -> tuple[
+    tuple[float, ...] | None,
+    tuple[float, ...] | None,
+    tuple[float, ...] | None,
+]:
+    """Measure per-event duration and flux-deficit-weighted midpoint.
+
+    Each event uses a local sideband baseline and requires at least two
+    half-depth cadences above twice the local noise. Durations are the resolved
+    half-depth span in hours; their uncertainty is one local cadence. All three
+    outputs remain unavailable unless at least two events resolve cleanly.
+    """
+    period = signal.period_days
+    epoch = signal.epoch_bjd
+    half_duration = signal.duration_hours / 48.0
+    if period <= 0.0 or half_duration <= 0.0 or len(time_bjd) < 5:
+        return None, None, None
+
+    ordered_time = np.sort(np.unique(time_bjd[np.isfinite(time_bjd)]))
+    cadence_deltas = np.diff(ordered_time)
+    cadence_deltas = cadence_deltas[cadence_deltas > 0.0]
+    if cadence_deltas.size == 0:
+        return None, None, None
+    cadence_days = float(np.median(cadence_deltas))
+    search_half = min(max(1.5 * half_duration, 2.0 * cadence_days), 0.2 * period)
+    if search_half <= 0.0:
+        return None, None, None
+
+    global_baseline = float(np.median(flux))
+    t_start = float(np.min(time_bjd))
+    t_end = float(np.max(time_bjd))
+    n_first = int(np.floor((t_start - epoch) / period))
+    n_last = int(np.ceil((t_end - epoch) / period))
+    durations: list[float] = []
+    duration_errors: list[float] = []
+    midpoints: list[float] = []
+
+    for transit_number in range(n_first - 1, n_last + 2):
+        predicted = epoch + transit_number * period
+        if predicted < t_start - search_half or predicted > t_end + search_half:
+            continue
+        offsets = time_bjd - predicted
+        window = np.abs(offsets) <= search_half
+        if int(np.sum(window)) < 5:
+            continue
+        local_time = time_bjd[window]
+        local_flux = flux[window]
+        local_err = flux_err[window]
+        local_offsets = offsets[window]
+        sideband = np.abs(local_offsets) > half_duration
+        baseline = (
+            float(np.median(local_flux[sideband]))
+            if int(np.sum(sideband)) >= 3
+            else global_baseline
+        )
+        noise = float(np.median(local_err))
+        if not np.isfinite(noise) or noise <= 0.0:
+            continue
+        deficit = baseline - local_flux
+        peak = float(np.quantile(deficit, 0.9))
+        if not np.isfinite(peak) or peak <= 2.0 * noise:
+            continue
+        resolved = deficit >= max(0.5 * peak, 2.0 * noise)
+        if int(np.sum(resolved)) < 2:
+            continue
+        resolved_time = local_time[resolved]
+        weights = deficit[resolved]
+        weight_sum = float(np.sum(weights))
+        if not np.isfinite(weight_sum) or weight_sum <= 0.0:
+            continue
+        midpoint = float(np.dot(resolved_time, weights) / weight_sum)
+        duration_hours = float(
+            (np.max(resolved_time) - np.min(resolved_time) + cadence_days) * 24.0
+        )
+        if not np.isfinite(midpoint) or not np.isfinite(duration_hours):
+            continue
+        if duration_hours <= 0.0 or duration_hours > 2.0 * search_half * 24.0:
+            continue
+        midpoints.append(midpoint)
+        durations.append(duration_hours)
+        duration_errors.append(cadence_days * 24.0)
+
+    if len(midpoints) < 2:
+        return None, None, None
+    return tuple(durations), tuple(duration_errors), tuple(midpoints)
 
 
 def _measure_odd_even(

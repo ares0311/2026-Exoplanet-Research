@@ -1,7 +1,7 @@
 # PROJECT STATUS
 
 ## Status: Active Development
-## Phase: Phase 3 broad representation experiment design
+## Phase: Phase 4 individual anomalous-transit diagnostics
 ## Last Updated: 2026-07-16
 
 ---
@@ -178,6 +178,13 @@ tiny 0.722778/0.696344/71 and Astromer2 0.708984/0.659679/67. Version 0.2.76
 records `no_external_added_value`; broad extraction/training remains blocked.
 The 0.2.76 evidence-release gate passed 2,797 default tests plus Ruff/mypy as
 8/8 supervised gates in 36.3 seconds under the canonical 6x6 topology.
+Version 0.2.77 activates the previously unreachable per-transit duration-
+consistency and TTV features in production vetting. Measurements use local
+sidebands and noise-gated half-depth cadences, require two resolved events, and
+otherwise remain unavailable. Flat noise is rejected and a 30-minute shifted
+event is recovered in focused regression evidence.
+The 0.2.77 release gate passed 2,801 default tests plus Ruff/mypy as 8/8
+supervised gates in 35.3 seconds under the canonical 6x6 topology.
 The 0.2.63 release gate passed the unchanged 2,759 tests plus Ruff/mypy as 8/8
 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 
