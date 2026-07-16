@@ -447,6 +447,21 @@ truncated products, wrote/downloaded nothing, and returned exact `(2048,)` and
 embeddings.
 The version 0.2.75 release gate passed 2,791 default tests plus Ruff/mypy as
 8/8 supervised gates in 36.3 seconds under the canonical 6x6 topology.
+The merged v3 run passed all six shards and global reconciliation: 1,536 unique
+KICs, exactly 111 pinned truncated-product skips, zero failures/downloads/
+persisted embeddings, six temporary arrays removed, and one frozen test
+opening. `benchmark_cnn_v1` remained strongest (test AUC 0.923096, AP 0.899184,
+top-100 yield 91) versus Chronos-Bolt tiny (0.722778/0.696344/71), Astromer2
+(0.708984/0.659679/67), and the statistical baseline
+(0.699402/0.607780/67). Version 0.2.76 commits and integrity-tests the evidence.
+The precommitted outcome is `no_external_added_value`: do not begin broad
+external embedding extraction, training, promotion, or production scoring
+changes from these models. Aggregate SHA-256 is
+`3d24363b29eefc1be7a6d9c69e163683e7c36e0dbca757a2ced7e33ebd4952bd`;
+the seven Run Report commits end at `1200612`.
+The version 0.2.76 evidence-release gate passed 2,797 default tests plus
+Ruff/mypy as 8/8 supervised gates in 36.3 seconds under the canonical 6x6
+topology.
 
 The version 0.2.62 release gate passed 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 34.3 seconds under the canonical 6×6 topology.

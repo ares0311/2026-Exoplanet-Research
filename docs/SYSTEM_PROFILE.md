@@ -245,6 +245,12 @@ workers.
   skips and zero writes/downloads; both model smoke embeddings were finite.
 - Version 0.2.75 validation passed 2,791 default tests plus Ruff/mypy as 8/8
   supervised gates in 36.3 seconds under the canonical 6x6 test topology.
+- The merged v3 grouped benchmark completed all six shards in 60.7-71.8
+  seconds: 1,536 KICs, 111 pinned skips, zero failures/downloads, and 2,956,067
+  temporary bytes removed after aggregation. The outcome was
+  `no_external_added_value`; keep the frozen CNN and do not scale extraction.
+- Version 0.2.76 validation passed 2,797 default tests plus Ruff/mypy as 8/8
+  supervised gates in 36.3 seconds under the canonical 6x6 test topology.
 - Version 0.2.63 validation passed the unchanged 2,759 tests plus Ruff/mypy as
   8/8 supervised gates in 27.3 seconds with the canonical 6×6 test topology.
 

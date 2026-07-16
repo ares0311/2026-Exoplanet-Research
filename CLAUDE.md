@@ -260,6 +260,18 @@ all 1,536 KICs with exactly 111 pinned skips and finite inputs; one-product
 smoke inference returned 256-element outputs from both frozen models.
 The version 0.2.75 release gate passed 2,791 default tests plus Ruff/mypy as
 8/8 supervised gates in 36.3 seconds under the canonical 6x6 topology.
+The merged v3 run passed 1,536 unique KICs with 111 exact pinned skips, zero
+failures/downloads/persisted embeddings, six temporary arrays removed, and one
+test opening. The frozen CNN remained strongest: test AUC/AP/top-100 were
+0.923096/0.899184/91, versus Chronos-Bolt tiny 0.722778/0.696344/71,
+Astromer2 0.708984/0.659679/67, and statistical baseline
+0.699402/0.607780/67. Version 0.2.76 records the evidence and the precommitted
+`no_external_added_value` outcome; broad extraction, training, promotion, and
+production changes remain unauthorized. Aggregate SHA-256 is
+`3d24363b…4952bd`; Run Report commits end at `1200612`.
+The version 0.2.76 evidence-release gate passed 2,797 default tests plus
+Ruff/mypy as 8/8 supervised gates in 36.3 seconds under the canonical 6x6
+topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.

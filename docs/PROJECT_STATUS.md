@@ -15,7 +15,7 @@ The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit w
 - Optional XGBoost and stacking scorer modes (Tier 1 model trained: Kepler KOI AUC=0.992)
 - SQLite-backed background automation with top-level logs
 - 126 standalone `Skills/` Python files (`rg --files Skills -g '*.py'`)
-- 148 top-level test files
+- 149 top-level test files
 - 32 package Python modules under `src/exo_toolkit/`
 - JWST time-series ingestion wired into the CLI with `--mission JWST`
 - Novel TESS target scanning that excludes TOI, CTOI, and confirmed-host catalogs
@@ -171,6 +171,13 @@ seconds with exactly 111 pinned skips, zero writes/downloads, and finite smoke
 embeddings from both external models. Merged v3 evidence remains pending.
 The 0.2.75 release gate passed 2,791 default tests plus Ruff/mypy as 8/8
 supervised gates in 36.3 seconds under the canonical 6x6 topology.
+The merged v3 benchmark passed 1,536 unique KICs with 111 pinned skips, zero
+failures/downloads/persisted embeddings, and one test opening. The frozen CNN
+retained a wide lead: AUC/AP/top-100 0.923096/0.899184/91 versus Chronos-Bolt
+tiny 0.722778/0.696344/71 and Astromer2 0.708984/0.659679/67. Version 0.2.76
+records `no_external_added_value`; broad extraction/training remains blocked.
+The 0.2.76 evidence-release gate passed 2,797 default tests plus Ruff/mypy as
+8/8 supervised gates in 36.3 seconds under the canonical 6x6 topology.
 The 0.2.63 release gate passed the unchanged 2,759 tests plus Ruff/mypy as 8/8
 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 

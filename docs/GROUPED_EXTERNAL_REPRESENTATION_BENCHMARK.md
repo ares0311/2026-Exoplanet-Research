@@ -8,8 +8,9 @@ TESS-style `QUALITY` column from Kepler files, which use `SAP_QUALITY`.
 Version 0.2.74 preserved v1 as failed-schema evidence and activated immutable
 v2 with the corrected column. Its first merged run failed closed during
 preparation because 95% occupancy across 2,048 bins was not supported by every
-frozen KIC. Version 0.2.75 preserves v2 and activates immutable v3, which fills
-empty bins with neutral median physical flux. The evidence run remains pending.
+frozen KIC. Version 0.2.75 preserved v2 and activated immutable v3, which fills
+empty bins with neutral median physical flux. The merged run passed; version
+0.2.76 preserves and integrity-tests the `no_external_added_value` evidence.
 This gate does not authorize training, broad embedding extraction, checkpoint
 promotion, or a production-scoring change.
 Its release validation passed 2,789 default tests plus Ruff and mypy as 8/8
@@ -118,3 +119,31 @@ completed and produced interpretable held-out evidence. The scientific outcome
 may be `external_adds_value` or `no_external_added_value`. Neither outcome
 authorizes broad extraction, supervised training, model promotion, or a change
 to production scoring; those require a separate reviewed decision.
+
+## Merged evidence
+
+All six shards passed and global reconciliation proved 1,536 unique KICs,
+exactly 111 pinned truncated-product skips, zero failures or downloads, and
+2,956,067 temporary feature bytes. Aggregate reconciliation opened the frozen
+test subset once, removed all six feature arrays, and persisted zero embeddings.
+Shard elapsed times were 60.7-71.8 seconds.
+
+| Model | Test ROC AUC | Average precision | F1 | Top-100 positives |
+|---|---:|---:|---:|---:|
+| `benchmark_cnn_v1` | 0.923096 | 0.899184 | 0.880309 | 91 |
+| Chronos-Bolt tiny | 0.722778 | 0.696344 | 0.689873 | 71 |
+| Astromer2 | 0.708984 | 0.659679 | 0.730159 | 67 |
+| Statistical ephemeris baseline | 0.699402 | 0.607780 | 0.722408 | 67 |
+
+Neither external representation beat the better required comparator by the
+precommitted 0.01 margin on any decision metric. The outcome is therefore
+`no_external_added_value`. Retain `benchmark_cnn_v1`; do not authorize broad
+external embedding extraction or training from these baselines.
+
+Aggregate SHA-256 is
+`3d24363b29eefc1be7a6d9c69e163683e7c36e0dbca757a2ced7e33ebd4952bd`.
+The six shard and one aggregate Run Report commits end at `1200612`.
+
+Version 0.2.76's evidence-release validation passed 2,797 default tests plus
+Ruff and mypy as 8/8 supervised gates in 36.3 seconds under the canonical 6x6
+test topology.
