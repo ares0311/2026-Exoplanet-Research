@@ -1219,3 +1219,5 @@ Thompson, Susan E., et al. "Planetary Candidates Observed by Kepler. VIII. Cumul
 VanderPlas, Jacob T. "Understanding the Lomb-Scargle Periodogram." *The Astrophysical Journal Supplement Series*, vol. 236, no. 1, 2018, p. 16. https://doi.org/10.3847/1538-4365/aab766.
 
 Winn, Joshua N. "Transits and Occultations." *Exoplanets*, edited by Sara Seager, University of Arizona Press, 2010, pp. 55–77.
+
+<!-- gh-write-verification: throwaway, will not be merged -->
