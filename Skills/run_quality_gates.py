@@ -1,8 +1,11 @@
 """Run the repository quality gates with six pytest shards and six workers each.
 
 The test suite is partitioned by file so every test module belongs to exactly
-one shard. Each shard then uses pytest-xdist for in-shard execution. Ruff and
-mypy run beside the test shards under the same supervising parent process.
+one shard. Each shard then uses pytest-xdist for in-shard execution. Ruff,
+mypy, the incomplete-implementation scan, and the directive-integrity check
+run beside the test shards under the same supervising parent process. The
+summary JSON records the exact git HEAD SHA and working-tree dirty state this
+run verified, per AGENTS.md "No Unsupported Completion Claims".
 """
 from __future__ import annotations
 
@@ -93,6 +96,14 @@ def build_gate_specs(
             (
                 GateSpec("ruff", (python_executable, "-m", "ruff", "check", ".")),
                 GateSpec("mypy", (python_executable, "-m", "mypy", "src")),
+                GateSpec(
+                    "incomplete_implementations",
+                    (python_executable, "Skills/check_incomplete_implementations.py"),
+                ),
+                GateSpec(
+                    "directive_integrity",
+                    (python_executable, "Skills/check_directive_integrity.py"),
+                ),
             )
         )
     # Thirty-six test workers are already the outer CPU parallelism layer.
@@ -123,6 +134,34 @@ def build_gate_specs(
             )
         )
     return tuple(specs)
+
+
+def _git_state(repo_root: Path) -> dict[str, Any]:
+    """Capture the exact repository state this run verified.
+
+    A summary without this is not evidence of *current* correctness once
+    the tree changes further — see AGENTS.md "No Unsupported Completion
+    Claims". Fails loudly (non-empty "error" key) rather than silently
+    omitting the state if git itself is unavailable.
+    """
+    try:
+        head_sha = subprocess.run(
+            ("git", "rev-parse", "HEAD"),
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        porcelain = subprocess.run(
+            ("git", "status", "--porcelain"),
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        return {"git_head_sha": head_sha, "git_dirty": bool(porcelain.strip())}
+    except (OSError, subprocess.CalledProcessError) as exc:
+        return {"git_head_sha": None, "git_dirty": None, "git_state_error": str(exc)}
 
 
 def _format_eta(seconds: float) -> str:
@@ -267,6 +306,7 @@ def main(argv: list[str] | None = None) -> int:
         "total_test_workers": TOTAL_TEST_WORKERS,
         "elapsed_seconds": elapsed,
         "outcomes": [outcome.__dict__ for outcome in outcomes],
+        **_git_state(REPO_ROOT),
     }
     summary_path = log_dir / "quality_gate_summary.json"
     summary_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")

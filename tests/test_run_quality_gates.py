@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,7 @@ from Skills.run_quality_gates import (
     TOTAL_TEST_WORKERS,
     WORKERS_PER_SHARD,
     GateSpec,
+    _git_state,
     build_gate_specs,
     partition_test_files,
     supervise_gates,
@@ -50,7 +52,14 @@ def test_build_specs_creates_six_disjoint_six_worker_pytest_commands(tmp_path: P
     repo_files = list((Path(__file__).parent).glob("test_*.py"))[:12]
     specs = build_gate_specs(repo_files, python_executable=".venv/bin/python")
     pytest_specs = [spec for spec in specs if spec.name.startswith("pytest_shard_")]
-    assert len(specs) == 8
+    static_specs = [spec for spec in specs if not spec.name.startswith("pytest_shard_")]
+    assert len(specs) == 10
+    assert {spec.name for spec in static_specs} == {
+        "ruff",
+        "mypy",
+        "incomplete_implementations",
+        "directive_integrity",
+    }
     assert len(pytest_specs) == TEST_SHARD_COUNT
     assert TOTAL_TEST_WORKERS == 36
     seen: list[str] = []
@@ -104,3 +113,39 @@ def test_supervisor_runs_all_specs_with_separate_logs(tmp_path: Path) -> None:
     assert len({outcome.log_path for outcome in outcomes}) == 2
     assert all(Path(outcome.log_path).exists() for outcome in outcomes)
     assert calls[1]["env"]["PYTHONPATH"] == "src"  # type: ignore[index]
+
+
+def _init_committed_repo(root: Path) -> None:
+    subprocess.run(("git", "init"), cwd=root, check=True, capture_output=True)
+    subprocess.run(("git", "config", "user.email", "test@example.com"), cwd=root, check=True)
+    subprocess.run(("git", "config", "user.name", "Test"), cwd=root, check=True)
+    (root / "file.txt").write_text("content\n")
+    subprocess.run(("git", "add", "file.txt"), cwd=root, check=True)
+    subprocess.run(
+        ("git", "commit", "-m", "initial"), cwd=root, check=True, capture_output=True
+    )
+
+
+class TestGitState:
+    def test_clean_repo_reports_sha_and_not_dirty(self, tmp_path: Path) -> None:
+        _init_committed_repo(tmp_path)
+
+        state = _git_state(tmp_path)
+        expected_sha = subprocess.run(
+            ("git", "rev-parse", "HEAD"), cwd=tmp_path, capture_output=True, text=True, check=True
+        ).stdout.strip()
+        assert state["git_head_sha"] == expected_sha
+        assert state["git_dirty"] is False
+
+    def test_uncommitted_change_reports_dirty(self, tmp_path: Path) -> None:
+        _init_committed_repo(tmp_path)
+        (tmp_path / "file.txt").write_text("changed\n")
+
+        state = _git_state(tmp_path)
+        assert state["git_dirty"] is True
+
+    def test_non_git_directory_fails_loudly_not_silently(self, tmp_path: Path) -> None:
+        state = _git_state(tmp_path)
+        assert state["git_head_sha"] is None
+        assert state["git_dirty"] is None
+        assert "git_state_error" in state
