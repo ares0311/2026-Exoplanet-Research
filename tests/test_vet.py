@@ -224,8 +224,8 @@ class TestMeasureIndividualTransitShapes:
     def test_resolves_multiple_durations_and_midpoints(self) -> None:
         lc = _lc_with_transit(depth=0.005, noise=0.0002)
         t, f, e = _extract_arrays(lc, flux_shape=None)
-        durations, errors, midpoints = _measure_individual_transit_shapes(
-            t, f, e, signal=_signal()
+        durations, errors, midpoints, missing_fraction = (
+            _measure_individual_transit_shapes(t, f, e, signal=_signal())
         )
         assert durations is not None and errors is not None and midpoints is not None
         assert len(durations) == len(errors) == len(midpoints) >= 2
@@ -236,15 +236,27 @@ class TestMeasureIndividualTransitShapes:
             < 0.01
             for midpoint in midpoints
         )
+        # Clean injected transit: nearly every covered window should resolve.
+        assert missing_fraction is not None
+        assert missing_fraction < 0.2
 
     def test_returns_none_for_flat_noise(self) -> None:
         lc = _flat_lc(noise=0.0002)
         t, f, e = _extract_arrays(lc, flux_shape=None)
-        assert _measure_individual_transit_shapes(t, f, e, signal=_signal()) == (
-            None,
-            None,
-            None,
+        durations, errors, midpoints, _missing_fraction = (
+            _measure_individual_transit_shapes(t, f, e, signal=_signal())
         )
+        assert (durations, errors, midpoints) == (None, None, None)
+
+    def test_all_windows_missing_for_densely_sampled_flat_noise(self) -> None:
+        # Dense enough sampling that every predicted window clears the
+        # 5-cadence coverage floor, but no dip is present anywhere.
+        lc = _flat_lc(n_points=2000, noise=0.0002)
+        t, f, e = _extract_arrays(lc, flux_shape=None)
+        _durations, _errors, _midpoints, missing_fraction = (
+            _measure_individual_transit_shapes(t, f, e, signal=_signal())
+        )
+        assert missing_fraction == 1.0
 
     def test_recovers_a_shifted_transit_midpoint(self) -> None:
         rng = np.random.default_rng(123)
@@ -256,8 +268,10 @@ class TestMeasureIndividualTransitShapes:
         for center in centers:
             flux[np.abs(time_bjd - center) <= half_duration] -= 0.005
         errors = np.full_like(flux, 0.0001)
-        _durations, _duration_errors, midpoints = _measure_individual_transit_shapes(
-            time_bjd, flux, errors, signal=_signal()
+        _durations, _duration_errors, midpoints, _missing_fraction = (
+            _measure_individual_transit_shapes(
+                time_bjd, flux, errors, signal=_signal()
+            )
         )
         assert midpoints is not None
         oc_minutes = [
@@ -271,6 +285,32 @@ class TestMeasureIndividualTransitShapes:
             for midpoint in midpoints
         ]
         assert max(oc_minutes) > 20.0
+
+    def test_returns_none_when_fewer_than_two_windows_have_data(self) -> None:
+        # Long period, short baseline → at most one window can have coverage.
+        lc = _lc_with_transit(t_span_days=5.0)
+        t, f, e = _extract_arrays(lc, flux_shape=None)
+        _d, _e, _m, missing_fraction = _measure_individual_transit_shapes(
+            t, f, e, signal=_signal(period_days=100.0, epoch_bjd=_EPOCH + 200.0)
+        )
+        assert missing_fraction is None
+
+    def test_missing_fraction_is_fraction_of_unresolved_covered_windows(self) -> None:
+        # Five expected windows with data, only the first two carry a real dip.
+        rng = np.random.default_rng(7)
+        period = 5.0
+        time_bjd = np.linspace(_EPOCH, _EPOCH + 4.0 * period + 1.0, 6000)
+        flux = np.ones_like(time_bjd) + rng.normal(0.0, 0.0001, time_bjd.size)
+        half_duration = _DURATION_H / 48.0
+        for index in range(2):
+            center = _EPOCH + index * period
+            flux[np.abs(time_bjd - center) <= half_duration] -= 0.006
+        errors = np.full_like(flux, 0.0001)
+        _d, _e, _m, missing_fraction = _measure_individual_transit_shapes(
+            time_bjd, flux, errors, signal=_signal(period_days=period)
+        )
+        assert missing_fraction is not None
+        assert 0.4 < missing_fraction < 0.8
 
 
 # ---------------------------------------------------------------------------

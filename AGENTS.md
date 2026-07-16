@@ -473,6 +473,20 @@ diagnostics remain `None`. Flat noise stays unavailable, while a tested
 or external action is involved.
 The version 0.2.77 release gate passed 2,801 default tests plus Ruff/mypy as
 8/8 supervised gates in 35.3 seconds under the canonical 6x6 topology.
+Version 0.2.78 adds the `missing_transit_fraction` diagnostic named in the
+0.2.77 roadmap note as the next bounded Phase 4 increment. It reuses
+`_measure_individual_transit_shapes()`'s existing per-window resolution test
+(local sideband baseline, twice-noise half-depth gate) to count, among
+predicted windows with at least five cadences of coverage, the fraction that
+never resolved a significant dip — evidence against genuine periodicity that
+is distinct from the pre-existing data-gap-fraction diagnostic (which
+measures absent coverage, not unresolved coverage). Wired into
+`log_score_planet()` (−0.70) and `log_score_instrumental()` (+0.60); `None`
+unless at least two windows have coverage to test. See
+`docs/SCORING_MODEL.md §23`. Depth/asymmetry and extra-event ranking remain
+future bounded increments of the same roadmap item.
+The version 0.2.78 release gate passed 2,813 default tests plus Ruff/mypy as
+8/8 supervised gates in 28.2 seconds under the canonical 6x6 topology.
 
 The version 0.2.62 release gate passed 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 34.3 seconds under the canonical 6×6 topology.

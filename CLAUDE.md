@@ -280,6 +280,20 @@ unless at least two events resolve. This activates existing duration-
 consistency and TTV features without new data or model training.
 The version 0.2.77 release gate passed 2,801 default tests plus Ruff/mypy as
 8/8 supervised gates in 35.3 seconds under the canonical 6x6 topology.
+Version 0.2.78 extends the Phase 4 individual-transit core with the
+`missing_transit_fraction` diagnostic: `_measure_individual_transit_shapes()`
+now also counts, among predicted transit windows with at least five cadences
+of coverage, the fraction that never resolved a significant dip under the
+same local-sideband twice-noise half-depth test already used for
+duration/midpoint measurement. `missing_transit_fraction_score()` wires this
+into `log_score_planet()` (−0.70) and `log_score_instrumental()` (+0.60),
+giving evidence against periodicity even when data coverage itself is not the
+limiting factor. `None` unless at least two windows have coverage to test.
+See `docs/SCORING_MODEL.md §23`. This is the first extension named in the
+Phase 4 roadmap note ("depth/asymmetry/missing/extra-event ranking");
+asymmetry and extra-event ranking remain future bounded increments.
+The version 0.2.78 release gate passed 2,813 default tests plus Ruff/mypy as
+8/8 supervised gates in 28.2 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
@@ -534,6 +548,19 @@ New feature in `features.py` and `schemas.py` (Milestone 11a):
 
 ---
 
+## Missing Transit Fraction Score
+
+New feature in `features.py`, `schemas.py`, `hypotheses.py`, and `vet.py` (version 0.2.78):
+
+- `missing_transit_fraction_score(missing_transit_fraction) -> float` — identity clip; input already bounded to `[0, 1]`
+- `RawDiagnostics.missing_transit_fraction`: fraction of predicted transit windows with ≥5 cadences of coverage that never resolved a significant dip, using the exact same per-window resolution test `_measure_individual_transit_shapes()` already uses for durations/midpoints (local sideband baseline, twice-noise half-depth gate)
+- High score → data covers most predicted windows but the signal fails to resolve at most of them → evidence against genuine periodicity even when the "no data" explanation is ruled out
+- Wired into `log_score_planet()` (−0.70 weight) and `log_score_instrumental()` (+0.60 weight)
+- `None` if fewer than 2 predicted windows have sufficient coverage to test
+- Spec: `docs/SCORING_MODEL.md §23`
+
+---
+
 ## Milestone 12 Features (features.py + schemas.py + hypotheses.py)
 
 Five new diagnostic scores added (Milestone 12a–12e):
@@ -666,7 +693,7 @@ SubmissionPathway = Literal[
 ]
 
 CandidateSignal      # raw BLS output
-CandidateFeatures    # 35 OptScore fields, all default None
+CandidateFeatures    # 44 OptScore fields, all default None
 HypothesisPosterior  # 6 Score fields, validator enforces sum ≈ 1.0 ±0.01
 CandidateScores      # 6 Score fields (fpp, detection_confidence, novelty_score, …)
 CandidateExplanation # tuple[str, ...] fields for positive/negative/blocking evidence

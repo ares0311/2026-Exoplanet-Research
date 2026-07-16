@@ -278,6 +278,16 @@ by itself satisfy a master-guide evidence requirement.
    validate against real or frozen injected controls before production claims.
    The version 0.2.77 release gate passed 2,801 default tests plus Ruff/mypy as
    8/8 supervised gates in 35.3 seconds under the canonical 6x6 topology.
+   Version 0.2.78 begins that named extension with `missing_transit_fraction`:
+   the fraction of predicted transit windows with enough cadence coverage to
+   test that never resolved a significant dip, reusing the exact resolution
+   test already proven for duration/midpoint measurement. Wired as evidence
+   against `planet_candidate` (−0.70) and for `instrumental_artifact` (+0.60);
+   `None` unless at least two windows have coverage to test. See
+   `docs/SCORING_MODEL.md §23`. Depth/asymmetry and extra-event ranking remain
+   the next bounded increments of this roadmap item.
+   The version 0.2.78 release gate passed 2,813 default tests plus Ruff/mypy as
+   8/8 supervised gates in 28.2 seconds under the canonical 6x6 topology.
    The 0.2.60 release passed 2,751 default tests plus Ruff/mypy as
    8/8 supervised gates under the 6×6 topology in 25.2 seconds.
 

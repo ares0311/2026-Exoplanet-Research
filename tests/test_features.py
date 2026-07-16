@@ -25,6 +25,7 @@ from exo_toolkit.features import (
     large_depth_score,
     limb_darkening_plausibility_score,
     log_snr_score,
+    missing_transit_fraction_score,
     multi_sector_depth_consistency_score,
     nearby_bright_source_score,
     nearby_targets_common_signal_score,
@@ -809,6 +810,38 @@ class TestTransitTimingVariationScore:
         mids = self._midpoints([0.0, 0.0])
         s = transit_timing_variation_score(mids, self._PERIOD, self._EPOCH)
         assert s is not None
+
+
+# ---------------------------------------------------------------------------
+# missing_transit_fraction_score
+# ---------------------------------------------------------------------------
+
+
+class TestMissingTransitFractionScore:
+    def test_zero_fraction_gives_zero(self) -> None:
+        assert missing_transit_fraction_score(0.0) == pytest.approx(0.0)
+
+    def test_full_fraction_gives_one(self) -> None:
+        assert missing_transit_fraction_score(1.0) == pytest.approx(1.0)
+
+    def test_partial_fraction_passes_through(self) -> None:
+        assert missing_transit_fraction_score(0.4) == pytest.approx(0.4)
+
+    def test_output_in_zero_one(self) -> None:
+        assert 0.0 <= missing_transit_fraction_score(0.7) <= 1.0
+
+    def test_extract_features_propagates_missing_fraction(
+        self, base_signal: CandidateSignal
+    ) -> None:
+        diag = RawDiagnostics(missing_transit_fraction=0.6)
+        f = extract_features(base_signal, diag)
+        assert f.missing_transit_fraction_score == pytest.approx(0.6)
+
+    def test_none_missing_fraction_gives_none_feature(
+        self, base_signal: CandidateSignal
+    ) -> None:
+        f = extract_features(base_signal, RawDiagnostics())
+        assert f.missing_transit_fraction_score is None
 
 
 # ---------------------------------------------------------------------------
