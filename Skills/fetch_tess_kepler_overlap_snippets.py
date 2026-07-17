@@ -46,6 +46,10 @@ fetch_koi_table(url) -> list[KoiRow]
 build_koi_tess_snippet(row, *, n_bins, lc_fetcher) -> KoiSnippetResult
 build_koi_tess_snippets(rows, *, n_bins, output_path, lc_fetcher, max_errors,
                         workers, request_delay) -> int
+
+The CLI entry point writes a structured completion record via
+``Skills/run_report.py`` after each run (AGENTS.md Run Report Policy,
+Rule 7) and commits/pushes only that record.
 """
 from __future__ import annotations
 
@@ -60,9 +64,12 @@ from collections import defaultdict
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from urllib.request import urlopen
+
+from Skills.run_report import RunReport, report_path_for, run_and_commit_report
 
 # Prevent indefinite hangs when WiFi drops mid-download.
 socket.setdefaulttimeout(120)
@@ -432,6 +439,7 @@ def build_koi_tess_snippets(
     retry_failures: bool = False,
     workers: int = 4,
     request_delay: float = 0.25,
+    stats: dict[str, int] | None = None,
 ) -> int:
     """Build phase-folded TESS snippets for a list of KOI rows.
 
@@ -449,6 +457,14 @@ def build_koi_tess_snippets(
         retry_failures: Reprocess rows recorded in the failure sidecar.
         workers: Number of KIC groups to process concurrently.
         request_delay: Seconds to wait between submitting KIC fetch jobs.
+        stats: When given, populated with
+            ``{"written", "errors", "terminal_failures", "total"}`` in-place
+            on return — a non-breaking side channel for callers (e.g. the
+            CLI's Run Report) that need per-run counts this function's
+            single-int return does not otherwise expose. ``errors`` counts
+            every non-OK result (including retryable ones), matching
+            AGENTS.md's "partial success must not be represented as complete
+            success".
 
     Returns:
         Number of snippets written.
@@ -649,6 +665,11 @@ def build_koi_tess_snippets(
         f"terminal_failures_recorded={n_terminal_failures} "
         f"total_elapsed={elapsed_total:.0f}s"
     )
+    if stats is not None:
+        stats["written"] = n_written
+        stats["errors"] = n_skipped
+        stats["terminal_failures"] = n_terminal_failures
+        stats["total"] = n_total
     return n_written
 
 
@@ -657,7 +678,41 @@ def build_koi_tess_snippets(
 # ---------------------------------------------------------------------------
 
 
-def _cli(argv: list[str] | None = None) -> int:
+def _write_run_report(
+    *,
+    started_at: str,
+    elapsed_seconds: float,
+    stats: dict[str, int],
+    output_path: Path,
+    git_run_fn: Any = None,
+) -> None:
+    """Append and publish one fetch_tess_kepler_overlap_snippets completion
+    report (AGENTS.md Rule 7)."""
+    errors = stats.get("errors", 0)
+    report = RunReport(
+        script="fetch_tess_kepler_overlap_snippets",
+        status="success" if errors == 0 else "partial",
+        started_at=started_at,
+        completed_at=datetime.now(UTC).isoformat(),
+        elapsed_seconds=elapsed_seconds,
+        items_processed=stats.get("total", 0),
+        items_written=stats.get("written", 0),
+        items_failed=errors,
+        output_paths=(str(output_path),),
+        notes=f"terminal_failures={stats.get('terminal_failures', 0)}",
+    )
+    path = report_path_for("fetch_tess_kepler_overlap_snippets")
+    kwargs: dict[str, Any] = {}
+    if git_run_fn is not None:
+        kwargs["run_fn"] = git_run_fn
+    ok = run_and_commit_report(report, path, **kwargs)
+    if ok:
+        _emit_progress(f"Run report committed and pushed: {path}")
+    else:
+        _emit_progress(f"Warning: run report written to {path} but commit/push failed")
+
+
+def _cli(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(
@@ -730,6 +785,9 @@ def _cli(argv: list[str] | None = None) -> int:
         f" {sum(1 for r in rows if r.disposition == 'FALSE POSITIVE')} FALSE POSITIVE)."
     )
 
+    started_at = datetime.now(UTC).isoformat()
+    start = time.monotonic()
+    stats: dict[str, int] = {}
     n = build_koi_tess_snippets(
         rows,
         n_bins=args.n_bins,
@@ -739,8 +797,17 @@ def _cli(argv: list[str] | None = None) -> int:
         retry_failures=args.retry_failures,
         workers=args.workers,
         request_delay=args.request_delay,
+        stats=stats,
     )
+    elapsed = time.monotonic() - start
     _emit_progress(f"[{datetime.now().strftime('%H:%M:%S')}] Wrote {n} snippets -> {args.output}")
+    _write_run_report(
+        started_at=started_at,
+        elapsed_seconds=elapsed,
+        stats=stats,
+        output_path=args.output,
+        git_run_fn=git_run_fn,
+    )
     return 0
 
 

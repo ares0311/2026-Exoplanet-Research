@@ -371,6 +371,17 @@ requirement. Both are fixed. AGENTS.md now flags this exact check for the
 remaining ten scripts.
 The version 0.2.84 release gate passed 2,906 default tests plus Ruff/mypy as
 10/10 supervised gates in 32.1 seconds under the canonical 6x6 topology.
+Version 0.2.85 retrofits `Skills/fetch_tess_kepler_overlap_snippets.py` with
+the Run Report Policy — fifth of fourteen scripts, same `stats` side-channel
+pattern. Its core function distinguishes retryable skips from durable
+terminal failures (via a failure sidecar); retrofit uses the total non-OK
+count for `items_failed` rather than just the terminal subset, per "partial
+success must not be represented as complete success," and records the
+terminal-failure count separately in the report's `notes` field. AGENTS.md
+now documents this distinction for any remaining script with a similar
+sidecar/terminal-failure design.
+The version 0.2.85 release gate passed 2,914 default tests plus Ruff/mypy as
+10/10 supervised gates in 25.1 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
