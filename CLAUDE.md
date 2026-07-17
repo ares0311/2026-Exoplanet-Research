@@ -338,6 +338,16 @@ duration, excluding single-point noise and broad low-frequency trends.
 cadences are available. See `docs/SCORING_MODEL.md §25`.
 The version 0.2.81 release gate passed 2,883 default tests plus Ruff/mypy as
 10/10 supervised gates in 26.1 seconds under the canonical 6x6 topology.
+Version 0.2.82 retrofits `Skills/batch_scan.py` with the Run Report Policy
+(AGENTS.md Rule 7): its CLI entry point now captures `started_at`/elapsed
+around the scan, builds a `RunReport` from real per-target outcome counts
+(`error` status → `items_failed`), and calls `run_and_commit_report` with an
+injectable `git_run_fn` so tests never touch the real git commit/push path.
+This is the second of fourteen scripts on the Rule 7 retrofit list (first
+was `star_scanner.py`); AGENTS.md now tracks done/remaining explicitly and
+names the CLI-level wiring pattern for the next twelve.
+The version 0.2.82 release gate passed 2,889 default tests plus Ruff/mypy as
+10/10 supervised gates in 31.1 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
@@ -468,7 +478,8 @@ Scans a list of TIC IDs from a text or CSV file, writing incremental JSON result
 - `batch_scan(tic_ids, *, output_path, resume, run_pipeline_fn, ...)` — calls `run_pipeline` per target; writes after each result; `--resume` skips already-completed IDs
 - Status per entry: `"candidate_found"` | `"scanned_clear"` | `"error"`
 - CLI: `.venv/bin/python Skills/batch_scan.py targets.txt --output results.json [--resume]`
-- 14 tests in `tests/test_batch_scan.py`
+- CLI writes a Run Report (AGENTS.md Rule 7) after each run via `Skills/run_report.py`
+- 20 tests in `tests/test_batch_scan.py`
 
 ---
 

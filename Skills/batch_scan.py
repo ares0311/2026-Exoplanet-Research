@@ -7,6 +7,10 @@ detection pipeline on each, and writes a JSON results file.
 Supports ``--resume``: previously completed TIC IDs are skipped by reading the
 existing output file, enabling incremental runs over large target lists.
 
+The CLI entry point writes a structured completion record via
+``Skills/run_report.py`` after each run (AGENTS.md Run Report Policy, Rule 7)
+and commits/pushes only that record.
+
 Public API
 ----------
 read_tic_ids(path) -> list[int]
@@ -23,10 +27,14 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 import traceback
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from Skills.run_report import RunReport, report_path_for, run_and_commit_report
 
 # ---------------------------------------------------------------------------
 # TIC ID reader
@@ -162,11 +170,52 @@ def batch_scan(
 
 
 # ---------------------------------------------------------------------------
+# Run Report
+# ---------------------------------------------------------------------------
+
+
+def _write_run_report(
+    *,
+    started_at: str,
+    elapsed_seconds: float,
+    results: list[dict[str, Any]],
+    output_path: Path,
+    git_run_fn: Any = None,
+) -> None:
+    """Append and publish one batch_scan completion report (AGENTS.md Rule 7)."""
+    items_failed = sum(1 for entry in results if entry.get("status") == "error")
+    report = RunReport(
+        script="batch_scan",
+        status="success" if items_failed == 0 else "partial",
+        started_at=started_at,
+        completed_at=datetime.now(UTC).isoformat(),
+        elapsed_seconds=elapsed_seconds,
+        items_processed=len(results),
+        items_written=len(results) - items_failed,
+        items_failed=items_failed,
+        output_paths=(str(output_path),),
+    )
+    path = report_path_for("batch_scan")
+    kwargs: dict[str, Any] = {}
+    if git_run_fn is not None:
+        kwargs["run_fn"] = git_run_fn
+    ok = run_and_commit_report(report, path, **kwargs)
+    if ok:
+        print(f"Run report committed and pushed: {path}", file=sys.stderr, flush=True)
+    else:
+        print(
+            f"Warning: run report written to {path} but commit/push failed",
+            file=sys.stderr,
+            flush=True,
+        )
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
 
-def _cli(argv: list[str] | None = None) -> int:
+def _cli(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
     import argparse  # noqa: PLC0415
 
     parser = argparse.ArgumentParser(
@@ -199,7 +248,9 @@ def _cli(argv: list[str] | None = None) -> int:
         return 1
 
     print(f"Loaded {len(tic_ids)} TIC IDs from {args.targets}", file=sys.stderr)
-    batch_scan(
+    started_at = datetime.now(UTC).isoformat()
+    start = time.monotonic()
+    results = batch_scan(
         tic_ids,
         output_path=args.output,
         mission=args.mission,
@@ -209,7 +260,15 @@ def _cli(argv: list[str] | None = None) -> int:
         model_path=args.model_path,
         resume=args.resume,
     )
+    elapsed = time.monotonic() - start
     print(f"Results written to {args.output}", file=sys.stderr)
+    _write_run_report(
+        started_at=started_at,
+        elapsed_seconds=elapsed,
+        results=results,
+        output_path=args.output,
+        git_run_fn=git_run_fn,
+    )
     return 0
 
 
