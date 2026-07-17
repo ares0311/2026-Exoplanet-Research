@@ -420,6 +420,12 @@ all, per Fail Loudly. The pre-existing `_cli()`-level tests were missing
 retrofit); fixed.
 The version 0.2.89 release gate passed 2,954 default tests plus Ruff/mypy as
 10/10 supervised gates in 25.2 seconds under the canonical 6x6 topology.
+Version 0.2.90 retrofits `Skills/fetch_nea_koi_lc_index.py` with the Run
+Report Policy — tenth of fourteen scripts, near-identical `KoiLcIndex`/flag
+shape to `fetch_exofop_ctoi.py`, so the same both-flags Run Report pattern
+applied directly with no new gaps found.
+The version 0.2.90 release gate passed 2,958 default tests plus Ruff/mypy as
+10/10 supervised gates in 27.3 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
