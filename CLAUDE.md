@@ -484,6 +484,33 @@ The version 0.2.95 release gate passed 2,984 default tests plus Ruff/mypy as
 10/10 supervised gates in 23.2 seconds under the canonical 6x6 topology. The
 AGENTS.md Run Report Policy retrofit (Rule 7) is now complete for all 15
 tracked acquisition/processing Skills.
+Version 0.2.96 implements `docs/ROADMAP.md` Milestone 20 (Slick Animated
+Command-Line UI), unlocked since the 0.2.33 production-ensemble acceptance
+PASS and the last item on the active roadmap once Phase 3/Phase 4 and the
+Rule 7 retrofit closed. `run_pipeline()` gains an optional
+`on_stage(stage_name)` callback fired before each of fetch/clean/search/
+vet_score_classify (vet/score/classify combine into one displayed phase
+since they always run together per signal). `exo scan`'s new
+`_StageAnimator` drives a `rich.console.Console.status()` spinner from it,
+showing the current stage and elapsed time. Animation auto-disables
+whenever `sys.stdout.isatty()` is false (redirected output, CI) and a new
+`--no-animation` flag forces the same plain `[<elapsed>s] <Stage> ...`
+line mode explicitly. `KeyboardInterrupt` during a scan stops the spinner
+cleanly, prints `Interrupted during stage: <Stage>` to stderr, and exits
+`130` with no partial JSON written. JSON output, exit codes, and the
+post-run candidate summary are byte-identical whether animation ran or
+not — this is a cosmetic terminal-presentation layer only, never a
+scoring change. Delivers elapsed-time, not a predictive ETA: a single
+scan has no per-stage duration history to extrapolate from, so a
+fabricated estimate would violate the No-Unsupported-Completion-Claims
+policy rather than help the operator. Documented in
+`docs/DISCOVERY_RUNBOOK.md`'s new "`exo scan` interactive vs.
+automation-safe display modes" section. 16 new tests across
+`TestRunPipelineOnStage`, `TestScanCommand`, and `TestStageAnimator` in
+`tests/test_cli.py`, including a narrow (`width=20`) non-interactive-
+console render check.
+The version 0.2.96 release gate passed 3,000 default tests plus Ruff/mypy as
+10/10 supervised gates in 27.1 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.

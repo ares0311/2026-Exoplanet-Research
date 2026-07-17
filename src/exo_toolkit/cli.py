@@ -12,6 +12,7 @@ Usage examples
     exo "TIC 150428135"
     exo "TIC 150428135" --mission TESS --min-snr 7.0 --scorer xgboost --model-path model.json
     exo "TIC 150428135" --output results.json
+    exo "TIC 150428135" --no-animation   # plain per-stage lines; also automatic when non-TTY
 
     exo background-run-once
     exo background-run-once --dry-run
@@ -24,6 +25,7 @@ import argparse
 import json
 import subprocess
 import sys
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, is_dataclass
 from datetime import UTC, datetime
@@ -259,6 +261,7 @@ def run_pipeline(
     clean_fn: Any = None,
     stellar_params_fn: Any = None,
     run_context: dict[str, Any] | None = None,
+    on_stage: Callable[[str], None] | None = None,
 ) -> list[dict[str, Any]]:
     """Run the full pipeline on one target and return serialisable results.
 
@@ -301,6 +304,10 @@ def run_pipeline(
             (for tests). Only consulted when ``mission == "TESS"``.
         run_context: Optional mutable mapping populated with fetch and
             preprocessing provenance even when no signal clears the search gate.
+        on_stage: Optional callback invoked with a stage name
+            (``"fetch"``, ``"clean"``, ``"search"``, ``"vet_score_classify"``)
+            immediately before that stage begins. Used by the CLI's animated
+            progress display; purely cosmetic and never affects scoring.
 
     Returns:
         List of dicts, one per candidate signal, suitable for JSON output.
@@ -382,6 +389,8 @@ def run_pipeline(
         if resolved_context_path is not None:
             candidate_context_reference = load_candidate_context(resolved_context_path)
 
+    if on_stage is not None:
+        on_stage("fetch")
     fetch_kwargs: dict[str, Any] = {}
     if exptime is not None:
         fetch_kwargs["exptime"] = exptime
@@ -396,6 +405,8 @@ def run_pipeline(
                 "toolkit_version": __version__,
             }
         )
+    if on_stage is not None:
+        on_stage("clean")
     clean_result = _clean(fetch_result.light_curve)
     provenance_score = compute_provenance_score(fetch_result.provenance)
 
@@ -406,6 +417,8 @@ def run_pipeline(
         except Exception:  # noqa: BLE001 — catalog lookup is supplementary, fail open
             stellar_params = {}
 
+    if on_stage is not None:
+        on_stage("search")
     signals: list[CandidateSignal] = search_lightcurve(
         clean_result.light_curve,
         target_id=target_id,
@@ -423,6 +436,8 @@ def run_pipeline(
     if not signals:
         return []
 
+    if on_stage is not None:
+        on_stage("vet_score_classify")
     rows: list[dict[str, Any]] = []
     for signal in signals:
         vet_result = vet_signal(
@@ -570,6 +585,64 @@ def run_pipeline(
 # Display helpers (typer scan command)
 # ---------------------------------------------------------------------------
 
+_STAGE_LABELS: dict[str, str] = {
+    "fetch": "Fetch",
+    "clean": "Clean",
+    "search": "Search",
+    "vet_score_classify": "Vet -> Score -> Classify",
+}
+
+
+class _StageAnimator:
+    """Animated or plain-text stage progress display for ``exo scan``.
+
+    Purely cosmetic: never alters scoring, JSON output, or exit codes. Falls
+    back to plain per-stage lines when not attached to a TTY, when animation
+    is explicitly disabled (``--no-animation``), or on interruption.
+    """
+
+    def __init__(self, *, target_id: str, mission: str, scorer: str, animate: bool) -> None:
+        self._target_id = target_id
+        self._mission = mission
+        self._scorer = scorer
+        self._animate = animate
+        self._console = Console(highlight=False)
+        self._start = time.monotonic()
+        self._status_cm: Any = None
+        self._current_stage: str | None = None
+
+    def __enter__(self) -> _StageAnimator:
+        header = f"Scanning {self._target_id} ({self._mission}) [scorer={self._scorer}] ..."
+        if self._animate:
+            self._status_cm = self._console.status(f"[bold cyan]{header}", spinner="dots")
+            self._status_cm.__enter__()
+        else:
+            typer.echo(header)
+        return self
+
+    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+        if self._status_cm is not None:
+            self._status_cm.__exit__(exc_type, exc, tb)
+
+    def on_stage(self, stage: str) -> None:
+        self._current_stage = stage
+        label = _STAGE_LABELS.get(stage, stage)
+        elapsed = time.monotonic() - self._start
+        if self._animate and self._status_cm is not None:
+            self._status_cm.update(
+                f"[bold cyan]{label}[/bold cyan]  "
+                f"[dim]({self._target_id}, {elapsed:.1f}s elapsed)[/dim]"
+            )
+        else:
+            typer.echo(f"  [{elapsed:.1f}s] {label} ...")
+
+    def interrupted(self) -> None:
+        # By the time this is called, the `with` block's __exit__ has
+        # already stopped any active spinner display.
+        stage = self._current_stage or "startup"
+        label = _STAGE_LABELS.get(stage, stage)
+        typer.echo(f"\nInterrupted during stage: {label}", err=True)
+
 
 def _print_results(rows: list[dict[str, Any]], target_id: str) -> None:
     if not rows:
@@ -673,6 +746,16 @@ def scan(
     output: Path | None = typer.Option(
         None, "--output", "-o", help="Write JSON results to this file"
     ),
+    no_animation: bool = typer.Option(
+        False,
+        "--no-animation",
+        help=(
+            "Disable the animated spinner and print plain per-stage lines "
+            "instead. Automatically disabled when stdout is not a terminal "
+            "(e.g. redirected output or CI); JSON output and exit codes are "
+            "identical either way."
+        ),
+    ),
     version: bool | None = typer.Option(
         None,
         "--version",
@@ -686,6 +769,11 @@ def scan(
     """Scan a target for exoplanet transit candidates.
 
     Runs the full pipeline: fetch → clean → search → vet → score → classify.
+
+    Prints an animated spinner with per-stage status when stdout is an
+    interactive terminal; automatically falls back to plain per-stage lines
+    under redirected output, CI, or ``--no-animation``. JSON output
+    (``--output``) and exit codes are identical in both modes.
     """
     valid_missions = ("TESS", "Kepler", "K2", "JWST")
     if mission not in valid_missions:
@@ -721,23 +809,31 @@ def scan(
             )
             raise typer.Exit(code=1)
 
-    typer.echo(f"Scanning {target_id} ({mission}) [scorer={scorer}] ...")
+    animate = (not no_animation) and sys.stdout.isatty()
+    animator = _StageAnimator(
+        target_id=target_id, mission=mission, scorer=scorer, animate=animate
+    )
 
     try:
-        rows = run_pipeline(
-            target_id,
-            mission,  # type: ignore[arg-type]
-            exptime=exptime,
-            pipeline=pipeline,
-            min_snr=min_snr,
-            max_peaks=max_peaks,
-            max_period_grid_points=max_period_grid_points,
-            scorer=scorer,
-            model_path=model_path,
-            cnn_checkpoint_path=cnn_checkpoint_path,
-            candidate_context_path=candidate_context_path,
-            allow_cross_mission_cnn=allow_cross_mission_cnn,
-        )
+        with animator:
+            rows = run_pipeline(
+                target_id,
+                mission,  # type: ignore[arg-type]
+                exptime=exptime,
+                pipeline=pipeline,
+                min_snr=min_snr,
+                max_peaks=max_peaks,
+                max_period_grid_points=max_period_grid_points,
+                scorer=scorer,
+                model_path=model_path,
+                cnn_checkpoint_path=cnn_checkpoint_path,
+                candidate_context_path=candidate_context_path,
+                allow_cross_mission_cnn=allow_cross_mission_cnn,
+                on_stage=animator.on_stage,
+            )
+    except KeyboardInterrupt:
+        animator.interrupted()
+        raise typer.Exit(code=130) from None
     except Exception as exc:  # noqa: BLE001
         typer.echo(f"Pipeline error: {exc}", err=True)
         raise typer.Exit(code=2) from exc
