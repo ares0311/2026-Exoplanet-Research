@@ -299,3 +299,152 @@ def test_fetch_uses_cache_on_second_call(monkeypatch: pytest.MonkeyPatch, tmp_pa
     result = fetch_jwst_lc("obs777", cache_dir=tmp_path, product_fn=_product_fn_x1dints)
     assert result is not None
     assert download_calls == []  # should use cache
+
+
+# ---------------------------------------------------------------------------
+# Run Report (AGENTS.md Rule 7 retrofit)
+# ---------------------------------------------------------------------------
+
+
+def test_run_report_success_all_downloaded(monkeypatch) -> None:
+    import fetch_jwst_lc as mod
+
+    captured = {}
+
+    def fake_commit(report, path, **kwargs):
+        captured["report"] = report
+        captured["path"] = path
+        captured["run_fn"] = kwargs.get("run_fn")
+        return True
+
+    monkeypatch.setattr(mod, "run_and_commit_report", fake_commit)
+
+    mod._write_run_report(
+        started_at="2026-07-17T00:00:00+00:00",
+        elapsed_seconds=5.0,
+        n_processed=3,
+        n_written=3,
+        output_paths=("data/jwst_lcs/1.json",),
+        git_run_fn=object(),
+    )
+    report = captured["report"]
+    assert report.script == "fetch_jwst_lc"
+    assert report.status == "success"
+    assert report.items_processed == 3
+    assert report.items_written == 3
+    assert report.items_failed == 0
+    assert captured["path"].name == "fetch_jwst_lc.jsonl"
+    assert captured["run_fn"] is not None
+
+
+def test_run_report_partial_status(monkeypatch) -> None:
+    import fetch_jwst_lc as mod
+
+    captured = {}
+
+    def fake_commit(report, path, **kwargs):
+        captured["report"] = report
+        return True
+
+    monkeypatch.setattr(mod, "run_and_commit_report", fake_commit)
+
+    mod._write_run_report(
+        started_at="2026-07-17T00:00:00+00:00",
+        elapsed_seconds=1.0,
+        n_processed=4,
+        n_written=2,
+        output_paths=(),
+        git_run_fn=None,
+    )
+    report = captured["report"]
+    assert report.status == "partial"
+    assert report.items_failed == 2
+    assert "downloaded=2/4" in report.notes
+
+
+def test_run_report_failed_status_on_zero_written(monkeypatch) -> None:
+    import fetch_jwst_lc as mod
+
+    captured = {}
+
+    def fake_commit(report, path, **kwargs):
+        captured["report"] = report
+        return True
+
+    monkeypatch.setattr(mod, "run_and_commit_report", fake_commit)
+
+    mod._write_run_report(
+        started_at="2026-07-17T00:00:00+00:00",
+        elapsed_seconds=1.0,
+        n_processed=2,
+        n_written=0,
+        output_paths=(),
+        git_run_fn=None,
+    )
+    report = captured["report"]
+    assert report.status == "failed"
+    assert report.items_failed == 2
+
+
+def test_commit_failure_warns_but_does_not_raise(monkeypatch, capsys) -> None:
+    import fetch_jwst_lc as mod
+
+    monkeypatch.setattr(mod, "run_and_commit_report", lambda *a, **k: False)
+    mod._write_run_report(
+        started_at="2026-07-17T00:00:00+00:00",
+        elapsed_seconds=1.0,
+        n_processed=1,
+        n_written=1,
+        output_paths=(),
+        git_run_fn=None,
+    )
+    assert "Warning" in capsys.readouterr().out
+
+
+def test_cli_no_args_returns_error_without_run_report(monkeypatch, capsys) -> None:
+    import fetch_jwst_lc as mod
+
+    captured = {}
+
+    def fake_commit(report, path, **kwargs):
+        captured["called"] = True
+        return True
+
+    monkeypatch.setattr(mod, "run_and_commit_report", fake_commit)
+
+    code = mod._cli([])
+
+    assert code == 1
+    assert "called" not in captured
+
+
+def test_cli_writes_run_report_with_injected_git_runner(monkeypatch, tmp_path: Path) -> None:
+    import fetch_jwst_lc as mod
+
+    monkeypatch.setattr(
+        mod, "fetch_jwst_lc",
+        lambda obsid, **kwargs: JwstLcResult(
+            obsid=obsid, target_name=obsid, time_btjd=[1.0, 2.0],
+            flux_norm=[1.0, 1.0], flux_err_norm=[0.01, 0.01],
+            instrument="NIRISS/SOSS", n_integrations=2,
+            product_type="x1dints", warnings=[], product_uri=f"mast:JWST/{obsid}",
+        ),
+    )
+    captured = {}
+
+    def fake_commit(report, path, **kwargs):
+        captured["report"] = report
+        captured["run_fn"] = kwargs.get("run_fn")
+        return True
+
+    monkeypatch.setattr(mod, "run_and_commit_report", fake_commit)
+
+    fake_runner = object()
+    out = tmp_path / "obs123.json"
+    code = mod._cli(["obs123", "--output", str(out)], git_run_fn=fake_runner)
+
+    assert code == 0
+    assert captured["run_fn"] is fake_runner
+    assert captured["report"].status == "success"
+    assert captured["report"].items_written == 1
+    assert out.exists()
