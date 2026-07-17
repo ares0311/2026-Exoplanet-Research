@@ -767,7 +767,9 @@ class TestScanCommand:
         assert "No transit candidates" in result.output
 
     def test_no_animation_help_text_present(self) -> None:
-        result = runner.invoke(app, ["--help"])
+        # Force a wide virtual terminal so Rich's help panel doesn't wrap
+        # "--no-animation" across lines on narrower CI runners.
+        result = runner.invoke(app, ["--help"], env={"COLUMNS": "300"})
         assert result.exit_code == 0
         assert "--no-animation" in result.output
 

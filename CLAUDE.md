@@ -509,8 +509,14 @@ automation-safe display modes" section. 16 new tests across
 `TestRunPipelineOnStage`, `TestScanCommand`, and `TestStageAnimator` in
 `tests/test_cli.py`, including a narrow (`width=20`) non-interactive-
 console render check.
+The first merged 0.2.96 CI run failed closed on one test only:
+`test_no_animation_help_text_present` asserted on rendered `--help` text
+that Rich line-wrapped across `--no-animation` on CI's narrower terminal
+width, a difference from this local sandbox's width that did not surface
+locally. Fixed by forcing a wide virtual terminal (`env={"COLUMNS": "300"}`)
+for that one invocation rather than asserting on width-dependent rendering.
 The version 0.2.96 release gate passed 3,000 default tests plus Ruff/mypy as
-10/10 supervised gates in 27.1 seconds under the canonical 6x6 topology.
+10/10 supervised gates in 30.1 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
