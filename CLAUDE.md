@@ -391,6 +391,17 @@ than adding retrofit tests to nothing. AGENTS.md now directs future retrofit
 work to check for this gap before assuming Run Report tests are sufficient.
 The version 0.2.86 release gate passed 2,934 default tests plus Ruff/mypy as
 10/10 supervised gates in 27.2 seconds under the canonical 6x6 topology.
+Version 0.2.87 retrofits `Skills/fetch_kepler_tce.py` with the Run Report
+Policy — seventh of fourteen scripts, also zero prior test coverage. This
+one is a single-shot table download with no `_cli()`, no injectable
+fetcher, and no per-item loop, unlike every other retrofitted script, so
+retrofit first added `query_fn`/`stats` injectable parameters to
+`fetch_koi_table()` and a proper `_cli(argv, *, git_run_fn=None) -> int`
+function replacing the bare `if __name__ == "__main__":` block, before
+wiring the Run Report. A query failure propagates uncaught rather than
+writing a false-success report.
+The version 0.2.87 release gate passed 2,943 default tests plus Ruff/mypy as
+10/10 supervised gates in 27.2 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
