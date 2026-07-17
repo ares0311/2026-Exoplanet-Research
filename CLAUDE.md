@@ -402,6 +402,13 @@ wiring the Run Report. A query failure propagates uncaught rather than
 writing a false-success report.
 The version 0.2.87 release gate passed 2,943 default tests plus Ruff/mypy as
 10/10 supervised gates in 27.2 seconds under the canonical 6x6 topology.
+Version 0.2.88 retrofits `Skills/fetch_tess_toi.py` with the Run Report
+Policy — eighth of fourteen scripts, same single-shot-table shape as
+`fetch_kepler_tce.py` but this one already had a real test file and an
+injectable `fetch_fn`, so only the `stats` param and `_cli()`/Run Report
+wiring were new.
+The version 0.2.88 release gate passed 2,949 default tests plus Ruff/mypy as
+10/10 supervised gates in 27.2 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
