@@ -426,6 +426,14 @@ shape to `fetch_exofop_ctoi.py`, so the same both-flags Run Report pattern
 applied directly with no new gaps found.
 The version 0.2.90 release gate passed 2,958 default tests plus Ruff/mypy as
 10/10 supervised gates in 27.3 seconds under the canonical 6x6 topology.
+Version 0.2.91 retrofits `Skills/fetch_additional_tess_labels.py` with the
+Run Report Policy — eleventh of fourteen scripts. This one has no `flag`
+field; its CLI already caught per-source TOI/CTOI fetch failures and
+continued with an empty list rather than aborting, so the retrofit always
+reports `status="success"` and folds fetch-failure counts into the `stats`
+side channel instead.
+The version 0.2.91 release gate passed 2,963 default tests plus Ruff/mypy as
+10/10 supervised gates in 23.2 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
