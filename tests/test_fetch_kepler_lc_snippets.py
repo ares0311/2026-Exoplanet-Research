@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 from Skills.fetch_kepler_lc_snippets import (
+    _cli,
     _default_failure_log_path,
     _format_flags,
     _mad,
@@ -14,6 +17,7 @@ from Skills.fetch_kepler_lc_snippets import (
     _phase_fold_bin,
     _remove_corrupt_lightkurve_cache_file,
     _safe_print,
+    _write_run_report,
     build_kepler_snippet,
     build_kepler_snippets,
 )
@@ -202,6 +206,59 @@ class TestBuildKeplerSnippets:
         assert n == 3
         lines = [ln for ln in out.read_text().strip().split("\n") if ln]
         assert len(lines) == 3
+
+    def test_stats_populated_on_success(self, tmp_path: Path) -> None:
+        koi_rows = self._make_koi_rows(3)
+        out = tmp_path / "kepler_snippets.jsonl"
+        stats: dict[str, int] = {}
+        n = build_kepler_snippets(
+            koi_rows,
+            n_bins=11,
+            output_path=out,
+            lc_fetcher=self._make_fetcher(),
+            resume=False,
+            max_errors=10,
+            stats=stats,
+        )
+        assert stats["written"] == n == 3
+        assert stats["errors"] == 0
+        assert stats["total"] == 3
+
+    def test_stats_populated_with_errors(self, tmp_path: Path) -> None:
+        koi_rows = self._make_koi_rows(1)
+        out = tmp_path / "kepler_snippets.jsonl"
+
+        def broken_fetcher(kepid, period, epoch):
+            raise RuntimeError("temporary network failure")
+
+        stats: dict[str, int] = {}
+        n = build_kepler_snippets(
+            koi_rows,
+            n_bins=11,
+            output_path=out,
+            lc_fetcher=broken_fetcher,
+            resume=False,
+            max_errors=10,
+            stats=stats,
+        )
+        assert n == 0
+        assert stats["written"] == 0
+        assert stats["errors"] == 1
+        assert stats["total"] == 1
+
+    def test_stats_unset_when_not_requested(self, tmp_path: Path) -> None:
+        koi_rows = self._make_koi_rows(2)
+        out = tmp_path / "kepler_snippets.jsonl"
+        # No `stats=` kwarg -- must not raise, matches pre-existing behavior.
+        n = build_kepler_snippets(
+            koi_rows,
+            n_bins=11,
+            output_path=out,
+            lc_fetcher=self._make_fetcher(),
+            resume=False,
+            max_errors=10,
+        )
+        assert n == 2
 
     def test_resume_skips_already_written(self, tmp_path: Path) -> None:
         koi_rows = self._make_koi_rows(4)
@@ -523,3 +580,133 @@ class TestOperationalHardening:
 
         assert removed is None
         assert ordinary.exists()
+
+
+# ---------------------------------------------------------------------------
+# Run Report (AGENTS.md Rule 7 retrofit)
+# ---------------------------------------------------------------------------
+
+
+class TestRunReport:
+    def test_success_status_with_no_errors(self) -> None:
+        with patch(
+            "Skills.fetch_kepler_lc_snippets.run_and_commit_report", return_value=True
+        ) as commit:
+            _write_run_report(
+                started_at="2026-07-17T00:00:00+00:00",
+                elapsed_seconds=5.0,
+                stats={"written": 10, "errors": 0, "total": 10},
+                output_path=Path("data/kepler_snippets.jsonl"),
+                git_run_fn=MagicMock(),
+            )
+        report, path = commit.call_args.args
+        assert report.script == "fetch_kepler_lc_snippets"
+        assert report.status == "success"
+        assert report.items_processed == 10
+        assert report.items_written == 10
+        assert report.items_failed == 0
+        assert path.name == "fetch_kepler_lc_snippets.jsonl"
+
+    def test_partial_status_when_errors_present(self) -> None:
+        with patch(
+            "Skills.fetch_kepler_lc_snippets.run_and_commit_report", return_value=True
+        ) as commit:
+            _write_run_report(
+                started_at="2026-07-17T00:00:00+00:00",
+                elapsed_seconds=5.0,
+                stats={"written": 8, "errors": 2, "total": 10},
+                output_path=Path("data/kepler_snippets.jsonl"),
+                git_run_fn=MagicMock(),
+            )
+        report, _path = commit.call_args.args
+        assert report.status == "partial"
+        assert report.items_failed == 2
+        assert report.items_written == 8
+
+    def test_missing_stats_keys_default_to_zero(self) -> None:
+        with patch(
+            "Skills.fetch_kepler_lc_snippets.run_and_commit_report", return_value=True
+        ) as commit:
+            _write_run_report(
+                started_at="2026-07-17T00:00:00+00:00",
+                elapsed_seconds=1.0,
+                stats={},
+                output_path=Path("out.jsonl"),
+                git_run_fn=MagicMock(),
+            )
+        report, _path = commit.call_args.args
+        assert report.status == "success"
+        assert report.items_processed == 0
+        assert report.items_written == 0
+        assert report.items_failed == 0
+
+    def test_git_run_fn_is_threaded_through(self) -> None:
+        fake_runner = MagicMock()
+        with patch(
+            "Skills.fetch_kepler_lc_snippets.run_and_commit_report", return_value=True
+        ) as commit:
+            _write_run_report(
+                started_at="2026-07-17T00:00:00+00:00",
+                elapsed_seconds=1.0,
+                stats={},
+                output_path=Path("out.jsonl"),
+                git_run_fn=fake_runner,
+            )
+        assert commit.call_args.kwargs["run_fn"] is fake_runner
+
+    def test_commit_failure_warns_but_does_not_raise(self, capsys: Any) -> None:
+        with patch(
+            "Skills.fetch_kepler_lc_snippets.run_and_commit_report", return_value=False
+        ):
+            _write_run_report(
+                started_at="2026-07-17T00:00:00+00:00",
+                elapsed_seconds=1.0,
+                stats={},
+                output_path=Path("out.jsonl"),
+                git_run_fn=MagicMock(),
+            )
+        assert "Warning" in capsys.readouterr().out
+
+    def test_cli_writes_run_report_with_injected_git_runner(
+        self, tmp_path: Path
+    ) -> None:
+        out = tmp_path / "kepler_snippets.jsonl"
+        fake_runner = MagicMock()
+        koi_rows = [
+            {
+                "kepid": "100",
+                "koi_disposition": "CONFIRMED",
+                "koi_period": "3.5",
+                "koi_time0bk": "100.0",
+            }
+        ]
+
+        def fake_build(*args: Any, **kwargs: Any) -> int:
+            stats = kwargs.get("stats")
+            if stats is not None:
+                stats["written"] = 1
+                stats["errors"] = 0
+                stats["total"] = 1
+            return 1
+
+        with (
+            patch(
+                "Skills.fetch_kepler_lc_snippets.fetch_koi_table",
+                return_value=koi_rows,
+            ),
+            patch(
+                "Skills.fetch_kepler_lc_snippets.build_kepler_snippets",
+                side_effect=fake_build,
+            ),
+            patch(
+                "Skills.fetch_kepler_lc_snippets.run_and_commit_report",
+                return_value=True,
+            ) as commit,
+        ):
+            exit_code = _cli(["--output", str(out)], git_run_fn=fake_runner)
+
+        assert exit_code == 0
+        commit.assert_called_once()
+        assert commit.call_args.kwargs["run_fn"] is fake_runner
+        report, _path = commit.call_args.args
+        assert report.items_written == 1
