@@ -35,6 +35,13 @@ fetch_jwst_lc(obsid, *, product_fn, download_fn) -> JwstLcResult | None
 white_light_from_x1dints(fits_path) -> tuple[ndarray, ndarray, ndarray]
 white_light_from_calints(fits_path) -> tuple[ndarray, ndarray, ndarray]
 to_lightkurve(result) -> LightCurve  (requires lightkurve installed)
+
+The CLI entry point writes a structured completion record via
+``Skills/run_report.py`` after each batch run (AGENTS.md Run Report
+Policy, Rule 7): "success" when every obsid yields a light curve,
+"partial" when some but not all do, "failed" when none do. A run
+invoked with no obsid/targets is a CLI usage error, not an acquisition
+attempt, so no report is written for that path.
 """
 from __future__ import annotations
 
@@ -44,10 +51,15 @@ import sys
 import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
+from Skills.run_report import RunReport, report_path_for, run_and_commit_report  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -381,7 +393,50 @@ def to_lightkurve(result: JwstLcResult) -> Any:
 # CLI
 # ---------------------------------------------------------------------------
 
-def _cli() -> None:
+def _write_run_report(
+    *,
+    started_at: str,
+    elapsed_seconds: float,
+    n_processed: int,
+    n_written: int,
+    output_paths: tuple[str, ...],
+    git_run_fn: Any = None,
+) -> None:
+    """Append and publish one fetch_jwst_lc completion report
+    (AGENTS.md Rule 7)."""
+    if n_written == n_processed and n_processed > 0:
+        status = "success"
+    elif n_written > 0:
+        status = "partial"
+    else:
+        status = "failed"
+    report = RunReport(
+        script="fetch_jwst_lc",
+        status=status,
+        started_at=started_at,
+        completed_at=datetime.now(UTC).isoformat(),
+        elapsed_seconds=elapsed_seconds,
+        items_processed=n_processed,
+        items_written=n_written,
+        items_failed=n_processed - n_written,
+        output_paths=output_paths,
+        notes=f"downloaded={n_written}/{n_processed}",
+    )
+    path = report_path_for("fetch_jwst_lc")
+    kwargs: dict[str, Any] = {}
+    if git_run_fn is not None:
+        kwargs["run_fn"] = git_run_fn
+    ok = run_and_commit_report(report, path, **kwargs)
+    if ok:
+        print(f"Run report committed and pushed: {path}", flush=True)
+    else:
+        print(
+            f"Warning: run report written to {path} but commit/push failed",
+            flush=True,
+        )
+
+
+def _cli(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
     parser = argparse.ArgumentParser(
         description="Download JWST time-series data and convert to pipeline LightCurve format"
     )
@@ -392,7 +447,7 @@ def _cli() -> None:
     parser.add_argument("--cache-dir", default="data/jwst_cache", help="FITS cache directory")
     parser.add_argument("--run-pipeline", action="store_true",
                         help="Run clean+search+vet on the downloaded light curve")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     obsids: list[tuple[str, str, str]] = []  # (obsid, target_name, instrument)
 
@@ -403,11 +458,13 @@ def _cli() -> None:
         obsids = [(args.obsid, "", "")]
     else:
         parser.print_help()
-        sys.exit(1)
+        return 1
 
+    started_at = datetime.now(UTC).isoformat()
     cache_dir = Path(args.cache_dir)
     n = len(obsids)
     ok = 0
+    written_paths: list[str] = []
     start = time.monotonic()
 
     for i, (obsid, tname, inst) in enumerate(obsids, 1):
@@ -433,16 +490,30 @@ def _cli() -> None:
 
         # Write output
         if args.output and len(obsids) == 1:
-            Path(args.output).write_text(json.dumps(asdict(result), indent=2))
+            out_path = Path(args.output)
+            out_path.write_text(json.dumps(asdict(result), indent=2))
+            written_paths.append(str(out_path))
         elif args.output_dir:
             out = Path(args.output_dir) / f"{obsid}.json"
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text(json.dumps(asdict(result), indent=2))
+            written_paths.append(str(out))
 
         if args.run_pipeline:
             _run_pipeline(result)
 
     print(f"\nDone: {ok}/{n} observations downloaded successfully", flush=True)
+
+    elapsed = time.monotonic() - start
+    _write_run_report(
+        started_at=started_at,
+        elapsed_seconds=elapsed,
+        n_processed=n,
+        n_written=ok,
+        output_paths=tuple(written_paths),
+        git_run_fn=git_run_fn,
+    )
+    return 0 if ok == n else 1
 
 
 def _run_pipeline(result: JwstLcResult) -> None:
@@ -476,4 +547,4 @@ def _run_pipeline(result: JwstLcResult) -> None:
 
 
 if __name__ == "__main__":
-    _cli()
+    raise SystemExit(_cli())

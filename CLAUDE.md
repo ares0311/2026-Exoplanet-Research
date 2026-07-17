@@ -453,6 +453,22 @@ the standard `_cli(argv, *, git_run_fn=None) -> int` shape and now writes a
 report on both success and MAST query-failure outcomes.
 The version 0.2.93 release gate passed 2,973 default tests plus Ruff/mypy as
 10/10 supervised gates in 23.2 seconds under the canonical 6x6 topology.
+Version 0.2.94 retrofits `Skills/fetch_jwst_lc.py` with the Run Report
+Policy — fourteenth of what is actually fifteen scripts, not fourteen:
+recounting the tracking note's own "Done" list from `star_scanner.py` as
+item 1 through `fetch_exofop_ctoi.py`'s previously-confirmed "ninth" label
+lands on 9, matching only if `star_scanner.py` counts — carrying that count
+forward through the full list totals 15, one more than the figure this
+narrative had been citing since the retrofit began. `tess_tce_fetcher.py`
+remains as the fifteenth and final script. `fetch_jwst_lc.py`'s batch-mode
+`_cli()` had no return code; retrofit gives it the standard
+`_cli(argv, *, git_run_fn=None) -> int` shape and writes one report per
+batch run: `"success"` when every obsid yields a light curve, `"partial"`
+when some but not all do, `"failed"` when none do. A run invoked with no
+obsid/targets is a CLI usage error, not an acquisition attempt, so no
+report is written for that path.
+The version 0.2.94 release gate passed 2,979 default tests plus Ruff/mypy as
+10/10 supervised gates in 25.2 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
