@@ -186,6 +186,8 @@ def test_ctoi_label_rows_include_manifest_fields():
 def test_cli_labels_output_writes_assembler_rows(tmp_path, monkeypatch):
     result = fetch_ctoi_table(fetch_fn=_make_fetch(_GOOD_CSV), min_ratings=1)
     monkeypatch.setattr(fetch_exofop_ctoi, "fetch_ctoi_table", lambda **kwargs: result)
+    # Never invoke the real git commit/push path (AGENTS.md Rule 7).
+    monkeypatch.setattr(fetch_exofop_ctoi, "run_and_commit_report", lambda *a, **k: True)
 
     out = tmp_path / "ctoi_labels.json"
     code = fetch_exofop_ctoi._cli(["--labels-output", str(out)])
@@ -200,6 +202,7 @@ def test_cli_labels_output_writes_assembler_rows(tmp_path, monkeypatch):
 def test_cli_labels_output_excludes_pc_rows(tmp_path, monkeypatch):
     result = fetch_ctoi_table(fetch_fn=_make_fetch(_GOOD_CSV), min_ratings=1)
     monkeypatch.setattr(fetch_exofop_ctoi, "fetch_ctoi_table", lambda **kwargs: result)
+    monkeypatch.setattr(fetch_exofop_ctoi, "run_and_commit_report", lambda *a, **k: True)
 
     out = tmp_path / "ctoi_labels.json"
     fetch_exofop_ctoi._cli(["--labels-output", str(out)])
@@ -212,6 +215,7 @@ def test_cli_labels_output_excludes_pc_rows(tmp_path, monkeypatch):
 def test_cli_raw_output_still_writes_parsed_payload(tmp_path, monkeypatch):
     result = fetch_ctoi_table(fetch_fn=_make_fetch(_GOOD_CSV), min_ratings=1)
     monkeypatch.setattr(fetch_exofop_ctoi, "fetch_ctoi_table", lambda **kwargs: result)
+    monkeypatch.setattr(fetch_exofop_ctoi, "run_and_commit_report", lambda *a, **k: True)
 
     out = tmp_path / "ctoi_raw.json"
     code = fetch_exofop_ctoi._cli(["--output", str(out)])
@@ -223,3 +227,124 @@ def test_cli_raw_output_still_writes_parsed_payload(tmp_path, monkeypatch):
     assert payload["n_fp"] == 2
     assert payload["n_pc"] == 1
     assert len(payload["rows"]) == 4
+
+
+# ---------------------------------------------------------------------------
+# Run Report (AGENTS.md Rule 7 retrofit)
+# ---------------------------------------------------------------------------
+
+
+def test_run_report_success_status_on_ok_flag(monkeypatch):
+    result = fetch_ctoi_table(fetch_fn=_make_fetch(_GOOD_CSV), min_ratings=1)
+    captured = {}
+
+    def fake_commit(report, path, **kwargs):
+        captured["report"] = report
+        captured["path"] = path
+        captured["run_fn"] = kwargs.get("run_fn")
+        return True
+
+    monkeypatch.setattr(fetch_exofop_ctoi, "run_and_commit_report", fake_commit)
+
+    fetch_exofop_ctoi._write_run_report(
+        started_at="2026-07-17T00:00:00+00:00",
+        elapsed_seconds=5.0,
+        result=result,
+        output_paths=("data/ctoi.json",),
+        git_run_fn=object(),
+    )
+    report = captured["report"]
+    assert report.script == "fetch_exofop_ctoi"
+    assert report.status == "success"
+    assert report.items_processed == len(result.rows)
+    assert report.items_written == len(result.rows)
+    assert "flag=OK" in report.notes
+    assert captured["path"].name == "fetch_exofop_ctoi.jsonl"
+    assert captured["run_fn"] is not None
+
+
+def test_run_report_failed_status_on_fetch_error(monkeypatch):
+    def broken_fetch(url):
+        raise RuntimeError("network down")
+
+    result = fetch_ctoi_table(fetch_fn=broken_fetch)
+    assert result.flag == "FETCH_ERROR"
+    captured = {}
+
+    def fake_commit(report, path, **kwargs):
+        captured["report"] = report
+        return True
+
+    monkeypatch.setattr(fetch_exofop_ctoi, "run_and_commit_report", fake_commit)
+
+    fetch_exofop_ctoi._write_run_report(
+        started_at="2026-07-17T00:00:00+00:00",
+        elapsed_seconds=1.0,
+        result=result,
+        output_paths=(),
+        git_run_fn=None,
+    )
+    report = captured["report"]
+    assert report.status == "failed"
+    assert report.items_processed == 0
+    assert report.items_written == 0
+    assert "flag=FETCH_ERROR" in report.notes
+
+
+def test_run_report_written_paths_empty_when_no_output_flags(monkeypatch):
+    result = fetch_ctoi_table(fetch_fn=_make_fetch(_GOOD_CSV), min_ratings=1)
+    captured = {}
+
+    def fake_commit(report, path, **kwargs):
+        captured["report"] = report
+        return True
+
+    monkeypatch.setattr(fetch_exofop_ctoi, "run_and_commit_report", fake_commit)
+
+    fetch_exofop_ctoi._write_run_report(
+        started_at="2026-07-17T00:00:00+00:00",
+        elapsed_seconds=1.0,
+        result=result,
+        output_paths=(),
+        git_run_fn=None,
+    )
+    report = captured["report"]
+    assert report.output_paths == ()
+    assert report.items_written == 0
+
+
+def test_commit_failure_warns_but_does_not_raise(monkeypatch, capsys):
+    result = fetch_ctoi_table(fetch_fn=_make_fetch(_GOOD_CSV), min_ratings=1)
+    monkeypatch.setattr(
+        fetch_exofop_ctoi, "run_and_commit_report", lambda *a, **k: False
+    )
+
+    fetch_exofop_ctoi._write_run_report(
+        started_at="2026-07-17T00:00:00+00:00",
+        elapsed_seconds=1.0,
+        result=result,
+        output_paths=(),
+        git_run_fn=None,
+    )
+    assert "Warning" in capsys.readouterr().out
+
+
+def test_cli_writes_run_report_with_injected_git_runner(tmp_path, monkeypatch):
+    result = fetch_ctoi_table(fetch_fn=_make_fetch(_GOOD_CSV), min_ratings=1)
+    monkeypatch.setattr(fetch_exofop_ctoi, "fetch_ctoi_table", lambda **kwargs: result)
+    captured = {}
+
+    def fake_commit(report, path, **kwargs):
+        captured["report"] = report
+        captured["run_fn"] = kwargs.get("run_fn")
+        return True
+
+    monkeypatch.setattr(fetch_exofop_ctoi, "run_and_commit_report", fake_commit)
+
+    fake_runner = object()
+    out = tmp_path / "ctoi_raw.json"
+    code = fetch_exofop_ctoi._cli(["--output", str(out)], git_run_fn=fake_runner)
+
+    assert code == 0
+    assert captured["run_fn"] is fake_runner
+    assert captured["report"].items_written == len(result.rows)

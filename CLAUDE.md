@@ -409,6 +409,17 @@ injectable `fetch_fn`, so only the `stats` param and `_cli()`/Run Report
 wiring were new.
 The version 0.2.88 release gate passed 2,949 default tests plus Ruff/mypy as
 10/10 supervised gates in 27.2 seconds under the canonical 6x6 topology.
+Version 0.2.89 retrofits `Skills/fetch_exofop_ctoi.py` with the Run Report
+Policy — ninth of fourteen scripts. This one already returned a rich
+`CtoisResult` dataclass with row counts and a `flag` field
+("OK"/"EMPTY"/"FETCH_ERROR"), so no `stats` side-channel was needed. The
+Run Report is written on both success and failure flags — a table-level
+fetch failure gets `status="failed"` rather than producing no report at
+all, per Fail Loudly. The pre-existing `_cli()`-level tests were missing
+`run_and_commit_report` stubs (same gap class as `fetch_tess_lc_snippets.py`'s
+retrofit); fixed.
+The version 0.2.89 release gate passed 2,954 default tests plus Ruff/mypy as
+10/10 supervised gates in 25.2 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
