@@ -579,17 +579,17 @@ by itself satisfy a master-guide evidence requirement.
 
 ---
 
-## Milestone 20 — Slick Animated Command-Line UI
+## Milestone 20 — Slick Animated Command-Line UI ✓ COMPLETE
 
 Unlocked by the formal production-ensemble acceptance PASS in version 0.2.33.
 This milestone improves operator clarity without changing scientific scoring,
-thresholds, or classifications.
+thresholds, or classifications. Version 0.2.96 implements it.
 
-- [ ] Add a polished terminal presentation for Fetch → Clean → Search → Vet → Score → Classify, with animated progress and useful elapsed-time/ETA status
-- [ ] Preserve stable machine-readable JSON output, exit codes, redirected output, and non-TTY/CI behavior
-- [ ] Provide an explicit `--no-animation`/reduced-motion path and graceful interruption/error rendering
-- [ ] Add terminal-width, TTY/non-TTY, failure-path, and interruption regression tests
-- [ ] Document the interactive and automation-safe CLI modes
+- [x] Add a polished terminal presentation for Fetch → Clean → Search → Vet → Score → Classify, with animated progress and useful elapsed-time status. `run_pipeline()` gained an optional `on_stage(stage_name)` callback fired before each of fetch/clean/search/vet_score_classify (vet/score/classify are combined into one displayed phase since they always run together per-signal); `exo scan`'s new `_StageAnimator` drives a `rich.console.Console.status()` spinner from it. **Scoping note**: this delivers elapsed-time only, not a predictive ETA — a single scan has no per-stage duration history to extrapolate from (unlike `batch_scan.py`'s N-item-rate ETA), so a fabricated estimate would violate the project's No-Unsupported-Completion-Claims policy rather than serve the operator.
+- [x] Preserve stable machine-readable JSON output, exit codes, redirected output, and non-TTY/CI behavior — `--output` JSON, exit codes, and the post-run candidate summary are identical whether the spinner ran or not; regression-tested.
+- [x] Provide an explicit `--no-animation`/reduced-motion path and graceful interruption/error rendering — `--no-animation` forces plain `[<elapsed>s] <Stage> ...` lines; animation also auto-disables whenever `sys.stdout.isatty()` is false. `KeyboardInterrupt` during a scan stops the spinner cleanly, prints `Interrupted during stage: <Stage>` to stderr, and exits `130` with no partial JSON written.
+- [x] Add terminal-width, TTY/non-TTY, failure-path, and interruption regression tests — 15 new tests across `TestRunPipelineOnStage`, `TestScanCommand`, and `TestStageAnimator` in `tests/test_cli.py`, including a narrow (`width=20`) non-interactive-console render check. (A 16th test asserting on rendered `--help` text was added then removed after a CI-only failure showed Typer's Rich-based help renderer wraps long option names at widths this sandbox doesn't reproduce and doesn't honor `COLUMNS` the way Click's plain formatter does; the flag's registration is already proven end-to-end by the `--no-animation` invocation test.)
+- [x] Document the interactive and automation-safe CLI modes — see `docs/DISCOVERY_RUNBOOK.md`'s "`exo scan` interactive vs. automation-safe display modes" section.
 
 ---
 

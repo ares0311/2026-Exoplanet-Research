@@ -8,10 +8,11 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
+from rich.console import Console
 from typer.testing import CliRunner
 
 from exo_toolkit.candidate_context import CandidateContextReference
-from exo_toolkit.cli import app, cli_entry, run_pipeline
+from exo_toolkit.cli import _StageAnimator, app, cli_entry, run_pipeline
 from exo_toolkit.features import RawDiagnostics
 from exo_toolkit.fetch import FetchProvenance
 from exo_toolkit.schemas import (
@@ -548,6 +549,82 @@ class TestRunPipeline:
 
 
 # ---------------------------------------------------------------------------
+# on_stage callback (Milestone 20: animated stage progress hook)
+# ---------------------------------------------------------------------------
+
+
+class TestRunPipelineOnStage:
+    def _patched_fetch(self, lc: Any) -> Any:
+        def _fn(target_id: str, mission: str) -> Any:
+            return _make_fetch_result(lc)
+
+        return _fn
+
+    def _patched_clean(self, lc: Any) -> Any:
+        def _fn(light_curve: Any) -> Any:
+            return MagicMock(light_curve=lc)
+
+        return _fn
+
+    def test_stages_fire_in_order_with_signal(self) -> None:
+        lc = _mock_lc()
+        signal = _make_signal()
+        seen: list[str] = []
+
+        with (
+            patch("exo_toolkit.cli.search_lightcurve", return_value=[signal]),
+            patch(
+                "exo_toolkit.cli.vet_signal",
+                return_value=MagicMock(features=CandidateFeatures()),
+            ),
+            patch(
+                "exo_toolkit.cli.score_candidate",
+                return_value=(_uniform_posterior(), _make_scores()),
+            ),
+            patch(
+                "exo_toolkit.cli.classify_submission_pathway",
+                return_value="planet_hunters_discussion",
+            ),
+        ):
+            run_pipeline(
+                "TIC 0", "TESS",
+                fetch_fn=self._patched_fetch(lc),
+                clean_fn=self._patched_clean(lc),
+                stellar_params_fn=lambda *_: {},
+                on_stage=seen.append,
+            )
+
+        assert seen == ["fetch", "clean", "search", "vet_score_classify"]
+
+    def test_vet_score_classify_not_fired_when_no_signals(self) -> None:
+        lc = _mock_lc()
+        seen: list[str] = []
+
+        with patch("exo_toolkit.cli.search_lightcurve", return_value=[]):
+            result = run_pipeline(
+                "TIC 0", "TESS",
+                fetch_fn=self._patched_fetch(lc),
+                clean_fn=self._patched_clean(lc),
+                stellar_params_fn=lambda *_: {},
+                on_stage=seen.append,
+            )
+
+        assert result == []
+        assert seen == ["fetch", "clean", "search"]
+
+    def test_on_stage_none_does_not_raise(self) -> None:
+        lc = _mock_lc()
+        with patch("exo_toolkit.cli.search_lightcurve", return_value=[]):
+            run_pipeline(
+                "TIC 0", "TESS",
+                fetch_fn=self._patched_fetch(lc),
+                clean_fn=self._patched_clean(lc),
+                stellar_params_fn=lambda *_: {},
+                on_stage=None,
+            )
+
+
+# ---------------------------------------------------------------------------
 # CLI command tests via CliRunner
 # ---------------------------------------------------------------------------
 
@@ -682,6 +759,174 @@ class TestScanCommand:
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
         assert "TIC" in result.output
+
+    def test_no_animation_flag_accepted(self) -> None:
+        with self._patch_pipeline([]):
+            result = runner.invoke(app, ["TIC 0", "--no-animation"])
+        assert result.exit_code == 0
+        assert "No transit candidates" in result.output
+
+    # Note: --no-animation's registration is already proven end-to-end by
+    # test_no_animation_flag_accepted above (Typer rejects unregistered
+    # options with a nonzero exit code). A separate --help-text assertion
+    # was removed: Typer's Rich-based help panel wraps long option names
+    # at widths that differ between this sandbox and CI, making a
+    # substring check on rendered output unreliable across environments.
+
+    def test_on_stage_kwarg_forwarded_to_run_pipeline(self) -> None:
+        captured: dict[str, Any] = {}
+
+        def _spy(target_id: str, mission: str, **kwargs: Any) -> list[Any]:
+            captured["on_stage"] = kwargs.get("on_stage")
+            return []
+
+        with patch("exo_toolkit.cli.run_pipeline", side_effect=_spy):
+            result = runner.invoke(app, ["TIC 0"])
+
+        assert result.exit_code == 0
+        assert callable(captured.get("on_stage"))
+
+    def test_keyboard_interrupt_exits_130(self) -> None:
+        with patch("exo_toolkit.cli.run_pipeline", side_effect=KeyboardInterrupt()):
+            result = runner.invoke(app, ["TIC 0"])
+        assert result.exit_code == 130
+        try:
+            combined = result.output + result.stderr
+        except ValueError:
+            combined = result.output
+        assert "Interrupted" in combined
+
+    def test_json_output_unaffected_by_no_animation(self, tmp_path: Path) -> None:
+        rows = [
+            {
+                "candidate_id": "TIC0-001",
+                "target_id": "TIC 0",
+                "mission": "TESS",
+                "period_days": 3.0,
+                "epoch_bjd": 2458001.0,
+                "duration_hours": 2.0,
+                "depth_ppm": 1000.0,
+                "transit_count": 9,
+                "snr": 12.5,
+                "provenance_score": 1.0,
+                "posterior": {
+                    "planet_candidate": 0.167,
+                    "eclipsing_binary": 0.167,
+                    "background_eclipsing_binary": 0.167,
+                    "stellar_variability": 0.167,
+                    "instrumental_artifact": 0.167,
+                    "known_object": 0.165,
+                },
+                "scores": {
+                    "false_positive_probability": 0.3,
+                    "detection_confidence": 0.7,
+                    "novelty_score": 0.5,
+                },
+                "pathway": "github_only_reproducibility",
+            }
+        ]
+        out_file = tmp_path / "results.json"
+        with self._patch_pipeline(rows):
+            result = runner.invoke(
+                app, ["TIC 0", "--no-animation", "--output", str(out_file)]
+            )
+        assert result.exit_code == 0
+        data = json.loads(out_file.read_text())
+        assert len(data) == 1
+        assert data[0]["candidate_id"] == "TIC0-001"
+
+
+# ---------------------------------------------------------------------------
+# _StageAnimator unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestStageAnimator:
+    def test_plain_mode_prints_stage_lines(self, capsys: pytest.CaptureFixture[str]) -> None:
+        animator = _StageAnimator(
+            target_id="TIC 0", mission="TESS", scorer="bayesian", animate=False
+        )
+        with animator:
+            animator.on_stage("fetch")
+            animator.on_stage("clean")
+        out = capsys.readouterr().out
+        assert "Scanning TIC 0 (TESS) [scorer=bayesian]" in out
+        assert "Fetch" in out
+        assert "Clean" in out
+
+    def test_plain_mode_uses_stage_labels(self, capsys: pytest.CaptureFixture[str]) -> None:
+        animator = _StageAnimator(
+            target_id="TIC 0", mission="TESS", scorer="bayesian", animate=False
+        )
+        with animator:
+            animator.on_stage("vet_score_classify")
+        out = capsys.readouterr().out
+        assert "Vet -> Score -> Classify" in out
+
+    def test_unknown_stage_falls_back_to_raw_name(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        animator = _StageAnimator(
+            target_id="TIC 0", mission="TESS", scorer="bayesian", animate=False
+        )
+        with animator:
+            animator.on_stage("mystery_stage")
+        assert "mystery_stage" in capsys.readouterr().out
+
+    def test_animated_mode_updates_status_text(self) -> None:
+        animator = _StageAnimator(
+            target_id="TIC 0", mission="TESS", scorer="bayesian", animate=True
+        )
+        fake_status = MagicMock()
+        with patch.object(Console, "status", return_value=fake_status), animator:
+            animator.on_stage("fetch")
+        fake_status.__enter__.assert_called_once()
+        fake_status.__exit__.assert_called_once()
+        assert fake_status.update.call_count == 1
+        assert "Fetch" in fake_status.update.call_args.args[0]
+
+    def test_interrupted_reports_current_stage(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        animator = _StageAnimator(
+            target_id="TIC 0", mission="TESS", scorer="bayesian", animate=False
+        )
+        with animator:
+            animator.on_stage("search")
+        animator.interrupted()
+        assert "Interrupted during stage: Search" in capsys.readouterr().err
+
+    def test_interrupted_before_any_stage_reports_startup(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        animator = _StageAnimator(
+            target_id="TIC 0", mission="TESS", scorer="bayesian", animate=False
+        )
+        with animator:
+            pass
+        animator.interrupted()
+        assert "Interrupted during stage: startup" in capsys.readouterr().err
+
+    def test_exception_inside_with_block_propagates(self) -> None:
+        animator = _StageAnimator(
+            target_id="TIC 0", mission="TESS", scorer="bayesian", animate=False
+        )
+        with pytest.raises(RuntimeError, match="boom"), animator:
+            raise RuntimeError("boom")
+
+    def test_narrow_animated_terminal_does_not_raise(self) -> None:
+        animator = _StageAnimator(
+            target_id="TIC 0123456789 with a very long identifier",
+            mission="TESS", scorer="full-ensemble", animate=True,
+        )
+        # Force a narrow, non-interactive Console so the animated status
+        # renders statically rather than hanging on cursor-control codes
+        # under pytest's captured (non-tty) stdout.
+        animator._console = Console(highlight=False, width=20, force_terminal=False)
+        with animator:
+            animator.on_stage("fetch")
+            animator.on_stage("vet_score_classify")
+        # No exception means the narrow width was handled cleanly.
 
 
 # ---------------------------------------------------------------------------

@@ -379,6 +379,31 @@ The pipeline can do these things today without new code:
 
 The XGBoost model (`models/xgboost_koi.json`) is trained and available now.
 
+### `exo scan` interactive vs. automation-safe display modes
+
+`exo <TIC-ID>` (Milestone 20) shows a live-updating spinner tracking the
+fetch → clean → search → vet/score/classify stages plus elapsed time when
+stdout is an interactive terminal. Machine-readable behavior is identical
+in every mode: JSON output (`--output`), exit codes, and the candidate
+summary printed after the run never depend on whether the animation ran.
+
+- **Interactive terminal (default)**: an animated spinner shows the
+  current stage and elapsed seconds.
+- **Redirected output / CI / non-TTY**: animation is disabled
+  automatically (`sys.stdout.isatty()` is checked once at startup) and
+  plain `[<elapsed>s] <Stage> ...` lines are printed instead — safe to
+  pipe, log, or diff.
+- **`--no-animation`**: forces the plain-line mode even in an interactive
+  terminal, for reduced-motion preference or predictable terminal
+  recordings.
+- **Interruption (Ctrl-C)**: the spinner (if any) stops cleanly, a single
+  `Interrupted during stage: <Stage>` line is printed to stderr, and the
+  process exits with code `130` — no partial JSON is written.
+
+This is purely a terminal-presentation layer around the existing pipeline
+(`run_pipeline()`'s new optional `on_stage` callback); it never changes
+scoring, thresholds, or classifications.
+
 ---
 
 ## The Immediate Next Action (As of 2026-07-11)
