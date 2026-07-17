@@ -41,6 +41,10 @@ Public API
 JwstObservation   dataclass for one MAST observation record
 query_jwst_timeseries(instrument, min_exptime, search_fn) -> list[JwstObservation]
 format_summary(obs_list) -> str
+
+The CLI entry point writes a structured completion record via
+``Skills/run_report.py`` after each run (AGENTS.md Run Report Policy,
+Rule 7), on both success and query-failure outcomes.
 """
 from __future__ import annotations
 
@@ -50,7 +54,13 @@ import sys
 import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
+from Skills.run_report import RunReport, report_path_for, run_and_commit_report  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Data model
@@ -241,7 +251,46 @@ def format_summary(obs_list: list[JwstObservation]) -> str:
 # CLI
 # ---------------------------------------------------------------------------
 
-def _cli() -> None:
+
+def _write_run_report(
+    *,
+    started_at: str,
+    elapsed_seconds: float,
+    status: str,
+    n_observations: int,
+    output_path: str | None,
+    notes: str,
+    git_run_fn: Any = None,
+) -> None:
+    """Append and publish one fetch_jwst_targets completion report
+    (AGENTS.md Rule 7). Written on both success and query-failure outcomes."""
+    report = RunReport(
+        script="fetch_jwst_targets",
+        status=status,
+        started_at=started_at,
+        completed_at=datetime.now(UTC).isoformat(),
+        elapsed_seconds=elapsed_seconds,
+        items_processed=n_observations,
+        items_written=n_observations if output_path else 0,
+        items_failed=0 if status == "success" else 1,
+        output_paths=(output_path,) if output_path else (),
+        notes=notes,
+    )
+    path = report_path_for("fetch_jwst_targets")
+    kwargs: dict[str, Any] = {}
+    if git_run_fn is not None:
+        kwargs["run_fn"] = git_run_fn
+    ok = run_and_commit_report(report, path, **kwargs)
+    if ok:
+        print(f"Run report committed and pushed: {path}", flush=True)
+    else:
+        print(
+            f"Warning: run report written to {path} but commit/push failed",
+            flush=True,
+        )
+
+
+def _cli(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
     parser = argparse.ArgumentParser(
         description="List JWST time-series observations available on MAST"
     )
@@ -253,8 +302,9 @@ def _cli() -> None:
     )
     parser.add_argument("--json", action="store_true", dest="json_mode",
                         help="Print JSON to stdout instead of summary table")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
+    started_at = datetime.now(UTC).isoformat()
     print("Querying MAST for JWST time-series observations...", flush=True)
     start = time.monotonic()
 
@@ -262,7 +312,17 @@ def _cli() -> None:
         obs = query_jwst_timeseries(instrument=args.instrument, min_exptime=args.min_exptime)
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
-        sys.exit(1)
+        elapsed = time.monotonic() - start
+        _write_run_report(
+            started_at=started_at,
+            elapsed_seconds=elapsed,
+            status="failed",
+            n_observations=0,
+            output_path=None,
+            notes=f"error={exc}",
+            git_run_fn=git_run_fn,
+        )
+        return 1
 
     elapsed = time.monotonic() - start
     print(f"Found {len(obs)} observations in {elapsed:.1f}s", flush=True)
@@ -273,12 +333,22 @@ def _cli() -> None:
         print(format_summary(obs))
 
     if args.output:
-        import pathlib
-        p = pathlib.Path(args.output)
+        p = Path(args.output)
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(json.dumps([asdict(o) for o in obs], indent=2))
         print(f"\nSaved to {args.output}", flush=True)
 
+    _write_run_report(
+        started_at=started_at,
+        elapsed_seconds=elapsed,
+        status="success",
+        n_observations=len(obs),
+        output_path=args.output,
+        notes=f"instrument={args.instrument} min_exptime={args.min_exptime}",
+        git_run_fn=git_run_fn,
+    )
+    return 0
+
 
 if __name__ == "__main__":
-    _cli()
+    raise SystemExit(_cli())

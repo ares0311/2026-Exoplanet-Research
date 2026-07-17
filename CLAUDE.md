@@ -446,6 +446,13 @@ completion record, independent of the fail-open library default used by
 `star_scanner.py`.
 The version 0.2.92 release gate passed 2,968 default tests plus Ruff/mypy as
 10/10 supervised gates in 23.2 seconds under the canonical 6x6 topology.
+Version 0.2.93 retrofits `Skills/fetch_jwst_targets.py` with the Run Report
+Policy — thirteenth of fourteen scripts. Its `_cli()` had no return code
+(bare `sys.exit(1)` on error, implicit success otherwise); retrofit gave it
+the standard `_cli(argv, *, git_run_fn=None) -> int` shape and now writes a
+report on both success and MAST query-failure outcomes.
+The version 0.2.93 release gate passed 2,973 default tests plus Ruff/mypy as
+10/10 supervised gates in 23.2 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
