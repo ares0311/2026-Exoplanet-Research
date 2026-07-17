@@ -17,6 +17,10 @@ build_tess_snippet(tic_id, label, period_days, epoch_bjd, *, n_bins,
                    lc_fetcher) -> TessSnippetResult
 build_tess_snippets(rows, *, n_bins, output_path, lc_fetcher,
                     resume, max_errors) -> int
+
+The CLI entry point writes a structured completion record via
+``Skills/run_report.py`` after each run (AGENTS.md Run Report Policy,
+Rule 7) and commits/pushes only that record.
 """
 from __future__ import annotations
 
@@ -27,8 +31,11 @@ import socket
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
+
+from Skills.run_report import RunReport, report_path_for, run_and_commit_report
 
 # Prevent indefinite hangs when WiFi drops mid-download.
 # Any stalled socket operation raises socket.timeout after this many seconds,
@@ -241,6 +248,7 @@ def build_tess_snippets(
     lc_fetcher: Callable | None = None,
     resume: bool = True,
     max_errors: int = 50,
+    stats: dict[str, int] | None = None,
 ) -> int:
     """Build phase-folded CNN snippets for a list of TESS target rows.
 
@@ -255,6 +263,10 @@ def build_tess_snippets(
         lc_fetcher: Injectable light-curve fetcher.
         resume: Skip tic_ids already present in output_path.
         max_errors: Abort after this many consecutive errors.
+        stats: When given, populated with ``{"written", "errors", "total"}``
+            in-place on return — a non-breaking side channel for callers
+            (e.g. the CLI's Run Report) that need the error count this
+            function's single-int return does not otherwise expose.
 
     Returns:
         Number of snippets written.
@@ -352,6 +364,10 @@ def build_tess_snippets(
         f"Done. {n_written} snippets written, {n_errors} skipped/errors.",
         flush=True,
     )
+    if stats is not None:
+        stats["written"] = n_written
+        stats["errors"] = n_errors
+        stats["total"] = n_total
     return n_written
 
 
@@ -360,7 +376,43 @@ def build_tess_snippets(
 # ---------------------------------------------------------------------------
 
 
-def _cli(argv: list[str] | None = None) -> int:
+def _write_run_report(
+    *,
+    started_at: str,
+    elapsed_seconds: float,
+    stats: dict[str, int],
+    output_path: Path,
+    git_run_fn: Any = None,
+) -> None:
+    """Append and publish one fetch_tess_lc_snippets completion report
+    (AGENTS.md Rule 7)."""
+    errors = stats.get("errors", 0)
+    report = RunReport(
+        script="fetch_tess_lc_snippets",
+        status="success" if errors == 0 else "partial",
+        started_at=started_at,
+        completed_at=datetime.now(UTC).isoformat(),
+        elapsed_seconds=elapsed_seconds,
+        items_processed=stats.get("total", 0),
+        items_written=stats.get("written", 0),
+        items_failed=errors,
+        output_paths=(str(output_path),),
+    )
+    path = report_path_for("fetch_tess_lc_snippets")
+    kwargs: dict[str, Any] = {}
+    if git_run_fn is not None:
+        kwargs["run_fn"] = git_run_fn
+    ok = run_and_commit_report(report, path, **kwargs)
+    if ok:
+        print(f"Run report committed and pushed: {path}", flush=True)
+    else:
+        print(
+            f"Warning: run report written to {path} but commit/push failed",
+            flush=True,
+        )
+
+
+def _cli(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(
@@ -404,14 +456,26 @@ def _cli(argv: list[str] | None = None) -> int:
         flush=True,
     )
 
+    started_at = datetime.now(UTC).isoformat()
+    start = time.monotonic()
+    stats: dict[str, int] = {}
     n = build_tess_snippets(
         rows,
         n_bins=args.n_bins,
         output_path=args.output,
         resume=not args.no_resume,
         max_errors=args.max_errors,
+        stats=stats,
     )
+    elapsed = time.monotonic() - start
     print(f"Flag: OK  snippets_written={n}")
+    _write_run_report(
+        started_at=started_at,
+        elapsed_seconds=elapsed,
+        stats=stats,
+        output_path=args.output,
+        git_run_fn=git_run_fn,
+    )
     return 0
 
 

@@ -359,6 +359,18 @@ caller. AGENTS.md's retrofit note records this pattern for future scripts
 whose core function also doesn't already expose error counts.
 The version 0.2.83 release gate passed 2,898 default tests plus Ruff/mypy as
 10/10 supervised gates in 25.1 seconds under the canonical 6x6 topology.
+Version 0.2.84 retrofits `Skills/fetch_tess_lc_snippets.py` with the Run
+Report Policy — fourth of fourteen scripts, same `stats` side-channel
+pattern as 0.2.83. Also found and fixed a real gap while retrofitting: the
+file's pre-existing `TestCliDefaults` test monkeypatched a fake
+`build_tess_snippets` with a rigid signature that would have broken on the
+new `stats` kwarg, and called `_cli()` without stubbing
+`run_and_commit_report` — meaning the real git commit/push path would have
+run under CI once this retrofit landed, violating the Rule 7 test
+requirement. Both are fixed. AGENTS.md now flags this exact check for the
+remaining ten scripts.
+The version 0.2.84 release gate passed 2,906 default tests plus Ruff/mypy as
+10/10 supervised gates in 32.1 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
