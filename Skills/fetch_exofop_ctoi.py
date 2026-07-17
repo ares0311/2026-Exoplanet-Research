@@ -11,20 +11,31 @@ fetch_ctoi_table(*, ctoi_url, min_ratings, fetch_fn) -> CtoisResult
 ctoi_rows_to_label_rows(rows) -> tuple[dict, ...]
 write_json(path, payload) -> Path
 format_ctoi_result(result) -> str
+
+The CLI entry point writes a structured completion record via
+``Skills/run_report.py`` after each run (AGENTS.md Run Report Policy,
+Rule 7) and commits/pushes only that record. ``CtoisResult.flag`` already
+distinguishes success ("OK") from failure ("EMPTY"/"FETCH_ERROR"), so the
+Run Report is written for both outcomes rather than only on success --
+per AGENTS.md's Fail Loudly directive, a failed fetch should leave a
+durable failure record, not silently produce no report at all.
 """
 from __future__ import annotations
 
 import csv
 import io
 import sys
+import time
 import urllib.request
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TypeAlias
+from typing import Any, TypeAlias
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
+from Skills.run_report import RunReport, report_path_for, run_and_commit_report  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -330,7 +341,42 @@ def format_ctoi_result(result: CtoisResult) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _cli(argv: list[str] | None = None) -> int:
+def _write_run_report(
+    *,
+    started_at: str,
+    elapsed_seconds: float,
+    result: CtoisResult,
+    output_paths: tuple[str, ...],
+    git_run_fn: Any = None,
+) -> None:
+    """Append and publish one fetch_exofop_ctoi completion report
+    (AGENTS.md Rule 7). Written on both success and failure flags."""
+    n_rows = len(result.rows)
+    status = "success" if result.flag == "OK" else "failed"
+    report = RunReport(
+        script="fetch_exofop_ctoi",
+        status=status,
+        started_at=started_at,
+        completed_at=datetime.now(UTC).isoformat(),
+        elapsed_seconds=elapsed_seconds,
+        items_processed=n_rows,
+        items_written=n_rows if output_paths else 0,
+        items_failed=0,
+        output_paths=output_paths,
+        notes=f"flag={result.flag} cp={result.n_cp} fp={result.n_fp} pc={result.n_pc}",
+    )
+    path = report_path_for("fetch_exofop_ctoi")
+    kwargs: dict[str, Any] = {}
+    if git_run_fn is not None:
+        kwargs["run_fn"] = git_run_fn
+    ok = run_and_commit_report(report, path, **kwargs)
+    if ok:
+        print(f"Run report committed and pushed: {path}")
+    else:
+        print(f"Warning: run report written to {path} but commit/push failed")
+
+
+def _cli(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(
@@ -351,9 +397,12 @@ def _cli(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    started_at = datetime.now(UTC).isoformat()
+    start = time.monotonic()
     result = fetch_ctoi_table(min_ratings=args.min_ratings)
     print(format_ctoi_result(result))
 
+    written_paths: list[str] = []
     if args.output:
         out = write_json(
             args.output,
@@ -367,12 +416,23 @@ def _cli(argv: list[str] | None = None) -> int:
             },
         )
         print(f"\nSaved to {out}")
+        written_paths.append(str(out))
     if args.labels_output:
         labels_out = write_json(
             args.labels_output,
             list(ctoi_rows_to_label_rows(result.rows)),
         )
         print(f"\nSaved label rows to {labels_out}")
+        written_paths.append(str(labels_out))
+
+    elapsed = time.monotonic() - start
+    _write_run_report(
+        started_at=started_at,
+        elapsed_seconds=elapsed,
+        result=result,
+        output_paths=tuple(written_paths),
+        git_run_fn=git_run_fn,
+    )
     return 0 if result.flag == "OK" else 1
 
 
