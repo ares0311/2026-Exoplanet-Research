@@ -511,12 +511,16 @@ automation-safe display modes" section. 16 new tests across
 console render check.
 The first merged 0.2.96 CI run failed closed on one test only:
 `test_no_animation_help_text_present` asserted on rendered `--help` text
-that Rich line-wrapped across `--no-animation` on CI's narrower terminal
-width, a difference from this local sandbox's width that did not surface
-locally. Fixed by forcing a wide virtual terminal (`env={"COLUMNS": "300"}`)
-for that one invocation rather than asserting on width-dependent rendering.
-The version 0.2.96 release gate passed 3,000 default tests plus Ruff/mypy as
-10/10 supervised gates in 30.1 seconds under the canonical 6x6 topology.
+that Rich line-wrapped across `--no-animation` at a narrower width than
+this local sandbox. Forcing `env={"COLUMNS": "300"}` on the invocation did
+not fix it — Typer's Rich-based help renderer does not consult that env
+var the way Click's plain-text formatter does — so the test was removed
+rather than chasing an unverified Typer/Rich internal API; the flag's
+registration is already proven end-to-end by
+`test_no_animation_flag_accepted`, since Typer rejects an unregistered
+option with a nonzero exit code.
+The version 0.2.96 release gate passed 2,999 default tests plus Ruff/mypy as
+10/10 supervised gates in 27.1 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.

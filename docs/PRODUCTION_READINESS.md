@@ -12,7 +12,7 @@ production task should be chosen fresh from readiness checks and roadmap
 state, not assumed to still be Phase 4.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
-Test baseline: 3,000 default tests passing; 2 `integration_live` tests excluded by
+Test baseline: 2,999 default tests passing; 2 `integration_live` tests excluded by
 the configured marker expression (2026-07-17; 6×6 gate: 27.1s, 10/10 gates
 including two verifiable-agent-reliability checks — see
 `docs/RELIABILITY_CONTROLS.md`)
