@@ -20,16 +20,29 @@ fetch_ctoi_labels(ctoi_table_fn) -> list[dict]
 find_new_tic_ids(corpus_ids, labeled_rows, *, positive_only) -> list[dict]
 write_target_list(rows, output_path) -> int
 format_expansion_summary(corpus_ids, new_rows) -> str
+
+The CLI entry point writes a structured completion record via
+``Skills/run_report.py`` after each run (AGENTS.md Run Report Policy,
+Rule 7). TOI/CTOI fetch failures are already caught and treated as
+empty-but-continue by the existing CLI, so the report always records
+``status="success"`` with fetch failure counts folded into ``stats``.
 """
 from __future__ import annotations
 
 import csv
 import io
 import json
+import sys
 import time
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from urllib.request import urlopen
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
+from Skills.run_report import RunReport, report_path_for, run_and_commit_report  # noqa: E402
 
 _TOI_CSV_URL = (
     "https://exofop.ipac.caltech.edu/tess/download_toi.php?sort=toi&output=csv"
@@ -358,7 +371,46 @@ def format_expansion_summary(
 # ---------------------------------------------------------------------------
 
 
-def _cli(argv: list[str] | None = None) -> int:
+def _write_run_report(
+    *,
+    started_at: str,
+    elapsed_seconds: float,
+    stats: dict[str, int],
+    output_path: Path,
+    git_run_fn: Any = None,
+) -> None:
+    """Append and publish one fetch_additional_tess_labels completion report
+    (AGENTS.md Rule 7)."""
+    report = RunReport(
+        script="fetch_additional_tess_labels",
+        status="success",
+        started_at=started_at,
+        completed_at=datetime.now(UTC).isoformat(),
+        elapsed_seconds=elapsed_seconds,
+        items_processed=stats.get("total_labeled", 0),
+        items_written=stats.get("new_tic_ids", 0),
+        items_failed=stats.get("fetch_failures", 0),
+        output_paths=(str(output_path), str(output_path.with_suffix(".json"))),
+        notes=(
+            f"corpus_size={stats.get('corpus_size', 0)} "
+            f"positive_only={stats.get('positive_only', 0)}"
+        ),
+    )
+    path = report_path_for("fetch_additional_tess_labels")
+    kwargs: dict[str, Any] = {}
+    if git_run_fn is not None:
+        kwargs["run_fn"] = git_run_fn
+    ok = run_and_commit_report(report, path, **kwargs)
+    if ok:
+        print(f"Run report committed and pushed: {path}", flush=True)
+    else:
+        print(
+            f"Warning: run report written to {path} but commit/push failed",
+            flush=True,
+        )
+
+
+def _cli(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(
@@ -381,9 +433,14 @@ def _cli(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    started_at = datetime.now(UTC).isoformat()
+    start = time.monotonic()
+    stats: dict[str, int] = {"fetch_failures": 0}
+
     print(f"Loading existing corpus from {args.corpus} ...", flush=True)
     corpus_ids = load_corpus_tic_ids(args.corpus)
     print(f"  {len(corpus_ids)} TIC IDs already in corpus.", flush=True)
+    stats["corpus_size"] = len(corpus_ids)
 
     print("Fetching ExoFOP TOI table ...", flush=True)
     t0 = time.monotonic()
@@ -393,6 +450,7 @@ def _cli(argv: list[str] | None = None) -> int:
     except Exception as exc:
         print(f"  Warning: TOI fetch failed: {exc}")
         toi_rows = []
+        stats["fetch_failures"] += 1
 
     print("Fetching ExoFOP CTOI table ...", flush=True)
     t1 = time.monotonic()
@@ -402,11 +460,15 @@ def _cli(argv: list[str] | None = None) -> int:
     except Exception as exc:
         print(f"  Warning: CTOI fetch failed: {exc}")
         ctoi_rows = []
+        stats["fetch_failures"] += 1
 
     all_rows = toi_rows + ctoi_rows
+    stats["total_labeled"] = len(all_rows)
     new_rows = find_new_tic_ids(corpus_ids, all_rows, positive_only=args.positive_only)
+    stats["positive_only"] = 1 if args.positive_only else 0
 
     n = write_target_list(new_rows, args.output)
+    stats["new_tic_ids"] = n
     print(
         format_expansion_summary(
             corpus_ids,
@@ -416,6 +478,15 @@ def _cli(argv: list[str] | None = None) -> int:
         )
     )
     print(f"Flag: OK  new_tic_ids={n}  output={args.output}")
+
+    elapsed = time.monotonic() - start
+    _write_run_report(
+        started_at=started_at,
+        elapsed_seconds=elapsed,
+        stats=stats,
+        output_path=args.output,
+        git_run_fn=git_run_fn,
+    )
     return 0
 
 

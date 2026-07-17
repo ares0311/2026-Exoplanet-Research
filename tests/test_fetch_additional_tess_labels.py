@@ -179,3 +179,146 @@ class TestFormatExpansionSummary:
         assert "data/tess_cnn_splits_v3" in result
         assert "caffeinate -dims python" not in result
         assert "data/cnn_splits_v2" not in result
+
+
+# ---------------------------------------------------------------------------
+# Run Report (AGENTS.md Rule 7 retrofit)
+# ---------------------------------------------------------------------------
+
+
+class TestRunReport:
+    def test_success_status_with_notes(self) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from Skills.fetch_additional_tess_labels import _write_run_report
+
+        with patch(
+            "Skills.fetch_additional_tess_labels.run_and_commit_report",
+            return_value=True,
+        ) as commit:
+            _write_run_report(
+                started_at="2026-07-17T00:00:00+00:00",
+                elapsed_seconds=5.0,
+                stats={
+                    "total_labeled": 10, "new_tic_ids": 3, "fetch_failures": 0,
+                    "corpus_size": 100, "positive_only": 0,
+                },
+                output_path=Path("data/new_tess_targets.txt"),
+                git_run_fn=MagicMock(),
+            )
+        report, path = commit.call_args.args
+        assert report.script == "fetch_additional_tess_labels"
+        assert report.status == "success"
+        assert report.items_processed == 10
+        assert report.items_written == 3
+        assert report.items_failed == 0
+        assert "corpus_size=100" in report.notes
+        assert "positive_only=0" in report.notes
+        assert path.name == "fetch_additional_tess_labels.jsonl"
+
+    def test_git_run_fn_is_threaded_through(self) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from Skills.fetch_additional_tess_labels import _write_run_report
+
+        fake_runner = MagicMock()
+        with patch(
+            "Skills.fetch_additional_tess_labels.run_and_commit_report",
+            return_value=True,
+        ) as commit:
+            _write_run_report(
+                started_at="2026-07-17T00:00:00+00:00",
+                elapsed_seconds=1.0,
+                stats={},
+                output_path=Path("out.txt"),
+                git_run_fn=fake_runner,
+            )
+        assert commit.call_args.kwargs["run_fn"] is fake_runner
+
+    def test_commit_failure_warns_but_does_not_raise(self, capsys) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from Skills.fetch_additional_tess_labels import _write_run_report
+
+        with patch(
+            "Skills.fetch_additional_tess_labels.run_and_commit_report",
+            return_value=False,
+        ):
+            _write_run_report(
+                started_at="2026-07-17T00:00:00+00:00",
+                elapsed_seconds=1.0,
+                stats={},
+                output_path=Path("out.txt"),
+                git_run_fn=MagicMock(),
+            )
+        assert "Warning" in capsys.readouterr().out
+
+    def test_cli_writes_run_report_with_injected_git_runner(self, tmp_path: Path) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from Skills.fetch_additional_tess_labels import _cli
+
+        corpus = tmp_path / "corpus.jsonl"
+        corpus.write_text("")
+        out = tmp_path / "targets.txt"
+        fake_runner = MagicMock()
+
+        with (
+            patch(
+                "Skills.fetch_additional_tess_labels.fetch_toi_labels",
+                return_value=[
+                    {"tic_id": 1, "label": 1, "disposition": "CP",
+                     "period_days": 1.0, "epoch_bjd": 0.0, "source": "exofop_toi"},
+                ],
+            ),
+            patch(
+                "Skills.fetch_additional_tess_labels.fetch_ctoi_labels",
+                return_value=[],
+            ),
+            patch(
+                "Skills.fetch_additional_tess_labels.run_and_commit_report",
+                return_value=True,
+            ) as commit,
+        ):
+            exit_code = _cli(
+                ["--corpus", str(corpus), "--output", str(out)],
+                git_run_fn=fake_runner,
+            )
+
+        assert exit_code == 0
+        report, _path = commit.call_args.args
+        assert report.items_processed == 1
+        assert report.items_written == 1
+        assert report.items_failed == 0
+        assert commit.call_args.kwargs["run_fn"] is fake_runner
+
+    def test_cli_counts_fetch_failures_but_still_succeeds(self, tmp_path: Path) -> None:
+        from unittest.mock import patch
+
+        from Skills.fetch_additional_tess_labels import _cli
+
+        corpus = tmp_path / "corpus.jsonl"
+        corpus.write_text("")
+        out = tmp_path / "targets.txt"
+
+        with (
+            patch(
+                "Skills.fetch_additional_tess_labels.fetch_toi_labels",
+                side_effect=ConnectionError("no network"),
+            ),
+            patch(
+                "Skills.fetch_additional_tess_labels.fetch_ctoi_labels",
+                side_effect=ConnectionError("no network"),
+            ),
+            patch(
+                "Skills.fetch_additional_tess_labels.run_and_commit_report",
+                return_value=True,
+            ) as commit,
+        ):
+            exit_code = _cli(["--corpus", str(corpus), "--output", str(out)])
+
+        assert exit_code == 0
+        report, _path = commit.call_args.args
+        assert report.items_failed == 2
+        assert report.items_processed == 0
+        assert report.items_written == 0
