@@ -37,7 +37,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.96 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.97 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
