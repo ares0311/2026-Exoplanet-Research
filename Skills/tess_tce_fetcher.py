@@ -14,12 +14,27 @@ TceFetchResult(records, n_total, n_planet_candidate, n_false_positive,
 fetch_tce_table(*, max_rows, disposition_filter, fetch_fn) -> TceFetchResult
 tce_to_label_rows(result) -> list[dict]
 format_tce_summary(result) -> str
+
+The CLI entry point writes a structured completion record via
+``Skills/run_report.py`` after each run (AGENTS.md Run Report Policy,
+Rule 7). ``TceFetchResult.flag`` already distinguishes success ("OK")
+from failure ("EMPTY"/"INVALID"/"UNAVAILABLE"), so the Run Report is
+written for both outcomes rather than only on success.
 """
 from __future__ import annotations
 
 import json
+import sys
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
+from Skills.run_report import RunReport, report_path_for, run_and_commit_report  # noqa: E402
 
 _EXOMAST_TCE_URL = (
     "https://exo.mast.stsci.edu/api/v0.1/exoplanets/tce/"
@@ -222,7 +237,49 @@ def format_tce_summary(result: TceFetchResult) -> str:
     return "\n".join(lines)
 
 
-def _cli(argv: list[str] | None = None) -> int:
+def _write_run_report(
+    *,
+    started_at: str,
+    elapsed_seconds: float,
+    result: TceFetchResult,
+    n_written: int,
+    output_paths: tuple[str, ...],
+    git_run_fn: Any = None,
+) -> None:
+    """Append and publish one tess_tce_fetcher completion report
+    (AGENTS.md Rule 7). Written on both success and failure flags."""
+    status = "success" if result.flag == "OK" else "failed"
+    report = RunReport(
+        script="tess_tce_fetcher",
+        status=status,
+        started_at=started_at,
+        completed_at=datetime.now(UTC).isoformat(),
+        elapsed_seconds=elapsed_seconds,
+        items_processed=result.n_total,
+        items_written=n_written,
+        items_failed=0 if status == "success" else 1,
+        output_paths=output_paths,
+        notes=(
+            f"flag={result.flag} pc={result.n_planet_candidate} "
+            f"fp={result.n_false_positive} nd={result.n_not_dispositioned}"
+            + (f" error={result.error_message}" if result.error_message else "")
+        ),
+    )
+    path = report_path_for("tess_tce_fetcher")
+    kwargs: dict[str, Any] = {}
+    if git_run_fn is not None:
+        kwargs["run_fn"] = git_run_fn
+    ok = run_and_commit_report(report, path, **kwargs)
+    if ok:
+        print(f"Run report committed and pushed: {path}", flush=True)
+    else:
+        print(
+            f"Warning: run report written to {path} but commit/push failed",
+            flush=True,
+        )
+
+
+def _cli(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(description="Fetch TESS TCE table from ExoMAST.")
@@ -236,17 +293,30 @@ def _cli(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", help="Write label rows to JSON file.")
     args = parser.parse_args(argv)
 
+    started_at = datetime.now(UTC).isoformat()
+    start = time.monotonic()
     result = fetch_tce_table(max_rows=args.max_rows, disposition_filter=args.disposition)
     print(format_tce_summary(result))
 
+    written_paths: list[str] = []
+    n_written = 0
     if args.output and result.flag == "OK":
-        import json
-        from pathlib import Path
         rows = tce_to_label_rows(result)
         Path(args.output).parent.mkdir(parents=True, exist_ok=True)
         Path(args.output).write_text(json.dumps(rows, indent=2))
         print(f"\nWrote {len(rows)} label rows to {args.output}")
+        written_paths.append(args.output)
+        n_written = len(rows)
 
+    elapsed = time.monotonic() - start
+    _write_run_report(
+        started_at=started_at,
+        elapsed_seconds=elapsed,
+        result=result,
+        n_written=n_written,
+        output_paths=tuple(written_paths),
+        git_run_fn=git_run_fn,
+    )
     return 0 if result.flag == "OK" else 1
 
 

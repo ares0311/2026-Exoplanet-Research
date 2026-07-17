@@ -469,6 +469,21 @@ obsid/targets is a CLI usage error, not an acquisition attempt, so no
 report is written for that path.
 The version 0.2.94 release gate passed 2,979 default tests plus Ruff/mypy as
 10/10 supervised gates in 25.2 seconds under the canonical 6x6 topology.
+Version 0.2.95 retrofits `Skills/tess_tce_fetcher.py` with the Run Report
+Policy — the fifteenth and final script on the AGENTS.md retrofit list,
+completing it. Same both-flags `TceFetchResult`/flag shape as
+`fetch_exofop_ctoi.py` and `fetch_nea_koi_lc_index.py`. This retrofit
+caught a real bug during its own verification: the first `_write_run_report()`
+draft set `items_written` from `result.n_total` (every fetched TCE record)
+rather than the count of label rows actually written to disk (records with
+disposition `ND` are excluded by `tce_to_label_rows()`); a quality-gate test
+failure (`3 == 2`) surfaced the mismatch before merge, and the fix threads an
+explicit `n_written` parameter through `_write_run_report()` instead of
+deriving it from the fetch result.
+The version 0.2.95 release gate passed 2,984 default tests plus Ruff/mypy as
+10/10 supervised gates in 23.2 seconds under the canonical 6x6 topology. The
+AGENTS.md Run Report Policy retrofit (Rule 7) is now complete for all 15
+tracked acquisition/processing Skills.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
