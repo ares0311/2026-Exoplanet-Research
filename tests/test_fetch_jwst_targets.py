@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
+import fetch_jwst_targets
 from fetch_jwst_targets import (
     JwstObservation,
     _enrich_with_products,
@@ -213,3 +214,131 @@ def test_format_summary_checkmark_for_calints() -> None:
     obs = _enrich_with_products(raw, _product_fn_calints)
     table = format_summary(obs)
     assert "✓" in table
+
+
+# ---------------------------------------------------------------------------
+# Run Report (AGENTS.md Rule 7 retrofit)
+# ---------------------------------------------------------------------------
+
+
+def test_run_report_success_status(monkeypatch) -> None:
+    captured = {}
+
+    def fake_commit(report, path, **kwargs):
+        captured["report"] = report
+        captured["path"] = path
+        captured["run_fn"] = kwargs.get("run_fn")
+        return True
+
+    monkeypatch.setattr(fetch_jwst_targets, "run_and_commit_report", fake_commit)
+
+    fetch_jwst_targets._write_run_report(
+        started_at="2026-07-17T00:00:00+00:00",
+        elapsed_seconds=5.0,
+        status="success",
+        n_observations=2,
+        output_path="data/jwst_timeseries_targets.json",
+        notes="instrument=None min_exptime=1800.0",
+        git_run_fn=object(),
+    )
+    report = captured["report"]
+    assert report.script == "fetch_jwst_targets"
+    assert report.status == "success"
+    assert report.items_processed == 2
+    assert report.items_written == 2
+    assert report.items_failed == 0
+    assert captured["path"].name == "fetch_jwst_targets.jsonl"
+    assert captured["run_fn"] is not None
+
+
+def test_run_report_failed_status_on_query_error(monkeypatch) -> None:
+    captured = {}
+
+    def fake_commit(report, path, **kwargs):
+        captured["report"] = report
+        return True
+
+    monkeypatch.setattr(fetch_jwst_targets, "run_and_commit_report", fake_commit)
+
+    fetch_jwst_targets._write_run_report(
+        started_at="2026-07-17T00:00:00+00:00",
+        elapsed_seconds=1.0,
+        status="failed",
+        n_observations=0,
+        output_path=None,
+        notes="error=connection refused",
+        git_run_fn=None,
+    )
+    report = captured["report"]
+    assert report.status == "failed"
+    assert report.items_written == 0
+    assert report.items_failed == 1
+    assert "connection refused" in report.notes
+
+
+def test_commit_failure_warns_but_does_not_raise(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        fetch_jwst_targets, "run_and_commit_report", lambda *a, **k: False
+    )
+    fetch_jwst_targets._write_run_report(
+        started_at="2026-07-17T00:00:00+00:00",
+        elapsed_seconds=1.0,
+        status="success",
+        n_observations=0,
+        output_path=None,
+        notes="",
+        git_run_fn=None,
+    )
+    assert "Warning" in capsys.readouterr().out
+
+
+def test_cli_writes_run_report_on_success(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        fetch_jwst_targets, "query_jwst_timeseries",
+        lambda **kwargs: query_jwst_timeseries(
+            search_fn=_mock_search, product_fn=_product_fn_calints
+        ),
+    )
+    captured = {}
+
+    def fake_commit(report, path, **kwargs):
+        captured["report"] = report
+        captured["run_fn"] = kwargs.get("run_fn")
+        return True
+
+    monkeypatch.setattr(fetch_jwst_targets, "run_and_commit_report", fake_commit)
+
+    fake_runner = object()
+    out = tmp_path / "jwst_targets.json"
+    code = fetch_jwst_targets._cli(["--output", str(out)], git_run_fn=fake_runner)
+
+    assert code == 0
+    assert captured["run_fn"] is fake_runner
+    assert captured["report"].status == "success"
+    assert captured["report"].items_written > 0
+    assert out.exists()
+
+
+def test_cli_writes_run_report_on_query_failure(monkeypatch) -> None:
+    def _raise_search(instrument, min_exptime):
+        raise ConnectionError("no network")
+
+    monkeypatch.setattr(
+        fetch_jwst_targets, "query_jwst_timeseries",
+        lambda **kwargs: query_jwst_timeseries(
+            search_fn=_raise_search, product_fn=_product_fn_calints
+        ),
+    )
+    captured = {}
+
+    def fake_commit(report, path, **kwargs):
+        captured["report"] = report
+        return True
+
+    monkeypatch.setattr(fetch_jwst_targets, "run_and_commit_report", fake_commit)
+
+    code = fetch_jwst_targets._cli([])
+
+    assert code == 1
+    assert captured["report"].status == "failed"
+    assert "no network" in captured["report"].notes
