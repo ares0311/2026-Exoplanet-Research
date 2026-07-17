@@ -1,8 +1,17 @@
 # PROJECT STATUS
 
-## Status: Active Development
-## Phase: Phase 4 individual anomalous-transit diagnostics
-## Last Updated: 2026-07-16
+## Status: Active Development — no open Tier 1/Tier 2 gaps; no active roadmap phase
+## Last Updated: 2026-07-17 (version 0.2.96)
+
+This file had drifted badly stale before this update: it described Phase 4
+individual-transit diagnostics and T1-2 stacking calibration as the active
+work, when both closed many versions earlier (Phase 4 closed at 0.2.81;
+T1-2 closed well before that). Per the PRIMARY DIRECTIVE in `AGENTS.md`,
+do not trust a cached snapshot of "current work" here or anywhere else —
+`docs/PRODUCTION_READINESS.md` is the single actively-maintained
+version-by-version changelog and is re-read fresh every session. This file
+now points to it rather than duplicating it, to avoid re-accumulating the
+same drift.
 
 ---
 
@@ -10,183 +19,43 @@
 
 The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit with:
 
-- Core pipeline: Fetch -> Clean -> Search -> Vet -> Score -> Classify
+- Core pipeline: Fetch -> Clean -> Search -> Vet -> Score -> Classify, with an
+  animated terminal presentation (Milestone 20, version 0.2.96) that is purely
+  cosmetic and auto-disables under redirected output/CI
 - Bayesian log-score model over six hypotheses
-- Optional XGBoost and stacking scorer modes (Tier 1 model trained: Kepler KOI AUC=0.992)
+- XGBoost, stacking, CNN (`benchmark_cnn_v1`, promoted), and full-ensemble
+  scorer modes — all `PRODUCTION READY` per `docs/PRODUCTION_READINESS.md`'s
+  Live-Readiness Summary
 - SQLite-backed background automation with top-level logs
-- 126 standalone `Skills/` Python files (`rg --files Skills -g '*.py'`)
-- 149 top-level test files
+- 128 standalone `Skills/` Python files as of 2026-07-17 (re-run
+  `rg --files Skills -g '*.py' | wc -l` for the current count — this number
+  drifts and should not be trusted beyond the date above)
+- 153 top-level test files, ~3,000 default tests passing (exact current
+  figure: `docs/PRODUCTION_READINESS.md`'s "Test baseline" line)
 - 32 package Python modules under `src/exo_toolkit/`
 - JWST time-series ingestion wired into the CLI with `--mission JWST`
 - Novel TESS target scanning that excludes TOI, CTOI, and confirmed-host catalogs
+- AGENTS.md Rule 7 (Run Report Policy) is retrofitted across all 15 tracked
+  acquisition/processing Skills as of version 0.2.95
 
 Local validation note: validated on Python 3.14.3 in `.venv` with `xgboost` dependency restored and macOS OpenMP runtime (`libomp`) installed. System Python is never used.
 
-Phase 3 source gate: version 0.2.55 pins the 56,036,648-byte direct package and
-model footprint for Chronos-Bolt tiny plus Astromer2 and adds a metadata-only,
-fail-closed verifier. Its first merged run failed closed on followed Hugging
-Face HEAD redirects without writing evidence or downloading payloads. Version
-0.2.56 preserves the authoritative resolver headers and passes 2,734 tests plus
-Ruff/mypy in 26.1 seconds. The merged full verifier then passed 7/7 operations
-in 4.94 seconds: five
-sources verified, 56,036,648 projected direct bytes, and zero payload bytes
-downloaded. Artifact SHA-256 is `5610bbb8…3042`; Run Report commit `ae4e659`.
-Source identity/footprint is complete, while dependencies, weights, inference,
-training, stellar-variability labels, and injection comparison remain gated.
-
-Version 0.2.57 adds the next bounded gate: one cached TESS product, two exact
-ONNX revisions, isolated one-thread CPU inference, finite 256-dimensional
-output checks, and structured timing/memory evidence. The dependencies are an
-optional group and the model cache is ignored/ledgered. At that point merged
-installation and smoke evidence were next; broad extraction and training remain
-unauthorized.
-The 0.2.57 full 6×6 gate passed 2,743 tests plus Ruff/mypy in 24.2 seconds with
-the optional packages absent.
-
-The first merged smoke failed closed before payload download because Xet tried
-to write a log below sandbox-blocked `~/.cache/huggingface`; only 8 KB of
-ignored metadata was created. Version 0.2.58 relocates Hub and Xet state into
-the ignored model cache before import. The pinned optional group is installed,
-`pip check` passes, and the 0.2.58 6×6 gate passed 2,743 tests plus Ruff/mypy in
-26.2 seconds. The merged retry passed both exact models in 26.875 seconds with
-finite `(1,1,1,256)` embeddings; max child RSS was 186,204,160 bytes and the
-ignored cache totals 29,960,842 file bytes. Artifact SHA-256 is
-`1cc59ab3…5de5d10`; Run Report commit `f8a7207`. Version 0.2.59 records the
-runtime PASS. Variability-label and injection-recovery scientific gates remain
-before broad extraction or training. The 0.2.59 6×6 evidence-release gate
-passed 2,743 tests plus Ruff/mypy in 34.3 seconds.
-
-Version 0.2.60 pins the publication-backed Drake et al. Catalina
-stellar-variability source (47,055 rows, 17 classes, 1,166,660 compressed
-bytes) and adds a five-operation, zero-full-payload verifier with eight offline
-tests. Merged-code verification is next. The later 2,790-TIC metadata
-crossmatch and embedding-aware injection comparison remain gated; independent
-TIC work uses the single-parent six-shard/six-worker pattern. The version
-0.2.60 release gate passed 2,751 default tests plus Ruff/mypy in 25.2 seconds.
-
-The merged source verifier passed 5/5 operations in 3.334 seconds, validating
-47,055 rows, all 17 class counts, schema, delivery metadata, and three sample
-rows with zero full-catalog bytes. Artifact SHA-256 is `eb5d4bc6…39b9a`; Run
-Report commit `b0003bb`. Version 0.2.61 records source identity complete. The
-2,790-TIC crossmatch and embedding-aware injection comparison remain gated.
-The 0.2.61 evidence-release gate passed 2,751 tests plus Ruff/mypy as 8/8
-supervised gates in 40.2 seconds under the canonical 6×6 topology.
-
-Version 0.2.62 adds the next bounded gate: a deterministic 216-TIC
-TESS-Catalina crossmatch pilot using six shards × six exact-ID MAST batch
-workers, one locked 1.17 MB source cache, precommitted positional/magnitude/
-duplicate/blend safeguards, and training-disabled outputs. Full 2,790-TIC
-execution awaits merged pilot evidence and global one-to-one reconciliation.
-The 0.2.62 release gate passed 2,759 tests plus Ruff/mypy as 8/8 supervised
-gates in 34.3 seconds under the canonical 6×6 topology.
-Version 0.2.63 fixes the merged-main launch blocker by ignoring the shared
-Catalina runtime cache. The supervisor stopped before issuing MAST requests,
-so the authorized 216-TIC pilot remains pending a clean merged-main retry.
-Version 0.2.64 fixes the second fail-closed integration defect from that run:
-valid CDS rows without the optional class flag are 71 rather than 73 bytes.
-The bounded parser now accepts 71-73 bytes, pads only omitted trailing fields,
-and still rejects malformed shorter or longer rows before MAST access.
-The 0.2.64 release gate passed 2,760 tests plus Ruff/mypy as 8/8 supervised
-gates in 25.2 seconds under the canonical 6×6 topology; the real pinned
-catalog parsed all 47,055 rows.
-Version 0.2.65 closes the third fail-closed integration defect. MAST rejects
-v1's `duplicate_i` field and accepts `duplicate_id`; immutable contract v1 is
-retained for audit, v2 is active, and the request column list now comes from
-the contract. The failed attempt wrote no pilot artifacts.
-The v2 six-ID probe returned all rows in 1.5 seconds, and the 0.2.65 release
-gate passed 2,761 tests plus Ruff/mypy as 8/8 gates in 26.2 seconds.
-The merged pilot completed 216/216 queries and wrote every shard artifact.
-Version 0.2.66 fixes only the final sandbox-lock handling so Run Report git
-failure warns without converting successful data acquisition into exit 1.
-The 0.2.66 release gate passed 2,762 tests plus Ruff/mypy as 8/8 supervised
-gates in 34.3 seconds under the canonical 6×6 topology.
-Version 0.2.67 closes the Catalina pilot as evidence-limited: 216/216 unique
-TICs, 38 completed batches, 8.519s observed wall, and zero candidates within
-the precommitted 3-arcsecond search radius. Global reconciliation passes with
-zero accepted or duplicate sources; full execution/training stays blocked.
-The 0.2.67 release gate passed 2,763 tests plus Ruff/mypy as 8/8 supervised
-gates in 24.2 seconds under the canonical 6×6 topology.
-Version 0.2.68 adds the replacement source preflight for ASAS-SN Catalog X.
-Its immutable contract pins 378,861 VizieR rows, delivery/schema/distribution
-metadata, exact TIC joins, and the fact that catalog classes are automated ML
-outputs rather than ground truth. An exploratory zero-payload six-worker query
-found 48 matches among the full 2,790-TIC inventory in 7.86 seconds. The
-durable merged-main run uses six shards x six workers and must globally
-reconcile all TICs before it can authorize follow-up benchmark design. It
-cannot authorize training, extraction, promotion, or production scoring.
-The 0.2.68 release gate passed 2,772 default tests plus Ruff/mypy as 8/8
-supervised gates in 31.3 seconds under the canonical 6x6 topology.
-The merged run passed all six shards and the global gate: 2,790 unique TICs,
-48 unique ASAS-SN matches (44 known variables, four discoveries), minimum
-probability 0.902, no duplicate TIC/source IDs, and no catalog payload bytes.
-Observed wall time was 6.762 seconds. Version 0.2.69 commits the shard outputs,
-summaries, aggregate, and integrity test. Follow-up embedding-aware benchmark
-design is now the active scientific gate; training remains unauthorized.
-The 0.2.69 evidence-release gate passed 2,773 default tests plus Ruff/mypy as
-8/8 supervised gates in 32.3 seconds under the canonical 6x6 topology.
-Version 0.2.70 freezes the next cache-only gate: all 48 matched TICs, four
-bounded injection cells, 192 unique blind-BLS trials, and 384 paired rows from
-the exact cached Chronos-Bolt tiny and Astromer2 models. The implementation is
-allowlisted in the single-parent 6x6 launcher and persists no embeddings or
-modified light curves. Its results are
-descriptive only; training, broad extraction, promotion, and production scoring
-remain unauthorized. See
-`docs/REPRESENTATION_VARIABILITY_INJECTION_BENCHMARK.md`.
-The 0.2.70 release gate passed 2,780 default tests plus Ruff/mypy as 8/8
-supervised gates in 33.3 seconds under the canonical 6x6 topology.
-Version 0.2.71 requires the benchmark's label rows to match all six paths and
-hashes pinned by the ASAS-SN aggregate before any FITS/model work. The 6x6
-release gate passed 2,781 tests plus Ruff/mypy in 30.1 seconds.
-The merged run passed all six shards and global reconciliation: 48 TICs,
-192 trials, 384 unique model rows, 96/96 higher-depth larger-shift comparisons
-for each frozen model, 13/192 blind-BLS recoveries, and zero failures,
-duplicates, downloads, or persisted embeddings. Version 0.2.72 commits the
-evidence and integrity regression. The bounded gate is complete; training,
-broad extraction, promotion, and production scoring remain unauthorized.
-The 0.2.72 evidence-release gate passed 2,782 default tests plus Ruff/mypy as
-8/8 supervised gates in 37.2 seconds under the canonical 6x6 topology.
-Version 0.2.73 implements the next separately contracted grouped benchmark on
-1,536 unique cache-local Kepler KICs. It compares frozen Chronos-Bolt tiny and
-Astromer2 linear probes with the frozen calibrated CNN and a statistical
-ephemeris baseline under train/validation/test separation. The exact selected
-10.398 GB cache inventory is read-only, the run is allowlisted for the 6x6
-supervisor, and aggregate reconciliation must remove every temporary embedding
-array. Merged-main execution is next; all training and production authorization
-flags remain false.
-The 0.2.73 release gate passed 2,789 default tests plus Ruff/mypy as 8/8
-supervised gates in 34.1 seconds under the canonical 6x6 topology.
-The first merged v1 benchmark launch failed closed before processing because
-Kepler files expose `SAP_QUALITY`, not v1's TESS-style `QUALITY`. No benchmark
-data was downloaded or persisted. Version 0.2.74 preserves v1 and activates
-immutable v2 with the corrected column and a hash-pinned exception for exactly
-111 known truncated cache products. All other FITS errors remain fatal; the
-merged v2 evidence run is pending.
-The 0.2.74 release gate passed 2,790 default tests plus Ruff/mypy as 8/8
-supervised gates in 36.3 seconds under the canonical 6x6 topology.
-The first merged v2 run failed closed on its over-strict 95% 2,048-bin
-occupancy rule before embeddings or durable output. Version 0.2.75 preserves
-v2 and activates immutable v3 with neutral median physical-flux fill for empty
-phase bins. A full cache-only 1,536-KIC preparation preflight passed in 158.4
-seconds with exactly 111 pinned skips, zero writes/downloads, and finite smoke
-embeddings from both external models. Merged v3 evidence remains pending.
-The 0.2.75 release gate passed 2,791 default tests plus Ruff/mypy as 8/8
-supervised gates in 36.3 seconds under the canonical 6x6 topology.
-The merged v3 benchmark passed 1,536 unique KICs with 111 pinned skips, zero
-failures/downloads/persisted embeddings, and one test opening. The frozen CNN
-retained a wide lead: AUC/AP/top-100 0.923096/0.899184/91 versus Chronos-Bolt
-tiny 0.722778/0.696344/71 and Astromer2 0.708984/0.659679/67. Version 0.2.76
-records `no_external_added_value`; broad extraction/training remains blocked.
-The 0.2.76 evidence-release gate passed 2,797 default tests plus Ruff/mypy as
-8/8 supervised gates in 36.3 seconds under the canonical 6x6 topology.
-Version 0.2.77 activates the previously unreachable per-transit duration-
-consistency and TTV features in production vetting. Measurements use local
-sidebands and noise-gated half-depth cadences, require two resolved events, and
-otherwise remain unavailable. Flat noise is rejected and a 30-minute shifted
-event is recovered in focused regression evidence.
-The 0.2.77 release gate passed 2,801 default tests plus Ruff/mypy as 8/8
-supervised gates in 35.3 seconds under the canonical 6x6 topology.
-The 0.2.63 release gate passed the unchanged 2,759 tests plus Ruff/mypy as 8/8
-supervised gates in 27.3 seconds under the canonical 6×6 topology.
+**The version-by-version changelog previously duplicated here (versions
+0.2.55 through 0.2.77) has been removed** in favor of a single pointer, to
+stop this file from re-accumulating drift the way it did before this
+2026-07-17 correction. Read `CLAUDE.md`'s changelog narrative for the full,
+current, version-by-version history — it now runs through version 0.2.96
+and covers everything this file used to duplicate plus everything since:
+the completed Phase 3 representation-learning tracks (both branches closed
+`no_external_added_value`/evidence-limited, training not authorized), the
+completed Phase 4 individual-transit-detector extension (all three named
+increments), the completed AGENTS.md Rule 7 Run Report Policy retrofit
+(all 15 tracked scripts), and the completed Milestone 20 animated CLI.
+`docs/PRODUCTION_READINESS.md` carries the equivalent narrative with the
+Tier 1/Tier 2 gap framing; `docs/ROADMAP.md` carries it with the
+milestone/phase framing. All three should agree; if they ever don't,
+treat that disagreement itself as a defect to fix, not a call to guess
+which one is right.
 
 ---
 
@@ -196,7 +65,7 @@ supervised gates in 27.3 seconds under the canonical 6×6 topology.
 |------|-----------|--------|
 | Scoring engine | `schemas.py`, `features.py`, `hypotheses.py`, `priors.py`, `scoring.py`, `pathway.py` | Complete |
 | Data pipeline | `fetch.py`, `clean.py`, `search.py`, `vet.py`, `calibration.py` | Complete |
-| Transit scan CLI | `cli.py` — `exo <TIC-ID>` with `--scorer`, `--model-path`, `--output`; JWST via `--mission JWST` | Complete |
+| Transit scan CLI | `cli.py` — `exo <TIC-ID>` with `--scorer`, `--model-path`, `--output`; JWST via `--mission JWST`; animated/plain progress display (Milestone 20) | Complete |
 | Background automation CLI | `cli.py` — `background-run-once`, summaries, integrity, validation | Complete |
 | Background automation module | `background/` — config, fixtures, priority, runner, storage, reports | Complete |
 | SQLite runtime state | `logs/background_search.sqlite3` schema v2 | Complete |
@@ -204,17 +73,18 @@ supervised gates in 27.3 seconds under the canonical 6×6 topology.
 | Scoring prior config | `configs/scoring_priors_v0.json` — conservative default plus TESS/Kepler/K2 profiles | Complete |
 | Scheduler docs | `docs/SCHEDULER.md` — cron, launchd, systemd | Complete |
 | ML Tier 1 | `ml/xgboost_scorer.py` + `models/xgboost_koi.json` | Complete — trained on 7,586 Kepler KOIs (AUC=0.992) |
-| ML Tier 3 | `ml/stacking_scorer.py` | Complete, includes optional 3-tier XGBoost/CNN/Bayesian blend |
-| ML Tier 2 scaffolding | `ml/cnn_scorer.py`, `Skills/train_cnn.py`, CNN data utilities | Complete, no production checkpoint; active work follows `docs/exoplanet_exomoon_dataset_handoff.md` |
+| ML Tier 2 | `ml/cnn_scorer.py` + `models/cnn/benchmark_cnn_v1/` | Complete — promoted checkpoint, test AUC 0.9572 |
+| ML Tier 3 | `ml/stacking_scorer.py` | Complete, calibrated full-ensemble weights (XGBoost=0.95/CNN=0.00/Bayesian=0.05) wired into `cli.py` |
 | Training/evaluation Skills | Kepler, TESS, combined training, CNN data assembly/validation/training support, XGBoost training, scorer evaluation | Complete |
-| Discovery workflow Skills | star scanner, batch scan, alert filter, ranking, watchlist, exports, reports | Complete; run006/run008 evidence retained as historical provenance, not the active production blocker |
+| Discovery workflow Skills | star scanner, batch scan, alert filter, ranking, watchlist, exports, reports | Complete; run006/run008 evidence retained as historical provenance |
 | Additional Skills | Analysis, vetting, observability, ML, physics, reporting, scheduling, and follow-up utilities retained after production-scope cleanup | Complete |
-| Milestone 19a Skill | `multi_sector_phase_compare.py` — offline per-sector phase-fold comparison | Complete |
-| Milestone 19b Skill | `candidate_dashboard_export.py` — static conservative candidate dashboard with optional plot artifacts | Complete |
-| Milestone 19c Skill | `candidate_api.py` — local read-only candidate API plus optional background SQLite summaries | Complete |
-| Milestone 19d Skill | `candidate_browser_ui.py` — interactive local candidate browser with optional plot previews | Complete |
+| Milestone 19a-d Skills | Multi-sector phase compare, static dashboard, local read-only API, interactive browser | Complete |
+| Milestone 20 | Animated terminal presentation for `exo scan`, `--no-animation`, interruption handling | Complete (version 0.2.96) |
 | Milestone 30 Skills | 15 diagnostics + scheduling tools including `flux_anomaly_detector`, `candidate_confidence_tracker`, `uncertainty_propagator`, `multi_target_scheduler`, `candidate_archive`, and 10 more | Complete |
 | Milestones 34-39 Skills | 90 additional ML evaluation, photometry quality, transit vetting, noise budget, orbit simulation, stellar physics, TTV, occurrence-rate, and planning utilities | Complete |
+| Phase 3 representation learning | External foundation-model baseline (Chronos-Bolt tiny, Astromer2) + stellar-variability/injection benchmarks | Complete — `no_external_added_value`; frozen CNN remains strongest comparator; training not authorized |
+| Phase 4 individual-transit diagnostics | Per-transit duration/midpoint, missing-transit-fraction, transit-asymmetry, extra-event-count scores | Complete — all three named extensions wired into `log_score_planet()`/`log_score_instrumental()` |
+| AGENTS.md Rule 7 retrofit | Run Report Policy across all 15 tracked acquisition/processing Skills | Complete (version 0.2.95) |
 | CTOI source contract | `docs/CTOI_SOURCE_CONTRACT.md`, `Skills/fetch_exofop_ctoi.py`, `tests/fixtures/exofop_ctoi_sample.csv`, `tests/fixtures/exofop_ctoi_labels_sample.json` — opt-in fixture-backed community candidate labels | Complete, excluded from default training |
 | Project MCP bootstrap | `.mcp.json`, `.codex/config.toml`, `Skills/mcp_bootstrap_server.py` — project-scoped file, git-read, and fixed validation MCP servers | Complete, offline by default |
 | Live label-check audit | `Skills/count_tess_labels.py`, `Skills/tess_label_check_summary.py` — opt-in live ExoFOP gate check plus read-only SQLite log summary | Complete, live access requires intentional approval |
@@ -259,29 +129,30 @@ without relying on chat context or local terminal output.
 
 ## Active Production Blocker
 
-**T1-1 — production trained model checkpoint**
+**None.** No Tier 1 or Tier 2 gap is open: T1-0/T1-1/T1-2 are all complete
+(`benchmark_cnn_v1` is the promoted CNN checkpoint; stacking calibration is
+wired into `cli.py` with weights XGBoost=0.95/CNN=0.00/Bayesian=0.05). All
+scorer modes (`bayesian`, `xgboost`, `ensemble`, `cnn`, `full-ensemble`) are
+`PRODUCTION READY` per `docs/PRODUCTION_READINESS.md`'s Live-Readiness
+Summary. Phase 3 representation learning, Phase 4 individual-transit
+diagnostics, the AGENTS.md Rule 7 Run Report Policy retrofit, and Milestone
+20's animated CLI are all closed as of version 0.2.96.
 
-- The project reset on 2026-07-01 wholly adopts
-  `docs/exoplanet_exomoon_dataset_handoff.md` as the active path to a trained
-  model.
-- Source-contract-first data/ML hardening is complete enough to produce a
-  passing checkpoint: provider schemas were verified, source snapshots and
-  manifests were committed, leakage-safe splits were enforced, storage remained
-  bounded, and the master Kepler corpus trained successfully.
-- `checkpoints/cnn_t1_1_kepler_master/best.pt` is promoted as
-  `benchmark_cnn_v1` under `models/cnn/benchmark_cnn_v1/` after explicit human
-  approval on 2026-07-09. It passed held-out gates with raw test AUC 0.9572,
-  calibrated F1 0.8347, Brier 0.0580, ECE 0.0142, and temperature T=1.0.
-- The active blocker is no longer data acquisition, another training loop, or
-  checkpoint promotion. The next production gap is T1-2 stacking calibration
-  after the promotion PR is merged and CI-clean.
-- Do not repeat old C1-C19/C20-style retraining or Kepler batch processing
-  unless a named promotion validation gate fails.
-- Do not use synthetic examples as supervised training positives in this phase;
-  synthetics remain CI/background fixtures only.
-- Any local long-running command must be resumable, print progress/ETA, use
-  top-level logs where applicable, and use the M4 Max/MPS path from
-  `docs/SYSTEM_PROFILE.md` for training.
+Per the PRIMARY DIRECTIVE in `AGENTS.md`: a closed gap list does not mean
+work should stop or that the project is live in production. The correct
+process each session is to read `docs/PRODUCTION_READINESS.md`,
+`docs/ROADMAP.md`, and `docs/DISCOVERY_RUNBOOK.md` fresh, then choose the
+highest-impact task from the pre-deployment checklist, open production
+defects, or real operator workflow gaps — not to assume a hardcoded "next
+action" from this file, which is exactly the kind of stale pointer that
+caused this file's previous drift.
+
+`docs/DISCOVERY_RUNBOOK.md`'s live-search follow-up (TIC 355651994, P=97.16
+d) is evidence-exhausted given currently available data: neither of its two
+independent TESS-SPOC target-pixel products covers the predicted event, and
+the QLP light curve has only two independent events versus the four required
+for odd/even testing. Resolving it further requires new observations
+(a human/telescope-time blocker), not more code.
 
 ## Historical Discovery Evidence
 
@@ -366,52 +237,46 @@ evidence without explicit human approval, and do not use it to block T1-1.
 - Architecture details: `docs/CNN_SPEC.md`.
 - Human local runbook: `docs/CNN_PRODUCTION_RUNBOOK.md`.
 - Source access smoke test passed end-to-end on 2026-07-02 with TAP schemas/rows,
-  ExoFOP CSV, and Lightkurve Kepler/TESS searches verified. The next blocker is
-  leakage-safe manifest and cleanup-path verification before any bulk download.
+  ExoFOP CSV, and Lightkurve Kepler/TESS searches verified.
 - Storage/source snapshot planning passed on 2026-07-02: committed metadata
   records source row counts, sample MAST product metadata, and an under-cap
   92,093,823,360-byte combined Kepler-long-cadence plus TESS estimate.
+- The full T1-1 outcome (checkpoint training, promotion, calibration) and
+  everything since is in `CLAUDE.md`'s changelog narrative — not repeated
+  here to avoid re-duplicating the drift this file just had corrected.
 
 ---
 
 ## Next Actions
 
-1. Promotion tooling compatibility is complete: `Skills/promote_cnn_checkpoint.py`
-   verifies the current `method: temperature` calibration JSON produced by
-   `Skills/evaluate_cnn_checkpoint.py`, preserves legacy Platt support, accepts
-   explicit `--model-id`, and prints the required intentional `git add -f`
-   checkpoint staging step.
-2. The evidence package is on GitHub:
-   `models/benchmark_cnn_v1/MODEL_CARD.md`,
-   `models/benchmark_cnn_v1/REPRODUCIBILITY_MANIFEST.json`, and
-   `data_selection/data_role_registry.yaml` record the selected artifact scope,
-   exact SHA-256 hashes, data roles, limitations, and `git add -f` requirement.
-3. Human promotion approval was granted on 2026-07-09 for checkpoint SHA
-   `f29e6891c255289fa1e2eddad1fb6ca131c063cf11c24b8113e0e29d049441c5` as
-   `benchmark_cnn_v1`.
-4. Selected checkpoint/calibration/config/metrics/manifest artifacts are copied
-   into `models/cnn/benchmark_cnn_v1/`, and `models/registry.json` registers
-   `benchmark_cnn_v1`.
-5. After this promotion PR merges and post-merge CI is clean, start T1-2
-   stacking calibration on a held-out
-   calibration set; do not tune full-ensemble weights before the CNN artifact
-   exists.
+There is no single hardcoded "next action" — the PRIMARY DIRECTIVE in
+`AGENTS.md` requires reading `docs/PRODUCTION_READINESS.md`,
+`docs/ROADMAP.md`, and `docs/DISCOVERY_RUNBOOK.md` fresh each session and
+choosing the highest-impact task from current evidence, not from a stale
+list here (this exact anti-pattern is what left this file describing T1-2
+as pending for dozens of versions after it actually closed). As of version
+0.2.96:
+
+- No Tier 1/Tier 2 gap is open.
+- `docs/ROADMAP.md`'s "Current Master-Guide Alignment" priority list is
+  fully closed through Milestone 20.
+- The one open live-search follow-up (TIC 355651994) is evidence-exhausted
+  pending new telescope observations — a human/hardware blocker, not a
+  coding task.
+- Before starting new work, re-derive the next task from current readiness
+  checks, roadmap state, and any newly reported defect, per the PRIMARY
+  DIRECTIVE's impact ordering (production blocker > failing check > roadmap
+  item > validation/reliability/operability improvement).
 
 Remote sync note: local `main` is synced with `origin/main` as of the latest
 handoff.
 
-
 ## Latest Local Validation
 
-Validated on 2026-07-13:
-
-```bash
-.venv/bin/python Skills/run_quality_gates.py
-```
-
-Result: Ruff and mypy passed; six disjoint pytest shards × six xdist workers
-passed 2,726 default tests in 34.1 seconds total. Two `integration_live` tests
-remain excluded by default.
+See `docs/PRODUCTION_READINESS.md`'s "Test baseline" line for the current
+verified figure (re-run `.venv/bin/python Skills/run_quality_gates.py` to
+reproduce) — not hardcoded here, since a hardcoded number here is exactly
+what went stale before this correction.
 
 ---
 

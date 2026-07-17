@@ -521,6 +521,26 @@ registration is already proven end-to-end by
 option with a nonzero exit code.
 The version 0.2.96 release gate passed 2,999 default tests plus Ruff/mypy as
 10/10 supervised gates in 27.1 seconds under the canonical 6x6 topology.
+Version 0.2.97 corrects `docs/PROJECT_STATUS.md`, a file explicitly named in
+AGENTS.md's "Read First" required-reading list as "current active state and
+next work," which had drifted badly stale: its header, "Active Production
+Blocker," and "Next Actions" sections still described Phase 4 individual-
+transit diagnostics and T1-2 stacking calibration as pending work, though
+both closed many versions earlier (Phase 4 at 0.2.81, T1-2 well before
+that), and its inline changelog stopped at version 0.2.77 while `main` was
+at 0.2.96. Removes the duplicated version-by-version changelog (0.2.55
+through 0.2.77) in favor of a pointer to `CLAUDE.md`'s own narrative — the
+duplication was itself why the file re-drifted, matching the unscoped
+"reduce duplication/drift across AGENTS.md/CLAUDE.md/docs/*.md" item already
+recorded in AGENTS.md's Maintenance TODO backlog, addressed here for this
+one file rather than the full backlog item. Rewrites "Active Production
+Blocker" to state plainly that none is open and to point at
+`docs/PRODUCTION_READINESS.md`/`docs/ROADMAP.md` for the live current state
+instead of a hardcoded snapshot. "Historical Discovery Evidence" and
+"Trained-Model History" sections are left unchanged since they are
+correctly dated history, not current-state claims.
+The version 0.2.97 release gate passed 2,999 default tests plus Ruff/mypy as
+10/10 supervised gates in 31.1 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
