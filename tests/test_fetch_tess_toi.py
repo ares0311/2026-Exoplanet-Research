@@ -173,3 +173,116 @@ class TestFetchToiTable:
         rows = _read_csv(out)
         assert rows
         assert "epoch_bjd" in rows[0]
+
+    def test_stats_populated(self, tmp_path: Path) -> None:
+        from Skills.fetch_tess_toi import fetch_toi_table
+        out = tmp_path / "toi.csv"
+        stats: dict[str, int] = {}
+        fetch_toi_table(out, fetch_fn=_mock_fetch, stats=stats)
+        # 5 mock rows, PC excluded by disposition -> 4 kept, all valid ephemerides.
+        assert stats["written"] == 4
+        assert stats["errors"] == 0
+        assert stats["total"] == 4
+        assert stats["rejected_ephemerides"] == 0
+
+    def test_stats_unset_when_not_requested(self, tmp_path: Path) -> None:
+        from Skills.fetch_tess_toi import fetch_toi_table
+        out = tmp_path / "toi.csv"
+        result = fetch_toi_table(out, fetch_fn=_mock_fetch)
+        assert result.exists()
+
+
+# ---------------------------------------------------------------------------
+# Run Report (AGENTS.md Rule 7 retrofit)
+# ---------------------------------------------------------------------------
+
+
+class TestRunReport:
+    def test_success_status_with_notes(self) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from Skills.fetch_tess_toi import _write_run_report
+
+        with patch(
+            "Skills.fetch_tess_toi.run_and_commit_report", return_value=True
+        ) as commit:
+            _write_run_report(
+                started_at="2026-07-17T00:00:00+00:00",
+                elapsed_seconds=5.0,
+                stats={"written": 4, "errors": 0, "total": 4, "rejected_ephemerides": 1},
+                output_path=Path("data/tess_toi.csv"),
+                git_run_fn=MagicMock(),
+            )
+        report, path = commit.call_args.args
+        assert report.script == "fetch_tess_toi"
+        assert report.status == "success"
+        assert report.items_processed == 4
+        assert report.items_written == 4
+        assert report.items_failed == 0
+        assert "rejected_ephemerides=1" in report.notes
+        assert path.name == "fetch_tess_toi.jsonl"
+
+    def test_git_run_fn_is_threaded_through(self) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from Skills.fetch_tess_toi import _write_run_report
+
+        fake_runner = MagicMock()
+        with patch(
+            "Skills.fetch_tess_toi.run_and_commit_report", return_value=True
+        ) as commit:
+            _write_run_report(
+                started_at="2026-07-17T00:00:00+00:00",
+                elapsed_seconds=1.0,
+                stats={},
+                output_path=Path("out.csv"),
+                git_run_fn=fake_runner,
+            )
+        assert commit.call_args.kwargs["run_fn"] is fake_runner
+
+    def test_commit_failure_warns_but_does_not_raise(self, capsys) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from Skills.fetch_tess_toi import _write_run_report
+
+        with patch(
+            "Skills.fetch_tess_toi.run_and_commit_report", return_value=False
+        ):
+            _write_run_report(
+                started_at="2026-07-17T00:00:00+00:00",
+                elapsed_seconds=1.0,
+                stats={},
+                output_path=Path("out.csv"),
+                git_run_fn=MagicMock(),
+            )
+        assert "Warning" in capsys.readouterr().out
+
+    def test_cli_writes_run_report_with_injected_git_runner(self, tmp_path: Path) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from Skills.fetch_tess_toi import _cli
+
+        out = tmp_path / "toi.csv"
+        fake_runner = MagicMock()
+
+        def fake_fetch(output_path, *, stats=None):
+            if stats is not None:
+                stats["written"] = 4
+                stats["errors"] = 0
+                stats["total"] = 4
+                stats["rejected_ephemerides"] = 0
+            return Path(output_path)
+
+        with (
+            patch("Skills.fetch_tess_toi.fetch_toi_table", side_effect=fake_fetch),
+            patch(
+                "Skills.fetch_tess_toi.run_and_commit_report", return_value=True
+            ) as commit,
+        ):
+            exit_code = _cli(["--output", str(out)], git_run_fn=fake_runner)
+
+        assert exit_code == 0
+        commit.assert_called_once()
+        assert commit.call_args.kwargs["run_fn"] is fake_runner
+        report, _path = commit.call_args.args
+        assert report.items_written == 4
