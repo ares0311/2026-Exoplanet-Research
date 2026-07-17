@@ -5,10 +5,11 @@ import json
 import sys
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from Skills.batch_scan import batch_scan, read_tic_ids  # noqa: E402
+from Skills.batch_scan import _cli, _write_run_report, batch_scan, read_tic_ids  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # read_tic_ids
@@ -139,3 +140,117 @@ class TestBatchScan:
             [10, 20, 30], output_path=out, run_pipeline_fn=_make_pipeline_fn({})
         )
         assert len(result) == 3
+
+
+# ---------------------------------------------------------------------------
+# Run Report (AGENTS.md Rule 7 retrofit)
+# ---------------------------------------------------------------------------
+
+
+class TestRunReport:
+    def test_success_status_with_no_errors(self) -> None:
+        results = [
+            {"tic_id": 1, "status": "candidate_found"},
+            {"tic_id": 2, "status": "scanned_clear"},
+        ]
+        with patch(
+            "Skills.batch_scan.run_and_commit_report", return_value=True
+        ) as commit:
+            _write_run_report(
+                started_at="2026-07-16T00:00:00+00:00",
+                elapsed_seconds=5.0,
+                results=results,
+                output_path=Path("results.json"),
+                git_run_fn=MagicMock(),
+            )
+        report, path = commit.call_args.args
+        assert report.script == "batch_scan"
+        assert report.status == "success"
+        assert report.items_processed == 2
+        assert report.items_written == 2
+        assert report.items_failed == 0
+        assert path.name == "batch_scan.jsonl"
+
+    def test_partial_status_when_errors_present(self) -> None:
+        results = [
+            {"tic_id": 1, "status": "candidate_found"},
+            {"tic_id": 2, "status": "error"},
+        ]
+        with patch(
+            "Skills.batch_scan.run_and_commit_report", return_value=True
+        ) as commit:
+            _write_run_report(
+                started_at="2026-07-16T00:00:00+00:00",
+                elapsed_seconds=5.0,
+                results=results,
+                output_path=Path("results.json"),
+                git_run_fn=MagicMock(),
+            )
+        report, _path = commit.call_args.args
+        assert report.status == "partial"
+        assert report.items_failed == 1
+        assert report.items_written == 1
+
+    def test_output_path_recorded(self) -> None:
+        with patch(
+            "Skills.batch_scan.run_and_commit_report", return_value=True
+        ) as commit:
+            _write_run_report(
+                started_at="2026-07-16T00:00:00+00:00",
+                elapsed_seconds=1.0,
+                results=[],
+                output_path=Path("results/candidates.json"),
+                git_run_fn=MagicMock(),
+            )
+        report, _path = commit.call_args.args
+        assert report.output_paths == ("results/candidates.json",)
+
+    def test_git_run_fn_is_threaded_through(self) -> None:
+        fake_runner = MagicMock()
+        with patch(
+            "Skills.batch_scan.run_and_commit_report", return_value=True
+        ) as commit:
+            _write_run_report(
+                started_at="2026-07-16T00:00:00+00:00",
+                elapsed_seconds=1.0,
+                results=[],
+                output_path=Path("out.json"),
+                git_run_fn=fake_runner,
+            )
+        assert commit.call_args.kwargs["run_fn"] is fake_runner
+
+    def test_commit_failure_warns_but_does_not_raise(self, capsys: Any) -> None:
+        with patch("Skills.batch_scan.run_and_commit_report", return_value=False):
+            _write_run_report(
+                started_at="2026-07-16T00:00:00+00:00",
+                elapsed_seconds=1.0,
+                results=[],
+                output_path=Path("out.json"),
+                git_run_fn=MagicMock(),
+            )
+        assert "Warning" in capsys.readouterr().err
+
+    def test_cli_writes_run_report_with_injected_git_runner(
+        self, tmp_path: Path
+    ) -> None:
+        targets = tmp_path / "targets.txt"
+        targets.write_text("100\n200\n")
+        out = tmp_path / "results.json"
+        fake_runner = MagicMock()
+
+        with (
+            patch(
+                "Skills.batch_scan.batch_scan",
+                return_value=[{"tic_id": 100, "status": "scanned_clear"}],
+            ),
+            patch(
+                "Skills.batch_scan.run_and_commit_report", return_value=True
+            ) as commit,
+        ):
+            exit_code = _cli(
+                [str(targets), "--output", str(out)], git_run_fn=fake_runner
+            )
+
+        assert exit_code == 0
+        commit.assert_called_once()
+        assert commit.call_args.kwargs["run_fn"] is fake_runner
