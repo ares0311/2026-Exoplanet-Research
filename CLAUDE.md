@@ -382,6 +382,15 @@ now documents this distinction for any remaining script with a similar
 sidecar/terminal-failure design.
 The version 0.2.85 release gate passed 2,914 default tests plus Ruff/mypy as
 10/10 supervised gates in 25.1 seconds under the canonical 6x6 topology.
+Version 0.2.86 retrofits `Skills/fetch_tess_k2_overlap_snippets.py` with the
+Run Report Policy — sixth of fourteen scripts. This one had **zero**
+dedicated test coverage before the retrofit (`grep -rl` across `tests/`
+found only an incidental reference from an unrelated manifest test), so a
+full test file (20 tests) was written alongside the Run Report wiring rather
+than adding retrofit tests to nothing. AGENTS.md now directs future retrofit
+work to check for this gap before assuming Run Report tests are sufficient.
+The version 0.2.86 release gate passed 2,934 default tests plus Ruff/mypy as
+10/10 supervised gates in 27.2 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
