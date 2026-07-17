@@ -348,6 +348,17 @@ was `star_scanner.py`); AGENTS.md now tracks done/remaining explicitly and
 names the CLI-level wiring pattern for the next twelve.
 The version 0.2.82 release gate passed 2,889 default tests plus Ruff/mypy as
 10/10 supervised gates in 31.1 seconds under the canonical 6x6 topology.
+Version 0.2.83 retrofits `Skills/fetch_kepler_lc_snippets.py` with the Run
+Report Policy — third of fourteen scripts. Its core `build_kepler_snippets()`
+returns a single `int` with 15+ existing test call sites, so rather than
+changing that contract, retrofit added an optional
+`stats: dict[str, int] | None = None` parameter populated in-place with
+`written`/`errors`/`total` — a non-breaking side channel giving the CLI's
+Run Report an accurate `items_failed` count without touching any existing
+caller. AGENTS.md's retrofit note records this pattern for future scripts
+whose core function also doesn't already expose error counts.
+The version 0.2.83 release gate passed 2,898 default tests plus Ruff/mypy as
+10/10 supervised gates in 25.1 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
