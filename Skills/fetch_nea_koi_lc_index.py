@@ -11,19 +11,29 @@ KoiRecord(kepid, kepoi_name, disposition, period_days, epoch_bkjd, duration_hour
 KoiLcIndex(records, n_confirmed, n_fp, queried_at, flag)
 fetch_koi_lc_index(*, tap_fn, max_rows) -> KoiLcIndex
 format_koi_lc_index(result) -> str
+
+The CLI entry point writes a structured completion record via
+``Skills/run_report.py`` after each run (AGENTS.md Run Report Policy,
+Rule 7) and commits/pushes only that record. ``KoiLcIndex.flag`` already
+distinguishes success ("OK") from failure ("EMPTY"/"FETCH_ERROR"), so the
+Run Report is written for both outcomes rather than only on success.
 """
 from __future__ import annotations
 
 import csv
 import io
 import sys
+import time
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
+from Skills.run_report import RunReport, report_path_for, run_and_commit_report  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -214,7 +224,42 @@ def format_koi_lc_index(result: KoiLcIndex) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _cli(argv: list[str] | None = None) -> int:
+def _write_run_report(
+    *,
+    started_at: str,
+    elapsed_seconds: float,
+    result: KoiLcIndex,
+    output_paths: tuple[str, ...],
+    git_run_fn: Any = None,
+) -> None:
+    """Append and publish one fetch_nea_koi_lc_index completion report
+    (AGENTS.md Rule 7). Written on both success and failure flags."""
+    n_records = len(result.records)
+    status = "success" if result.flag == "OK" else "failed"
+    report = RunReport(
+        script="fetch_nea_koi_lc_index",
+        status=status,
+        started_at=started_at,
+        completed_at=datetime.now(UTC).isoformat(),
+        elapsed_seconds=elapsed_seconds,
+        items_processed=n_records,
+        items_written=n_records if output_paths else 0,
+        items_failed=0,
+        output_paths=output_paths,
+        notes=f"flag={result.flag} confirmed={result.n_confirmed} fp={result.n_fp}",
+    )
+    path = report_path_for("fetch_nea_koi_lc_index")
+    kwargs: dict[str, Any] = {}
+    if git_run_fn is not None:
+        kwargs["run_fn"] = git_run_fn
+    ok = run_and_commit_report(report, path, **kwargs)
+    if ok:
+        print(f"Run report committed and pushed: {path}")
+    else:
+        print(f"Warning: run report written to {path} but commit/push failed")
+
+
+def _cli(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(
@@ -226,9 +271,12 @@ def _cli(argv: list[str] | None = None) -> int:
                         help="Optional path to save JSON output")
     args = parser.parse_args(argv)
 
+    started_at = datetime.now(UTC).isoformat()
+    start = time.monotonic()
     result = fetch_koi_lc_index(max_rows=args.max_rows)
     print(format_koi_lc_index(result))
 
+    written_paths: list[str] = []
     if args.output:
         import json
         out = Path(args.output)
@@ -256,6 +304,16 @@ def _cli(argv: list[str] | None = None) -> int:
             )
         )
         print(f"\nSaved to {out}")
+        written_paths.append(str(out))
+
+    elapsed = time.monotonic() - start
+    _write_run_report(
+        started_at=started_at,
+        elapsed_seconds=elapsed,
+        result=result,
+        output_paths=tuple(written_paths),
+        git_run_fn=git_run_fn,
+    )
     return 0 if result.flag == "OK" else 1
 
 
