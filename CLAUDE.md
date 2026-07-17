@@ -434,6 +434,18 @@ reports `status="success"` and folds fetch-failure counts into the `stats`
 side channel instead.
 The version 0.2.91 release gate passed 2,963 default tests plus Ruff/mypy as
 10/10 supervised gates in 23.2 seconds under the canonical 6x6 topology.
+Version 0.2.92 retrofits `Skills/fetch_confirmed_hosts.py` with the Run
+Report Policy — twelfth of fourteen scripts. This module is primarily
+consumed as a library by `Skills/star_scanner.py` (already retrofitted),
+which calls it with the fail-open `strict=False` default; it had no CLI
+entry point at all, so retrofit first added a proper `_cli()` writing a
+sorted TIC ID JSON artifact, matching the shape every other retrofitted
+script uses, before wiring the Run Report. The new CLI always calls the
+fetcher with `strict=True` so a real success/failure signal reaches the
+completion record, independent of the fail-open library default used by
+`star_scanner.py`.
+The version 0.2.92 release gate passed 2,968 default tests plus Ruff/mypy as
+10/10 supervised gates in 23.2 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
