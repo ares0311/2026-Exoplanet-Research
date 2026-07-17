@@ -4,13 +4,17 @@ from __future__ import annotations
 import json
 import sys
 from io import StringIO
+from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
+from unittest.mock import MagicMock, patch
 
 import Skills.fetch_tess_kepler_overlap_snippets as overlap
 from Skills.fetch_tess_kepler_overlap_snippets import (
     KoiRow,
     _normalise,
     _phase_fold_bin,
+    _write_run_report,
     build_koi_tess_snippet,
     build_koi_tess_snippets,
     fetch_koi_table,
@@ -199,6 +203,40 @@ def test_batch_writes_jsonl(tmp_path):
     assert n == 2
     lines = [json.loads(ln) for ln in out.read_text().splitlines() if ln.strip()]
     assert len(lines) == 2
+
+
+def test_batch_stats_populated_on_success(tmp_path):
+    out = tmp_path / "overlap.jsonl"
+    rows = [_CONFIRMED_ROW, _FP_ROW]
+    stats: dict[str, int] = {}
+    n = build_koi_tess_snippets(
+        rows, n_bins=201, output_path=out, lc_fetcher=_make_lc_fetcher(), stats=stats
+    )
+    assert stats["written"] == n == 2
+    assert stats["errors"] == 0
+    assert stats["total"] == 2
+
+
+def test_batch_stats_populated_with_errors(tmp_path):
+    out = tmp_path / "overlap.jsonl"
+    rows = [_CONFIRMED_ROW]
+    stats: dict[str, int] = {}
+    n = build_koi_tess_snippets(
+        rows, n_bins=201, output_path=out, lc_fetcher=_no_data_fetcher, stats=stats
+    )
+    assert n == 0
+    assert stats["written"] == 0
+    assert stats["errors"] == 1
+    assert stats["terminal_failures"] == 1
+    assert stats["total"] == 1
+
+
+def test_batch_stats_unset_when_not_requested(tmp_path):
+    out = tmp_path / "overlap.jsonl"
+    n = build_koi_tess_snippets(
+        [_CONFIRMED_ROW], n_bins=201, output_path=out, lc_fetcher=_make_lc_fetcher()
+    )
+    assert n == 1
 
 
 def test_batch_jsonl_fields(tmp_path):
@@ -485,6 +523,115 @@ def test_fetch_koi_table_rejects_invalid_disposition(tmp_path):
     f.write_text(mock_data, encoding="utf-8")
     rows = fetch_koi_table(f"file://{f}")
     assert rows == []
+
+
+# ---------------------------------------------------------------------------
+# Run Report (AGENTS.md Rule 7 retrofit)
+# ---------------------------------------------------------------------------
+
+
+class TestRunReport:
+    def test_success_status_with_no_errors(self) -> None:
+        with patch(
+            "Skills.fetch_tess_kepler_overlap_snippets.run_and_commit_report",
+            return_value=True,
+        ) as commit:
+            _write_run_report(
+                started_at="2026-07-17T00:00:00+00:00",
+                elapsed_seconds=5.0,
+                stats={"written": 10, "errors": 0, "terminal_failures": 0, "total": 10},
+                output_path=Path("data/tess_kepler_overlap_snippets.jsonl"),
+                git_run_fn=MagicMock(),
+            )
+        report, path = commit.call_args.args
+        assert report.script == "fetch_tess_kepler_overlap_snippets"
+        assert report.status == "success"
+        assert report.items_processed == 10
+        assert report.items_written == 10
+        assert report.items_failed == 0
+        assert path.name == "fetch_tess_kepler_overlap_snippets.jsonl"
+
+    def test_partial_status_when_errors_present(self) -> None:
+        with patch(
+            "Skills.fetch_tess_kepler_overlap_snippets.run_and_commit_report",
+            return_value=True,
+        ) as commit:
+            _write_run_report(
+                started_at="2026-07-17T00:00:00+00:00",
+                elapsed_seconds=5.0,
+                stats={"written": 8, "errors": 2, "terminal_failures": 1, "total": 10},
+                output_path=Path("out.jsonl"),
+                git_run_fn=MagicMock(),
+            )
+        report, _path = commit.call_args.args
+        assert report.status == "partial"
+        assert report.items_failed == 2
+        assert report.items_written == 8
+        assert "terminal_failures=1" in report.notes
+
+    def test_git_run_fn_is_threaded_through(self) -> None:
+        fake_runner = MagicMock()
+        with patch(
+            "Skills.fetch_tess_kepler_overlap_snippets.run_and_commit_report",
+            return_value=True,
+        ) as commit:
+            _write_run_report(
+                started_at="2026-07-17T00:00:00+00:00",
+                elapsed_seconds=1.0,
+                stats={},
+                output_path=Path("out.jsonl"),
+                git_run_fn=fake_runner,
+            )
+        assert commit.call_args.kwargs["run_fn"] is fake_runner
+
+    def test_commit_failure_warns_but_does_not_raise(self, capsys: Any) -> None:
+        with patch(
+            "Skills.fetch_tess_kepler_overlap_snippets.run_and_commit_report",
+            return_value=False,
+        ):
+            _write_run_report(
+                started_at="2026-07-17T00:00:00+00:00",
+                elapsed_seconds=1.0,
+                stats={},
+                output_path=Path("out.jsonl"),
+                git_run_fn=MagicMock(),
+            )
+        assert "Warning" in capsys.readouterr().out
+
+    def test_cli_writes_run_report_with_injected_git_runner(self, tmp_path: Path) -> None:
+        out = tmp_path / "overlap.jsonl"
+        fake_runner = MagicMock()
+
+        def fake_build(*args: Any, **kwargs: Any) -> int:
+            stats = kwargs.get("stats")
+            if stats is not None:
+                stats["written"] = 1
+                stats["errors"] = 0
+                stats["terminal_failures"] = 0
+                stats["total"] = 1
+            return 1
+
+        with (
+            patch(
+                "Skills.fetch_tess_kepler_overlap_snippets.fetch_koi_table",
+                return_value=[_CONFIRMED_ROW],
+            ),
+            patch(
+                "Skills.fetch_tess_kepler_overlap_snippets.build_koi_tess_snippets",
+                side_effect=fake_build,
+            ),
+            patch(
+                "Skills.fetch_tess_kepler_overlap_snippets.run_and_commit_report",
+                return_value=True,
+            ) as commit,
+        ):
+            exit_code = overlap._cli(["--output", str(out)], git_run_fn=fake_runner)
+
+        assert exit_code == 0
+        commit.assert_called_once()
+        assert commit.call_args.kwargs["run_fn"] is fake_runner
+        report, _path = commit.call_args.args
+        assert report.items_written == 1
 
 
 def test_fetch_koi_table_rejects_missing_period(tmp_path):
