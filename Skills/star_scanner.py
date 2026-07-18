@@ -79,9 +79,15 @@ _SKILLS_DIR = Path(__file__).resolve().parent
 
 _DEFAULT_SEARCH_CENTERS: tuple[tuple[float, float], ...] = tuple(
     (float(ra), float(dec))
-    for dec in (-60, -30, 0, 30, 60)
-    for ra in range(0, 360, 30)
+    for dec in (-60, -40, -20, 0, 20, 40, 60)
+    for ra in range(0, 360, 20)
 )
+# 7 declination bands x 18 right-ascension steps = 126 tiles (0.5 deg radius
+# each => ~99 sq deg total coverage, ~0.24% of the full 41,253 sq deg sky).
+# Roughly double the density of the original 5x12=60-tile grid in both axes.
+# This is still a documented sample, not an exhaustive survey -- see
+# select_targets()'s search_log output for the exact coverage of any given
+# run.
 
 
 class _StartRateLimiter:
@@ -180,6 +186,7 @@ def priority_score(
     teff: float | None = None,
     n_sectors: int | None = None,
     contratio: float | None = None,
+    radius_rsun: float | None = None,
 ) -> float:
     """Compute a [0, 1] priority score for a TIC star.
 
@@ -187,13 +194,18 @@ def priority_score(
 
     Weighted sub-scores:
 
-    * **Magnitude** (0.30): peaks at Tmag ≈ 12–13; falls off outside [10, 14].
-    * **Stellar type** (0.25): prefers K/M dwarfs (3000–5500 K) where the
+    * **Magnitude** (0.25): peaks at Tmag ≈ 12–13; falls off outside [10, 14].
+    * **Stellar type** (0.20): prefers K/M dwarfs (3000–5500 K) where the
       habitable zone lies at short, easily-observed periods.
-    * **Sector coverage** (0.25): more sectors → more transits visible; capped
+    * **Sector coverage** (0.20): more sectors → more transits visible; capped
       at 6 sectors for score = 1.0.  ``None`` → neutral 0.5.
-    * **Contamination** (0.20): lower contamination → cleaner transit depth;
+    * **Contamination** (0.15): lower contamination → cleaner transit depth;
       ``contratio = 0`` scores 1.0.  ``None`` → neutral 0.5.
+    * **Stellar radius** (0.20): smaller stars → deeper transit for a
+      fixed-size planet (transit depth scales as ``(R_planet / R_star)^2``),
+      so a given planet is far easier to detect around a small star.
+      Peaks for M/K dwarfs (``R <= 0.7`` R_sun); falls off for larger stars.
+      ``None`` → neutral 0.5.
 
     Args:
         tmag: TESS magnitude.
@@ -201,6 +213,7 @@ def priority_score(
         n_sectors: Sectors of TESS data available (``None`` → neutral 0.5).
         contratio: Fraction of aperture flux from nearby sources
             (``None`` → neutral 0.5).
+        radius_rsun: Stellar radius in solar radii (``None`` → neutral 0.5).
 
     Returns:
         Priority in [0, 1].
@@ -243,11 +256,25 @@ def priority_score(
     # Contamination score
     cont_score = 0.5 if contratio is None else max(0.0, 1.0 - min(float(contratio), 1.0))
 
+    # Stellar-radius score — smaller stars give deeper, more detectable
+    # transits for a fixed planet size.
+    if radius_rsun is None:
+        radius_score = 0.5
+    elif radius_rsun <= 0.7:
+        radius_score = 1.0   # M/K dwarf
+    elif radius_rsun <= 1.0:
+        radius_score = 0.7   # G dwarf, Sun-like
+    elif radius_rsun <= 1.5:
+        radius_score = 0.4   # F dwarf / subgiant
+    else:
+        radius_score = 0.15  # giant — transits nearly undetectable
+
     return (
-        0.30 * mag_score
-        + 0.25 * teff_score
-        + 0.25 * sector_score
-        + 0.20 * cont_score
+        0.25 * mag_score
+        + 0.20 * teff_score
+        + 0.20 * sector_score
+        + 0.15 * cont_score
+        + 0.20 * radius_score
     )
 
 
@@ -508,9 +535,109 @@ def _load_confirmed_host_tic_ids(*, strict: bool = False) -> frozenset[int]:
         return frozenset()
 
 
+_ASASSN_CONTRACT_PATH = (
+    _REPO_ROOT / "metadata" / "asassn_variability_label_source_contract_v1.json"
+)
+
+
+def _load_asassn_variable_tic_ids(
+    candidate_tic_ids: Any,
+    *,
+    strict: bool = False,
+) -> frozenset[int]:
+    """Return the subset of *candidate_tic_ids* already flagged as known
+    variable stars in the pinned ASAS-SN Catalog X source.
+
+    Uses ``Skills/preflight_tess_asassn_labels.py``'s already-reviewed
+    contract loader and exact-TIC VizieR TAP query builder (live, zero
+    payload bytes downloaded). A star already classified as a variable
+    (eclipsing binary, pulsator, etc.) is a poor novel-transit-search
+    target for the same reason a known planet host is — it isn't "unlooked
+    at," it's already characterized, just not by a planet-search pipeline.
+
+    Fails open (empty frozenset) on any error unless ``strict=True``, which
+    is for immutable metadata preparation only, matching the other
+    exclusion-set loaders in this module.
+    """
+    if not candidate_tic_ids:
+        return frozenset()
+
+    import importlib.util
+
+    preflight_path = _SKILLS_DIR / "preflight_tess_asassn_labels.py"
+    spec = importlib.util.spec_from_file_location(
+        "preflight_tess_asassn_labels", preflight_path
+    )
+    if spec is None or spec.loader is None:
+        if strict:
+            raise RuntimeError("Cannot load preflight_tess_asassn_labels.py")
+        return frozenset()
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)  # type: ignore[attr-defined]
+
+    try:
+        contract = module.load_contract(_ASASSN_CONTRACT_PATH)
+        batch_size = int(contract["query"]["batch_size"])
+        ids = list(dict.fromkeys(int(t) for t in candidate_tic_ids))
+        matched: set[int] = set()
+        for i in range(0, len(ids), batch_size):
+            batch = ids[i : i + batch_size]
+            query = module.build_query(contract, batch)
+            response = module._default_tap(str(contract["catalog"]["tap_endpoint"]), query)
+            names, rows = module._response_rows(response)
+            tic_idx = names.index("TIC")
+            for row in rows:
+                raw = str(row[tic_idx]).strip()
+                digits = raw[4:].strip() if raw.upper().startswith("TIC ") else raw
+                try:
+                    matched.add(int(digits))
+                except ValueError:
+                    continue
+        return frozenset(matched)
+    except Exception:  # noqa: BLE001
+        if strict:
+            raise
+        return frozenset()
+
+
 # ---------------------------------------------------------------------------
 # Target selection
 # ---------------------------------------------------------------------------
+
+
+def _query_one_tile(
+    tile_idx: int,
+    ra_deg: float,
+    dec_deg: float,
+    *,
+    query_radius_deg: float,
+    retry_attempts: int,
+    retry_delay: float,
+) -> tuple[Any | None, list[str]]:
+    """Query one TIC sky tile with retry. Returns (result_table_or_None, errors)."""
+    from astropy import units as u
+    from astropy.coordinates import SkyCoord
+    from astroquery.mast import Catalogs
+
+    coord = SkyCoord(ra=ra_deg * u.deg, dec=dec_deg * u.deg, frame="icrs")
+    errors: list[str] = []
+    for attempt in range(1, retry_attempts + 1):
+        try:
+            result = Catalogs.query_region(
+                coord,
+                radius=query_radius_deg * u.deg,
+                catalog="TIC",
+            )
+            return result, errors
+        except Exception as exc:  # noqa: BLE001
+            errors.append(
+                f"tile {tile_idx} ra={ra_deg:.1f} dec={dec_deg:.1f} "
+                f"attempt {attempt}/{retry_attempts}: {exc}"
+            )
+            if attempt < retry_attempts:
+                time.sleep(retry_delay)
+    return None, errors
 
 
 def select_targets(
@@ -519,9 +646,12 @@ def select_targets(
     exclude_tic_ids: set[int] | None = None,
     *,
     query_radius_deg: float = 0.5,
-    max_tiles: int = 60,
+    max_tiles: int = 126,
     retry_attempts: int = 2,
     retry_delay: float = 2.0,
+    full_sweep: bool = False,
+    max_workers: int = 6,
+    search_log: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Query the TIC catalog and return up to *n* stars ranked by priority.
 
@@ -529,6 +659,17 @@ def select_targets(
     removed before ranking.  The query is intentionally tiled by sky position:
     all-sky TIC magnitude queries are too large for MAST and can be closed by
     the remote service before a response is returned.
+
+    By default (``full_sweep=False``), this stops querying tiles as soon as a
+    small buffer (``3n`` candidates) has been collected, for fast incremental
+    use. This means the ranked result only reflects whichever few tiles the
+    query happened to reach first, in a fixed order — **not** a search across
+    the full configured grid. Pass ``full_sweep=True`` to query every tile up
+    to *max_tiles* (in parallel, via *max_workers* threads) before ranking,
+    so "top n" genuinely means top-n across the whole swept area. This is
+    still only a sample of the grid defined by ``_DEFAULT_SEARCH_CENTERS``
+    (a fixed set of cone-search tiles), not an exhaustive survey of the sky
+    — see ``search_log`` for the exact coverage achieved.
 
     Args:
         n: Maximum number of targets to return.
@@ -538,15 +679,23 @@ def select_targets(
         max_tiles: Maximum number of sky tiles to query.
         retry_attempts: Attempts per tile before skipping it.
         retry_delay: Seconds to wait between retry attempts.
+        full_sweep: If ``True``, query every tile up to *max_tiles* (in
+            parallel) before ranking, instead of stopping early. Use this
+            for an actual wide/optimized search; the default fast/early-stop
+            behavior is preserved for existing incremental callers.
+        max_workers: Thread pool size when ``full_sweep=True``.
+        search_log: Optional mutable dict populated in-place with exactly
+            what was searched: ``tiles_configured``, ``tiles_queried``,
+            ``tiles_failed``, ``tile_errors``, ``sky_coverage_deg2``,
+            ``raw_candidates_before_exclusion``, ``excluded_count``,
+            ``full_sweep``, ``elapsed_seconds``. Populated regardless of
+            ``full_sweep``, so callers can always see the actual search
+            extent rather than assuming a wide search occurred.
 
     Returns:
         List of dicts, sorted by ``"priority"`` descending, each with TIC ID,
-        coordinates, stellar metadata, contamination, and priority.
+        coordinates, stellar metadata, contamination, radius, and priority.
     """
-    from astropy import units as u
-    from astropy.coordinates import SkyCoord
-    from astroquery.mast import Catalogs
-
     exclude = exclude_tic_ids or set()
     min_tmag, max_tmag = tmag_range
     target_pool_size = max(n * 3, n)
@@ -554,30 +703,15 @@ def select_targets(
     targets: list[dict[str, Any]] = []
     seen: set[int] = set()
     tile_errors: list[str] = []
+    tiles_queried = 0
+    tiles_failed = 0
+    raw_rows_matching_query = 0
+    _search_start = time.monotonic()
 
-    for tile_idx, (ra_deg, dec_deg) in enumerate(_DEFAULT_SEARCH_CENTERS[:max_tiles], 1):
-        coord = SkyCoord(ra=ra_deg * u.deg, dec=dec_deg * u.deg, frame="icrs")
-        result: Any | None = None
-        for attempt in range(1, retry_attempts + 1):
-            try:
-                result = Catalogs.query_region(
-                    coord,
-                    radius=query_radius_deg * u.deg,
-                    catalog="TIC",
-                )
-                break
-            except Exception as exc:  # noqa: BLE001
-                msg = (
-                    f"tile {tile_idx} ra={ra_deg:.1f} dec={dec_deg:.1f} "
-                    f"attempt {attempt}/{retry_attempts}: {exc}"
-                )
-                tile_errors.append(msg)
-                if attempt < retry_attempts:
-                    time.sleep(retry_delay)
+    tiles = list(enumerate(_DEFAULT_SEARCH_CENTERS[:max_tiles], 1))
 
-        if result is None:
-            continue
-
+    def _process_tile_result(result: Any) -> None:
+        nonlocal raw_rows_matching_query
         for row in result:
             obj_type = _row_get(row, "objType")
             if obj_type is not None and str(obj_type).strip().upper() != "STAR":
@@ -586,14 +720,22 @@ def select_targets(
                 tic_id = int(_row_get(row, "ID"))
             except (ValueError, TypeError):
                 continue
-            if tic_id in exclude or tic_id in seen:
-                continue
 
             try:
                 tmag = float(_row_get(row, "Tmag"))
             except (ValueError, TypeError):
                 continue
             if tmag != tmag or not (min_tmag <= tmag <= max_tmag):  # NaN guard
+                continue
+
+            # Counts every row matching the query's own structural filters
+            # (star type, magnitude range), independent of exclusion —
+            # i.e. how many real candidates existed before we removed
+            # already-known/already-scanned ones.
+            if tic_id not in seen:
+                raw_rows_matching_query += 1
+
+            if tic_id in exclude or tic_id in seen:
                 continue
 
             try:
@@ -610,7 +752,15 @@ def select_targets(
             except (ValueError, TypeError):
                 contratio = None
 
-            pri = priority_score(tmag, teff=teff, contratio=contratio)
+            try:
+                raw_rad = _row_get(row, "rad")
+                radius_rsun: float | None = float(raw_rad) if raw_rad is not None else None
+            except (ValueError, TypeError):
+                radius_rsun = None
+
+            pri = priority_score(
+                tmag, teff=teff, contratio=contratio, radius_rsun=radius_rsun
+            )
             seen.add(tic_id)
             targets.append(
                 {
@@ -620,11 +770,49 @@ def select_targets(
                     "tmag": tmag,
                     "teff": teff,
                     "contratio": contratio,
+                    "radius_rsun": radius_rsun,
                     "priority": pri,
                 }
             )
-        if len(targets) >= target_pool_size:
-            break
+
+    if full_sweep:
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = {
+                pool.submit(
+                    _query_one_tile,
+                    tile_idx,
+                    ra_deg,
+                    dec_deg,
+                    query_radius_deg=query_radius_deg,
+                    retry_attempts=retry_attempts,
+                    retry_delay=retry_delay,
+                ): (tile_idx, ra_deg, dec_deg)
+                for tile_idx, (ra_deg, dec_deg) in tiles
+            }
+            for fut in as_completed(futures):
+                tiles_queried += 1
+                result, errors = fut.result()
+                tile_errors.extend(errors)
+                if result is None:
+                    tiles_failed += 1
+                    continue
+                _process_tile_result(result)
+    else:
+        for tile_idx, (ra_deg, dec_deg) in tiles:
+            tiles_queried += 1
+            result, errors = _query_one_tile(
+                tile_idx, ra_deg, dec_deg,
+                query_radius_deg=query_radius_deg,
+                retry_attempts=retry_attempts,
+                retry_delay=retry_delay,
+            )
+            tile_errors.extend(errors)
+            if result is None:
+                tiles_failed += 1
+                continue
+            _process_tile_result(result)
+            if len(targets) >= target_pool_size:
+                break
 
     if not targets and tile_errors:
         sample = "; ".join(tile_errors[-3:])
@@ -633,6 +821,25 @@ def select_targets(
         )
 
     targets.sort(key=lambda t: t["priority"], reverse=True)
+
+    if search_log is not None:
+        search_log.update(
+            {
+                "tiles_configured": len(tiles),
+                "tiles_queried": tiles_queried,
+                "tiles_failed": tiles_failed,
+                "tile_errors": list(tile_errors),
+                "sky_coverage_deg2": round(
+                    tiles_queried * math.pi * query_radius_deg**2, 4
+                ),
+                "raw_candidates_before_exclusion": raw_rows_matching_query,
+                "candidates_after_exclusion": len(targets),
+                "excluded_count": len(exclude),
+                "full_sweep": full_sweep,
+                "elapsed_seconds": round(time.monotonic() - _search_start, 3),
+            }
+        )
+
     return targets[:n]
 
 
@@ -713,6 +920,7 @@ def inspect_target_products(
         teff=result.get("teff"),
         n_sectors=result["n_sectors"],
         contratio=result.get("contratio"),
+        radius_rsun=result.get("radius_rsun"),
     )
     return result
 
@@ -1699,7 +1907,7 @@ def run_background_scan(
     pipeline: str = "QLP",
     exptime: str = "long",
     query_radius_deg: float = 0.5,
-    max_target_query_tiles: int = 60,
+    max_target_query_tiles: int = 126,
     workers: int = 6,
     request_delay: float = 0.5,
     prepare_only: bool = False,
@@ -1715,6 +1923,9 @@ def run_background_scan(
     ),
     repo_root: Path = Path("."),
     replace_preparation: bool = False,
+    full_sweep: bool = False,
+    exclude_known_variables: bool = False,
+    search_log_path: Path | None = None,
 ) -> dict[str, Any]:
     """Fetch a ranked target list and scan each star in priority order.
 
@@ -1724,6 +1935,23 @@ def run_background_scan(
     fail-open behavior for exclusion sources; metadata preparation fails closed
     so an incomplete source cannot silently enter a frozen queue. The log is
     updated after every star so progress is never lost on interruption.
+
+    ``full_sweep``, ``exclude_known_variables``, and ``search_log_path`` are
+    new, opt-in (default off) capabilities that do not change existing
+    default behavior or the reproducibility of any prior frozen batch:
+
+    - ``full_sweep=True`` passes through to :func:`select_targets`, querying
+      every configured tile before ranking instead of stopping early once a
+      small buffer is collected — see that function's docstring.
+    - ``exclude_known_variables=True`` removes candidates already flagged as
+      known variable stars in the pinned ASAS-SN Catalog X source (a live,
+      zero-payload exact-TIC query) after selection. This can return fewer
+      than *n_targets* results; the count removed is reported and written to
+      *search_log_path* if given, never silently dropped.
+    - ``search_log_path``, if given, writes a durable JSON record of exactly
+      what was searched (tiles queried, coverage, raw/excluded/final counts,
+      elapsed time) so a later session can see the real search extent
+      instead of assuming one.
 
     Args:
         log_path: Path to the persistent JSON scan log.
@@ -1810,6 +2038,7 @@ def run_background_scan(
         f"radius={query_radius_deg:.2f} deg; tiles≤{max_target_query_tiles}) …",
         flush=True,
     )
+    search_log: dict[str, Any] = {}
     try:
         targets = select_targets(
             n=n_targets,
@@ -1817,10 +2046,36 @@ def run_background_scan(
             exclude_tic_ids=exclude,
             query_radius_deg=query_radius_deg,
             max_tiles=max_target_query_tiles,
+            full_sweep=full_sweep,
+            search_log=search_log,
         )
     except Exception as exc:  # noqa: BLE001
         print(f"Target selection failed: {exc}", file=sys.stderr, flush=True)
         raise
+
+    asassn_variable_ids: frozenset[int] = frozenset()
+    if exclude_known_variables and targets:
+        print("Checking selected targets against known ASAS-SN variables …", flush=True)
+        asassn_variable_ids = _load_asassn_variable_tic_ids(
+            [t["tic_id"] for t in targets]
+        )
+        if asassn_variable_ids:
+            before = len(targets)
+            targets = [t for t in targets if t["tic_id"] not in asassn_variable_ids]
+            print(
+                f"  Excluded {before - len(targets)} known ASAS-SN variable(s); "
+                f"{len(targets)} of the originally requested {n_targets} remain "
+                "(not backfilled).",
+                flush=True,
+            )
+    search_log["asassn_variables_excluded"] = len(asassn_variable_ids)
+    search_log["final_target_count"] = len(targets)
+    search_log["requested_target_count"] = n_targets
+
+    if search_log_path is not None:
+        search_log_path.parent.mkdir(parents=True, exist_ok=True)
+        search_log_path.write_text(json.dumps(search_log, indent=2, default=str))
+        print(f"Search manifest written to {search_log_path}", flush=True)
 
     if prepare_only:
         return prepare_live_search_snapshot(
@@ -1935,6 +2190,7 @@ def run_background_scan(
         "items_written": n_done - n_failed,
         "items_failed": n_failed,
         "output_paths": (str(log_path),),
+        "search_log": search_log,
     }
 
 
@@ -1995,8 +2251,25 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                    help="MAST exposure hint for TESS light curves (default: long)")
     p.add_argument("--query-radius-deg", type=float, default=0.5,
                    help="TIC cone-search radius per target-selection tile (default: 0.5)")
-    p.add_argument("--max-target-query-tiles", type=int, default=60,
-                   help="Maximum TIC sky tiles to query for target selection (default: 60)")
+    p.add_argument("--max-target-query-tiles", type=int, default=126,
+                   help="Maximum TIC sky tiles to query for target selection (default: 126, "
+                        "the full configured grid)")
+    p.add_argument(
+        "--full-sweep", action="store_true",
+        help="Query every configured tile before ranking targets, instead of "
+             "stopping early once a small buffer is collected. Slower but "
+             "'top N' then genuinely means top-N across the whole swept area.",
+    )
+    p.add_argument(
+        "--exclude-known-variables", action="store_true",
+        help="Remove selected targets already flagged as known variable stars "
+             "in the pinned ASAS-SN Catalog X source (live, zero-payload check).",
+    )
+    p.add_argument(
+        "--search-log-path", default=None,
+        help="Write a JSON manifest of exactly what was searched (tiles, "
+             "coverage, candidate/exclusion counts, elapsed time) to this path.",
+    )
     p.add_argument("--workers", type=int, default=6,
                    help="Concurrent target scans/metadata queries (default: 6)")
     p.add_argument("--request-delay", type=float, default=0.5,
@@ -2251,6 +2524,9 @@ def main(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
         dataset_manifest_path=Path(args.dataset_manifest_path),
         repo_root=_SKILLS_DIR.parent,
         replace_preparation=args.replace_preparation,
+        full_sweep=args.full_sweep,
+        exclude_known_variables=args.exclude_known_variables,
+        search_log_path=Path(args.search_log_path) if args.search_log_path else None,
     )
     if not args.no_git_report:
         if args.prepare_only:
@@ -2275,6 +2551,19 @@ def main(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
                 git_run_fn=git_run_fn,
             )
         else:
+            search_log = summary.get("search_log") or {}
+            notes = "bounded background scan"
+            if search_log:
+                notes += (
+                    f"; tiles_queried={search_log.get('tiles_queried')}"
+                    f"/{search_log.get('tiles_configured')}"
+                    f" full_sweep={search_log.get('full_sweep')}"
+                    f" sky_coverage_deg2={search_log.get('sky_coverage_deg2')}"
+                    f" candidates_before_exclusion="
+                    f"{search_log.get('raw_candidates_before_exclusion')}"
+                    f" asassn_variables_excluded="
+                    f"{search_log.get('asassn_variables_excluded')}"
+                )
             _write_run_report(
                 started_at=started_at,
                 elapsed_seconds=time.monotonic() - started,
@@ -2283,7 +2572,7 @@ def main(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
                 items_failed=int(summary["items_failed"]),
                 output_paths=tuple(summary["output_paths"]),
                 report_dir=args.report_dir,
-                notes="bounded background scan",
+                notes=notes,
                 git_run_fn=git_run_fn,
             )
     return 0

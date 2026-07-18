@@ -541,6 +541,49 @@ instead of a hardcoded snapshot. "Historical Discovery Evidence" and
 correctly dated history, not current-state claims.
 The version 0.2.97 release gate passed 2,999 default tests plus Ruff/mypy as
 10/10 supervised gates in 31.1 seconds under the canonical 6x6 topology.
+Version 0.2.98 materially widens `Skills/star_scanner.py`'s target-selection
+algorithm after a live review of its output found it querying only a
+handful of arbitrary sky tiles and stopping early rather than genuinely
+ranking across a wide search — real user-facing gaps, not just cosmetic
+ones. `priority_score()` gains a fifth weighted factor, stellar radius
+(0.20 weight; peaks for `radius_rsun <= 0.7`), since transit depth scales
+as `(R_planet/R_star)^2` and the formula previously ignored the single
+largest physical driver of transit detectability; the other four weights
+are rebalanced (0.25/0.20/0.20/0.15) to make room, and the "ideal star"
+threshold tests still pass with radius both specified and omitted (`None`
+stays neutral at 0.5). `select_targets()` gains `full_sweep=True`, which
+queries every configured tile in parallel (`ThreadPoolExecutor`, 6 workers)
+before ranking, instead of the original default that silently stopped
+once a small buffer was collected — meaning "top N" previously meant "top
+N of whichever 1-4 tiles happened to be queried first in a fixed order,"
+not a genuine rank across the search space. The tile grid itself
+(`_DEFAULT_SEARCH_CENTERS`) is also densified from 5 dec bands × 12 RA
+steps (60 tiles) to 7 × 18 (126 tiles); both `select_targets()`'s and
+`run_background_scan()`'s `max_tiles` defaults are bumped from 60 to 126
+to preserve full-sky-band coverage for existing incremental callers (the
+old default of 60 would now cover only the southern third of the grid).
+`select_targets()` also accepts a mutable `search_log` dict, populated
+with exactly what was searched (tiles queried/failed, sky coverage in
+deg², raw candidates before exclusion, final count, elapsed time) —
+answering "log what we actually looked at" directly rather than leaving
+it implicit. A new `_load_asassn_variable_tic_ids()` reuses the pinned
+ASAS-SN Catalog X source contract (`Skills/preflight_tess_asassn_labels.py`)
+for a live, zero-payload exact-TIC check, since a star already flagged as
+a known variable is a poor novel-transit-search target for the same
+reason a known planet host is — the old exclusion set (TOI/CTOI/confirmed
+hosts/prior scans) missed this category entirely.
+`run_background_scan()` gains three new opt-in (default off) parameters —
+`full_sweep`, `exclude_known_variables`, `search_log_path` — and matching
+CLI flags (`--full-sweep`, `--exclude-known-variables`,
+`--search-log-path`), deliberately defaulting to off so existing behavior
+and the frozen `tess_live_search_v1` batch's reproducibility are
+unaffected; `exclude_known_variables=True` can return fewer than
+`n_targets` results, and the removed count is always reported rather than
+silently backfilled or hidden. 21 new tests across `TestPriorityScore`,
+`TestSelectTargets`, the new `TestAsassnVariableExclusion`, and
+`TestRunBackgroundScan` in `tests/test_star_scanner.py`.
+The version 0.2.98 release gate passed 3,020 default tests plus Ruff/mypy as
+10/10 supervised gates in 29.1 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
@@ -691,11 +734,12 @@ Queries MAST for which TESS sectors are available for a target without downloadi
 
 Queries the TESS Input Catalog (TIC) via astroquery to rank uncharacterised stars by transit-search promise, then scans them in priority order, logging results.
 
-- `priority_score(tmag, teff, n_sectors, contratio)` → float in [0, 1]
+- `priority_score(tmag, teff, n_sectors, contratio, radius_rsun)` → float in [0, 1]. Five weighted factors: magnitude (0.25), stellar type (0.20), sector coverage (0.20), contamination (0.15), stellar radius (0.20 — smaller stars give deeper, more detectable transits for a fixed planet size; peaks for `radius_rsun <= 0.7`). Any factor's input may be `None` → neutral 0.5.
 - `ScanLog(path)` — atomic-write JSON log; `record()`, `is_scanned()`, `scanned_ids()`, `summary()`
-- `select_targets(n, tmag_range, exclude_tic_ids)` — TIC query, ranked, filtered
+- `select_targets(n, tmag_range, exclude_tic_ids, *, full_sweep=False, max_workers=6, search_log=None, max_tiles=126)` — TIC query, ranked, filtered. Default (`full_sweep=False`) preserves the original fast/early-stop behavior (stops once a small buffer is collected) for existing incremental callers. `full_sweep=True` queries every configured tile in parallel (`ThreadPoolExecutor`) before ranking, so "top N" is a genuine rank across the whole swept area rather than whatever the first few tiles happened to return. The tile grid (`_DEFAULT_SEARCH_CENTERS`) is 7 dec bands × 18 RA steps = 126 tiles (~99 sq deg, ~0.24% of the sky) — still a documented sample, not an exhaustive survey. Pass a mutable `search_log` dict to record exactly what was searched: `tiles_configured`, `tiles_queried`, `tiles_failed`, `tile_errors`, `sky_coverage_deg2`, `raw_candidates_before_exclusion`, `candidates_after_exclusion`, `excluded_count`, `full_sweep`, `elapsed_seconds`.
+- `_load_asassn_variable_tic_ids(candidate_tic_ids, *, strict=False)` — live, zero-payload exact-TIC lookup against the pinned ASAS-SN Catalog X source; a star already flagged as a known variable (eclipsing binary, pulsator) is a poor novel-transit-search target for the same reason a known planet host is. Fails open like the other exclusion loaders.
 - `scan_star(tic_id, *, log, ...)` → dict with status/n_signals/best_fpp/best_pathway
-- `run_background_scan(log_path, ...)` — iterates until Ctrl-C or max stars reached
+- `run_background_scan(log_path, ..., full_sweep=False, exclude_known_variables=False, search_log_path=None)` — iterates until Ctrl-C or max stars reached. The three new keyword params are opt-in (default off) so existing behavior and the frozen `tess_live_search_v1` batch's reproducibility are unaffected. `exclude_known_variables=True` removes selected targets already flagged as known ASAS-SN variables post-selection (can return fewer than `n_targets`; the removed count is reported, never silently dropped). `search_log_path`, if given, writes the search manifest above as a durable JSON file. CLI flags: `--full-sweep`, `--exclude-known-variables`, `--search-log-path`.
 - Excludes TOI list at startup; skips already-scanned IDs from log
 
 ---
