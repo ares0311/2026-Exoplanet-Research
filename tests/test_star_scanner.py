@@ -29,6 +29,7 @@ from Skills.star_scanner import (  # noqa: E402
     PreparedLiveSearchBundle,
     ScanLog,
     _ledger_record_for_outcome,
+    _load_asassn_variable_tic_ids,
     _load_prior_discovery_tic_ids,
     _load_toi_tic_ids,
     _write_run_report,
@@ -148,6 +149,34 @@ class TestPriorityScore:
         score_12 = priority_score(12.0, teff=4500.0, n_sectors=6, contratio=0.0)
         # Both 12 and 13 are in the flat-top region; 13.0 should be ≥ 12.0
         assert score_13 >= score_12 * 0.95
+
+    def test_small_star_preferred_over_large_star(self) -> None:
+        # Same-size planet transits far deeper (and more detectably) around
+        # a small star than a large one.
+        score_small = priority_score(12.0, radius_rsun=0.4)
+        score_large = priority_score(12.0, radius_rsun=3.0)
+        assert score_small > score_large
+
+    def test_none_radius_gives_neutral(self) -> None:
+        score = priority_score(12.0, radius_rsun=None)
+        assert 0.0 < score < 1.0
+
+    def test_radius_capped_at_point_seven_rsun(self) -> None:
+        score_small = priority_score(12.0, radius_rsun=0.7)
+        score_smaller = priority_score(12.0, radius_rsun=0.2)
+        assert score_small == score_smaller
+
+    def test_ideal_star_with_radius_still_scores_high(self) -> None:
+        score = priority_score(
+            12.5, teff=4000.0, n_sectors=6, contratio=0.0, radius_rsun=0.5
+        )
+        assert score >= 0.85
+
+    def test_ideal_star_without_radius_info_still_scores_high(self) -> None:
+        # Existing behavior: an otherwise-ideal star with no radius data
+        # available must not be penalised below the historical threshold.
+        score = priority_score(12.5, teff=4000.0, n_sectors=6, contratio=0.0)
+        assert score >= 0.85
 
 
 # ---------------------------------------------------------------------------
@@ -338,6 +367,115 @@ class TestSelectTargets:
         mock_catalogs.query_region.side_effect = RuntimeError("remote closed")
         with pytest.raises(RuntimeError, match="TIC target selection failed"):
             select_targets(n=2, max_tiles=1, retry_attempts=1)
+
+    @patch("astroquery.mast.Catalogs")
+    def test_default_stops_before_querying_every_tile(
+        self, mock_catalogs: MagicMock
+    ) -> None:
+        # Default (full_sweep=False) behavior: with a small target pool and
+        # every tile returning fresh unique candidates, the search should
+        # stop long before exhausting the full configured grid.
+        counter = {"n": 0}
+
+        def _rows(*args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+            counter["n"] += 1
+            base = counter["n"] * 1000
+            return [{"ID": base + i, "Tmag": 12.0, "Teff": 4500.0, "contratio": 0.0}
+                    for i in range(5)]
+
+        mock_catalogs.query_region.side_effect = _rows
+        select_targets(n=2, max_tiles=126)
+        assert mock_catalogs.query_region.call_count < 126
+
+    @patch("astroquery.mast.Catalogs")
+    def test_full_sweep_queries_every_configured_tile(
+        self, mock_catalogs: MagicMock
+    ) -> None:
+        mock_catalogs.query_region.return_value = self._catalog_rows()
+        select_targets(n=2, max_tiles=10, full_sweep=True)
+        assert mock_catalogs.query_region.call_count == 10
+
+    @patch("astroquery.mast.Catalogs")
+    def test_search_log_populated_on_default_path(
+        self, mock_catalogs: MagicMock
+    ) -> None:
+        mock_catalogs.query_region.return_value = self._catalog_rows()
+        log: dict[str, Any] = {}
+        select_targets(n=2, max_tiles=5, search_log=log)
+        assert log["tiles_configured"] == 5
+        assert log["tiles_queried"] >= 1
+        assert log["full_sweep"] is False
+        assert "raw_candidates_before_exclusion" in log
+        assert "candidates_after_exclusion" in log
+        assert "sky_coverage_deg2" in log
+        assert log["elapsed_seconds"] >= 0.0
+
+    @patch("astroquery.mast.Catalogs")
+    def test_search_log_reflects_full_sweep(self, mock_catalogs: MagicMock) -> None:
+        mock_catalogs.query_region.return_value = self._catalog_rows()
+        log: dict[str, Any] = {}
+        select_targets(n=2, max_tiles=10, full_sweep=True, search_log=log)
+        assert log["tiles_queried"] == 10
+        assert log["full_sweep"] is True
+
+    @patch("astroquery.mast.Catalogs")
+    def test_search_log_counts_excluded_candidates(
+        self, mock_catalogs: MagicMock
+    ) -> None:
+        mock_catalogs.query_region.return_value = self._catalog_rows()
+        log: dict[str, Any] = {}
+        select_targets(n=10, max_tiles=3, exclude_tic_ids={100}, search_log=log)
+        assert log["excluded_count"] == 1
+        assert 100 not in {t["tic_id"] for t in select_targets(
+            n=10, max_tiles=3, exclude_tic_ids={100}
+        )}
+
+    @patch("astroquery.mast.Catalogs")
+    def test_radius_extracted_from_catalog_row(self, mock_catalogs: MagicMock) -> None:
+        rows = [{"ID": 700, "Tmag": 12.0, "Teff": 4500.0, "contratio": 0.0, "rad": 0.45}]
+        mock_catalogs.query_region.return_value = rows
+        results = select_targets(n=5)
+        assert results[0]["radius_rsun"] == pytest.approx(0.45)
+
+    @patch("astroquery.mast.Catalogs")
+    def test_missing_radius_is_none(self, mock_catalogs: MagicMock) -> None:
+        rows = [{"ID": 800, "Tmag": 12.0, "Teff": 4500.0, "contratio": 0.0}]
+        mock_catalogs.query_region.return_value = rows
+        results = select_targets(n=5)
+        assert results[0]["radius_rsun"] is None
+
+
+# ---------------------------------------------------------------------------
+# TestAsassnVariableExclusion
+# ---------------------------------------------------------------------------
+
+
+class TestAsassnVariableExclusion:
+    def test_empty_candidates_returns_empty_without_import(self) -> None:
+        assert _load_asassn_variable_tic_ids([]) == frozenset()
+
+    def test_fails_open_when_module_cannot_load(self) -> None:
+        with patch(
+            "importlib.util.spec_from_file_location", return_value=None
+        ):
+            assert _load_asassn_variable_tic_ids([123]) == frozenset()
+
+    def test_strict_raises_when_module_cannot_load(self) -> None:
+        with (
+            patch("importlib.util.spec_from_file_location", return_value=None),
+            pytest.raises(RuntimeError, match="Cannot load"),
+        ):
+            _load_asassn_variable_tic_ids([123], strict=True)
+
+    def test_fails_open_on_network_error(self) -> None:
+        # The real preflight module loads and its contract parses fine, but
+        # the live TAP query itself must never actually touch the network
+        # in a default test -- force it to fail immediately instead.
+        with patch(
+            "urllib.request.urlopen", side_effect=OSError("network disabled in tests")
+        ):
+            result = _load_asassn_variable_tic_ids([123456789])
+        assert result == frozenset()
 
 
 class _FakeProductTable(list[dict[str, Any]]):
@@ -1149,3 +1287,97 @@ class TestRunBackgroundScan:
 
         assert 1001 in captured[0]
         assert 9999 in captured[0]
+
+    def test_full_sweep_forwarded_to_select_targets(self, tmp_path: Path) -> None:
+        log_path = tmp_path / "log.json"
+        captured: dict[str, Any] = {}
+
+        def fake_select(*args: Any, **kwargs: Any) -> list:
+            captured["full_sweep"] = kwargs.get("full_sweep")
+            return []
+
+        with (
+            patch("Skills.star_scanner._load_toi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_ctoi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_confirmed_host_tic_ids", return_value=frozenset()),
+            patch("Skills.star_scanner.select_targets", side_effect=fake_select),
+        ):
+            run_background_scan(log_path, n_targets=10, full_sweep=True)
+
+        assert captured["full_sweep"] is True
+
+    def test_exclude_known_variables_removes_matched_targets(
+        self, tmp_path: Path
+    ) -> None:
+        log_path = tmp_path / "log.json"
+        with (
+            patch("Skills.star_scanner._load_toi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_ctoi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_confirmed_host_tic_ids", return_value=frozenset()),
+            patch("Skills.star_scanner.select_targets", return_value=self._targets()),
+            patch(
+                "Skills.star_scanner._load_asassn_variable_tic_ids",
+                return_value=frozenset({1001}),
+            ),
+            patch("Skills.star_scanner.run_pipeline", return_value=[]),
+        ):
+            run_background_scan(log_path, n_targets=10, exclude_known_variables=True)
+
+        log = ScanLog(log_path)
+        assert not log.is_scanned(1001)
+        assert log.is_scanned(1002)
+
+    def test_exclude_known_variables_off_by_default(self, tmp_path: Path) -> None:
+        log_path = tmp_path / "log.json"
+        called = {"n": 0}
+
+        def fake_asassn(*args: Any, **kwargs: Any) -> frozenset:
+            called["n"] += 1
+            return frozenset()
+
+        with (
+            patch("Skills.star_scanner._load_toi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_ctoi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_confirmed_host_tic_ids", return_value=frozenset()),
+            patch("Skills.star_scanner.select_targets", return_value=self._targets()),
+            patch(
+                "Skills.star_scanner._load_asassn_variable_tic_ids",
+                side_effect=fake_asassn,
+            ),
+            patch("Skills.star_scanner.run_pipeline", return_value=[]),
+        ):
+            run_background_scan(log_path, n_targets=10)
+
+        assert called["n"] == 0
+
+    def test_search_log_written_to_path(self, tmp_path: Path) -> None:
+        log_path = tmp_path / "log.json"
+        search_log_path = tmp_path / "search_manifest.json"
+        with (
+            patch("Skills.star_scanner._load_toi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_ctoi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_confirmed_host_tic_ids", return_value=frozenset()),
+            patch("Skills.star_scanner.select_targets", return_value=self._targets()),
+            patch("Skills.star_scanner.run_pipeline", return_value=[]),
+        ):
+            run_background_scan(
+                log_path, n_targets=10, search_log_path=search_log_path
+            )
+
+        assert search_log_path.exists()
+        manifest = json.loads(search_log_path.read_text())
+        assert manifest["final_target_count"] == 2
+        assert manifest["requested_target_count"] == 10
+        assert manifest["asassn_variables_excluded"] == 0
+
+    def test_search_log_not_written_when_path_omitted(self, tmp_path: Path) -> None:
+        log_path = tmp_path / "log.json"
+        with (
+            patch("Skills.star_scanner._load_toi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_ctoi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_confirmed_host_tic_ids", return_value=frozenset()),
+            patch("Skills.star_scanner.select_targets", return_value=self._targets()),
+            patch("Skills.star_scanner.run_pipeline", return_value=[]),
+        ):
+            run_background_scan(log_path, n_targets=10)
+        assert not (tmp_path / "search_manifest.json").exists()
