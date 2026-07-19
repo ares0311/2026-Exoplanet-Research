@@ -795,6 +795,24 @@ def select_targets(
                 }
             )
 
+    n_tiles_to_query = len(tiles)
+    print(
+        f"select_targets: querying up to {n_tiles_to_query} TIC sky tiles "
+        f"(full_sweep={full_sweep}, workers={max_workers if full_sweep else 1}) ...",
+        flush=True,
+    )
+
+    def _progress_line(done: int, total: int, start: float) -> None:
+        elapsed = time.monotonic() - start
+        rate = done / elapsed if elapsed > 0 else 0.0
+        remaining = (total - done) / rate if rate > 0 else float("inf")
+        eta = (
+            f"{remaining / 60:.0f}m{remaining % 60:.0f}s"
+            if remaining > 90
+            else f"{remaining:.0f}s"
+        )
+        print(f"  [{done}/{total}]  elapsed={elapsed:.0f}s  ETA={eta}", flush=True)
+
     if full_sweep:
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
             futures = {
@@ -814,6 +832,7 @@ def select_targets(
                 tiles_queried += 1
                 result, errors = fut.result()
                 tile_errors.extend(errors)
+                _progress_line(tiles_queried, n_tiles_to_query, _search_start)
                 if result is None:
                     tiles_failed += 1
                     continue
@@ -829,6 +848,7 @@ def select_targets(
                 query_timeout_seconds=query_timeout_seconds,
             )
             tile_errors.extend(errors)
+            _progress_line(tiles_queried, n_tiles_to_query, _search_start)
             if result is None:
                 tiles_failed += 1
                 continue

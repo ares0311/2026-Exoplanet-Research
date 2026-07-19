@@ -606,6 +606,24 @@ errors at the same time — the timeout fix is an independent hardening
 improvement, not a fix for that specific incident.
 The version 0.2.99 release gate passed 3,022 default tests plus Ruff/mypy as
 10/10 supervised gates in 27.1 seconds under the canonical 6x6 topology.
+Version 0.2.100 fixes a genuine violation of AGENTS.md's mandatory
+Console Output and ETA policy ("every script that iterates over N items
+must print real-time progress with ETA... a silent script is
+indistinguishable from a hung one") found live while using 0.2.98's new
+`full_sweep=True` path: `select_targets()`'s tile-query loops (both the
+parallel `full_sweep` path and the sequential default path) printed
+nothing at all until the entire loop finished, so a working-but-slow
+126-tile sweep and a genuinely stuck one were indistinguishable from the
+console — exactly the failure mode the policy exists to prevent, and
+exactly what caused real confusion investigating an apparent hang
+earlier in this same session. `select_targets()` now prints a startup
+banner (tile count, full_sweep mode, worker count) and a `[done/total]
+elapsed=... ETA=...` line after every tile, in both loop paths, using
+the exact pattern already codified in AGENTS.md. No existing test
+asserted on silence, so all 3,022 default tests are unchanged; this is a
+console-output-only change.
+The version 0.2.100 release gate passed 3,022 default tests plus Ruff/mypy as
+10/10 supervised gates in 31.2 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
