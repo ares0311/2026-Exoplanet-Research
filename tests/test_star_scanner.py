@@ -444,6 +444,30 @@ class TestSelectTargets:
         results = select_targets(n=5)
         assert results[0]["radius_rsun"] is None
 
+    @patch("astroquery.mast.conf")
+    @patch("astroquery.mast.Catalogs")
+    def test_query_timeout_bounds_mast_conf(
+        self, mock_catalogs: MagicMock, mock_conf: MagicMock
+    ) -> None:
+        # astroquery.mast's own default timeout is 600s and is never
+        # otherwise overridden in this project; a single slow tile query
+        # could stall an entire full_sweep for up to ten minutes. Every
+        # tile query must bound it explicitly (as an int -- astropy's
+        # ConfigItem for this setting rejects float values).
+        mock_catalogs.query_region.return_value = self._catalog_rows()
+        select_targets(n=2, max_tiles=1, query_timeout_seconds=15.0)
+        assert mock_conf.timeout == 15
+        assert isinstance(mock_conf.timeout, int)
+
+    @patch("astroquery.mast.conf")
+    @patch("astroquery.mast.Catalogs")
+    def test_query_timeout_default_applied_without_override(
+        self, mock_catalogs: MagicMock, mock_conf: MagicMock
+    ) -> None:
+        mock_catalogs.query_region.return_value = self._catalog_rows()
+        select_targets(n=2, max_tiles=1)
+        assert mock_conf.timeout == 30
+
 
 # ---------------------------------------------------------------------------
 # TestAsassnVariableExclusion
