@@ -13,7 +13,7 @@ state, not assumed to still be Phase 4.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
 Test baseline: 3,022 default tests passing; 2 `integration_live` tests excluded by
-the configured marker expression (2026-07-19; 6×6 gate: 27.1s, 10/10 gates
+the configured marker expression (2026-07-19; 6×6 gate: 31.2s, 10/10 gates
 including two verifiable-agent-reliability checks — see
 `docs/RELIABILITY_CONTROLS.md`)
 
@@ -37,7 +37,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.99 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.2.100 is the current patch level. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
