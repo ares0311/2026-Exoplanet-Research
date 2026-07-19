@@ -1,6 +1,6 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-07-16 (formal production-ensemble acceptance remains PASS: the
+Last reviewed: 2026-07-19 (formal production-ensemble acceptance remains PASS: the
 catalog ephemeris for pi Mensae c was recovered within 0.005% with ensemble
 FPP 0.4405, while the TOI-146.01 false-positive control produced no signal.
 No Tier 1 gaps remain open; the bounded Phase 3 representation variability/
@@ -9,11 +9,14 @@ was `no_external_added_value`. Phase 4 individual-transit diagnostics'
 depth/asymmetry/missing/extra-event bounded core is now complete
 (missing_transit_fraction, transit_asymmetry, extra_event_count); the next
 production task should be chosen fresh from readiness checks and roadmap
-state, not assumed to still be Phase 4.)
+state, not assumed to still be Phase 4. Version 0.3.0 implements the new
+Hunter-level durable search lifecycle; offline acceptance is complete and a
+merged-main real-service lifecycle run remains required before the new
+top-level workflow may be called PROD.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
-Test baseline: 3,022 default tests passing; 2 `integration_live` tests excluded by
-the configured marker expression (2026-07-19; 6×6 gate: 31.2s, 10/10 gates
+Test baseline: 3,046 default tests passing; 2 `integration_live` tests excluded by
+the configured marker expression (2026-07-19; 6×6 gate: 10/10 gates
 including two verifiable-agent-reliability checks — see
 `docs/RELIABILITY_CONTROLS.md`)
 
@@ -37,7 +40,18 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.2.100 is the current patch level. 0.2.8 fixed QLP stitch
+Version note: 0.3.0 is the current development version. It adds the durable,
+non-AI-dependent Hunter workflow and exact `Create-New-Search`,
+`Run-New-Search`, and `Show-Follow-Ups` entry points. Candidate catalog,
+immutable manifest, run attempts, append-only target history, and follow-up
+registry are distinct versioned SQLite concepts; deterministic selection can
+freeze 100 targets from a 10,000-candidate universe, partial work is nonzero
+and resumable, and exact targets are never regenerated during execution. See
+`docs/HUNTER_PRODUCTION_WORKFLOW.md`. Live merged-main acceptance remains the
+only open gate for this new orchestration layer; the underlying scorer
+acceptance remains PASS.
+
+Historical version note: 0.2.100 added target-selection progress/ETA. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
 fetch provenance, missing-feature names, and human-readable missing-diagnostic
 reasons, 0.2.10 adds bounded retry for transient MAST/Lightkurve connection
