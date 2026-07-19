@@ -20,7 +20,7 @@ SearchMode = Literal["new", "follow-up"]
 TargetStatus = Literal["candidate_found", "no_signal", "no_data", "failed"]
 TERMINAL_TARGET_STATUSES = frozenset({"candidate_found", "no_signal", "no_data"})
 EXECUTABLE_SEARCH_STATES = frozenset({"pending", "running", "partial", "failed"})
-HUNTER_SCHEMA_VERSION = 1
+HUNTER_SCHEMA_VERSION = 2
 
 
 class PriorSearch(BaseModel):
@@ -74,6 +74,14 @@ class FollowUpRecommendation(BaseModel):
     reason: str = Field(min_length=1)
     evidence: dict[str, Any]
     recommended_action: str = Field(min_length=1)
+    search_eligible: bool = True
+    revisit_reason: str | None = None
+
+    @model_validator(mode="after")
+    def deferred_follow_up_requires_reason(self) -> FollowUpRecommendation:
+        if not self.search_eligible and not self.revisit_reason:
+            raise ValueError("non-executable follow-up requires revisit_reason")
+        return self
 
 
 class TargetExecutionResult(BaseModel):
@@ -212,6 +220,8 @@ CREATE TABLE IF NOT EXISTS follow_up_registry (
     evidence_json TEXT NOT NULL,
     prior_search_provenance_json TEXT NOT NULL,
     recommended_action TEXT NOT NULL,
+    search_eligible INTEGER NOT NULL DEFAULT 1,
+    revisit_reason TEXT,
     status TEXT NOT NULL,
     created_at TEXT NOT NULL,
     FOREIGN KEY(search_id) REFERENCES search_manifests(search_id)
@@ -270,16 +280,213 @@ class HunterStore:
     def initialize(self) -> None:
         with self.connect() as connection:
             connection.executescript(_DDL)
+            columns = {
+                str(row[1])
+                for row in connection.execute("PRAGMA table_info(follow_up_registry)")
+            }
+            if "search_eligible" not in columns:
+                connection.execute(
+                    "ALTER TABLE follow_up_registry "
+                    "ADD COLUMN search_eligible INTEGER NOT NULL DEFAULT 1"
+                )
+            if "revisit_reason" not in columns:
+                connection.execute(
+                    "ALTER TABLE follow_up_registry ADD COLUMN revisit_reason TEXT"
+                )
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations "
                 "(version, applied_at, description) VALUES (?, ?, ?)",
                 (
                     HUNTER_SCHEMA_VERSION,
                     _utc_now().isoformat(),
-                    "Hunter durable search lifecycle",
+                    "Follow-up execution eligibility and reviewed-evidence import",
                 ),
             )
             connection.execute(f"PRAGMA user_version = {HUNTER_SCHEMA_VERSION}")
+
+    def import_reviewed_follow_up(
+        self,
+        *,
+        candidate: HunterCandidate | Mapping[str, Any],
+        recommendation: FollowUpRecommendation | Mapping[str, Any],
+        source_search_id: str,
+        source_attempt_id: str,
+        source_result: Mapping[str, Any],
+        source_provenance: Mapping[str, Any],
+        completed_at: datetime,
+        imported_at: datetime | None = None,
+    ) -> dict[str, Any]:
+        """Import one provenance-complete prior result and its explicit revisit policy."""
+        validated_candidate = (
+            candidate
+            if isinstance(candidate, HunterCandidate)
+            else HunterCandidate.model_validate(candidate)
+        )
+        validated_recommendation = (
+            recommendation
+            if isinstance(recommendation, FollowUpRecommendation)
+            else FollowUpRecommendation.model_validate(recommendation)
+        )
+        if validated_candidate.source_provenance.get("search_category") != "follow-up":
+            raise ValueError("reviewed import candidate must have search_category=follow-up")
+        if not source_search_id or not source_attempt_id:
+            raise ValueError("source search and attempt IDs are required")
+        if completed_at.tzinfo is None:
+            raise ValueError("completed_at must include a timezone")
+
+        identity_payload = {
+            "source_search_id": source_search_id,
+            "source_attempt_id": source_attempt_id,
+            "candidate": validated_candidate.model_dump(mode="json"),
+            "result": dict(source_result),
+            "provenance": dict(source_provenance),
+            "recommendation": validated_recommendation.model_dump(mode="json"),
+        }
+        search_id = _stable_id("prior-search", identity_payload, completed_at)
+        attempt_id = _stable_id(
+            "prior-attempt",
+            {"search_id": search_id, "source_attempt_id": source_attempt_id},
+            completed_at,
+        )
+        created_at = imported_at or _utc_now()
+        manifest_sha256 = hashlib.sha256(_canonical_json(identity_payload).encode()).hexdigest()
+        candidate_json = validated_candidate.model_dump(mode="json")
+        snapshot_id = hashlib.sha256(
+            f"{search_id}:1:{_canonical_json(candidate_json)}".encode()
+        ).hexdigest()
+
+        with self.connect() as connection:
+            existing = connection.execute(
+                "SELECT manifest_sha256 FROM search_manifests WHERE search_id=?",
+                (search_id,),
+            ).fetchone()
+            if existing is not None:
+                if str(existing["manifest_sha256"]) != manifest_sha256:
+                    raise RuntimeError(f"Imported search identity collision: {search_id}")
+                follow_up = connection.execute(
+                    "SELECT follow_up_id FROM follow_up_registry WHERE search_id=?",
+                    (search_id,),
+                ).fetchone()
+                if follow_up is None:
+                    raise RuntimeError(f"Imported search is missing its follow-up row: {search_id}")
+                return {
+                    "created": False,
+                    "search_id": search_id,
+                    "attempt_id": attempt_id,
+                    "follow_up_id": str(follow_up["follow_up_id"]),
+                }
+
+            config = {
+                "imported_prior_search": True,
+                "source_search_id": source_search_id,
+                "source_attempt_id": source_attempt_id,
+            }
+            connection.execute(
+                """
+                INSERT INTO search_manifests (
+                    search_id, schema_version, mode, requested_target_count,
+                    selected_target_count, candidate_pool_count, selector_version,
+                    config_json, manifest_sha256, created_at
+                ) VALUES (?, ?, 'follow-up', 1, 1, 1, ?, ?, ?, ?)
+                """,
+                (
+                    search_id,
+                    HUNTER_SCHEMA_VERSION,
+                    "reviewed_prior_import_v1",
+                    _canonical_json(config),
+                    manifest_sha256,
+                    completed_at.isoformat(),
+                ),
+            )
+            connection.execute(
+                "INSERT INTO candidate_catalog "
+                "(snapshot_id, search_id, target_id, canonical_id, candidate_json, observed_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    snapshot_id,
+                    search_id,
+                    validated_candidate.target_id,
+                    validated_candidate.canonical_id,
+                    _canonical_json(candidate_json),
+                    created_at.isoformat(),
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO search_manifest_targets (
+                    search_id, ordinal, snapshot_id, target_id, canonical_id,
+                    ranking_score, selection_reason
+                ) VALUES (?, 1, ?, ?, ?, ?, ?)
+                """,
+                (
+                    search_id,
+                    snapshot_id,
+                    validated_candidate.target_id,
+                    validated_candidate.canonical_id,
+                    validated_candidate.ranking_score,
+                    validated_candidate.selection_reason,
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO search_runs (
+                    attempt_id, search_id, status, started_at, completed_at,
+                    config_json, items_processed, items_succeeded, items_failed
+                ) VALUES (?, ?, 'completed', ?, ?, ?, 1, 1, 0)
+                """,
+                (
+                    attempt_id,
+                    search_id,
+                    completed_at.isoformat(),
+                    completed_at.isoformat(),
+                    _canonical_json(config),
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO target_search_history (
+                    search_id, attempt_id, target_id, status, result_json,
+                    provenance_json, error_message, created_at
+                ) VALUES (?, ?, ?, 'candidate_found', ?, ?, NULL, ?)
+                """,
+                (
+                    search_id,
+                    attempt_id,
+                    validated_candidate.target_id,
+                    _canonical_json(dict(source_result)),
+                    _canonical_json(dict(source_provenance)),
+                    completed_at.isoformat(),
+                ),
+            )
+            self._append_state(
+                connection,
+                search_id,
+                "completed",
+                {
+                    "imported_prior_search": True,
+                    "source_search_id": source_search_id,
+                    "source_attempt_id": source_attempt_id,
+                },
+                created_at,
+            )
+            if not self._register_follow_up(
+                connection,
+                search_id=search_id,
+                candidate=validated_candidate,
+                follow_up=validated_recommendation,
+                created_at=created_at,
+            ):
+                raise RuntimeError("Reviewed follow-up import did not create a registry row")
+            follow_up = connection.execute(
+                "SELECT follow_up_id FROM follow_up_registry WHERE search_id=?",
+                (search_id,),
+            ).fetchone()
+        return {
+            "created": True,
+            "search_id": search_id,
+            "attempt_id": attempt_id,
+            "follow_up_id": str(follow_up["follow_up_id"]),
+        }
 
     def create_search(
         self,
@@ -733,8 +940,8 @@ class HunterStore:
             INSERT OR IGNORE INTO follow_up_registry (
                 follow_up_id, search_id, target_id, candidate_id, priority, reason,
                 evidence_json, prior_search_provenance_json, recommended_action,
-                status, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?)
+                search_eligible, revisit_reason, status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?)
             """,
             (
                 follow_up_id,
@@ -746,6 +953,8 @@ class HunterStore:
                 _canonical_json(follow_up.evidence),
                 _canonical_json([row.model_dump(mode="json") for row in candidate.prior_searches]),
                 follow_up.recommended_action,
+                int(follow_up.search_eligible),
+                follow_up.revisit_reason,
                 created_at.isoformat(),
             ),
         )
@@ -785,11 +994,14 @@ class HunterStore:
             row["prior_search_provenance"] = json.loads(
                 row.pop("prior_search_provenance_json")
             )
+            row["search_eligible"] = bool(row["search_eligible"])
         return result
 
     def follow_up_candidates(self) -> list[HunterCandidate]:
         candidates: list[HunterCandidate] = []
         for row in self.list_follow_ups():
+            if not bool(row["search_eligible"]):
+                continue
             prior = PriorSearch(
                 searched_by="EXO-Hunter",
                 searched_at=datetime.fromisoformat(str(row["created_at"])),

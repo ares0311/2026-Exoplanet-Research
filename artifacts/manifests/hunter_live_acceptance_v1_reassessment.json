@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "reassessment_id": "exo-hunter-live-acceptance-v1-reassessment",
+  "reassessed_at": "2026-07-19T14:00:00Z",
+  "original_artifact": "artifacts/manifests/hunter_live_acceptance_v1.json",
+  "original_acceptance_id": "exo-hunter-live-acceptance-v1",
+  "original_status": "pass",
+  "corrected_status": "partial",
+  "preservation_rule": "The original acceptance artifact is retained unchanged as historical provenance.",
+  "unsupported_claim": "follow_up_creation_and_recommendation",
+  "finding": "The live Hunter database contained zero follow-up rows. The original pass relied on test-only qualifying registration and therefore did not demonstrate real follow-up creation and recommendation under the PROD definition.",
+  "production_impact": "EXO-Hunter must not be called PROD until a real reviewed result is durably registered, displayed with its recommendation and provenance, and safely excluded from execution when its revisit policy is not satisfied.",
+  "corrective_release": "0.3.3",
+  "corrective_plan": [
+    "Import checksum-verified reviewed prior-search evidence into all durable Hunter entities.",
+    "Store explicit search eligibility and revisit rationale on follow-up rows.",
+    "Show deferred recommendations while excluding them from Create-New-Search --mode follow-up.",
+    "Execute the import and acceptance checks from merged main before issuing a new PROD artifact."
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "source_search_id": "tess_live_search_v1",
+  "source_attempt_id": "tess_live_search_v1-shards-0-2",
+  "completed_at": "2026-07-12T08:25:31.575910+00:00",
+  "source_files": [
+    {
+      "path": "artifacts/manifests/tess_live_search_v1_run_summary.json",
+      "sha256": "d518a778f112d707337c9edf900525f31627cf59530255da88b4f62167c839d2"
+    },
+    {
+      "path": "artifacts/manifests/tess_live_search_v1_fp_review_summary.json",
+      "sha256": "c2c912b9651c396d30421cf14493669bde0511dea7d0304863a5a1ed868544ed"
+    }
+  ],
+  "candidate": {
+    "target_id": "TIC 355651994",
+    "canonical_id": "TIC 355651994",
+    "aliases": [],
+    "mission": "TESS",
+    "object_classification": "star with plausible-but-weak transit-like signal",
+    "source": "EXO-Hunter reviewed tess_live_search_v1 result",
+    "source_provenance": {
+      "search_category": "follow-up",
+      "source_dataset_id": "tess_live_search_v1",
+      "run_summary": "artifacts/manifests/tess_live_search_v1_run_summary.json",
+      "review_summary": "artifacts/manifests/tess_live_search_v1_fp_review_summary.json"
+    },
+    "eligible": false,
+    "eligibility_reason": "tracked in the registry but not executable until new event-covering observations exist",
+    "distance_pc": null,
+    "estimated_download_gb": null,
+    "ranking_score": 102.42226287824357,
+    "selection_reason": "reviewed plausible-but-weak signal requiring additional event-covering observations",
+    "metrics": {
+      "false_positive_probability": 0.06630565358830542,
+      "detection_confidence": 0.905282823707411,
+      "ensemble_planet_probability": 0.9504058577933259,
+      "xgb_planet_probability": 0.9671173691749573,
+      "provenance_score": 0.5625,
+      "period_days": 97.16176299117727,
+      "depth_ppm": 11546.297370136972,
+      "independent_events": 2
+    },
+    "prior_searches": [
+      {
+        "searched_by": "EXO-Hunter",
+        "searched_at": "2026-07-12T00:38:28.031272+00:00",
+        "source_project": "2026 Exoplanet Research",
+        "method_or_data": "TESS QLP light curves; three shards with six workers each; transit search, vetting, Bayesian, XGBoost, and ensemble scores",
+        "result": "plausible_but_weak; 14 available checks passed, limb-darkening failed, and centroid/odd-even diagnostics are exhausted by current observations",
+        "provenance_uri": "artifacts/manifests/tess_live_search_v1_fp_review_summary.json#TIC_355651994_s02"
+      }
+    ]
+  },
+  "recommendation": {
+    "candidate_id": "TIC_355651994_s02",
+    "priority": 102.42226287824357,
+    "reason": "Reviewed plausible-but-weak signal: low model FPP, but available observations cannot resolve centroid or odd/even diagnostics",
+    "evidence": {
+      "review_status": "plausible_but_weak",
+      "available_vetting_checks_passed": 14,
+      "limb_darkening_plausibility_passed": false,
+      "initially_unavailable_diagnostics": 17,
+      "event_covering_tpf_sectors": 0,
+      "independent_events": 2,
+      "odd_even_required_events": 4,
+      "provenance_score": 0.5625,
+      "scientific_guardrail": "candidate signal only; not follow-up-ready, confirmed, or authorized for external submission"
+    },
+    "recommended_action": "Monitor for or obtain additional event-covering observations; do not rerun the frozen tess_live_search_v1 batch and do not submit externally.",
+    "search_eligible": false,
+    "revisit_reason": "No currently available TPF sector covers a predicted event and only two independent events exist; enable a new search only when additional event-covering observations are verified."
+  },
+  "source_result": {
+    "candidate_id": "TIC_355651994_s02",
+    "review_status": "plausible_but_weak",
+    "false_positive_probability": 0.06630565358830542,
+    "detection_confidence": 0.905282823707411,
+    "pathway": "planet_hunters_discussion",
+    "final_interpretation": "Candidate signal only; current evidence is insufficient for follow-up-ready or confirmed status."
+  },
+  "source_provenance": {
+    "source_dataset_id": "tess_live_search_v1",
+    "run_summary": "artifacts/manifests/tess_live_search_v1_run_summary.json",
+    "run_summary_sha256": "d518a778f112d707337c9edf900525f31627cf59530255da88b4f62167c839d2",
+    "review_summary": "artifacts/manifests/tess_live_search_v1_fp_review_summary.json",
+    "review_summary_sha256": "c2c912b9651c396d30421cf14493669bde0511dea7d0304863a5a1ed868544ed",
+    "reviewed_at": "2026-07-12T08:25:31.575910+00:00",
+    "execution_status": "success_review_complete_evidence_limited",
+    "targets_processed": 18,
+    "targets_failed": 0
+  }
+}

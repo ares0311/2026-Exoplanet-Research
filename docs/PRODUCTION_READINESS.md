@@ -9,12 +9,14 @@ was `no_external_added_value`. Phase 4 individual-transit diagnostics'
 depth/asymmetry/missing/extra-event bounded core is now complete
 (missing_transit_fraction, transit_asymmetry, extra_event_count); the next
 production task should be chosen fresh from readiness checks and roadmap
-state, not assumed to still be Phase 4. Version 0.3.2's Hunter-level durable
-search lifecycle is PROD: merged-main live selection froze 10,000 candidates,
-both exact new/follow-up searches completed with zero failures, the corrective
-run preserved prior history and selected the true minimum-FPP composite, and
-SQLite/foreign-key/Run Report evidence passed. See
-`artifacts/manifests/hunter_live_acceptance_v1.json`.)
+state, not assumed to still be Phase 4. Hunter orchestration acceptance is
+temporarily **PARTIAL**: merged-main live selection/execution evidence is valid,
+but the original acceptance had zero real follow-up registry rows and used
+test-only registration as PROD evidence. Version 0.3.3 adds checksum-verified
+reviewed-result import and an explicit revisit eligibility gate; merged-main
+live import remains required before Hunter can be called PROD. The original
+artifact is preserved and corrected by
+`artifacts/manifests/hunter_live_acceptance_v1_reassessment.json`.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
 Test baseline: 3,051 default tests passing; 2 `integration_live` tests excluded by
@@ -42,15 +44,16 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.3.2 is the current development version. It adds the durable,
+Version note: 0.3.3 is the current development version. Version 0.3.2 added the durable,
 non-AI-dependent Hunter workflow and exact `Create-New-Search`,
 `Run-New-Search`, and `Show-Follow-Ups` entry points. Candidate catalog,
 immutable manifest, run attempts, append-only target history, and follow-up
 registry are distinct versioned SQLite concepts; deterministic selection can
 freeze 100 targets from a 10,000-candidate universe, partial work is nonzero
 and resumable, and exact targets are never regenerated during execution. See
-`docs/HUNTER_PRODUCTION_WORKFLOW.md`. Live merged-main acceptance is PASS for
-this orchestration layer; the underlying scorer acceptance also remains PASS.
+`docs/HUNTER_PRODUCTION_WORKFLOW.md`. Hunter orchestration acceptance remains
+PARTIAL pending the merged-main reviewed follow-up import; the independently
+established underlying scorer acceptance remains PASS.
 The first merged-main acceptance attempt failed before
 search creation because installed console scripts omitted the repository root
 from `sys.path`; 0.3.1 adds a fail-loud validated loader for the required
@@ -72,9 +75,13 @@ failures, preserved its explicit prior-search/attempt provenance, and selected
 the correct s02 composite at FPP 0.372284. Both Run Reports are committed; the
 acceptance snapshot records two immutable manifests, two attempts, two history
 rows, six state events, database SHA-256/integrity, nine raw QLP URIs, 63,205
-cadences, and all PROD-requirement evidence. No signal met FPP < 0.15, so the
-live follow-up registry correctly remains empty rather than containing a
-threshold-bypassing entry.
+cadences, and the recorded execution evidence. No signal in those two runs met
+FPP < 0.15, so they correctly produced no new row. That did not demonstrate
+live follow-up creation. Version 0.3.3 therefore imports the already reviewed
+TIC 355651994 signal from the frozen `tess_live_search_v1` evidence with source
+SHA-256 validation. Its recommendation remains visible while
+`search_eligible=false` prevents the forbidden frozen-batch rerun until
+event-covering observations exist.
 
 Historical version note: 0.2.100 added target-selection progress/ETA. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import importlib
 import json
 import math
@@ -10,6 +11,7 @@ import sys
 import time
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import UTC, datetime
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -115,6 +117,65 @@ def _parser_follow_ups() -> argparse.ArgumentParser:
     parser.add_argument("--json", action="store_true", dest="json_output")
     parser.add_argument("--no-color", action="store_true")
     return parser
+
+
+def _parser_import_follow_up() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="Import-Follow-Up",
+        description="Durably import one reviewed prior result and recommendation.",
+    )
+    parser.add_argument("--evidence-file", type=Path, required=True)
+    parser.add_argument("--db", type=Path, default=DEFAULT_HUNTER_DB)
+    parser.add_argument("--json", action="store_true", dest="json_output")
+    parser.add_argument("--no-color", action="store_true")
+    return parser
+
+
+def _load_reviewed_follow_up(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        raise RuntimeError(f"Reviewed evidence file does not exist: {path}")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or payload.get("schema_version") != 1:
+        raise RuntimeError("Reviewed evidence must be a schema_version=1 JSON object")
+    required = {
+        "source_search_id",
+        "source_attempt_id",
+        "completed_at",
+        "source_files",
+        "candidate",
+        "recommendation",
+        "source_result",
+        "source_provenance",
+    }
+    missing = sorted(required - payload.keys())
+    if missing:
+        raise RuntimeError(f"Reviewed evidence is missing required fields: {missing}")
+    source_files = payload["source_files"]
+    if not isinstance(source_files, list) or not source_files:
+        raise RuntimeError("Reviewed evidence source_files must be a non-empty list")
+    for source in source_files:
+        if not isinstance(source, dict) or set(source) != {"path", "sha256"}:
+            raise RuntimeError("Each source file requires exactly path and sha256")
+        source_path = Path(str(source["path"]))
+        expected = str(source["sha256"])
+        if len(expected) != 64 or any(char not in "0123456789abcdef" for char in expected):
+            raise RuntimeError(f"Invalid SHA-256 for source file: {source_path}")
+        if not source_path.is_file():
+            raise RuntimeError(f"Reviewed evidence source is missing: {source_path}")
+        actual = hashlib.sha256(source_path.read_bytes()).hexdigest()
+        if actual != expected:
+            raise RuntimeError(
+                f"Reviewed evidence source hash mismatch: {source_path}; "
+                f"expected={expected} actual={actual}"
+            )
+    payload["candidate"] = HunterCandidate.model_validate(payload["candidate"])
+    payload["recommendation"] = FollowUpRecommendation.model_validate(
+        payload["recommendation"]
+    )
+    payload["completed_at"] = datetime.fromisoformat(str(payload["completed_at"]))
+    if payload["completed_at"].tzinfo is None:
+        raise RuntimeError("Reviewed evidence completed_at must include a timezone")
+    return payload
 
 
 def _load_candidate_file(path: Path) -> list[HunterCandidate]:
@@ -570,6 +631,34 @@ def _write_run_report(
     run_report.run_and_commit_report(report, path)
 
 
+def _write_follow_up_import_report(
+    result: Mapping[str, Any],
+    db_path: Path,
+    started_at: datetime,
+    completed_at: datetime,
+) -> None:
+    run_report = _load_project_skill("run_report")
+    report = run_report.RunReport(
+        script="hunter_followup_import",
+        status="success",
+        started_at=started_at.isoformat(),
+        completed_at=completed_at.isoformat(),
+        elapsed_seconds=(completed_at - started_at).total_seconds(),
+        items_processed=1,
+        items_written=int(bool(result["created"])),
+        items_failed=0,
+        output_paths=(str(db_path),),
+        notes=(
+            f"search_id={result['search_id']}; follow_up_id={result['follow_up_id']}; "
+            f"created={str(bool(result['created'])).lower()}"
+        ),
+    )
+    run_report.run_and_commit_report(
+        report,
+        run_report.report_path_for("hunter_followup_import"),
+    )
+
+
 def run_new_search(
     argv: Sequence[str] | None = None,
     *,
@@ -661,6 +750,7 @@ def show_follow_ups(argv: Sequence[str] | None = None) -> int:
         table = Table(title=f"EXO-Hunter follow-ups — {args.status}")
         table.add_column("Priority", justify="right", style="green")
         table.add_column("Target", style="cyan")
+        table.add_column("Search ready?", justify="center")
         table.add_column("Evidence / reason", overflow="fold")
         table.add_column("Prior search", overflow="fold")
         table.add_column("Recommended next action", overflow="fold")
@@ -683,6 +773,7 @@ def show_follow_ups(argv: Sequence[str] | None = None) -> int:
             table.add_row(
                 f"{float(row['priority']):.2f}",
                 str(row["target_id"]),
+                "yes" if bool(row["search_eligible"]) else "no",
                 str(row["reason"]),
                 prior_label,
                 str(row["recommended_action"]),
@@ -691,9 +782,67 @@ def show_follow_ups(argv: Sequence[str] | None = None) -> int:
         console.print("[bold]Prior-search provenance[/bold]")
         for detail in provenance_details:
             console.print(detail)
+        deferred = [row for row in rows if not bool(row["search_eligible"])]
+        if deferred:
+            console.print("[bold]Revisit gates[/bold]")
+            for row in deferred:
+                console.print(f"{row['target_id']}: {row['revisit_reason']}")
         return 0
     except Exception as exc:  # noqa: BLE001
         print(f"Show-Follow-Ups failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 2
+
+
+def import_follow_up(
+    argv: Sequence[str] | None = None,
+    *,
+    report_fn: Callable[[Mapping[str, Any], Path, datetime, datetime], None] | None = None,
+) -> int:
+    args = _parser_import_follow_up().parse_args(argv)
+    started_at = datetime.now(UTC)
+    try:
+        evidence = _load_reviewed_follow_up(args.evidence_file)
+        progress_stream = sys.stderr if args.json_output else sys.stdout
+        print(
+            "Import-Follow-Up: validating 1 reviewed result",
+            file=progress_stream,
+            flush=True,
+        )
+        store = HunterStore(args.db)
+        result = store.import_reviewed_follow_up(
+            candidate=evidence["candidate"],
+            recommendation=evidence["recommendation"],
+            source_search_id=str(evidence["source_search_id"]),
+            source_attempt_id=str(evidence["source_attempt_id"]),
+            source_result=evidence["source_result"],
+            source_provenance=evidence["source_provenance"],
+            completed_at=evidence["completed_at"],
+        )
+        if not store.integrity_summary()["ok"]:
+            raise RuntimeError("Hunter database integrity failed after follow-up import")
+        elapsed = (datetime.now(UTC) - started_at).total_seconds()
+        print(
+            f"[1/1] status=success elapsed={elapsed:.0f}s ETA=0s",
+            file=progress_stream,
+            flush=True,
+        )
+        completed_at = datetime.now(UTC)
+        if report_fn is None:
+            _write_follow_up_import_report(result, args.db, started_at, completed_at)
+        else:
+            report_fn(result, args.db, started_at, completed_at)
+        if args.json_output:
+            print(json.dumps(result, indent=2, sort_keys=True))
+        else:
+            console = _console(no_color=args.no_color)
+            verb = "Imported" if result["created"] else "Already imported"
+            console.print(
+                f"[green]{verb} reviewed follow-up[/green] {result['follow_up_id']} "
+                f"under {result['search_id']}."
+            )
+        return 0
+    except Exception as exc:  # noqa: BLE001
+        print(f"Import-Follow-Up failed: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
 
 
@@ -707,3 +856,7 @@ def run_new_search_entry() -> None:
 
 def show_follow_ups_entry() -> None:
     raise SystemExit(show_follow_ups())
+
+
+def import_follow_up_entry() -> None:
+    raise SystemExit(import_follow_up())
