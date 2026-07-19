@@ -10,6 +10,7 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 from rich.console import Console
@@ -38,6 +39,27 @@ FOLLOW_UP_PATHWAYS = {
 }
 VALID_SCORERS = {"bayesian", "xgboost", "ensemble", "cnn", "full-ensemble"}
 MAX_LIVE_WORKERS = 12
+
+
+def _load_project_skill(module_name: str) -> ModuleType:
+    """Load a repository Skill from installed console-script entry points."""
+    repo_root = Path(__file__).resolve().parents[2]
+    expected_path = repo_root / "Skills" / f"{module_name}.py"
+    if not expected_path.is_file():
+        raise RuntimeError(
+            f"Required project Skill is missing: {expected_path}. "
+            "Run EXO-Hunter from an editable checkout of this repository."
+        )
+    root_text = str(repo_root)
+    if root_text not in sys.path:
+        sys.path.insert(0, root_text)
+    try:
+        return importlib.import_module(f"Skills.{module_name}")
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(
+            f"Required project Skill Skills.{module_name} could not be imported: "
+            f"{type(exc).__name__}: {exc}"
+        ) from exc
 
 
 def _console(*, no_color: bool = False) -> Console:
@@ -139,7 +161,7 @@ def _select_live_new_candidates(
     progress_fn: Callable[[str], None] | None = print,
 ) -> tuple[list[HunterCandidate], dict[str, Any]]:
     """Two-stage metadata-only TIC selection over a large reproducible pool."""
-    scanner = importlib.import_module("Skills.star_scanner")
+    scanner = _load_project_skill("star_scanner")
     excluded = set(store.searched_target_ids())
     excluded_tics = {
         int(value.split()[-1]) for value in excluded if value.upper().startswith("TIC ")
@@ -517,7 +539,7 @@ def _write_run_report(
     summary: SearchExecutionSummary,
     db_path: Path = DEFAULT_HUNTER_DB,
 ) -> None:
-    run_report = importlib.import_module("Skills.run_report")
+    run_report = _load_project_skill("run_report")
     elapsed = (summary.completed_at - summary.started_at).total_seconds()
     report = run_report.RunReport(
         script="hunter_search",

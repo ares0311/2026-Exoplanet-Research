@@ -17,14 +17,16 @@ file assumes you already have.
 Current gap status (see `docs/PRODUCTION_READINESS.md` for the full,
 actively-maintained narrative — do not rely on any cached summary of it):
 **no Tier 1 gaps open as of 2026-07-12** (T1-0/T1-1/T1-2 all complete).
-Version 0.3.0 adds the Hunter product lifecycle above the accepted scientific
+Version 0.3.1 adds the Hunter product lifecycle above the accepted scientific
 pipeline: `src/exo_toolkit/search_lifecycle.py` is the append-only SQLite
 system of record, `src/exo_toolkit/hunter_cli.py` implements the exact
 `Create-New-Search`, `Run-New-Search`, and `Show-Follow-Ups` shell entry points,
 and `docs/HUNTER_PRODUCTION_WORKFLOW.md` is the operator/spec handoff. The
 Bayesian default keeps core operation independent of AI. Offline acceptance is
 implemented; a merged-main real-service lifecycle run is still required before
-claiming the new top-level workflow is PROD.
+claiming the new top-level workflow is PROD. Version 0.3.1 also fixes the
+installed-console-script path that initially could not import repository
+`Skills` modules.
 The active production priority is master-guide Phase 2 sensitivity evidence:
 version 0.2.42 adds the bounded real-background production-pipeline runner and
 fixes the XGBoost/PyTorch full-ensemble native-runtime collision. Version
