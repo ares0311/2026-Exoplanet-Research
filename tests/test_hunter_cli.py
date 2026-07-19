@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
@@ -253,6 +256,32 @@ def test_pyproject_registers_exact_required_shell_entry_points() -> None:
     assert scripts["Create-New-Search"].endswith(":create_new_search_entry")
     assert scripts["Run-New-Search"].endswith(":run_new_search_entry")
     assert scripts["Show-Follow-Ups"].endswith(":show_follow_ups_entry")
+
+
+def test_installed_process_can_load_required_project_skills_outside_repo_cwd(
+    tmp_path: Path,
+) -> None:
+    environment = os.environ.copy()
+    environment.pop("PYTHONPATH", None)
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from exo_toolkit.hunter_cli import _load_project_skill; "
+                "print(_load_project_skill('star_scanner').__name__); "
+                "print(_load_project_skill('run_report').__name__)"
+            ),
+        ],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.splitlines() == ["Skills.star_scanner", "Skills.run_report"]
 
 
 def test_pipeline_runner_records_no_data_as_terminal_not_retry_failure(
