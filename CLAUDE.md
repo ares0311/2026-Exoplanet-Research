@@ -584,6 +584,28 @@ silently backfilled or hidden. 21 new tests across `TestPriorityScore`,
 `TestRunBackgroundScan` in `tests/test_star_scanner.py`.
 The version 0.2.98 release gate passed 3,020 default tests plus Ruff/mypy as
 10/10 supervised gates in 29.1 seconds under the canonical 6x6 topology.
+Version 0.2.99 fixes a real robustness gap surfaced while live-testing
+0.2.98's new `full_sweep=True` path: `astroquery.mast`'s own default
+request timeout is 600 seconds and this project never overrode it
+anywhere; with `full_sweep=True` firing up to 126 concurrent tile
+queries, a single slow/stalled tile could silently stall the entire
+sweep for up to ten minutes waiting on that one straggler before
+erroring. `_query_one_tile()` and `select_targets()` gain an explicit
+`query_timeout_seconds` parameter (default 30) that sets
+`astroquery.mast.conf.timeout` before every tile query. A live check
+against the installed astroquery version caught a second, smaller bug
+before it shipped: astropy's `ConfigItem` for this setting is int-typed
+and raises `TypeError` on a float value (even a whole-number one like
+`30.0`), so the assignment casts explicitly. 2 new tests verify the
+timeout is applied as an int both with and without an explicit override.
+This was found via legitimate investigation of an apparent hang during
+a live full-sweep run; the actual cause of that specific hang was a
+real network interruption (unrelated to this bug), corroborated by two
+concurrently-running review agents also failing with DNS resolution
+errors at the same time — the timeout fix is an independent hardening
+improvement, not a fix for that specific incident.
+The version 0.2.99 release gate passed 3,022 default tests plus Ruff/mypy as
+10/10 supervised gates in 27.1 seconds under the canonical 6x6 topology.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
@@ -736,7 +758,7 @@ Queries the TESS Input Catalog (TIC) via astroquery to rank uncharacterised star
 
 - `priority_score(tmag, teff, n_sectors, contratio, radius_rsun)` → float in [0, 1]. Five weighted factors: magnitude (0.25), stellar type (0.20), sector coverage (0.20), contamination (0.15), stellar radius (0.20 — smaller stars give deeper, more detectable transits for a fixed planet size; peaks for `radius_rsun <= 0.7`). Any factor's input may be `None` → neutral 0.5.
 - `ScanLog(path)` — atomic-write JSON log; `record()`, `is_scanned()`, `scanned_ids()`, `summary()`
-- `select_targets(n, tmag_range, exclude_tic_ids, *, full_sweep=False, max_workers=6, search_log=None, max_tiles=126)` — TIC query, ranked, filtered. Default (`full_sweep=False`) preserves the original fast/early-stop behavior (stops once a small buffer is collected) for existing incremental callers. `full_sweep=True` queries every configured tile in parallel (`ThreadPoolExecutor`) before ranking, so "top N" is a genuine rank across the whole swept area rather than whatever the first few tiles happened to return. The tile grid (`_DEFAULT_SEARCH_CENTERS`) is 7 dec bands × 18 RA steps = 126 tiles (~99 sq deg, ~0.24% of the sky) — still a documented sample, not an exhaustive survey. Pass a mutable `search_log` dict to record exactly what was searched: `tiles_configured`, `tiles_queried`, `tiles_failed`, `tile_errors`, `sky_coverage_deg2`, `raw_candidates_before_exclusion`, `candidates_after_exclusion`, `excluded_count`, `full_sweep`, `elapsed_seconds`.
+- `select_targets(n, tmag_range, exclude_tic_ids, *, full_sweep=False, max_workers=6, search_log=None, max_tiles=126, query_timeout_seconds=30.0)` — TIC query, ranked, filtered. Default (`full_sweep=False`) preserves the original fast/early-stop behavior (stops once a small buffer is collected) for existing incremental callers. `full_sweep=True` queries every configured tile in parallel (`ThreadPoolExecutor`) before ranking, so "top N" is a genuine rank across the whole swept area rather than whatever the first few tiles happened to return. The tile grid (`_DEFAULT_SEARCH_CENTERS`) is 7 dec bands × 18 RA steps = 126 tiles (~99 sq deg, ~0.24% of the sky) — still a documented sample, not an exhaustive survey. Pass a mutable `search_log` dict to record exactly what was searched: `tiles_configured`, `tiles_queried`, `tiles_failed`, `tile_errors`, `sky_coverage_deg2`, `raw_candidates_before_exclusion`, `candidates_after_exclusion`, `excluded_count`, `full_sweep`, `elapsed_seconds`. `query_timeout_seconds` (version 0.2.99) bounds `astroquery.mast.conf.timeout` per tile query — that library's own default is 600s and was never overridden before, so a single slow tile under `full_sweep=True`'s up-to-126-concurrent-query load could otherwise stall the whole sweep for up to ten minutes.
 - `_load_asassn_variable_tic_ids(candidate_tic_ids, *, strict=False)` — live, zero-payload exact-TIC lookup against the pinned ASAS-SN Catalog X source; a star already flagged as a known variable (eclipsing binary, pulsator) is a poor novel-transit-search target for the same reason a known planet host is. Fails open like the other exclusion loaders.
 - `scan_star(tic_id, *, log, ...)` → dict with status/n_signals/best_fpp/best_pathway
 - `run_background_scan(log_path, ..., full_sweep=False, exclude_known_variables=False, search_log_path=None)` — iterates until Ctrl-C or max stars reached. The three new keyword params are opt-in (default off) so existing behavior and the frozen `tess_live_search_v1` batch's reproducibility are unaffected. `exclude_known_variables=True` removes selected targets already flagged as known ASAS-SN variables post-selection (can return fewer than `n_targets`; the removed count is reported, never silently dropped). `search_log_path`, if given, writes the search manifest above as a durable JSON file. CLI flags: `--full-sweep`, `--exclude-known-variables`, `--search-log-path`.

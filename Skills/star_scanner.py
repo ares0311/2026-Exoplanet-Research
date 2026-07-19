@@ -614,12 +614,25 @@ def _query_one_tile(
     query_radius_deg: float,
     retry_attempts: int,
     retry_delay: float,
+    query_timeout_seconds: float = 30.0,
 ) -> tuple[Any | None, list[str]]:
-    """Query one TIC sky tile with retry. Returns (result_table_or_None, errors)."""
+    """Query one TIC sky tile with retry. Returns (result_table_or_None, errors).
+
+    ``astroquery.mast``'s own default request timeout is 600 seconds and is
+    never overridden elsewhere in this project. A single slow/stalled tile
+    query under that default can stall an entire ``full_sweep`` (up to 126
+    concurrent tile queries) for up to ten minutes waiting on one straggler.
+    Bound it explicitly instead; a real stall now fails fast and retries
+    rather than silently blocking the whole sweep.
+    """
     from astropy import units as u
     from astropy.coordinates import SkyCoord
     from astroquery.mast import Catalogs
+    from astroquery.mast import conf as mast_conf
 
+    # astropy's ConfigItem for astroquery.mast's timeout is int-typed; a
+    # float (even a whole-number one like 30.0) raises TypeError.
+    mast_conf.timeout = int(query_timeout_seconds)
     coord = SkyCoord(ra=ra_deg * u.deg, dec=dec_deg * u.deg, frame="icrs")
     errors: list[str] = []
     for attempt in range(1, retry_attempts + 1):
@@ -652,6 +665,7 @@ def select_targets(
     full_sweep: bool = False,
     max_workers: int = 6,
     search_log: dict[str, Any] | None = None,
+    query_timeout_seconds: float = 30.0,
 ) -> list[dict[str, Any]]:
     """Query the TIC catalog and return up to *n* stars ranked by priority.
 
@@ -691,6 +705,12 @@ def select_targets(
             ``full_sweep``, ``elapsed_seconds``. Populated regardless of
             ``full_sweep``, so callers can always see the actual search
             extent rather than assuming a wide search occurred.
+        query_timeout_seconds: Per-tile-query request timeout, overriding
+            ``astroquery.mast``'s own 600-second default. A slow/stalled
+            single tile under that default can stall an entire
+            ``full_sweep`` (up to *max_tiles* concurrent queries) for up to
+            ten minutes waiting on one straggler; bounding it here means a
+            real stall fails fast and retries instead.
 
     Returns:
         List of dicts, sorted by ``"priority"`` descending, each with TIC ID,
@@ -786,6 +806,7 @@ def select_targets(
                     query_radius_deg=query_radius_deg,
                     retry_attempts=retry_attempts,
                     retry_delay=retry_delay,
+                    query_timeout_seconds=query_timeout_seconds,
                 ): (tile_idx, ra_deg, dec_deg)
                 for tile_idx, (ra_deg, dec_deg) in tiles
             }
@@ -805,6 +826,7 @@ def select_targets(
                 query_radius_deg=query_radius_deg,
                 retry_attempts=retry_attempts,
                 retry_delay=retry_delay,
+                query_timeout_seconds=query_timeout_seconds,
             )
             tile_errors.extend(errors)
             if result is None:

@@ -111,8 +111,64 @@ These are ranked by novelty (most underexplored first):
 - ExoFOP TOI list (already flagged by TESS pipeline)
 - ExoFOP CTOI list (already flagged by community)
 - NASA Exoplanet Archive confirmed planets table
+- The pinned ASAS-SN Catalog X known-variable-star source (version 0.2.98,
+  `Skills/star_scanner.py`'s `_load_asassn_variable_tic_ids()`) — a star
+  already classified as a variable (eclipsing binary, pulsator, etc.) is a
+  poor novel-transit-search target for the same reason a known planet host
+  is: it's already characterized, just not by a planet-search pipeline.
 
-`Skills/toi_checker.py` and `Skills/star_scanner.py` implement TOI, CTOI, and confirmed-host exclusion. Keep these exclusions enabled before running discovery batches.
+`Skills/toi_checker.py` and `Skills/star_scanner.py` implement TOI, CTOI, confirmed-host, and known-variable exclusion. Keep these exclusions enabled before running discovery batches.
+
+### REMINDER (added 2026-07-18, read this before any post-production data-source decision): raw Full Frame Image extraction is a separate, later, deliberately-scoped phase — not Day 1
+
+This note exists because the user explicitly asked for a durable reminder,
+anticipating forgetting it once the project reaches live production. Any
+session reading this file (which the PRIMARY DIRECTIVE requires every
+session to do) must surface this before treating "we've searched
+everything" as true.
+
+**What Day 1 discovery actually does today**: `select_targets()` /
+`inspect_target_products()` only ever query *already-extracted* light
+curves — products some pipeline (SPOC, QLP, TGLC, TASOC,
+GSFC-ELEANOR-LITE, T16, TARS, etc.) has already turned into a compact
+time-vs-brightness file from TESS's raw camera images. A live check in
+this project (2026-07-17/18) found that essentially every priority-ranked
+candidate star in the Tmag 12–14.5 band already has at least one such
+light curve, almost always via QLP. This makes "scan existing light
+curves" a cheap, bounded, already-built Day 1 operation — but it is
+**not** an exhaustive search of TESS's data. It only sees stars someone
+else's pipeline already chose to process.
+
+**What Day 1 discovery does NOT do**: extract a *new* light curve directly
+from raw Full Frame Image (FFI) pixel data for a star nobody's pipeline
+has ever processed. This is a fundamentally heavier, different engineering
+task — raw pixel calibration, aperture or PSF photometry, systematics/
+scattered-light removal, background modeling — comparable in scope to
+building a new pipeline, not to running an existing query. It is the only
+way to reach the stars that are genuinely unprocessed by anyone (likely
+concentrated in the faint tail below existing pipelines' magnitude cutoffs,
+and in crowded/blended fields automated pipelines skip). Rough proportion
+estimates given in-conversation on 2026-07-18 (by star count, and
+separately by raw FFI byte-volume, both meaningfully large) were **not**
+independently verified against the published QLP/TESS literature — that
+verification is part of this reminder's scope, not yet done.
+
+**Separately, a due-diligence gap**: a light curve already existing in a
+public archive proves *someone's pipeline* processed the raw pixels; it
+does not prove anyone screened it for a transit, and it does not fully
+rule out that another individual or group already looked at a specific
+candidate's light curve for exactly this purpose without publishing or
+otherwise recording it anywhere this project could check. This is a
+different risk than the FFI-extraction gap above and cannot be closed by
+more exclusion-list plumbing alone.
+
+**Action for a future session**: before authorizing any raw-FFI
+photometric-extraction effort, treat it as its own bounded, separately
+contracted production phase (matching this project's established pattern
+for major new data-source work — source contract, metadata-only preflight,
+bounded pilot, evidence gate, then scale) — not something folded into the
+existing `select_targets()`/`run_background_scan()` path. Do not start
+building it without the user's explicit go-ahead at that time.
 
 ---
 
