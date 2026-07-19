@@ -462,6 +462,21 @@ would need a fresh, dedicated held-out Kepler set not already claimed by
 - Citations: `docs/astrometrics_data_selection_policy.md` and
   `docs/HUNTER_PRODUCTION_WORKFLOW.md`.
 
+### Live acceptance disposition
+
+- New search: `exo-search-20260719T112104Z-37f71aaa95f5`; 10,000 frozen
+  candidates; TIC 237884073 selected; nine QLP products; `live_search` role.
+- Corrective follow-up: `exo-search-20260719T130936Z-09b008cdcfb6`; exact same
+  target with explicit prior search/attempt provenance; `followup_live_search`
+  role. This implementation-correction follow-up preserved rather than replaced
+  the original 0.3.1 history row.
+- Scientific result: three Bayesian signals; corrected minimum-FPP composite is
+  TIC_237884073_s02 at FPP 0.372284. No signal passed the unchanged FPP < 0.15
+  gate, so no follow-up registry row or external action was created.
+- Leakage/storage disposition: both roles remain training-forbidden; 3.9 MB of
+  public QLP products were used, and immutable evidence is committed in
+  `artifacts/manifests/hunter_live_acceptance_v1.json`.
+
 ## 2026-07-12 Decision: Canonical Regression Evaluation v1
 
 - Date: 2026-07-12

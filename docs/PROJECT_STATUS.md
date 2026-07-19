@@ -1,7 +1,7 @@
 # PROJECT STATUS
 
-## Status: Active Development — no open Tier 1/Tier 2 gaps; no active roadmap phase
-## Last Updated: 2026-07-17 (version 0.2.96)
+## Status: EXO-Hunter PROD Accepted — no open Tier 1/Tier 2 gaps
+## Last Updated: 2026-07-19 (version 0.3.2)
 
 This file had drifted badly stale before this update: it described Phase 4
 individual-transit diagnostics and T1-2 stacking calibration as the active
@@ -19,6 +19,10 @@ same drift.
 
 The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit with:
 
+- A merged-main, live-accepted EXO-Hunter lifecycle from a 10,000-candidate
+  universe through immutable search execution, append-only results/provenance,
+  and evidence-gated follow-up recommendations; see
+  `artifacts/manifests/hunter_live_acceptance_v1.json`
 - Core pipeline: Fetch -> Clean -> Search -> Vet -> Score -> Classify, with an
   animated terminal presentation (Milestone 20, version 0.2.96) that is purely
   cosmetic and auto-disables under redirected output/CI
@@ -30,9 +34,9 @@ The repository contains a reproducible TESS/Kepler exoplanet candidate toolkit w
 - 128 standalone `Skills/` Python files as of 2026-07-17 (re-run
   `rg --files Skills -g '*.py' | wc -l` for the current count — this number
   drifts and should not be trusted beyond the date above)
-- 153 top-level test files, ~3,000 default tests passing (exact current
+- 155 top-level test files, 3,051 default tests passing (exact current
   figure: `docs/PRODUCTION_READINESS.md`'s "Test baseline" line)
-- 32 package Python modules under `src/exo_toolkit/`
+- 34 package Python modules under `src/exo_toolkit/`
 - JWST time-series ingestion wired into the CLI with `--mission JWST`
 - Novel TESS target scanning that excludes TOI, CTOI, and confirmed-host catalogs
 - AGENTS.md Rule 7 (Run Report Policy) is retrofitted across all 15 tracked
@@ -68,6 +72,7 @@ which one is right.
 | Transit scan CLI | `cli.py` — `exo <TIC-ID>` with `--scorer`, `--model-path`, `--output`; JWST via `--mission JWST`; animated/plain progress display (Milestone 20) | Complete |
 | Background automation CLI | `cli.py` — `background-run-once`, summaries, integrity, validation | Complete |
 | Background automation module | `background/` — config, fixtures, priority, runner, storage, reports | Complete |
+| EXO-Hunter lifecycle | `search_lifecycle.py`, `hunter_cli.py` — exact new/follow-up manifests, resumable runs, append-only history, follow-up registry | PROD accepted on merged-main live data |
 | SQLite runtime state | `logs/background_search.sqlite3` schema v2 | Complete |
 | Background config | `configs/background_search_v0.json` | Complete |
 | Scoring prior config | `configs/scoring_priors_v0.json` — conservative default plus TESS/Kepler/K2 profiles | Complete |
