@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "exo-toolkit"
-version = "0.2.100"
+version = "0.3.0"
 description = "TESS/Kepler exoplanet candidate detection, vetting, scoring, and submission-pathway toolkit"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -63,6 +63,9 @@ dev = [
 
 [project.scripts]
 exo = "exo_toolkit.cli:cli_entry"
+Create-New-Search = "exo_toolkit.hunter_cli:create_new_search_entry"
+Run-New-Search = "exo_toolkit.hunter_cli:run_new_search_entry"
+Show-Follow-Ups = "exo_toolkit.hunter_cli:show_follow_ups_entry"
 
 [tool.setuptools.packages.find]
 where = ["src"]

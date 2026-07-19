@@ -423,6 +423,45 @@ same-domain stacking calibration for Kepler-mission `full-ensemble` scoring
 would need a fresh, dedicated held-out Kepler set not already claimed by
 `data_role_registry.yaml`'s training/validation/frozen-eval roles.
 
+## 2026-07-19 Decision: Hunter New/Follow-Up Search Lifecycle
+
+- Date: 2026-07-19
+- Repo: 2026 Exoplanet Research
+- Data: live TIC/MAST metadata candidate universe and durable follow-up registry
+- Role: `live_search` or `followup_live_search`, selected explicitly by mode
+- Acquisition mode: metadata-only selection, then target-batch light-curve pull
+- Estimated download GB: per-search sum frozen in candidate snapshots when known
+- Actual download GB: recorded by exact raw-product provenance during execution
+- Free space before: checked by the existing fetch/cache policies at execution
+- Free space after: recorded by the applicable acquisition/run evidence
+- Training priority score: not applicable; live targets remain training-forbidden
+- Live search priority score: deterministic TIC suitability plus verified data
+  availability and storage penalty; evidence-based follow-up priority for prior
+  candidates
+- Storage cost penalty: 0/1/2/3/5 at <=5/25/100/250/>250 GB
+- Why this data: it closes the required production path from a large target
+  universe to exact durable searches, results, and recommended follow-ups.
+- Why not alternatives: the seven-target background runner is fixture-only;
+  dynamic `star_scanner.py` execution does not preserve a general pending-search
+  lifecycle and must not silently regenerate membership.
+- Why this acquisition mode: metadata-first ranking evaluates the broad pool
+  without raw downloads; only the immutable selected manifest enters the
+  acquisition pipeline.
+- Eviction or pin rule: SQLite state and Run Reports are durable; raw public
+  light curves remain re-downloadable cache unless candidate-evidence policy
+  pins them.
+- Leakage risks: both live roles forbid training, validation, calibration, and
+  frozen-eval reuse without a separately versioned role transition.
+- Manifest: `search_manifests`/`search_manifest_targets` in
+  `data/hunter_searches.sqlite3`, SHA-256 stamped; CSV is review-only.
+- Search category: `new_target_search` for `--mode new`, `followup_search` for
+  `--mode follow-up`.
+- Expected scientific or model-hardening value: exact reproducibility,
+  no-overwrite history, loud partial failure, safe resume, and actionable
+  follow-up continuity across sessions.
+- Citations: `docs/astrometrics_data_selection_policy.md` and
+  `docs/HUNTER_PRODUCTION_WORKFLOW.md`.
+
 ## 2026-07-12 Decision: Canonical Regression Evaluation v1
 
 - Date: 2026-07-12

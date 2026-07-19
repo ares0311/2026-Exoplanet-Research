@@ -65,6 +65,23 @@ This repository implements a complete, reproducible computational pipeline for t
 
 > This section is for anyone who wants to run the pipeline without reading the full paper. No astronomy background required.
 
+### EXO-Hunter production workflow
+
+The production workflow can freeze and later execute an exact target search,
+resume failures without replacing targets, and preserve actionable follow-ups:
+
+```bash
+git switch main
+git pull --ff-only origin main
+.venv/bin/Create-New-Search --targets 100 --mode new
+.venv/bin/Run-New-Search --workers 6 --scorer bayesian
+.venv/bin/Show-Follow-Ups
+```
+
+The default Bayesian path requires no AI model. For searches above 100 targets,
+the create command writes a timestamped CSV for review; SQLite remains the
+durable system of record. See [the EXO-Hunter production workflow](docs/HUNTER_PRODUCTION_WORKFLOW.md).
+
 ### What this tool does
 
 You give it a star's ID number. It downloads the brightness measurements NASA has collected for that star, searches them for the tell-tale periodic dips that happen when a planet passes in front of the star, and then scores how likely each dip is to be a real planet versus a false alarm (a background binary star, an instrumental glitch, etc.). At the end it tells you what to do with the result — post it to a community forum, flag it for professional follow-up, or discard it.
