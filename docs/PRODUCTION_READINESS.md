@@ -9,15 +9,15 @@ was `no_external_added_value`. Phase 4 individual-transit diagnostics'
 depth/asymmetry/missing/extra-event bounded core is now complete
 (missing_transit_fraction, transit_asymmetry, extra_event_count); the next
 production task should be chosen fresh from readiness checks and roadmap
-state, not assumed to still be Phase 4. Version 0.3.2 implements the new
-Hunter-level durable search lifecycle. Live candidate selection, exact search
-creation, acquisition, scoring, and persistence have completed on merged main;
-the acceptance audit exposed and 0.3.2 fixes scorer-schema consumption, so one
-post-fix merged-main acceptance run remains before the workflow may be called
-PROD.)
+state, not assumed to still be Phase 4. Version 0.3.2's Hunter-level durable
+search lifecycle is PROD: merged-main live selection froze 10,000 candidates,
+both exact new/follow-up searches completed with zero failures, the corrective
+run preserved prior history and selected the true minimum-FPP composite, and
+SQLite/foreign-key/Run Report evidence passed. See
+`artifacts/manifests/hunter_live_acceptance_v1.json`.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
-Test baseline: 3,050 default tests passing; 2 `integration_live` tests excluded by
+Test baseline: 3,051 default tests passing; 2 `integration_live` tests excluded by
 the configured marker expression (2026-07-19; 6×6 gate: 10/10 gates
 including two verifiable-agent-reliability checks — see
 `docs/RELIABILITY_CONTROLS.md`)
@@ -49,9 +49,9 @@ immutable manifest, run attempts, append-only target history, and follow-up
 registry are distinct versioned SQLite concepts; deterministic selection can
 freeze 100 targets from a 10,000-candidate universe, partial work is nonzero
 and resumable, and exact targets are never regenerated during execution. See
-`docs/HUNTER_PRODUCTION_WORKFLOW.md`. Live merged-main acceptance remains the
-only open gate for this new orchestration layer; the underlying scorer
-acceptance remains PASS. The first merged-main acceptance attempt failed before
+`docs/HUNTER_PRODUCTION_WORKFLOW.md`. Live merged-main acceptance is PASS for
+this orchestration layer; the underlying scorer acceptance also remains PASS.
+The first merged-main acceptance attempt failed before
 search creation because installed console scripts omitted the repository root
 from `sys.path`; 0.3.1 adds a fail-loud validated loader for the required
 `Skills.star_scanner` and `Skills.run_report` modules plus a subprocess
@@ -66,6 +66,15 @@ normalizes both supported shapes through one finite-score validator, uses it for
 composite selection and follow-up gating, and fails loudly on missing scores.
 The same acceptance run exposed ETA strings such as `3m60s`; 0.3.2 routes all
 new lifecycle progress and the live TIC sweep through integer `divmod` formatters.
+The post-fix merged-main follow-up search
+`exo-search-20260719T130936Z-09b008cdcfb6` completed with one success, zero
+failures, preserved its explicit prior-search/attempt provenance, and selected
+the correct s02 composite at FPP 0.372284. Both Run Reports are committed; the
+acceptance snapshot records two immutable manifests, two attempts, two history
+rows, six state events, database SHA-256/integrity, nine raw QLP URIs, 63,205
+cadences, and all PROD-requirement evidence. No signal met FPP < 0.15, so the
+live follow-up registry correctly remains empty rather than containing a
+threshold-bypassing entry.
 
 Historical version note: 0.2.100 added target-selection progress/ETA. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,

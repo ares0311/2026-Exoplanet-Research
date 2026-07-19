@@ -23,8 +23,9 @@ system of record, `src/exo_toolkit/hunter_cli.py` implements the exact
 `Create-New-Search`, `Run-New-Search`, and `Show-Follow-Ups` shell entry points,
 and `docs/HUNTER_PRODUCTION_WORKFLOW.md` is the operator/spec handoff. The
 Bayesian default keeps core operation independent of AI. Offline acceptance is
-implemented; a merged-main real-service lifecycle run is still required before
-claiming the new top-level workflow is PROD. Version 0.3.1 fixes the
+implemented and merged-main live acceptance is PASS; the top-level workflow is
+PROD as recorded in `artifacts/manifests/hunter_live_acceptance_v1.json`.
+Version 0.3.1 fixes the
 installed-console-script path that initially could not import repository
 `Skills` modules. Version 0.3.2 fixes production scorer-schema consumption
 after the first completed live run proved that FPP/confidence are nested under

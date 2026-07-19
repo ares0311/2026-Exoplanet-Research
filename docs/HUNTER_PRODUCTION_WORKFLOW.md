@@ -5,7 +5,8 @@
 Version 0.3.2 closes the undocumented operator bridge between target selection
 and the existing fetch → clean → search → vet → score → classify pipeline. The
 three shell entry points now share one durable SQLite system of record and can
-run without an AI model:
+run without an AI model. Merged-main live acceptance is PASS; immutable evidence
+is committed at `artifacts/manifests/hunter_live_acceptance_v1.json`:
 
 ```text
 candidate universe
@@ -144,8 +145,14 @@ manifest immutability, loud partial failure, restart/resume, history
 preservation, external follow-up provenance, CSV review export, Run Report
 injection, the three exact package entry points, and repository-Skill loading
 from an installed process whose working directory is outside the repo.
-Real-service acceptance
-evidence must be recorded separately; mocks alone do not establish live PROD.
-The version 0.3.2 release gate passes all 3,050 default tests plus Ruff, mypy,
+Real-service acceptance used a live 10,000-candidate TIC universe and nine QLP
+products for TIC 237884073. The original 0.3.1 result exposed a nested scorer-
+schema defect; its history was preserved, 0.3.2 corrected the consumer, and a
+provenance-linked follow-up run persisted the true minimum-FPP composite. No
+signal passed the unchanged FPP < 0.15 gate, so zero live registry rows is the
+correct scientific outcome rather than missing work. The qualifying
+registration/recommendation branch remains covered by end-to-end store/CLI
+tests using the same production nested score shape.
+The version 0.3.2 release gate passes all 3,051 default tests plus Ruff, mypy,
 the incomplete-implementation scan, and directive-integrity scan as 10/10
 supervised gates under the canonical 6×6 topology.

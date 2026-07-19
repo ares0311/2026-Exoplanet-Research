@@ -370,3 +370,30 @@ def test_invalid_scorer_fails_before_starting_attempt(tmp_path: Path) -> None:
     )
     assert run_new_search(["--db", str(db), "--scorer", "opaque-ai"]) == 2
     assert store.open_searches()[0]["state"] == "pending"
+
+
+def test_live_acceptance_manifest_covers_prod_contract_and_run_reports() -> None:
+    acceptance = json.loads(
+        Path("artifacts/manifests/hunter_live_acceptance_v1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert acceptance["status"] == "pass"
+    assert acceptance["core_ai_dependency"] is False
+    assert acceptance["new_search"]["candidate_pool_count"] >= 10_000
+    assert acceptance["new_search"]["execution_status"] == "completed"
+    corrected = acceptance["corrective_follow_up_search"]
+    assert corrected["execution_status"] == "completed"
+    assert corrected["items_failed"] == 0
+    assert corrected["composite_candidate"] == "TIC_237884073_s02"
+    assert corrected["prior_search_id"] == acceptance["new_search"]["search_id"]
+    assert all(
+        str(evidence).startswith("pass:")
+        for evidence in acceptance["prod_requirements"].values()
+    )
+
+    report_lines = Path(
+        acceptance["durable_state"]["run_report_path"]
+    ).read_text(encoding="utf-8")
+    assert acceptance["new_search"]["search_id"] in report_lines
+    assert corrected["search_id"] in report_lines
