@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from exo_toolkit.hunter_cli import (
+    _commit_run_report,
     _pipeline_runner,
     create_new_search,
     import_follow_up,
@@ -345,6 +346,21 @@ def test_import_reviewed_follow_up_rejects_changed_source(tmp_path: Path) -> Non
         ["--evidence-file", str(evidence), "--db", str(tmp_path / "hunter.db")],
         report_fn=lambda *_: None,
     ) == 2
+
+
+def test_hunter_run_report_commit_failure_is_loud(
+    tmp_path: Path, capsys: object
+) -> None:
+    class FailedReportModule:
+        @staticmethod
+        def run_and_commit_report(*_: object) -> bool:
+            return False
+
+    path = tmp_path / "hunter.jsonl"
+    assert _commit_run_report(FailedReportModule, object(), path) is False
+    error = capsys.readouterr().err  # type: ignore[attr-defined]
+    assert "WARNING: Run Report data was preserved" in error
+    assert str(path) in error
 
 
 def test_installed_process_can_load_required_project_skills_outside_repo_cwd(

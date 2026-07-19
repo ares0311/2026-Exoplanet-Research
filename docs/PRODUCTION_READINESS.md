@@ -44,7 +44,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.3.3 is the current development version. Version 0.3.2 added the durable,
+Version note: 0.3.4 is the current development version. Version 0.3.2 added the durable,
 non-AI-dependent Hunter workflow and exact `Create-New-Search`,
 `Run-New-Search`, and `Show-Follow-Ups` entry points. Candidate catalog,
 immutable manifest, run attempts, append-only target history, and follow-up
@@ -82,6 +82,8 @@ TIC 355651994 signal from the frozen `tess_live_search_v1` evidence with source
 SHA-256 validation. Its recommendation remains visible while
 `search_eligible=false` prevents the forbidden frozen-batch rerun until
 event-covering observations exist.
+Version 0.3.4 also makes Hunter Run Report commit/push failure explicit on
+stderr while preserving the successfully written local report and search data.
 
 Historical version note: 0.2.100 added target-selection progress/ETA. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,

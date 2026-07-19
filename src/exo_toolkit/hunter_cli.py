@@ -628,7 +628,19 @@ def _write_run_report(
         notes=f"search_id={summary.search_id}; attempt_id={summary.attempt_id}",
     )
     path = run_report.report_path_for("hunter_search")
-    run_report.run_and_commit_report(report, path)
+    _commit_run_report(run_report, report, path)
+
+
+def _commit_run_report(run_report: Any, report: Any, path: Path) -> bool:
+    committed = bool(run_report.run_and_commit_report(report, path))
+    if not committed:
+        print(
+            f"WARNING: Run Report data was preserved at {path}, but its git commit/push "
+            "failed; push that exact report file manually.",
+            file=sys.stderr,
+            flush=True,
+        )
+    return committed
 
 
 def _write_follow_up_import_report(
@@ -653,7 +665,8 @@ def _write_follow_up_import_report(
             f"created={str(bool(result['created'])).lower()}"
         ),
     )
-    run_report.run_and_commit_report(
+    _commit_run_report(
+        run_report,
         report,
         run_report.report_path_for("hunter_followup_import"),
     )
