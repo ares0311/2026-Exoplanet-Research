@@ -9,7 +9,7 @@ by itself satisfy a master-guide evidence requirement.
 ## Current Master-Guide Alignment — Production Priority Order
 
 - **Hunter production lifecycle (IMPLEMENTED; LIVE ACCEPTANCE PENDING):**
-  version 0.3.1 adds the missing durable bridge from a large candidate universe
+  version 0.3.2 adds the missing durable bridge from a large candidate universe
   through exact pending-search execution and evidence-based follow-ups. The
   append-only SQLite contract separates candidate catalog, immutable manifest,
   run attempts, target history, and follow-up registry; selection is
@@ -17,8 +17,10 @@ by itself satisfy a master-guide evidence requirement.
   unfinished/failed targets. `Create-New-Search`, `Run-New-Search`, and
   `Show-Follow-Ups` are packaged shell entry points. Offline end-to-end and
   100-from-10,000 tests pass; 0.3.1 fixes the packaged-process repository-Skill
-  loader exposed by the first merged-main live attempt. Do not call the
-  lifecycle PROD until a merged-main real-service acceptance run preserves its evidence; see
+  loader exposed by the first merged-main live attempt. The next run completed
+  real selection/execution but exposed nested scorer fields that 0.3.2 now
+  consumes for composite selection and follow-up gating. Do not call the
+  lifecycle PROD until a post-fix merged-main acceptance run preserves its evidence; see
   `docs/HUNTER_PRODUCTION_WORKFLOW.md`.
 
 1. **Phase 1 — validated manifest contract (CONTRACT COMPLETE):** version 0.2.30 adds

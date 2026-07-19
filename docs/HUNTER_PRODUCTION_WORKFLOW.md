@@ -2,7 +2,7 @@
 
 ## Production outcome
 
-Version 0.3.1 closes the undocumented operator bridge between target selection
+Version 0.3.2 closes the undocumented operator bridge between target selection
 and the existing fetch → clean → search → vet → score → classify pipeline. The
 three shell entry points now share one durable SQLite system of record and can
 run without an AI model:
@@ -146,6 +146,6 @@ injection, the three exact package entry points, and repository-Skill loading
 from an installed process whose working directory is outside the repo.
 Real-service acceptance
 evidence must be recorded separately; mocks alone do not establish live PROD.
-The version 0.3.1 release gate passes all 3,047 default tests plus Ruff, mypy,
+The version 0.3.2 release gate passes all 3,050 default tests plus Ruff, mypy,
 the incomplete-implementation scan, and directive-integrity scan as 10/10
 supervised gates under the canonical 6×6 topology.

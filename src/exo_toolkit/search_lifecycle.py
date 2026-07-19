@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import math
 import sqlite3
 import time
 from collections.abc import Callable, Mapping, Sequence
@@ -226,6 +227,17 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 
 def _utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+def format_eta(seconds: float) -> str:
+    """Format a nonnegative ETA without impossible 60-second remainders."""
+    if math.isinf(seconds):
+        return "unknown"
+    rounded = max(0, int(round(seconds)))
+    if rounded > 90:
+        minutes, remainder = divmod(rounded, 60)
+        return f"{minutes}m{remainder:02d}s"
+    return f"{rounded}s"
 
 
 def _canonical_json(value: Any) -> str:
@@ -607,14 +619,10 @@ class HunterStore:
                         elapsed = time.monotonic() - start_monotonic
                         rate = done / elapsed if elapsed > 0 else 0.0
                         remaining = (len(pending) - done) / rate if rate > 0 else float("inf")
-                        eta = (
-                            f"{remaining / 60:.0f}m{remaining % 60:.0f}s"
-                            if remaining > 90
-                            else f"{remaining:.0f}s"
-                        )
                         progress_fn(
                             f"[{done}/{len(pending)}] target={candidate.target_id} "
-                            f"status={outcome.status} elapsed={elapsed:.0f}s ETA={eta}"
+                            f"status={outcome.status} elapsed={elapsed:.0f}s "
+                            f"ETA={format_eta(remaining)}"
                         )
         except BaseException as exc:
             completed_at = now_fn()
