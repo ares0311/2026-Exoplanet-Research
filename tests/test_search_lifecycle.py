@@ -15,6 +15,7 @@ from exo_toolkit.search_lifecycle import (
     HunterStore,
     PriorSearch,
     TargetExecutionResult,
+    format_eta,
 )
 
 
@@ -30,6 +31,11 @@ def _candidate(index: int, *, score: float | None = None) -> HunterCandidate:
         selection_reason="deterministic test rank",
         metrics={"priority": float(index)},
     )
+
+
+def test_format_eta_never_emits_sixty_second_remainder() -> None:
+    assert format_eta(239.6) == "4m00s"
+    assert format_eta(89.6) == "90s"
 
 
 def _prior(index: int = 1) -> PriorSearch:

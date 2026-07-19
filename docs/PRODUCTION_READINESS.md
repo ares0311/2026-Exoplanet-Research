@@ -9,13 +9,15 @@ was `no_external_added_value`. Phase 4 individual-transit diagnostics'
 depth/asymmetry/missing/extra-event bounded core is now complete
 (missing_transit_fraction, transit_asymmetry, extra_event_count); the next
 production task should be chosen fresh from readiness checks and roadmap
-state, not assumed to still be Phase 4. Version 0.3.1 implements the new
-Hunter-level durable search lifecycle; offline acceptance is complete and a
-merged-main real-service lifecycle run remains required before the new
-top-level workflow may be called PROD.)
+state, not assumed to still be Phase 4. Version 0.3.2 implements the new
+Hunter-level durable search lifecycle. Live candidate selection, exact search
+creation, acquisition, scoring, and persistence have completed on merged main;
+the acceptance audit exposed and 0.3.2 fixes scorer-schema consumption, so one
+post-fix merged-main acceptance run remains before the workflow may be called
+PROD.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
-Test baseline: 3,047 default tests passing; 2 `integration_live` tests excluded by
+Test baseline: 3,050 default tests passing; 2 `integration_live` tests excluded by
 the configured marker expression (2026-07-19; 6×6 gate: 10/10 gates
 including two verifiable-agent-reliability checks — see
 `docs/RELIABILITY_CONTROLS.md`)
@@ -40,7 +42,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.3.1 is the current development version. It adds the durable,
+Version note: 0.3.2 is the current development version. It adds the durable,
 non-AI-dependent Hunter workflow and exact `Create-New-Search`,
 `Run-New-Search`, and `Show-Follow-Ups` entry points. Candidate catalog,
 immutable manifest, run attempts, append-only target history, and follow-up
@@ -53,7 +55,17 @@ acceptance remains PASS. The first merged-main acceptance attempt failed before
 search creation because installed console scripts omitted the repository root
 from `sys.path`; 0.3.1 adds a fail-loud validated loader for the required
 `Skills.star_scanner` and `Skills.run_report` modules plus a subprocess
-regression test that runs outside the repository working directory.
+regression test that runs outside the repository working directory. The next
+merged-main run created `exo-search-20260719T112104Z-37f71aaa95f5` from 10,000
+frozen candidates and completed TIC 237884073 with three real Bayesian signal
+rows and zero execution failures. Audit then found that the lifecycle read
+FPP/confidence at the row top level while production rows store both under
+`scores`; this selected s01 (FPP 0.492621) instead of true minimum s02
+(FPP 0.372284) and made real follow-up registration unreachable. Version 0.3.2
+normalizes both supported shapes through one finite-score validator, uses it for
+composite selection and follow-up gating, and fails loudly on missing scores.
+The same acceptance run exposed ETA strings such as `3m60s`; 0.3.2 routes all
+new lifecycle progress and the live TIC sweep through integer `divmod` formatters.
 
 Historical version note: 0.2.100 added target-selection progress/ETA. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,

@@ -5,6 +5,7 @@ import argparse
 import csv
 import importlib
 import json
+import math
 import sys
 import time
 from collections.abc import Callable, Mapping, Sequence
@@ -24,6 +25,7 @@ from exo_toolkit.search_lifecycle import (
     HunterStore,
     SearchExecutionSummary,
     TargetExecutionResult,
+    format_eta,
 )
 
 DEFAULT_HUNTER_DB = Path("data/hunter_searches.sqlite3")
@@ -219,14 +221,9 @@ def _select_live_new_candidates(
                 elapsed = time.monotonic() - inspection_started
                 rate = completed / elapsed if elapsed > 0 else 0.0
                 remaining = (len(inspect_rows) - completed) / rate if rate > 0 else float("inf")
-                eta = (
-                    f"{remaining / 60:.0f}m{remaining % 60:.0f}s"
-                    if remaining > 90
-                    else f"{remaining:.0f}s"
-                )
                 progress_fn(
                     f"  [{completed}/{len(inspect_rows)}] "
-                    f"elapsed={elapsed:.0f}s ETA={eta}"
+                    f"elapsed={elapsed:.0f}s ETA={format_eta(remaining)}"
                 )
 
     candidates: list[HunterCandidate] = []
@@ -414,25 +411,41 @@ def create_new_search(
         return 2
 
 
+def _required_score(row: Mapping[str, Any], name: str) -> float:
+    """Read one finite scorer value from the production or legacy row shape."""
+    value = row.get(name)
+    if value is None:
+        scores = row.get("scores")
+        if isinstance(scores, Mapping):
+            value = scores.get(name)
+    if value is None:
+        raise RuntimeError(f"Pipeline scorer row is missing required score {name!r}")
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError(f"Pipeline scorer row has invalid score {name!r}: {value!r}") from exc
+    if not math.isfinite(numeric):
+        raise RuntimeError(f"Pipeline scorer row has non-finite score {name!r}: {value!r}")
+    return numeric
+
+
 def _follow_up_from_row(row: Mapping[str, Any]) -> FollowUpRecommendation | None:
-    fpp = row.get("false_positive_probability")
-    confidence = row.get("detection_confidence")
+    fpp = _required_score(row, "false_positive_probability")
+    confidence = _required_score(row, "detection_confidence")
     pathway = row.get("pathway")
     if (
-        fpp is None
-        or confidence is None
-        or float(fpp) >= FOLLOW_UP_FPP_MAX
-        or float(confidence) <= FOLLOW_UP_CONFIDENCE_MIN
+        fpp >= FOLLOW_UP_FPP_MAX
+        or confidence <= FOLLOW_UP_CONFIDENCE_MIN
         or pathway not in FOLLOW_UP_PATHWAYS
     ):
         return None
-    priority = 100.0 * (1.0 - float(fpp)) + 10.0 * float(confidence)
+    priority = 100.0 * (1.0 - fpp) + 10.0 * confidence
     return FollowUpRecommendation(
         candidate_id=str(row.get("candidate_id", "unknown-candidate")),
         priority=priority,
         reason=(
-            f"candidate signal passed follow-up gate: FPP={float(fpp):.4f}, "
-            f"confidence={float(confidence):.4f}, pathway={pathway}"
+            f"candidate signal passed follow-up gate: FPP={fpp:.4f}, "
+            f"confidence={confidence:.4f}, pathway={pathway}"
         ),
         evidence=dict(row),
         recommended_action=(
@@ -506,7 +519,7 @@ def _pipeline_runner(
             )
         strongest = min(
             rows,
-            key=lambda row: float(row.get("false_positive_probability", 1.0)),
+            key=lambda row: _required_score(row, "false_positive_probability"),
         )
         follow_ups = tuple(
             follow_up for row in rows if (follow_up := _follow_up_from_row(row)) is not None

@@ -303,6 +303,61 @@ def test_pipeline_runner_records_no_data_as_terminal_not_retry_failure(
     assert outcome.result["no_data_reason"].startswith("No TESS light curves")
 
 
+def test_pipeline_runner_consumes_production_nested_score_schema(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rows = [
+        {
+            "candidate_id": "higher-fpp",
+            "scores": {
+                "false_positive_probability": 0.4,
+                "detection_confidence": 0.8,
+            },
+            "pathway": "planet_hunters_discussion",
+        },
+        {
+            "candidate_id": "follow-up-candidate",
+            "scores": {
+                "false_positive_probability": 0.05,
+                "detection_confidence": 0.9,
+            },
+            "pathway": "planet_hunters_discussion",
+        },
+    ]
+    monkeypatch.setattr("exo_toolkit.hunter_cli.run_pipeline", lambda *_, **__: rows)
+    runner = _pipeline_runner(
+        scorer="bayesian",
+        model_path=None,
+        cnn_checkpoint=None,
+        pipeline="QLP",
+        exptime="long",
+    )
+
+    outcome = runner(_candidates(1)[0])
+
+    assert outcome.result["composite_result"]["candidate_id"] == "follow-up-candidate"
+    assert [row.candidate_id for row in outcome.follow_ups] == ["follow-up-candidate"]
+
+
+def test_pipeline_runner_fails_loudly_when_required_scores_are_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "exo_toolkit.hunter_cli.run_pipeline",
+        lambda *_, **__: [{"candidate_id": "invalid", "pathway": "tfop_ready"}],
+    )
+    runner = _pipeline_runner(
+        scorer="bayesian",
+        model_path=None,
+        cnn_checkpoint=None,
+        pipeline="QLP",
+        exptime="long",
+    )
+
+    with pytest.raises(RuntimeError, match="missing required score"):
+        runner(_candidates(1)[0])
+
+
 def test_invalid_scorer_fails_before_starting_attempt(tmp_path: Path) -> None:
     db = tmp_path / "hunter.sqlite3"
     store = HunterStore(db)

@@ -806,12 +806,10 @@ def select_targets(
         elapsed = time.monotonic() - start
         rate = done / elapsed if elapsed > 0 else 0.0
         remaining = (total - done) / rate if rate > 0 else float("inf")
-        eta = (
-            f"{remaining / 60:.0f}m{remaining % 60:.0f}s"
-            if remaining > 90
-            else f"{remaining:.0f}s"
+        print(
+            f"  [{done}/{total}]  elapsed={elapsed:.0f}s  ETA={_format_eta(remaining)}",
+            flush=True,
         )
-        print(f"  [{done}/{total}]  elapsed={elapsed:.0f}s  ETA={eta}", flush=True)
 
     if full_sweep:
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
