@@ -9,17 +9,16 @@ was `no_external_added_value`. Phase 4 individual-transit diagnostics'
 depth/asymmetry/missing/extra-event bounded core is now complete
 (missing_transit_fraction, transit_asymmetry, extra_event_count); the next
 production task should be chosen fresh from readiness checks and roadmap
-state, not assumed to still be Phase 4. Hunter orchestration acceptance is
-temporarily **PARTIAL**: merged-main live selection/execution evidence is valid,
-but the original acceptance had zero real follow-up registry rows and used
-test-only registration as PROD evidence. Version 0.3.3 adds checksum-verified
-reviewed-result import and an explicit revisit eligibility gate; merged-main
-live import remains required before Hunter can be called PROD. The original
-artifact is preserved and corrected by
-`artifacts/manifests/hunter_live_acceptance_v1_reassessment.json`.)
+state, not assumed to still be Phase 4. Version 0.3.4's Hunter orchestration is
+**PROD ACCEPTED**: merged-main live selection/execution is joined to one real,
+checksum-verified reviewed follow-up row with visible provenance,
+recommendation, and revisit gate. The deferred target cannot seed a new search;
+repeat import is idempotent; SQLite, foreign keys, Run Reports, CI, and 10/10
+quality gates pass. The corrected acceptance is
+`artifacts/manifests/hunter_live_acceptance_v2.json`.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
-Test baseline: 3,051 default tests passing; 2 `integration_live` tests excluded by
+Test baseline: 3,057 default tests passing; 2 `integration_live` tests excluded by
 the configured marker expression (2026-07-19; 6×6 gate: 10/10 gates
 including two verifiable-agent-reliability checks — see
 `docs/RELIABILITY_CONTROLS.md`)
@@ -51,9 +50,8 @@ immutable manifest, run attempts, append-only target history, and follow-up
 registry are distinct versioned SQLite concepts; deterministic selection can
 freeze 100 targets from a 10,000-candidate universe, partial work is nonzero
 and resumable, and exact targets are never regenerated during execution. See
-`docs/HUNTER_PRODUCTION_WORKFLOW.md`. Hunter orchestration acceptance remains
-PARTIAL pending the merged-main reviewed follow-up import; the independently
-established underlying scorer acceptance remains PASS.
+`docs/HUNTER_PRODUCTION_WORKFLOW.md`. Hunter orchestration acceptance and the
+independently established underlying scorer acceptance are both PASS.
 The first merged-main acceptance attempt failed before
 search creation because installed console scripts omitted the repository root
 from `sys.path`; 0.3.1 adds a fail-loud validated loader for the required
@@ -84,6 +82,12 @@ SHA-256 validation. Its recommendation remains visible while
 event-covering observations exist.
 Version 0.3.4 also makes Hunter Run Report commit/push failure explicit on
 stderr while preserving the successfully written local report and search data.
+Merged-main import created the durable TIC 355651994 recommendation; a second
+import returned the same stable IDs with `created=false`. `Show-Follow-Ups`
+displays its prior-search provenance and conservative next action, while
+`Create-New-Search --mode follow-up` exits 2 and creates no search because the
+required event-covering observations do not yet exist. See
+`artifacts/manifests/hunter_live_acceptance_v2.json`.
 
 Historical version note: 0.2.100 added target-selection progress/ETA. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,

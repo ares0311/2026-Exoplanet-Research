@@ -8,7 +8,7 @@ by itself satisfy a master-guide evidence requirement.
 
 ## Current Master-Guide Alignment — Production Priority Order
 
-- **Hunter production lifecycle (LIVE FOLLOW-UP ACCEPTANCE PENDING):**
+- **Hunter production lifecycle (PROD ACCEPTED):**
   version 0.3.2 adds the missing durable bridge from a large candidate universe
   through exact pending-search execution and evidence-based follow-ups. The
   append-only SQLite contract separates candidate catalog, immutable manifest,
@@ -27,9 +27,12 @@ by itself satisfy a master-guide evidence requirement.
   its unchanged historical artifact is superseded by
   `artifacts/manifests/hunter_live_acceptance_v1_reassessment.json`. Version
   0.3.3 supplies checksum-verified reviewed-result import and separates visible
-  recommendations from immediately executable searches. Merge it, import the
-  reviewed TIC 355651994 evidence on main, verify display and selection
-  exclusion, then issue a new acceptance artifact. See also
+  recommendations from immediately executable searches. Merged-main import now
+  durably records the real reviewed TIC 355651994 evidence; display,
+  recommendation, selection exclusion, idempotency, SQLite integrity, foreign
+  keys, and Run Reports all pass. Version 0.3.4 makes report-push failure loud.
+  Corrected acceptance evidence is frozen in
+  `artifacts/manifests/hunter_live_acceptance_v2.json`; see also
   `docs/HUNTER_PRODUCTION_WORKFLOW.md`.
 
 1. **Phase 1 — validated manifest contract (CONTRACT COMPLETE):** version 0.2.30 adds

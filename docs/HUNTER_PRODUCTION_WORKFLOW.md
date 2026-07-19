@@ -4,10 +4,11 @@
 
 Version 0.3.3 closes the reviewed-prior-result bridge left open by version 0.3.2.
 The shell entry points share one durable SQLite system of record and can run
-without an AI model. Live execution has passed, but Hunter acceptance remains
-PARTIAL until the version 0.3.3 reviewed evidence import runs from merged main.
-The unsupported version 0.3.2 conclusion is preserved and corrected at
-`artifacts/manifests/hunter_live_acceptance_v1_reassessment.json`:
+without an AI model. Version 0.3.4 Hunter acceptance is PASS after merged-main
+reviewed evidence import, display, selection exclusion, and idempotency checks.
+The unsupported version 0.3.2 conclusion remains preserved in its original and
+reassessment artifacts; corrected evidence is committed at
+`artifacts/manifests/hunter_live_acceptance_v2.json`:
 
 ```text
 candidate universe
@@ -168,5 +169,8 @@ Neither acceptance run passed the unchanged FPP < 0.15 gate, so zero new rows
 was scientifically correct for those runs but insufficient as live follow-up
 creation evidence. Version 0.3.3 adds checksum-verified import of a separate,
 already reviewed real result plus tests for migration, idempotency, provenance,
-visible deferral, and selection exclusion. The canonical release gate and
-merged-main import are required before a replacement acceptance can pass.
+visible deferral, and selection exclusion. The merged-main import created one
+real registry/history row; a repeated import returned the same stable IDs with
+no duplicate rows. The replacement acceptance passes 3,057 default tests plus
+Ruff, mypy, incomplete-implementation, and directive-integrity checks as 10/10
+canonical gates.
