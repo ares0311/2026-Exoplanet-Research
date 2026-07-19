@@ -2,11 +2,12 @@
 
 ## Production outcome
 
-Version 0.3.2 closes the undocumented operator bridge between target selection
-and the existing fetch → clean → search → vet → score → classify pipeline. The
-three shell entry points now share one durable SQLite system of record and can
-run without an AI model. Merged-main live acceptance is PASS; immutable evidence
-is committed at `artifacts/manifests/hunter_live_acceptance_v1.json`:
+Version 0.3.3 closes the reviewed-prior-result bridge left open by version 0.3.2.
+The shell entry points share one durable SQLite system of record and can run
+without an AI model. Live execution has passed, but Hunter acceptance remains
+PARTIAL until the version 0.3.3 reviewed evidence import runs from merged main.
+The unsupported version 0.3.2 conclusion is preserved and corrected at
+`artifacts/manifests/hunter_live_acceptance_v1_reassessment.json`:
 
 ```text
 candidate universe
@@ -59,6 +60,21 @@ git switch main
 git pull --ff-only origin main
 .venv/bin/Show-Follow-Ups
 ```
+
+Import a checksum-verified reviewed prior result before showing it:
+
+```bash
+git switch main
+git pull --ff-only origin main
+.venv/bin/Import-Follow-Up \
+  --evidence-file artifacts/manifests/hunter_reviewed_followup_import_v1.json
+```
+
+`Import-Follow-Up` records the source as a completed historical manifest, run,
+target-history row, and follow-up row. This evidence row explicitly carries
+`search_eligible=false`; it remains visible in `Show-Follow-Ups`, but cannot
+seed `Create-New-Search --mode follow-up` until their stated revisit condition
+is satisfied. Source-file hash drift fails before any database mutation.
 
 All commands support `--json` for scripts and `--no-color` for predictable
 plain output. A candidate file may be supplied to `Create-New-Search` as JSON
@@ -147,12 +163,10 @@ injection, the three exact package entry points, and repository-Skill loading
 from an installed process whose working directory is outside the repo.
 Real-service acceptance used a live 10,000-candidate TIC universe and nine QLP
 products for TIC 237884073. The original 0.3.1 result exposed a nested scorer-
-schema defect; its history was preserved, 0.3.2 corrected the consumer, and a
-provenance-linked follow-up run persisted the true minimum-FPP composite. No
-signal passed the unchanged FPP < 0.15 gate, so zero live registry rows is the
-correct scientific outcome rather than missing work. The qualifying
-registration/recommendation branch remains covered by end-to-end store/CLI
-tests using the same production nested score shape.
-The version 0.3.2 release gate passes all 3,051 default tests plus Ruff, mypy,
-the incomplete-implementation scan, and directive-integrity scan as 10/10
-supervised gates under the canonical 6×6 topology.
+schema defect; its history was preserved, and 0.3.2 corrected the consumer.
+Neither acceptance run passed the unchanged FPP < 0.15 gate, so zero new rows
+was scientifically correct for those runs but insufficient as live follow-up
+creation evidence. Version 0.3.3 adds checksum-verified import of a separate,
+already reviewed real result plus tests for migration, idempotency, provenance,
+visible deferral, and selection exclusion. The canonical release gate and
+merged-main import are required before a replacement acceptance can pass.

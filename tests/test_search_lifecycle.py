@@ -264,6 +264,75 @@ def test_follow_up_registry_can_seed_later_follow_up_search(tmp_path: Path) -> N
     assert follow_search["targets"][0]["candidate"]["prior_searches"]
 
 
+def test_deferred_follow_up_is_visible_but_not_search_eligible(tmp_path: Path) -> None:
+    store = HunterStore(tmp_path / "hunter.sqlite3")
+    search = _create(store, [_candidate(1)], count=1)
+    store.execute_search(
+        lambda _: TargetExecutionResult(
+            status="candidate_found",
+            result={},
+            provenance={},
+            follow_ups=(
+                FollowUpRecommendation(
+                    candidate_id="TIC1-s01",
+                    priority=99.0,
+                    reason="evidence limited",
+                    evidence={"events": 2},
+                    recommended_action="wait for more observations",
+                    search_eligible=False,
+                    revisit_reason="four independent events are required",
+                ),
+            ),
+        ),
+        search_id=search["search_id"],
+    )
+
+    rows = store.list_follow_ups()
+    assert rows[0]["search_eligible"] is False
+    assert rows[0]["revisit_reason"] == "four independent events are required"
+    assert store.follow_up_candidates() == []
+
+
+def test_reviewed_import_preserves_history_and_is_idempotent(tmp_path: Path) -> None:
+    store = HunterStore(tmp_path / "hunter.sqlite3")
+    candidate = _candidate(7).model_copy(
+        update={
+            "source_provenance": {"search_category": "follow-up"},
+            "prior_searches": (_prior(7),),
+        }
+    )
+    recommendation = FollowUpRecommendation(
+        candidate_id="TIC7-s02",
+        priority=88.0,
+        reason="reviewed signal",
+        evidence={"events": 2},
+        recommended_action="await another event",
+        search_eligible=False,
+        revisit_reason="new event-covering observations required",
+    )
+    kwargs = {
+        "candidate": candidate,
+        "recommendation": recommendation,
+        "source_search_id": "legacy-batch",
+        "source_attempt_id": "legacy-shards",
+        "source_result": {"review_status": "plausible_but_weak"},
+        "source_provenance": {"artifact": "review.json"},
+        "completed_at": datetime(2026, 1, 3, tzinfo=UTC),
+        "imported_at": datetime(2026, 1, 4, tzinfo=UTC),
+    }
+
+    first = store.import_reviewed_follow_up(**kwargs)
+    second = store.import_reviewed_follow_up(**kwargs)
+
+    assert first["created"] is True
+    assert second == {**first, "created": False}
+    assert store.get_search(first["search_id"])["state"] == "completed"
+    assert store.open_searches() == []
+    assert store.target_history("TIC 7")[0]["result"]["review_status"] == "plausible_but_weak"
+    assert len(store.list_follow_ups()) == 1
+    assert store.follow_up_candidates() == []
+
+
 def test_manifest_csv_is_operator_review_artifact_not_system_of_record(tmp_path: Path) -> None:
     store = HunterStore(tmp_path / "hunter.sqlite3")
     search = _create(store, [_candidate(1), _candidate(2)], count=2)
@@ -282,7 +351,7 @@ def test_integrity_reports_all_required_durable_concepts(tmp_path: Path) -> None
         "sqlite_integrity": "ok",
         "missing_tables": [],
         "orphan_manifest_targets": 0,
-        "schema_version": 1,
+        "schema_version": 2,
     }
     connection = sqlite3.connect(db_path)
     names = {
@@ -297,6 +366,46 @@ def test_integrity_reports_all_required_durable_concepts(tmp_path: Path) -> None
         "target_search_history",
         "follow_up_registry",
     } <= names
+
+
+def test_schema_v1_follow_up_table_migrates_without_losing_rows(tmp_path: Path) -> None:
+    db_path = tmp_path / "hunter.sqlite3"
+    store = HunterStore(db_path)
+    search = _create(store, [_candidate(1)], count=1)
+    store.execute_search(
+        lambda _: TargetExecutionResult(
+            status="candidate_found",
+            result={},
+            provenance={},
+            follow_ups=(
+                FollowUpRecommendation(
+                    candidate_id="signal",
+                    priority=90,
+                    reason="signal",
+                    evidence={},
+                    recommended_action="review",
+                ),
+            ),
+        ),
+        search_id=search["search_id"],
+    )
+    connection = sqlite3.connect(db_path)
+    connection.execute("ALTER TABLE follow_up_registry RENAME TO follow_up_registry_v2")
+    connection.execute(
+        "CREATE TABLE follow_up_registry AS SELECT follow_up_id, search_id, target_id, "
+        "candidate_id, priority, reason, evidence_json, prior_search_provenance_json, "
+        "recommended_action, status, created_at FROM follow_up_registry_v2"
+    )
+    connection.execute("DROP TABLE follow_up_registry_v2")
+    connection.execute("PRAGMA user_version = 1")
+    connection.commit()
+    connection.close()
+
+    migrated = HunterStore(db_path)
+    row = migrated.list_follow_ups()[0]
+    assert row["candidate_id"] == "signal"
+    assert row["search_eligible"] is True
+    assert row["revisit_reason"] is None
 
 
 def test_execute_refuses_completed_search(tmp_path: Path) -> None:

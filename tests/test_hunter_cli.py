@@ -14,6 +14,7 @@ import pytest
 from exo_toolkit.hunter_cli import (
     _pipeline_runner,
     create_new_search,
+    import_follow_up,
     run_new_search,
     show_follow_ups,
 )
@@ -256,6 +257,94 @@ def test_pyproject_registers_exact_required_shell_entry_points() -> None:
     assert scripts["Create-New-Search"].endswith(":create_new_search_entry")
     assert scripts["Run-New-Search"].endswith(":run_new_search_entry")
     assert scripts["Show-Follow-Ups"].endswith(":show_follow_ups_entry")
+    assert scripts["Import-Follow-Up"].endswith(":import_follow_up_entry")
+
+
+def test_import_reviewed_follow_up_verifies_sources_and_reports(
+    tmp_path: Path, capsys: object
+) -> None:
+    source = tmp_path / "review.json"
+    source.write_text('{"status":"reviewed"}', encoding="utf-8")
+    source_sha = __import__("hashlib").sha256(source.read_bytes()).hexdigest()
+    evidence = tmp_path / "evidence.json"
+    evidence.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "source_search_id": "prior-search",
+                "source_attempt_id": "prior-attempt",
+                "completed_at": "2026-01-01T00:00:00+00:00",
+                "source_files": [{"path": str(source), "sha256": source_sha}],
+                "candidate": {
+                    **_candidates(1)[0].model_dump(mode="json"),
+                    "source_provenance": {"search_category": "follow-up"},
+                    "prior_searches": [
+                        {
+                            "searched_by": "Researcher",
+                            "searched_at": "2025-01-01T00:00:00+00:00",
+                            "source_project": "Survey",
+                            "method_or_data": "TESS QLP",
+                            "result": "plausible_but_weak",
+                            "provenance_uri": str(source),
+                        }
+                    ],
+                },
+                "recommendation": {
+                    "candidate_id": "signal-1",
+                    "priority": 90,
+                    "reason": "reviewed evidence",
+                    "evidence": {"events": 2},
+                    "recommended_action": "await another event",
+                    "search_eligible": False,
+                    "revisit_reason": "new observations required",
+                },
+                "source_result": {"review_status": "plausible_but_weak"},
+                "source_provenance": {"review": str(source)},
+            }
+        ),
+        encoding="utf-8",
+    )
+    reports: list[object] = []
+
+    assert import_follow_up(
+        ["--evidence-file", str(evidence), "--db", str(tmp_path / "hunter.db"), "--json"],
+        report_fn=lambda *args: reports.append(args),
+    ) == 0
+    assert len(reports) == 1
+    output = capsys.readouterr().out  # type: ignore[attr-defined]
+    assert '"created": true' in output
+    assert show_follow_ups(
+        ["--db", str(tmp_path / "hunter.db"), "--json"]
+    ) == 0
+    output = capsys.readouterr().out  # type: ignore[attr-defined]
+    assert '"search_eligible": false' in output
+    assert "new observations required" in output
+
+
+def test_import_reviewed_follow_up_rejects_changed_source(tmp_path: Path) -> None:
+    source = tmp_path / "review.json"
+    source.write_text("changed", encoding="utf-8")
+    evidence = tmp_path / "evidence.json"
+    evidence.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "source_search_id": "prior-search",
+                "source_attempt_id": "prior-attempt",
+                "completed_at": "2026-01-01T00:00:00+00:00",
+                "source_files": [{"path": str(source), "sha256": "0" * 64}],
+                "candidate": {},
+                "recommendation": {},
+                "source_result": {},
+                "source_provenance": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert import_follow_up(
+        ["--evidence-file", str(evidence), "--db", str(tmp_path / "hunter.db")],
+        report_fn=lambda *_: None,
+    ) == 2
 
 
 def test_installed_process_can_load_required_project_skills_outside_repo_cwd(
