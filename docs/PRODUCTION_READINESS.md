@@ -9,17 +9,20 @@ was `no_external_added_value`. Phase 4 individual-transit diagnostics'
 depth/asymmetry/missing/extra-event bounded core is now complete
 (missing_transit_fraction, transit_asymmetry, extra_event_count); the next
 production task should be chosen fresh from readiness checks and roadmap
-state, not assumed to still be Phase 4. Hunter orchestration is temporarily
-**PARTIAL**: the real deferred-row evidence remains valid, but a fresh audit
+state, not assumed to still be Phase 4. Hunter orchestration remains
+**PARTIAL**: the real deferred-row evidence remains valid, and a fresh audit
 found that an actionable follow-up was never transitioned when scheduled or
 completed, allowing duplicate rescheduling. Version 0.3.5 adds append-only
 follow-up lifecycle events, consuming-search links, terminal disposition, and
 parent-child recommendations. The merged v3 migration was integrity-clean but
 exposed that the real non-executable row still used status `open`; version
 0.3.6 adds canonical `deferred` state and a v4 append-only correction. The
-merged-main v4 migration is integrity-clean and current MAST metadata still
-contains only the two non-event-covering products. Live actionable-consumption
-acceptance is blocked on new observations; see
+merged-main v4 migration is integrity-clean. Current MAST metadata still
+contains only the two non-event-covering products, so the real row correctly
+remains deferred; the absence of an open registry row is a valid registry
+outcome, not proof that the broader history universe has no eligible target.
+Seven preserved discovery logs contain 608 search events across 200 targets,
+but default follow-up creation does not durably ingest or rank them. See
 `artifacts/manifests/hunter_live_acceptance_v3.json`.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
@@ -56,9 +59,8 @@ registry are distinct versioned SQLite concepts; deterministic selection can
 freeze 100 targets from a 10,000-candidate universe, partial work is nonzero
 and resumable, and exact targets are never regenerated during execution. See
 `docs/HUNTER_PRODUCTION_WORKFLOW.md`. Hunter orchestration acceptance is
-PARTIAL because the merged-main status migration passes but no scientifically
-valid actionable follow-up exists for live consumption acceptance; the
-independently established underlying scorer acceptance remains PASS.
+PARTIAL pending durable prior-history universe ingestion; the independently
+established underlying scorer acceptance remains PASS.
 The first merged-main acceptance attempt failed before
 search creation because installed console scripts omitted the repository root
 from `sys.path`; 0.3.1 adds a fail-loud validated loader for the required
@@ -113,8 +115,13 @@ production database. The row now has append-only `open → deferred` events, wit
 the correction linked to its imported source search. A bounded metadata-only
 MAST query on 2026-07-21 found exactly the same TESS-SPOC sectors 1 and 28 and
 downloaded nothing. Since both products are already proven not to cover a
-predicted event, the remaining acceptance step is external-state blocked until
-new observations satisfy the recorded revisit gate.
+predicted event, the row correctly remains deferred until its revisit gate is
+satisfied. This is a scientific limitation on that target, not a production
+readiness gap. The actual gap is that `Create-New-Search --mode follow-up`
+constructs its default universe only from open registry rows. It does not
+ingest the seven preserved legacy discovery logs (608 events across 200 unique
+TIC targets), so zero candidates cannot be interpreted as a universe-wide
+eligibility result.
 
 Historical version note: 0.2.100 added target-selection progress/ETA. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,

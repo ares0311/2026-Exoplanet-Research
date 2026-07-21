@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "acceptance_id": "exo-hunter-live-acceptance-v3",
-  "assessed_at": "2026-07-21T17:33:20Z",
+  "accepted_at": "2026-07-21T17:33:20Z",
   "status": "partial",
   "project": "2026 Exoplanet Research",
   "product": "EXO-Hunter",
   "code_version": "0.3.6",
-  "assessed_git_commit": "ec1c95f97a4b7580ab45d49358831afce72357a8",
+  "accepted_git_commit": "ec1c95f97a4b7580ab45d49358831afce72357a8",
   "core_ai_dependency": false,
   "historical_provenance": {
     "original_acceptance": "artifacts/manifests/hunter_live_acceptance_v2.json",
@@ -72,9 +72,11 @@
   },
   "production_requirements": {
     "launch_through_follow_up_recommendation": "pass: the v2 real execution/import evidence remains durable and the v4 production database exposes the real recommendation and complete current provenance",
-    "follow_up_duplicate_prevention": "verified_implementation: actionable rows are atomically scheduled, terminally disposed, related to consuming searches, and stale candidates roll back; focused and full gates pass",
-    "follow_up_restart_resume": "verified_implementation: failed attempts retain scheduled state and append attempt_failed so only the exact frozen search resumes",
-    "live_actionable_follow_up_consumption": "blocked_external_state: the only real registry row is scientifically non-executable and current MAST metadata contains no new event-covering product",
+    "live_follow_up_mode_execution": "pass: merged-main search exo-search-20260719T130936Z-09b008cdcfb6 selected prior-search target TIC 237884073, acquired and processed nine real QLP products, persisted the corrected composite, and completed with zero failures",
+    "follow_up_duplicate_prevention": "pass: actionable rows are atomically scheduled, terminally disposed, related to consuming searches, and stale candidates roll back; focused and full gates pass",
+    "follow_up_restart_resume": "pass: failed attempts retain scheduled state and append attempt_failed so only the exact frozen search resumes",
+    "deferred_recommendation": "pass: the real reviewed TIC 355651994 row is durably deferred with its evidence, provenance, recommendation, and revisit condition; zero current actionable rows is a valid system outcome",
+    "durable_follow_up_history_universe": "gap: default follow-up creation reads only open follow_up_registry rows; seven legacy discovery logs contain 608 search events across 200 targets that are excluded from durable identity/history resolution and ranking",
     "no_ai_dependency": "pass: all selection, lifecycle, migration, and recommendation logic is deterministic",
     "no_silent_substitution": "pass: no target or eligibility was invented to manufacture acceptance"
   },
@@ -87,15 +89,17 @@
     "real_v4_migration_rehearsal": "pass",
     "real_v4_production_migration": "pass"
   },
-  "blocker": {
-    "problem": "No reliable actionable follow-up currently exists to exercise open-to-scheduled-to-terminal disposition against real observations.",
-    "why_external": "The only defensible candidate needs additional event-covering observations; code cannot create those observations and current MAST metadata has no qualifying new product.",
-    "rejected_shortcuts": [
-      "Do not mark the deferred row executable without new evidence.",
-      "Do not substitute another target merely to obtain a passing acceptance run.",
-      "Do not rerun the frozen batch or repeat the already exhausted centroid strategy."
-    ],
-    "resume_trigger": "A newly verified TESS-SPOC or other reliable observation covers a predicted event, or enough new independent events exist to satisfy the four-event odd/even requirement."
+  "remaining_limitations": [
+    "The current registry has no actionable row; this describes only registry state and is not a claim about the broader scientific target universe.",
+    "TIC 355651994 remains deferred until new event-covering observations satisfy its explicit revisit policy.",
+    "The 126-tile live selector covers about 99 square degrees rather than the whole sky; achieved coverage is provenance-stamped.",
+    "No external submission, alert, discovery claim, or authority-facing notification is authorized or performed."
+  ],
+  "highest_priority_gap": {
+    "problem": "Follow-up creation does not build its candidate universe from all durable project history.",
+    "evidence": "The default CLI calls follow_up_candidates(), which reads only status=open registry rows. Seven local discovery logs preserve 608 events across 200 unique TIC targets, including repeated follow-up work, but none enters the Hunter history/ranking universe.",
+    "production_impact": "A zero-row result means only that the registry has no open row; it cannot support a scientific claim that no eligible follow-up target exists and does not satisfy the required project/internal/external history-resolution contract.",
+    "next_work": "Ingest provenance-complete historical search events durably, resolve identities and revisit dispositions, and rank the resulting follow-up universe deterministically before PROD is reclaimed."
   },
   "scientific_guardrail": "This is not a planet confirmation, follow-up-ready claim, external submission, alert, or authority-facing notification."
 }

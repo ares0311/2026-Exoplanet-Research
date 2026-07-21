@@ -197,6 +197,10 @@ scheduling/disposition defect. Version 0.3.6 closes the status-semantics gap
 exposed by the first real v3 migration. The merged-main v4 production migration
 is integrity-clean and the real row is now durably `deferred`. A 2026-07-21
 metadata-only MAST check still found only sectors 1 and 28, both already proven
-not to cover a predicted event. Honest live actionable-consumption acceptance
-is therefore blocked on new observations; no target or eligibility may be
-substituted to manufacture a pass.
+not to cover a predicted event. That leaves the real recommendation correctly
+deferred; it is a normal scientific data state, not a production blocker.
+However, default follow-up creation currently reads only open registry rows.
+Seven preserved discovery logs contain 608 events across 200 targets that are
+not part of Hunter's durable follow-up universe. Until those histories are
+ingested, identity-resolved, dispositioned, and ranked, an empty registry
+cannot support the broader production contract.
