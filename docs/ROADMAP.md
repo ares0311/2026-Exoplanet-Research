@@ -38,9 +38,13 @@ by itself satisfy a master-guide evidence requirement.
   recommendations, and stale-candidate rejection. The first real migration was
   integrity-clean and exposed one remaining mismatch: a non-executable row was
   labeled `open`. Version 0.3.6/schema v4 corrects old rows append-only and
-  creates new waiting-for-data recommendations as `deferred`. Merge, migrate
-  the real DB, verify the row/event integrity, then issue replacement
-  acceptance evidence. See
+  creates new waiting-for-data recommendations as `deferred`. Both corrective
+  PRs are merged; production schema v4 is integrity-clean and the row has
+  append-only `open → deferred` history. A current metadata-only MAST check
+  still finds only sectors 1 and 28, neither event-covering. Do not fabricate
+  an actionable row or rerun the frozen batch. Resume live consumption
+  acceptance only when new observations satisfy the durable revisit gate. See
+  `artifacts/manifests/hunter_live_acceptance_v3.json`,
   `artifacts/manifests/hunter_live_acceptance_v2_reassessment.json` and
   `docs/HUNTER_PRODUCTION_WORKFLOW.md`.
 

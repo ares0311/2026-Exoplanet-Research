@@ -488,6 +488,11 @@ def test_live_acceptance_manifest_covers_prod_contract_and_run_reports() -> None
             encoding="utf-8"
         )
     )
+    current = json.loads(
+        Path("artifacts/manifests/hunter_live_acceptance_v3.json").read_text(
+            encoding="utf-8"
+        )
+    )
     assert acceptance["status"] == "pass"
     assert acceptance["core_ai_dependency"] is False
     assert acceptance["live_search_execution"]["candidate_pool_count"] >= 10_000
@@ -500,6 +505,14 @@ def test_live_acceptance_manifest_covers_prod_contract_and_run_reports() -> None
     )
     assert reassessment["original_acceptance_id"] == acceptance["acceptance_id"]
     assert reassessment["corrected_status"] == "partial"
+    assert current["status"] == "partial"
+    assert current["production_database"]["schema_version"] == 4
+    assert current["real_follow_up_state"]["status"] == "deferred"
+    assert current["real_follow_up_state"]["event_states"] == ["open", "deferred"]
+    assert current["current_archive_check"]["products_found"] == 2
+    assert current["production_requirements"][
+        "live_actionable_follow_up_consumption"
+    ].startswith("blocked_external_state:")
 
     report_lines = Path(
         acceptance["durable_state"]["run_report_path"]

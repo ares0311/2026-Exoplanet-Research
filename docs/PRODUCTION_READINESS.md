@@ -16,9 +16,11 @@ completed, allowing duplicate rescheduling. Version 0.3.5 adds append-only
 follow-up lifecycle events, consuming-search links, terminal disposition, and
 parent-child recommendations. The merged v3 migration was integrity-clean but
 exposed that the real non-executable row still used status `open`; version
-0.3.6 adds canonical `deferred` state and a v4 append-only correction. Merged-main
-migration/evidence remains required;
-see `artifacts/manifests/hunter_live_acceptance_v2_reassessment.json`.)
+0.3.6 adds canonical `deferred` state and a v4 append-only correction. The
+merged-main v4 migration is integrity-clean and current MAST metadata still
+contains only the two non-event-covering products. Live actionable-consumption
+acceptance is blocked on new observations; see
+`artifacts/manifests/hunter_live_acceptance_v3.json`.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
 Test baseline: 3,057 default tests passing; 2 `integration_live` tests excluded by
@@ -54,8 +56,8 @@ registry are distinct versioned SQLite concepts; deterministic selection can
 freeze 100 targets from a 10,000-candidate universe, partial work is nonzero
 and resumable, and exact targets are never regenerated during execution. See
 `docs/HUNTER_PRODUCTION_WORKFLOW.md`. Hunter orchestration acceptance is
-PARTIAL pending the version 0.3.6 merged-main status migration and replacement
-acceptance; the
+PARTIAL because the merged-main status migration passes but no scientifically
+valid actionable follow-up exists for live consumption acceptance; the
 independently established underlying scorer acceptance remains PASS.
 The first merged-main acceptance attempt failed before
 search creation because installed console scripts omitted the repository root
@@ -106,6 +108,13 @@ preserved the real row, and added its backfill event. It also showed the row as
 state. Version 0.3.6/schema v4 migrates that combination to `deferred` with an
 append-only correction event and creates future non-executable recommendations
 directly as deferred.
+Merged-main schema v4 then passed SQLite integrity and foreign-key checks on the
+production database. The row now has append-only `open → deferred` events, with
+the correction linked to its imported source search. A bounded metadata-only
+MAST query on 2026-07-21 found exactly the same TESS-SPOC sectors 1 and 28 and
+downloaded nothing. Since both products are already proven not to cover a
+predicted event, the remaining acceptance step is external-state blocked until
+new observations satisfy the recorded revisit gate.
 
 Historical version note: 0.2.100 added target-selection progress/ETA. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,

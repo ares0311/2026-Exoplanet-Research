@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "acceptance_id": "exo-hunter-live-acceptance-v3",
+  "assessed_at": "2026-07-21T17:33:20Z",
+  "status": "partial",
+  "project": "2026 Exoplanet Research",
+  "product": "EXO-Hunter",
+  "code_version": "0.3.6",
+  "assessed_git_commit": "ec1c95f97a4b7580ab45d49358831afce72357a8",
+  "core_ai_dependency": false,
+  "historical_provenance": {
+    "original_acceptance": "artifacts/manifests/hunter_live_acceptance_v2.json",
+    "original_acceptance_sha256": "fd9e87194035ef3260e911720035616f8dea400981252afe1eede2c21a5b248b",
+    "reassessment": "artifacts/manifests/hunter_live_acceptance_v2_reassessment.json",
+    "reassessment_sha256": "55e7c19fe1cbe494131b4972661cf8904ba4bfbf3434c3862609765e3ae761b0",
+    "preservation_rule": "Earlier artifacts remain unchanged; this artifact records the corrected merged-main state."
+  },
+  "corrective_merges": [
+    {
+      "pull_request": 285,
+      "merge_commit": "18717e31fcdd180699e3b82334725298b9a30a94",
+      "outcome": "Durable scheduling, attempt-failure, terminal-disposition, and parent-child events"
+    },
+    {
+      "pull_request": 286,
+      "merge_commit": "ec1c95f97a4b7580ab45d49358831afce72357a8",
+      "outcome": "Canonical deferred state for non-executable revisit-gated recommendations"
+    }
+  ],
+  "production_database": {
+    "path": "data/hunter_searches.sqlite3",
+    "sha256_after_v4_migration": "e793a71dd74cc58aa17b9c226499004ecef79776c7157a370ec50ea54dfdeb89",
+    "schema_version": 4,
+    "sqlite_integrity_check": "ok",
+    "foreign_key_violation_count": 0,
+    "candidate_snapshot_count": 10002,
+    "manifest_count": 3,
+    "manifest_target_count": 3,
+    "run_attempt_count": 3,
+    "history_row_count": 3,
+    "search_state_event_count": 7,
+    "follow_up_registry_count": 1,
+    "follow_up_event_count": 2,
+    "open_search_count": 0,
+    "executable_follow_up_candidate_count": 0
+  },
+  "real_follow_up_state": {
+    "follow_up_id": "69c32c4d69a4196dc2a104dd3a37ec10f46d318c155f46b405bbc2cc62470b00",
+    "target_id": "TIC 355651994",
+    "candidate_id": "TIC_355651994_s02",
+    "status": "deferred",
+    "search_eligible": false,
+    "event_states": [
+      "open",
+      "deferred"
+    ],
+    "deferred_event_related_search_id": "prior-search-20260712T082531Z-c3f08004a7c3",
+    "revisit_reason": "No currently available TPF sector covers a predicted event and only two independent events exist; enable a new search only when additional event-covering observations are verified.",
+    "recommended_action": "Monitor for or obtain additional event-covering observations; do not rerun the frozen tess_live_search_v1 batch and do not submit externally."
+  },
+  "current_archive_check": {
+    "checked_at": "2026-07-21T17:33:00Z",
+    "service": "MAST via Lightkurve metadata-only TESS-SPOC target-pixel search",
+    "target_id": "TIC 355651994",
+    "products_found": 2,
+    "sectors": [
+      1,
+      28
+    ],
+    "downloads_performed": 0,
+    "result": "No product has appeared beyond the two already proven not to contain a predicted event."
+  },
+  "production_requirements": {
+    "launch_through_follow_up_recommendation": "pass: the v2 real execution/import evidence remains durable and the v4 production database exposes the real recommendation and complete current provenance",
+    "follow_up_duplicate_prevention": "verified_implementation: actionable rows are atomically scheduled, terminally disposed, related to consuming searches, and stale candidates roll back; focused and full gates pass",
+    "follow_up_restart_resume": "verified_implementation: failed attempts retain scheduled state and append attempt_failed so only the exact frozen search resumes",
+    "live_actionable_follow_up_consumption": "blocked_external_state: the only real registry row is scientifically non-executable and current MAST metadata contains no new event-covering product",
+    "no_ai_dependency": "pass: all selection, lifecycle, migration, and recommendation logic is deterministic",
+    "no_silent_substitution": "pass: no target or eligibility was invented to manufacture acceptance"
+  },
+  "verification": {
+    "focused_tests_passed": 38,
+    "canonical_quality_gates_passed": 10,
+    "canonical_quality_gates_total": 10,
+    "pr_285_ci_runs_passed": 2,
+    "pr_286_ci_runs_passed": 2,
+    "real_v4_migration_rehearsal": "pass",
+    "real_v4_production_migration": "pass"
+  },
+  "blocker": {
+    "problem": "No reliable actionable follow-up currently exists to exercise open-to-scheduled-to-terminal disposition against real observations.",
+    "why_external": "The only defensible candidate needs additional event-covering observations; code cannot create those observations and current MAST metadata has no qualifying new product.",
+    "rejected_shortcuts": [
+      "Do not mark the deferred row executable without new evidence.",
+      "Do not substitute another target merely to obtain a passing acceptance run.",
+      "Do not rerun the frozen batch or repeat the already exhausted centroid strategy."
+    ],
+    "resume_trigger": "A newly verified TESS-SPOC or other reliable observation covers a predicted event, or enough new independent events exist to satisfy the four-event odd/even requirement."
+  },
+  "scientific_guardrail": "This is not a planet confirmation, follow-up-ready claim, external submission, alert, or authority-facing notification."
+}
