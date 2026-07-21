@@ -66,6 +66,67 @@ def _create(
     )
 
 
+def _history_manifest(*, include_follow_up: bool = True) -> dict[str, Any]:
+    source = {
+        "search_id": "historical-new-search",
+        "mode": "new",
+        "started_at": "2025-01-01T00:00:00+00:00",
+        "completed_at": "2025-01-01T01:00:00+00:00",
+        "searched_by": "EXO-Hunter",
+        "source_project": "legacy project",
+        "method_or_data": "TESS QLP",
+        "source_path": "logs/prior.json",
+        "source_sha256": "a" * 64,
+        "provenance_uri": "artifact:prior-new",
+        "entries": [
+            {
+                "target_id": "TIC 1",
+                "status": "candidate_found",
+                "searched_at": "2025-01-01T00:30:00+00:00",
+                "ranking_score": 0.9,
+                "metrics": {"best_fpp": 0.1},
+                "result": {"interpretation": "promising"},
+                "best_fpp": 0.1,
+                "best_detection_confidence": 0.8,
+                "best_pathway": "planet_hunters_discussion",
+                "error_message": None,
+            },
+            {
+                "target_id": "TIC 2",
+                "status": "no_signal",
+                "searched_at": "2025-01-01T00:45:00+00:00",
+                "ranking_score": 0.5,
+                "metrics": {},
+                "result": {"interpretation": "clear"},
+                "best_fpp": None,
+                "best_pathway": None,
+                "error_message": None,
+            },
+        ],
+    }
+    sources = [source]
+    if include_follow_up:
+        sources.append(
+            {
+                **source,
+                "search_id": "historical-follow-up-search",
+                "mode": "follow-up",
+                "started_at": "2025-02-01T00:00:00+00:00",
+                "completed_at": "2025-02-01T01:00:00+00:00",
+                "source_path": "logs/prior-follow-up.json",
+                "source_sha256": "b" * 64,
+                "provenance_uri": "artifact:prior-follow-up",
+                "entries": [
+                    {
+                        **source["entries"][0],
+                        "searched_at": "2025-02-01T00:30:00+00:00",
+                    }
+                ],
+            }
+        )
+    return {"schema_version": 1, "sources": sources}
+
+
 def test_selects_100_deterministically_from_10000_candidate_universe(tmp_path: Path) -> None:
     store = HunterStore(tmp_path / "hunter.sqlite3")
     search = _create(store, [_candidate(i) for i in range(10_000)], count=100)
@@ -79,6 +140,62 @@ def test_selects_100_deterministically_from_10000_candidate_universe(tmp_path: P
     ]
     assert search["state"] == "pending"
     assert len(search["manifest_sha256"]) == 64
+
+
+def test_history_manifest_import_is_idempotent_and_preserves_repeated_work(
+    tmp_path: Path,
+) -> None:
+    store = HunterStore(tmp_path / "hunter.sqlite3")
+    manifest = _history_manifest()
+
+    assert store.import_history_manifest(manifest) == {
+        "sources_total": 2,
+        "sources_created": 2,
+        "events_created": 3,
+    }
+    assert store.import_history_manifest(manifest) == {
+        "sources_total": 2,
+        "sources_created": 0,
+        "events_created": 0,
+    }
+    universe = {row.target_id: row for row in store.follow_up_universe()}
+    assert set(universe) == {"TIC 1", "TIC 2"}
+    assert len(universe["TIC 1"].prior_searches) == 2
+    assert universe["TIC 1"].eligible is False
+    assert universe["TIC 1"].eligibility_reason == (
+        "latest durable search already performed follow-up"
+    )
+    assert len(store.target_history("TIC 1")) == 2
+
+
+def test_historical_partial_run_is_visible_but_not_resumable(tmp_path: Path) -> None:
+    store = HunterStore(tmp_path / "hunter.sqlite3")
+    manifest = _history_manifest(include_follow_up=False)
+    failed_entry = manifest["sources"][0]["entries"][1]
+    failed_entry["status"] = "failed"
+    failed_entry["error_message"] = "historical fetch failed"
+
+    store.import_history_manifest(manifest)
+
+    assert store.current_state("historical-new-search") == "archived_partial"
+    assert store.open_searches() == []
+    history = store.target_history("TIC 2")
+    assert history[0]["status"] == "failed"
+    assert history[0]["error_message"] == "historical fetch failed"
+
+
+def test_history_universe_selects_unfollowed_qualifying_new_result(tmp_path: Path) -> None:
+    store = HunterStore(tmp_path / "hunter.sqlite3")
+    store.import_history_manifest(_history_manifest(include_follow_up=False))
+
+    universe = store.follow_up_universe()
+    assert len(universe) == 2
+    assert universe[0].target_id == "TIC 1"
+    assert universe[0].eligible is True
+    search = _create(store, universe, count=1, mode="follow-up")
+    assert search["candidate_pool_count"] == 2
+    assert search["targets"][0]["target_id"] == "TIC 1"
+    assert len(search["targets"][0]["candidate"]["prior_searches"]) == 1
 
 
 def test_ineligible_candidates_never_enter_manifest(tmp_path: Path) -> None:

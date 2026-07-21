@@ -558,6 +558,261 @@ class HunterStore:
             "follow_up_id": str(follow_up["follow_up_id"]),
         }
 
+    def import_history_manifest(
+        self,
+        manifest: Path | Mapping[str, Any],
+    ) -> dict[str, int]:
+        """Idempotently import provenance-complete historical project searches."""
+        payload = (
+            json.loads(manifest.read_text(encoding="utf-8"))
+            if isinstance(manifest, Path)
+            else dict(manifest)
+        )
+        if payload.get("schema_version") != 1:
+            raise ValueError("History manifest must use schema_version=1")
+        sources = payload.get("sources")
+        if not isinstance(sources, list) or not sources:
+            raise ValueError("History manifest sources must be a non-empty list")
+
+        sources_created = 0
+        events_created = 0
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            for source in sources:
+                if not isinstance(source, Mapping):
+                    raise ValueError("History manifest sources must be objects")
+                search_id = str(source.get("search_id", ""))
+                mode = str(source.get("mode", ""))
+                started_at = datetime.fromisoformat(str(source.get("started_at", "")))
+                completed_at = datetime.fromisoformat(str(source.get("completed_at", "")))
+                entries = source.get("entries")
+                if not search_id or mode not in {"new", "follow-up"}:
+                    raise ValueError("Each history source requires search_id and valid mode")
+                if started_at.tzinfo is None or completed_at.tzinfo is None:
+                    raise ValueError(
+                        f"History source {search_id} timestamps need timezone"
+                    )
+                source_hash = str(source.get("source_sha256", ""))
+                if len(source_hash) != 64 or any(
+                    character not in "0123456789abcdef" for character in source_hash
+                ):
+                    raise ValueError(
+                        f"History source {search_id} needs a lowercase SHA-256"
+                    )
+                for field in (
+                    "searched_by",
+                    "source_project",
+                    "method_or_data",
+                    "source_path",
+                    "provenance_uri",
+                ):
+                    if not str(source.get(field, "")).strip():
+                        raise ValueError(
+                            f"History source {search_id} is missing provenance field {field}"
+                        )
+                if not isinstance(entries, list) or not entries:
+                    raise ValueError(f"History source {search_id} entries must be non-empty")
+                source_payload = dict(source)
+                source_sha256 = hashlib.sha256(
+                    _canonical_json(source_payload).encode()
+                ).hexdigest()
+                existing = connection.execute(
+                    "SELECT manifest_sha256 FROM search_manifests WHERE search_id=?",
+                    (search_id,),
+                ).fetchone()
+                if existing is not None:
+                    if str(existing["manifest_sha256"]) != source_sha256:
+                        raise RuntimeError(
+                            f"Historical search identity collision: {search_id}"
+                        )
+                    continue
+
+                normalized: list[tuple[HunterCandidate, dict[str, Any]]] = []
+                seen_targets: set[str] = set()
+                for entry in entries:
+                    if not isinstance(entry, Mapping):
+                        raise ValueError(f"History source {search_id} has a non-object entry")
+                    target_id = str(entry.get("target_id", ""))
+                    if not target_id or target_id in seen_targets:
+                        raise ValueError(
+                            f"History source {search_id} has missing/duplicate target_id"
+                        )
+                    seen_targets.add(target_id)
+                    status = str(entry.get("status", ""))
+                    if status not in {"candidate_found", "no_signal", "no_data", "failed"}:
+                        raise ValueError(
+                            f"History source {search_id} has invalid status={status!r}"
+                        )
+                    searched_at = datetime.fromisoformat(str(entry.get("searched_at", "")))
+                    if searched_at.tzinfo is None:
+                        raise ValueError(
+                            f"History source {search_id} entry timestamp needs timezone"
+                        )
+                    if status == "failed" and not entry.get("error_message"):
+                        raise ValueError(
+                            f"History source {search_id} failed entry needs error_message"
+                        )
+                    mission = entry.get("mission", "TESS")
+                    if mission not in {"TESS", "Kepler", "K2", "JWST"}:
+                        raise ValueError(
+                            f"History source {search_id} has invalid mission={mission!r}"
+                        )
+                    ranking_score = float(entry.get("ranking_score", 0.0))
+                    candidate = HunterCandidate(
+                        target_id=target_id,
+                        canonical_id=str(entry.get("canonical_id", target_id)),
+                        aliases=tuple(str(value) for value in entry.get("aliases", ())),
+                        mission=mission,
+                        source="Imported historical project search",
+                        source_provenance={
+                            "search_category": "historical",
+                            "historical_search_id": search_id,
+                            "source_path": source.get("source_path"),
+                            "source_sha256": source.get("source_sha256"),
+                        },
+                        eligible=False,
+                        eligibility_reason="historical search snapshot",
+                        ranking_score=ranking_score,
+                        selection_reason="Preserved exact historical search membership",
+                        metrics=dict(entry.get("metrics", {})),
+                    )
+                    normalized.append((candidate, dict(entry)))
+
+                config = {
+                    "historical_import": True,
+                    "source_path": source.get("source_path"),
+                    "source_sha256": source.get("source_sha256"),
+                    "method_or_data": source.get("method_or_data"),
+                }
+                connection.execute(
+                    """
+                    INSERT INTO search_manifests (
+                        search_id, schema_version, mode, requested_target_count,
+                        selected_target_count, candidate_pool_count, selector_version,
+                        config_json, manifest_sha256, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        search_id,
+                        HUNTER_SCHEMA_VERSION,
+                        mode,
+                        len(normalized),
+                        len(normalized),
+                        len(normalized),
+                        "historical_project_import_v1",
+                        _canonical_json(config),
+                        source_sha256,
+                        completed_at.isoformat(),
+                    ),
+                )
+                attempt_id = f"historical-attempt-{source_sha256[:24]}"
+                failed = sum(entry[1]["status"] == "failed" for entry in normalized)
+                succeeded = len(normalized) - failed
+                run_status = "completed" if failed == 0 else "partial"
+                lifecycle_state = "completed" if failed == 0 else "archived_partial"
+                connection.execute(
+                    """
+                    INSERT INTO search_runs (
+                        attempt_id, search_id, status, started_at, completed_at,
+                        config_json, items_processed, items_succeeded, items_failed
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        attempt_id,
+                        search_id,
+                        run_status,
+                        started_at.isoformat(),
+                        completed_at.isoformat(),
+                        _canonical_json(config),
+                        len(normalized),
+                        succeeded,
+                        failed,
+                    ),
+                )
+                for ordinal, (candidate, entry) in enumerate(normalized, 1):
+                    candidate_json = candidate.model_dump(mode="json")
+                    snapshot_id = hashlib.sha256(
+                        f"{search_id}:{ordinal}:{_canonical_json(candidate_json)}".encode()
+                    ).hexdigest()
+                    connection.execute(
+                        "INSERT INTO candidate_catalog "
+                        "(snapshot_id, search_id, target_id, canonical_id, "
+                        "candidate_json, observed_at) VALUES (?, ?, ?, ?, ?, ?)",
+                        (
+                            snapshot_id,
+                            search_id,
+                            candidate.target_id,
+                            candidate.canonical_id,
+                            _canonical_json(candidate_json),
+                            completed_at.isoformat(),
+                        ),
+                    )
+                    connection.execute(
+                        """
+                        INSERT INTO search_manifest_targets (
+                            search_id, ordinal, snapshot_id, target_id, canonical_id,
+                            ranking_score, selection_reason
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            search_id,
+                            ordinal,
+                            snapshot_id,
+                            candidate.target_id,
+                            candidate.canonical_id,
+                            candidate.ranking_score,
+                            candidate.selection_reason,
+                        ),
+                    )
+                    result = dict(entry.get("result", {}))
+                    result["historical_entry"] = entry
+                    provenance = {
+                        "searched_by": str(source.get("searched_by", "EXO-Hunter")),
+                        "source_project": str(
+                            source.get("source_project", "2026 Exoplanet Research")
+                        ),
+                        "method_or_data": str(source.get("method_or_data", "unknown")),
+                        "provenance_uri": str(source.get("provenance_uri", "unknown")),
+                        "source_path": source.get("source_path"),
+                        "source_sha256": source.get("source_sha256"),
+                    }
+                    connection.execute(
+                        """
+                        INSERT INTO target_search_history (
+                            search_id, attempt_id, target_id, status, result_json,
+                            provenance_json, error_message, created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            search_id,
+                            attempt_id,
+                            candidate.target_id,
+                            entry["status"],
+                            _canonical_json(result),
+                            _canonical_json(provenance),
+                            entry.get("error_message"),
+                            str(entry.get("searched_at", completed_at.isoformat())),
+                        ),
+                    )
+                self._append_state(
+                    connection,
+                    search_id,
+                    lifecycle_state,
+                    {
+                        "historical_import": True,
+                        "items_processed": len(normalized),
+                        "items_failed": failed,
+                    },
+                    completed_at,
+                )
+                sources_created += 1
+                events_created += len(normalized)
+        return {
+            "sources_total": len(sources),
+            "sources_created": sources_created,
+            "events_created": events_created,
+        }
+
     def create_search(
         self,
         candidates: Sequence[HunterCandidate | Mapping[str, Any]],
@@ -597,7 +852,8 @@ class HunterStore:
         if len(eligible) < requested_target_count:
             raise RuntimeError(
                 f"Requested {requested_target_count} {mode} targets but only "
-                f"{len(eligible)} eligible candidates are available; no search was created"
+                f"{len(eligible)} eligible candidates are available from "
+                f"{len(validated)} evaluated candidates; no search was created"
             )
         selected = eligible[:requested_target_count]
         created_at = now or _utc_now()
@@ -1274,36 +1530,222 @@ class HunterStore:
             row["detail"] = json.loads(row.pop("detail_json"))
         return result
 
-    def follow_up_candidates(self) -> list[HunterCandidate]:
-        candidates: list[HunterCandidate] = []
-        for row in self.list_follow_ups():
-            if not bool(row["search_eligible"]):
-                continue
-            prior = PriorSearch(
-                searched_by="EXO-Hunter",
-                searched_at=datetime.fromisoformat(str(row["created_at"])),
-                source_project="2026 Exoplanet Research",
-                method_or_data="EXO-Hunter acquisition, BLS vetting, and scoring pipeline",
-                result=str(row["reason"]),
-                provenance_uri=f"hunter-search:{row['search_id']}",
+    @staticmethod
+    def _history_result_summary(
+        row: Mapping[str, Any],
+    ) -> tuple[str, float | None, float | None, str | None]:
+        result = json.loads(str(row["result_json"]))
+        historical = result.get("historical_entry", {})
+        composite = result.get("composite_result", {})
+        scores = composite.get("scores", {}) if isinstance(composite, Mapping) else {}
+        fpp = historical.get("best_fpp") if isinstance(historical, Mapping) else None
+        if fpp is None and isinstance(composite, Mapping):
+            fpp = composite.get(
+                "false_positive_probability",
+                scores.get("false_positive_probability"),
             )
+        confidence = (
+            historical.get("best_detection_confidence")
+            if isinstance(historical, Mapping)
+            else None
+        )
+        if confidence is None and isinstance(composite, Mapping):
+            confidence = composite.get(
+                "detection_confidence",
+                scores.get("detection_confidence"),
+            )
+        pathway = historical.get("best_pathway") if isinstance(historical, Mapping) else None
+        if pathway is None and isinstance(composite, Mapping):
+            pathway = composite.get("pathway")
+        numeric_fpp = float(fpp) if isinstance(fpp, (int, float)) else None
+        numeric_confidence = (
+            float(confidence) if isinstance(confidence, (int, float)) else None
+        )
+        summary = str(row["status"])
+        if numeric_fpp is not None:
+            summary += f"; FPP={numeric_fpp:.6f}"
+        if pathway:
+            summary += f"; pathway={pathway}"
+        return (
+            summary,
+            numeric_fpp,
+            numeric_confidence,
+            str(pathway) if pathway else None,
+        )
+
+    def follow_up_universe(self) -> list[HunterCandidate]:
+        """Build the deterministic follow-up universe from every durable history."""
+        with self.connect() as connection:
+            history_rows = connection.execute(
+                """
+                SELECT h.*, m.mode, c.candidate_json
+                FROM target_search_history AS h
+                JOIN search_manifests AS m ON m.search_id=h.search_id
+                LEFT JOIN candidate_catalog AS c
+                    ON c.search_id=h.search_id AND c.target_id=h.target_id
+                ORDER BY h.target_id, h.id
+                """
+            ).fetchall()
+        grouped: dict[str, list[dict[str, Any]]] = {}
+        for raw in history_rows:
+            grouped.setdefault(str(raw["target_id"]), []).append(dict(raw))
+
+        registry_by_target: dict[str, list[dict[str, Any]]] = {}
+        for row in self.list_follow_ups(status="all"):
+            registry_by_target.setdefault(str(row["target_id"]), []).append(row)
+
+        candidates: list[HunterCandidate] = []
+        for target_id in sorted(set(grouped) | set(registry_by_target)):
+            histories = grouped.get(target_id, [])
+            registry_rows = registry_by_target.get(target_id, [])
+            prior_searches: list[PriorSearch] = []
+            seen_prior: set[tuple[str, str]] = set()
+            template: HunterCandidate | None = None
+            for row in histories:
+                candidate_json = row.get("candidate_json")
+                if candidate_json:
+                    parsed = HunterCandidate.model_validate(json.loads(str(candidate_json)))
+                    template = parsed
+                    for prior in parsed.prior_searches:
+                        key = (prior.provenance_uri, prior.searched_at.isoformat())
+                        if key not in seen_prior:
+                            prior_searches.append(prior)
+                            seen_prior.add(key)
+                provenance = json.loads(str(row["provenance_json"]))
+                summary, _, _, _ = self._history_result_summary(row)
+                prior = PriorSearch(
+                    searched_by=str(provenance.get("searched_by", "EXO-Hunter")),
+                    searched_at=datetime.fromisoformat(str(row["created_at"])),
+                    source_project=str(
+                        provenance.get("source_project", "2026 Exoplanet Research")
+                    ),
+                    method_or_data=str(
+                        provenance.get(
+                            "method_or_data",
+                            "EXO-Hunter acquisition, preprocessing, vetting, and scoring",
+                        )
+                    ),
+                    result=summary,
+                    provenance_uri=str(
+                        provenance.get(
+                            "provenance_uri",
+                            f"hunter-search:{row['search_id']}/{row['attempt_id']}",
+                        )
+                    ),
+                )
+                key = (prior.provenance_uri, prior.searched_at.isoformat())
+                if key not in seen_prior:
+                    prior_searches.append(prior)
+                    seen_prior.add(key)
+            if not prior_searches:
+                raise RuntimeError(f"Follow-up target lacks durable prior history: {target_id}")
+
+            if registry_rows:
+                registry_rows.sort(
+                    key=lambda row: (
+                        not (row["status"] == "open" and row["search_eligible"]),
+                        -float(row["priority"]),
+                        str(row["follow_up_id"]),
+                    )
+                )
+                registry = registry_rows[0]
+                eligible = bool(
+                    registry["status"] == "open" and registry["search_eligible"]
+                )
+                eligibility_reason = (
+                    "actionable evidence-based registry recommendation"
+                    if eligible
+                    else f"registry disposition={registry['status']}"
+                )
+                ranking_score = float(registry["priority"])
+                selection_reason = str(registry["reason"])
+                source_provenance = {
+                    "search_category": "follow-up",
+                    "follow_up_id": registry["follow_up_id"],
+                    "search_id": registry["search_id"],
+                    "history_event_count": len(histories),
+                }
+                metrics: dict[str, float | int | str | None] = {
+                    "follow_up_priority": ranking_score,
+                    "prior_search_count": len(prior_searches),
+                    "registry_status": str(registry["status"]),
+                }
+            else:
+                latest = histories[-1]
+                summary, fpp, confidence, pathway = self._history_result_summary(latest)
+                eligible = bool(
+                    latest["mode"] == "new"
+                    and latest["status"] == "candidate_found"
+                    and fpp is not None
+                    and fpp < 0.15
+                    and confidence is not None
+                    and confidence > 0.40
+                    and pathway
+                    in {
+                        "tfop_ready",
+                        "planet_hunters_discussion",
+                        "kepler_archive_candidate",
+                    }
+                )
+                if latest["mode"] == "follow-up":
+                    eligibility_reason = "latest durable search already performed follow-up"
+                elif latest["status"] != "candidate_found":
+                    eligibility_reason = f"latest result={latest['status']}"
+                elif not eligible:
+                    eligibility_reason = (
+                        "latest evidence is incomplete or does not pass follow-up gate"
+                    )
+                else:
+                    eligibility_reason = "new-search evidence passes follow-up gate"
+                ranking_score = (
+                    100.0 * (1.0 - fpp) + 10.0 * confidence
+                    if fpp is not None and confidence is not None
+                    else 0.0
+                )
+                selection_reason = f"Durable prior-search evaluation: {summary}"
+                source_provenance = {
+                    "search_category": "follow-up",
+                    "search_id": latest["search_id"],
+                    "history_event_count": len(histories),
+                }
+                metrics = {
+                    "prior_search_count": len(prior_searches),
+                    "latest_status": str(latest["status"]),
+                    "latest_mode": str(latest["mode"]),
+                    "latest_fpp": fpp,
+                    "latest_detection_confidence": confidence,
+                    "latest_pathway": pathway,
+                }
+
             candidates.append(
                 HunterCandidate(
-                    target_id=str(row["target_id"]),
-                    canonical_id=str(row["target_id"]),
-                    source="EXO-Hunter follow-up registry",
-                    source_provenance={
-                        "search_category": "follow-up",
-                        "follow_up_id": row["follow_up_id"],
-                        "search_id": row["search_id"],
-                    },
-                    ranking_score=float(row["priority"]),
-                    selection_reason=str(row["reason"]),
-                    metrics={"follow_up_priority": float(row["priority"])},
-                    prior_searches=(prior,),
+                    target_id=target_id,
+                    canonical_id=(template.canonical_id if template else target_id),
+                    aliases=(template.aliases if template else ()),
+                    mission=(template.mission if template else "TESS"),
+                    object_classification=(
+                        template.object_classification if template else "star"
+                    ),
+                    source="Durable EXO-Hunter prior-search universe",
+                    source_provenance=source_provenance,
+                    eligible=eligible,
+                    eligibility_reason=eligibility_reason,
+                    distance_pc=(template.distance_pc if template else None),
+                    estimated_download_gb=(
+                        template.estimated_download_gb if template else None
+                    ),
+                    ranking_score=ranking_score,
+                    selection_reason=selection_reason,
+                    metrics=metrics,
+                    prior_searches=tuple(prior_searches),
                 )
             )
+        candidates.sort(key=lambda row: (-row.ranking_score, row.canonical_id, row.target_id))
         return candidates
+
+    def follow_up_candidates(self) -> list[HunterCandidate]:
+        """Return only currently executable rows from the full history universe."""
+        return [candidate for candidate in self.follow_up_universe() if candidate.eligible]
 
     def export_manifest_csv(self, search_id: str, path: Path) -> Path:
         search = self.get_search(search_id)

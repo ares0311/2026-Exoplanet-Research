@@ -201,6 +201,69 @@ def test_candidate_json_file_supports_external_follow_up_provenance(tmp_path: Pa
     assert restored["targets"][0]["candidate"]["prior_searches"][0]["searched_by"] == "Researcher"
 
 
+def test_default_follow_up_imports_and_ranks_durable_history(
+    tmp_path: Path, capsys: object
+) -> None:
+    db = tmp_path / "hunter.sqlite3"
+    history = tmp_path / "history.json"
+    history.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "sources": [
+                    {
+                        "search_id": "historical-new-search",
+                        "mode": "new",
+                        "started_at": "2025-01-01T00:00:00+00:00",
+                        "completed_at": "2025-01-01T01:00:00+00:00",
+                        "searched_by": "EXO-Hunter",
+                        "source_project": "legacy project",
+                        "method_or_data": "TESS QLP",
+                        "source_path": "logs/prior.json",
+                        "source_sha256": "a" * 64,
+                        "provenance_uri": "artifact:prior-new",
+                        "entries": [
+                            {
+                                "target_id": "TIC 42",
+                                "status": "candidate_found",
+                                "searched_at": "2025-01-01T00:30:00+00:00",
+                                "ranking_score": 0.9,
+                                "metrics": {"best_fpp": 0.1},
+                                "result": {"interpretation": "promising"},
+                                "best_fpp": 0.1,
+                                "best_detection_confidence": 0.8,
+                                "best_pathway": "planet_hunters_discussion",
+                                "error_message": None,
+                            }
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert create_new_search(
+        [
+            "--targets",
+            "1",
+            "--mode",
+            "follow-up",
+            "--db",
+            str(db),
+            "--history-manifest",
+            str(history),
+            "--json",
+        ]
+    ) == 0
+    output = json.loads(capsys.readouterr().out)  # type: ignore[attr-defined]
+    assert output["candidate_pool_count"] == 1
+    stored = HunterStore(db)
+    assert len(stored.target_history("TIC 42")) == 1
+    search = stored.get_search(output["search_id"])
+    assert search["targets"][0]["target_id"] == "TIC 42"
+
+
 def test_follow_up_table_shows_external_prior_search_provenance(
     tmp_path: Path, capsys: object
 ) -> None:
@@ -521,3 +584,19 @@ def test_live_acceptance_manifest_covers_prod_contract_and_run_reports() -> None
         acceptance["durable_state"]["run_report_path"]
     ).read_text(encoding="utf-8")
     assert acceptance["reviewed_follow_up_import"]["imported_search_id"] in report_lines
+
+
+def test_committed_hunter_history_manifest_preserves_available_project_universe() -> None:
+    payload = json.loads(
+        Path("data_selection/hunter_prior_search_history_v1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    sources = payload["sources"]
+    events = [entry for source in sources for entry in source["entries"]]
+    assert payload["schema_version"] == 1
+    assert len(sources) == 7
+    assert len(events) == 608
+    assert len({entry["target_id"] for entry in events}) == 200
+    assert {source["mode"] for source in sources} == {"new", "follow-up"}
+    assert all(len(source["source_sha256"]) == 64 for source in sources)

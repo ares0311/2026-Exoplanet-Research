@@ -45,10 +45,13 @@ by itself satisfy a master-guide evidence requirement.
   correctly deferred. That is an expected scientific state, not a product
   blocker. The next audit found the actual gap: default follow-up creation reads
   only open registry rows while seven preserved discovery logs contain 608
-  events across 200 targets. Durably ingest those histories, resolve identity
-  and revisit disposition, and rank the complete available follow-up universe
-  before reclaiming PROD. Future observations may reopen the deferred row but
-  are unrelated to this software gap. See
+  events across 200 targets. Version 0.3.7 adds a committed normalized history
+  contract, idempotent durable import, exact preservation of failures and
+  repeated work, and deterministic full-universe eligibility/ranking. Merge,
+  migrate the production database, verify the 202-target combined universe,
+  and issue replacement acceptance evidence before reclaiming PROD. Future
+  observations may reopen the deferred row but are unrelated to this software
+  gap. See
   `artifacts/manifests/hunter_live_acceptance_v3.json`,
   `artifacts/manifests/hunter_live_acceptance_v2_reassessment.json`, and
   `docs/HUNTER_PRODUCTION_WORKFLOW.md`.

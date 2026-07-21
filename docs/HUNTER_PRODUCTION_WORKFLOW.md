@@ -43,13 +43,21 @@ git pull --ff-only origin main
 .venv/bin/Create-New-Search --targets 100 --mode new
 ```
 
-Create a follow-up search from the open follow-up registry:
+Create a follow-up search from the complete durable prior-search universe:
 
 ```bash
 git switch main
 git pull --ff-only origin main
 .venv/bin/Create-New-Search --targets 10 --mode follow-up
 ```
+
+The default source is
+`data_selection/hunter_prior_search_history_v1.json`; it is imported
+automatically and idempotently. `--history-manifest` may point to another
+schema-v1 provenance-complete manifest for isolated or scripted operation.
+The candidate-pool count includes every evaluated prior target, including
+ineligible rows, so zero selected targets is supported by an auditable
+universe rather than inferred from an empty registry.
 
 Execute or resume the exact pending manifest:
 
@@ -199,8 +207,9 @@ is integrity-clean and the real row is now durably `deferred`. A 2026-07-21
 metadata-only MAST check still found only sectors 1 and 28, both already proven
 not to cover a predicted event. That leaves the real recommendation correctly
 deferred; it is a normal scientific data state, not a production blocker.
-However, default follow-up creation currently reads only open registry rows.
-Seven preserved discovery logs contain 608 events across 200 targets that are
-not part of Hunter's durable follow-up universe. Until those histories are
-ingested, identity-resolved, dispositioned, and ranked, an empty registry
-cannot support the broader production contract.
+Version 0.3.7 normalizes all seven preserved discovery logs into a committed,
+checksum-provenance-stamped history manifest containing 608 events across 200
+targets. Default follow-up creation imports those searches, runs, exact target
+memberships, results, failures, and provenance idempotently before ranking the
+complete durable history plus registry dispositions. Historical partial runs
+remain visibly `archived_partial` and never masquerade as resumable work.
