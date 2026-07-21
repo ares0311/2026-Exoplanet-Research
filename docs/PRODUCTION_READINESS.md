@@ -9,8 +9,8 @@ was `no_external_added_value`. Phase 4 individual-transit diagnostics'
 depth/asymmetry/missing/extra-event bounded core is now complete
 (missing_transit_fraction, transit_asymmetry, extra_event_count); the next
 production task should be chosen fresh from readiness checks and roadmap
-state, not assumed to still be Phase 4. Hunter orchestration remains
-**PARTIAL**: the real deferred-row evidence remains valid, and a fresh audit
+state, not assumed to still be Phase 4. Hunter orchestration is **PROD
+ACCEPTED**: the real deferred-row evidence remains valid, and a fresh audit
 found that an actionable follow-up was never transitioned when scheduled or
 completed, allowing duplicate rescheduling. Version 0.3.5 adds append-only
 follow-up lifecycle events, consuming-search links, terminal disposition, and
@@ -23,8 +23,10 @@ remains deferred; the absence of an open registry row is a valid registry
 outcome, not proof that the broader history universe has no eligible target.
 Seven preserved discovery logs contain 608 search events across 200 targets,
 and version 0.3.7 adds their automatic durable import and full-universe ranking.
-Merged-main production migration and replacement acceptance remain required. See
-`artifacts/manifests/hunter_live_acceptance_v3.json`.)
+Merged-main production import preserved all 608 events, evaluated 202 combined
+targets, passed integrity/idempotency checks, and created no search because all
+202 have explicit ineligible dispositions. See
+`artifacts/manifests/hunter_live_acceptance_v4.json`.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
 Test baseline: 3,057 default tests passing; 2 `integration_live` tests excluded by
@@ -59,9 +61,8 @@ immutable manifest, run attempts, append-only target history, and follow-up
 registry are distinct versioned SQLite concepts; deterministic selection can
 freeze 100 targets from a 10,000-candidate universe, partial work is nonzero
 and resumable, and exact targets are never regenerated during execution. See
-`docs/HUNTER_PRODUCTION_WORKFLOW.md`. Hunter orchestration acceptance is
-PARTIAL pending merged-main prior-history import evidence; the independently
-established underlying scorer acceptance remains PASS.
+`docs/HUNTER_PRODUCTION_WORKFLOW.md`. Hunter orchestration acceptance and the
+independently established underlying scorer acceptance are both PASS.
 The first merged-main acceptance attempt failed before
 search creation because installed console scripts omitted the repository root
 from `sys.path`; 0.3.1 adds a fail-loud validated loader for the required
@@ -123,6 +124,11 @@ idempotently imports seven preserved legacy discovery logs (608 events across
 200 unique TIC targets) into durable searches, runs, manifests, and target
 history, then ranks every identity-resolved target together with registry
 dispositions. Superseded or failed history remains visible and non-resumable.
+Merged-main import produced 10 manifests, 10,610 catalog snapshots, 10 runs,
+611 target-history rows, and a 202-target identity-resolved follow-up universe.
+The zero-eligible result is now supported by explicit deterministic
+dispositions, not inferred from the registry. Repeat import preserved every
+row count, SQLite integrity is `ok`, and foreign-key violations are zero.
 
 Historical version note: 0.2.100 added target-selection progress/ETA. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,

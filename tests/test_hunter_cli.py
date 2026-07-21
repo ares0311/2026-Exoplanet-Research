@@ -556,6 +556,11 @@ def test_live_acceptance_manifest_covers_prod_contract_and_run_reports() -> None
             encoding="utf-8"
         )
     )
+    replacement = json.loads(
+        Path("artifacts/manifests/hunter_live_acceptance_v4.json").read_text(
+            encoding="utf-8"
+        )
+    )
     assert acceptance["status"] == "pass"
     assert acceptance["core_ai_dependency"] is False
     assert acceptance["live_search_execution"]["candidate_pool_count"] >= 10_000
@@ -578,6 +583,17 @@ def test_live_acceptance_manifest_covers_prod_contract_and_run_reports() -> None
     ].startswith("gap:")
     assert current["highest_priority_gap"]["evidence"].startswith(
         "The default CLI calls follow_up_candidates()"
+    )
+    assert replacement["status"] == "pass"
+    assert replacement["supersedes"]["partial_artifact"].endswith(
+        "hunter_live_acceptance_v3.json"
+    )
+    assert replacement["history_contract"]["event_count"] == 608
+    assert replacement["follow_up_universe"]["evaluated_target_count"] == 202
+    assert replacement["follow_up_universe"]["eligible_target_count"] == 0
+    assert all(
+        str(evidence).startswith("pass:")
+        for evidence in replacement["prod_requirements"].values()
     )
 
     report_lines = Path(

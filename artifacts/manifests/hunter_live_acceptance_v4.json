@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "acceptance_id": "exo-hunter-live-acceptance-v4",
+  "accepted_at": "2026-07-21T18:07:02Z",
+  "status": "pass",
+  "project": "2026 Exoplanet Research",
+  "product": "EXO-Hunter",
+  "code_version": "0.3.7",
+  "implementation_git_commit": "15fac40212a8125e903f42d97028cb5e0b75147e",
+  "core_ai_dependency": false,
+  "supersedes": {
+    "partial_artifact": "artifacts/manifests/hunter_live_acceptance_v3.json",
+    "reason": "Version 0.3.7 durably imports and evaluates the prior-search universe that v3 identified as missing; v3 remains unchanged as historical provenance."
+  },
+  "history_contract": {
+    "path": "data_selection/hunter_prior_search_history_v1.json",
+    "sha256": "431716c02851a204c154ba860eb6853be7f5e28d41927085a9956b92051e739c",
+    "source_count": 7,
+    "event_count": 608,
+    "unique_target_count": 200,
+    "source_modes": [
+      "new",
+      "follow-up"
+    ],
+    "source_hashes_present": true,
+    "import_idempotency": "A second merged-main invocation created zero rows; all durable table counts remained unchanged."
+  },
+  "production_database": {
+    "path": "data/hunter_searches.sqlite3",
+    "sha256_after_idempotency_check": "b0e660f2f7380c9d517d898d9ef1aaba20adb4d4bccf9c570850cd8383b0cfe8",
+    "schema_version": 4,
+    "sqlite_integrity_check": "ok",
+    "foreign_key_violation_count": 0,
+    "manifest_count": 10,
+    "candidate_snapshot_count": 10610,
+    "manifest_target_count": 611,
+    "run_count": 10,
+    "history_row_count": 611,
+    "search_state_event_count": 14,
+    "follow_up_registry_count": 1,
+    "follow_up_event_count": 2,
+    "open_search_count": 0,
+    "archived_partial_search_count": 5,
+    "completed_search_count": 5
+  },
+  "follow_up_universe": {
+    "evaluated_target_count": 202,
+    "eligible_target_count": 0,
+    "selection_attempt_exit_code": 2,
+    "selection_attempt_result": "Requested 1 follow-up target but 0 were eligible from 202 evaluated candidates; no search was created.",
+    "dispositions": {
+      "incomplete_or_below_evidence_gate": 190,
+      "no_signal": 6,
+      "already_followed_up": 3,
+      "registry_deferred": 1,
+      "failed": 1,
+      "no_data": 1
+    },
+    "interpretation": "Zero selected targets is the deterministic result of evaluating every available durable prior target, not an inference from an empty registry."
+  },
+  "real_execution_evidence": {
+    "large_new_candidate_universe": 10000,
+    "new_search_id": "exo-search-20260719T112104Z-37f71aaa95f5",
+    "follow_up_search_id": "exo-search-20260719T130936Z-09b008cdcfb6",
+    "follow_up_target_id": "TIC 237884073",
+    "raw_qlp_uri_count": 9,
+    "cadence_count": 63205,
+    "follow_up_execution_status": "completed",
+    "follow_up_items_failed": 0,
+    "reviewed_recommendation_target": "TIC 355651994",
+    "reviewed_recommendation_status": "deferred",
+    "reviewed_recommendation_event_states": [
+      "open",
+      "deferred"
+    ]
+  },
+  "prod_requirements": {
+    "launch": "pass: the three installed shell entry points execute from merged main",
+    "large_candidate_pool": "pass: live new selection froze 10000 candidates; follow-up selection evaluates all 202 available durable prior targets",
+    "identity_and_history_resolution": "pass: 608 historical events plus three existing events are preserved as 611 append-only rows with stable TIC identity, source hashes, timestamps, project, method, result, and provenance URI",
+    "eligibility_ranking_selection": "pass: deterministic non-LLM rules evaluate registry disposition, latest search mode/status, FPP, detection confidence, pathway, and prior-search count; incomplete evidence is ineligible",
+    "manifest_and_search_creation": "pass: exact historical and live memberships are immutable; insufficient eligible follow-ups return exit 2 and create no search",
+    "acquisition_and_preprocessing": "pass: the real new/follow-up run persisted nine QLP products, 63205 cadences, preprocessing version, and raw provenance",
+    "scoring_and_composite": "pass: the real follow-up run persisted individual Bayesian scores, corrected composite FPP/confidence, pathway, and interpretation",
+    "durable_results_and_failures": "pass: searches, attempts, 611 history rows, state events, failures, provenance, integrity, and foreign keys are verified; archived partial history is visible but non-resumable",
+    "follow_up_creation": "pass: checksum-verified reviewed evidence created the real TIC 355651994 registry row and the real TIC 237884073 follow-up search completed",
+    "follow_up_recommendation": "pass: evidence, reason, priority, prior provenance, next action, eligibility, and revisit gate are durable and visible",
+    "follow_up_lifecycle": "pass: open/scheduled/attempt-failed/completed/deferred transitions, consuming-search links, parent relationships, stale-candidate rollback, and exact-search resume pass lifecycle gates",
+    "restart_resume_recovery": "pass: exact pending manifests survive separate CLI processes; only unfinished/failed current work resumes; imported partial history never appears executable",
+    "no_ai_dependency": "pass: selection, history resolution, lifecycle, Bayesian execution, and recommendation logic require no AI model",
+    "no_manual_bridge": "pass: default follow-up creation automatically and idempotently imports the committed history contract before ranking",
+    "no_silent_substitution": "pass: exact targets and history are preserved; missing confidence is not assumed; zero eligible targets is loud and creates no search"
+  },
+  "verification": {
+    "focused_lifecycle_cli_tests_passed": 43,
+    "canonical_quality_gates_passed": 10,
+    "canonical_quality_gates_total": 10,
+    "canonical_quality_gate_summary": "logs/quality_gates/20260721T180251Z/quality_gate_summary.json",
+    "pull_request": 288,
+    "pull_request_ci_runs_passed": 2,
+    "production_import_rehearsal": "pass",
+    "merged_main_production_import": "pass",
+    "merged_main_repeat_import": "pass"
+  },
+  "remaining_limitations": [
+    "The available follow-up history contains 202 unique targets, not every target ever searched by all external projects; additional reliable sources can be added through the same versioned manifest contract.",
+    "No target in the currently available universe passes every follow-up eligibility requirement; this is an evaluated data outcome, not a pipeline gap.",
+    "TIC 355651994 remains deferred until new event-covering observations satisfy its explicit revisit policy.",
+    "The live new-target selector covers about 99 square degrees rather than the whole sky; achieved coverage is provenance-stamped.",
+    "No external submission, alert, discovery claim, or authority-facing notification is authorized or performed."
+  ]
+}

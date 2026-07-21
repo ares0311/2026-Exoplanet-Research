@@ -4,16 +4,17 @@
 
 Version 0.3.3 closes the reviewed-prior-result bridge left open by version 0.3.2.
 The shell entry points share one durable SQLite system of record and can run
-without an AI model. Hunter acceptance remains PARTIAL after a fresh
-audit found that consumed actionable follow-ups remained open and could be
-scheduled repeatedly. Version 0.3.5 adds durable scheduling/disposition events
+without an AI model. Hunter acceptance is PROD on merged-main version 0.3.7.
+An earlier audit found that consumed actionable follow-ups remained open and
+could be scheduled repeatedly. Version 0.3.5 adds durable scheduling/disposition events
 and parent-child recommendation relationships. Version 0.3.6 makes
 non-executable, revisit-gated recommendations canonically `deferred` rather
 than `open`. The prior acceptance remains
 preserved and is corrected by
 `artifacts/manifests/hunter_live_acceptance_v2_reassessment.json`. Merged-main
 schema-v4 migration and current archive evidence are recorded in
-`artifacts/manifests/hunter_live_acceptance_v3.json`:
+`artifacts/manifests/hunter_live_acceptance_v3.json`; replacement acceptance is
+`artifacts/manifests/hunter_live_acceptance_v4.json`:
 
 ```text
 candidate universe
@@ -213,3 +214,7 @@ targets. Default follow-up creation imports those searches, runs, exact target
 memberships, results, failures, and provenance idempotently before ranking the
 complete durable history plus registry dispositions. Historical partial runs
 remain visibly `archived_partial` and never masquerade as resumable work.
+Merged-main production import preserved 608 historical events, produced a
+202-target combined universe, and returned zero eligible targets with explicit
+dispositions and no search creation. A repeat invocation changed no durable
+row counts. Version 0.3.7 acceptance is therefore PASS.
