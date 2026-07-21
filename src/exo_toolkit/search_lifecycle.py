@@ -20,7 +20,7 @@ SearchMode = Literal["new", "follow-up"]
 TargetStatus = Literal["candidate_found", "no_signal", "no_data", "failed"]
 TERMINAL_TARGET_STATUSES = frozenset({"candidate_found", "no_signal", "no_data"})
 EXECUTABLE_SEARCH_STATES = frozenset({"pending", "running", "partial", "failed"})
-HUNTER_SCHEMA_VERSION = 2
+HUNTER_SCHEMA_VERSION = 3
 
 
 class PriorSearch(BaseModel):
@@ -222,10 +222,25 @@ CREATE TABLE IF NOT EXISTS follow_up_registry (
     recommended_action TEXT NOT NULL,
     search_eligible INTEGER NOT NULL DEFAULT 1,
     revisit_reason TEXT,
+    parent_follow_up_id TEXT,
     status TEXT NOT NULL,
     created_at TEXT NOT NULL,
     FOREIGN KEY(search_id) REFERENCES search_manifests(search_id)
 );
+
+CREATE TABLE IF NOT EXISTS follow_up_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id TEXT NOT NULL UNIQUE,
+    follow_up_id TEXT NOT NULL,
+    state TEXT NOT NULL,
+    related_search_id TEXT,
+    detail_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(follow_up_id) REFERENCES follow_up_registry(follow_up_id),
+    FOREIGN KEY(related_search_id) REFERENCES search_manifests(search_id)
+);
+CREATE INDEX IF NOT EXISTS idx_follow_up_events_follow_up
+    ON follow_up_events(follow_up_id, id);
 
 CREATE TABLE IF NOT EXISTS schema_migrations (
     version INTEGER PRIMARY KEY,
@@ -293,13 +308,38 @@ class HunterStore:
                 connection.execute(
                     "ALTER TABLE follow_up_registry ADD COLUMN revisit_reason TEXT"
                 )
+            if "parent_follow_up_id" not in columns:
+                connection.execute(
+                    "ALTER TABLE follow_up_registry ADD COLUMN parent_follow_up_id TEXT"
+                )
+            existing_events = {
+                str(row[0])
+                for row in connection.execute(
+                    "SELECT DISTINCT follow_up_id FROM follow_up_events"
+                ).fetchall()
+            }
+            for row in connection.execute(
+                "SELECT follow_up_id, status, created_at FROM follow_up_registry"
+            ).fetchall():
+                follow_up_id = str(row["follow_up_id"])
+                if follow_up_id in existing_events:
+                    continue
+                created_at = datetime.fromisoformat(str(row["created_at"]))
+                self._append_follow_up_event(
+                    connection,
+                    follow_up_id=follow_up_id,
+                    state=str(row["status"]),
+                    related_search_id=None,
+                    detail={"migration_backfill": True},
+                    created_at=created_at,
+                )
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations "
                 "(version, applied_at, description) VALUES (?, ?, ?)",
                 (
                     HUNTER_SCHEMA_VERSION,
                     _utc_now().isoformat(),
-                    "Follow-up execution eligibility and reviewed-evidence import",
+                    "Durable follow-up scheduling, disposition, and relationships",
                 ),
             )
             connection.execute(f"PRAGMA user_version = {HUNTER_SCHEMA_VERSION}")
@@ -542,6 +582,25 @@ class HunterStore:
         manifest_sha256 = hashlib.sha256(_canonical_json(identity_payload).encode()).hexdigest()
 
         with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            concurrent_open = connection.execute(
+                """
+                SELECT m.search_id, e.state
+                FROM search_manifests AS m
+                JOIN search_state_events AS e ON e.id = (
+                    SELECT MAX(e2.id) FROM search_state_events AS e2
+                    WHERE e2.search_id = m.search_id
+                )
+                WHERE e.state IN ('pending', 'running', 'partial', 'failed')
+                ORDER BY m.created_at
+                """
+            ).fetchall()
+            if concurrent_open:
+                raise RuntimeError(
+                    "An executable search was created concurrently; run or resolve it "
+                    "before creating another: "
+                    + ", ".join(str(row["search_id"]) for row in concurrent_open)
+                )
             connection.execute(
                 """
                 INSERT INTO search_manifests (
@@ -609,6 +668,20 @@ class HunterStore:
                 {"selected_target_count": len(selected)},
                 created_at,
             )
+            if mode == "follow-up":
+                for candidate in selected:
+                    follow_up_id = candidate.source_provenance.get("follow_up_id")
+                    if follow_up_id is None:
+                        continue
+                    self._transition_follow_up(
+                        connection,
+                        follow_up_id=str(follow_up_id),
+                        expected_state="open",
+                        new_state="scheduled",
+                        related_search_id=search_id,
+                        detail={"target_id": candidate.target_id},
+                        created_at=created_at,
+                    )
         return self.get_search(search_id)
 
     @staticmethod
@@ -623,6 +696,92 @@ class HunterStore:
             "INSERT INTO search_state_events "
             "(search_id, state, detail_json, created_at) VALUES (?, ?, ?, ?)",
             (search_id, state, _canonical_json(dict(detail)), created_at.isoformat()),
+        )
+
+    @staticmethod
+    def _append_follow_up_event(
+        connection: sqlite3.Connection,
+        *,
+        follow_up_id: str,
+        state: str,
+        related_search_id: str | None,
+        detail: Mapping[str, Any],
+        created_at: datetime,
+    ) -> None:
+        payload = {
+            "follow_up_id": follow_up_id,
+            "state": state,
+            "related_search_id": related_search_id,
+            "detail": dict(detail),
+            "created_at": created_at.isoformat(),
+        }
+        event_id = hashlib.sha256(_canonical_json(payload).encode()).hexdigest()
+        connection.execute(
+            "INSERT INTO follow_up_events "
+            "(event_id, follow_up_id, state, related_search_id, detail_json, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                event_id,
+                follow_up_id,
+                state,
+                related_search_id,
+                _canonical_json(dict(detail)),
+                created_at.isoformat(),
+            ),
+        )
+
+    @classmethod
+    def _transition_follow_up(
+        cls,
+        connection: sqlite3.Connection,
+        *,
+        follow_up_id: str,
+        expected_state: str,
+        new_state: str,
+        related_search_id: str,
+        detail: Mapping[str, Any],
+        created_at: datetime,
+        search_eligible: bool | None = None,
+        revisit_reason: str | None = None,
+    ) -> None:
+        row = connection.execute(
+            "SELECT status, search_eligible, revisit_reason "
+            "FROM follow_up_registry WHERE follow_up_id=?",
+            (follow_up_id,),
+        ).fetchone()
+        if row is None:
+            raise RuntimeError(f"Unknown follow-up registry row: {follow_up_id}")
+        current_state = str(row["status"])
+        if current_state != expected_state:
+            raise RuntimeError(
+                f"Follow-up {follow_up_id} is not {expected_state}: state={current_state}"
+            )
+        next_eligible = (
+            int(bool(row["search_eligible"]))
+            if search_eligible is None
+            else int(search_eligible)
+        )
+        next_revisit_reason = (
+            str(row["revisit_reason"])
+            if revisit_reason is None and row["revisit_reason"] is not None
+            else revisit_reason
+        )
+        connection.execute(
+            "UPDATE follow_up_registry SET status=?, search_eligible=?, revisit_reason=? "
+            "WHERE follow_up_id=?",
+            (new_state, next_eligible, next_revisit_reason, follow_up_id),
+        )
+        cls._append_follow_up_event(
+            connection,
+            follow_up_id=follow_up_id,
+            state=new_state,
+            related_search_id=related_search_id,
+            detail={
+                "previous_state": expected_state,
+                "previous_revisit_reason": row["revisit_reason"],
+                **dict(detail),
+            },
+            created_at=created_at,
         )
 
     def current_state(self, search_id: str) -> str:
@@ -818,6 +977,48 @@ class HunterStore:
                                 created_at=created_at,
                             ):
                                 follow_up_count += 1
+                        source_follow_up_id = candidate.source_provenance.get("follow_up_id")
+                        if source_follow_up_id is not None and outcome.status == "failed":
+                            self._append_follow_up_event(
+                                connection,
+                                follow_up_id=str(source_follow_up_id),
+                                state="attempt_failed",
+                                related_search_id=search_id,
+                                detail={
+                                    "attempt_id": attempt_id,
+                                    "target_id": candidate.target_id,
+                                    "error_message": outcome.error_message,
+                                },
+                                created_at=created_at,
+                            )
+                        elif (
+                            source_follow_up_id is not None
+                            and outcome.status in TERMINAL_TARGET_STATUSES
+                        ):
+                            disposition = (
+                                "deferred" if outcome.status == "no_data" else "completed"
+                            )
+                            self._transition_follow_up(
+                                connection,
+                                follow_up_id=str(source_follow_up_id),
+                                expected_state="scheduled",
+                                new_state=disposition,
+                                related_search_id=search_id,
+                                detail={
+                                    "attempt_id": attempt_id,
+                                    "target_id": candidate.target_id,
+                                    "outcome_status": outcome.status,
+                                    "error_message": outcome.error_message,
+                                },
+                                created_at=created_at,
+                                search_eligible=False,
+                                revisit_reason=(
+                                    f"Follow-up search {search_id} returned no data; "
+                                    "new archive products are required before another search."
+                                    if outcome.status == "no_data"
+                                    else None
+                                ),
+                            )
                     if outcome.status in TERMINAL_TARGET_STATUSES:
                         succeeded += 1
                     else:
@@ -923,8 +1124,9 @@ class HunterStore:
                 completed_at,
             )
 
-    @staticmethod
+    @classmethod
     def _register_follow_up(
+        cls,
         connection: sqlite3.Connection,
         *,
         search_id: str,
@@ -932,6 +1134,14 @@ class HunterStore:
         follow_up: FollowUpRecommendation,
         created_at: datetime,
     ) -> bool:
+        parent_follow_up_id = candidate.source_provenance.get("follow_up_id")
+        if parent_follow_up_id is not None:
+            parent = connection.execute(
+                "SELECT 1 FROM follow_up_registry WHERE follow_up_id=?",
+                (str(parent_follow_up_id),),
+            ).fetchone()
+            if parent is None:
+                raise RuntimeError(f"Unknown parent follow-up: {parent_follow_up_id}")
         follow_up_id = hashlib.sha256(
             f"{search_id}:{candidate.target_id}:{follow_up.candidate_id}".encode()
         ).hexdigest()
@@ -940,8 +1150,8 @@ class HunterStore:
             INSERT OR IGNORE INTO follow_up_registry (
                 follow_up_id, search_id, target_id, candidate_id, priority, reason,
                 evidence_json, prior_search_provenance_json, recommended_action,
-                search_eligible, revisit_reason, status, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?)
+                search_eligible, revisit_reason, parent_follow_up_id, status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?)
             """,
             (
                 follow_up_id,
@@ -955,10 +1165,26 @@ class HunterStore:
                 follow_up.recommended_action,
                 int(follow_up.search_eligible),
                 follow_up.revisit_reason,
+                parent_follow_up_id,
                 created_at.isoformat(),
             ),
         )
-        return cursor.rowcount == 1
+        created = cursor.rowcount == 1
+        if created:
+            cls._append_follow_up_event(
+                connection,
+                follow_up_id=follow_up_id,
+                state="open",
+                related_search_id=search_id,
+                detail={
+                    "target_id": candidate.target_id,
+                    "candidate_id": follow_up.candidate_id,
+                    "parent_follow_up_id": parent_follow_up_id,
+                    "search_eligible": follow_up.search_eligible,
+                },
+                created_at=created_at,
+            )
+        return created
 
     def completed_target_ids(self, search_id: str) -> frozenset[str]:
         with self.connect() as connection:
@@ -983,11 +1209,17 @@ class HunterStore:
 
     def list_follow_ups(self, *, status: str = "open") -> list[dict[str, Any]]:
         with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM follow_up_registry WHERE status=? "
-                "ORDER BY priority DESC, created_at, follow_up_id",
-                (status,),
-            ).fetchall()
+            if status == "all":
+                rows = connection.execute(
+                    "SELECT * FROM follow_up_registry "
+                    "ORDER BY priority DESC, created_at, follow_up_id"
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    "SELECT * FROM follow_up_registry WHERE status=? "
+                    "ORDER BY priority DESC, created_at, follow_up_id",
+                    (status,),
+                ).fetchall()
         result = [dict(row) for row in rows]
         for row in result:
             row["evidence"] = json.loads(row.pop("evidence_json"))
@@ -995,6 +1227,19 @@ class HunterStore:
                 row.pop("prior_search_provenance_json")
             )
             row["search_eligible"] = bool(row["search_eligible"])
+            row["events"] = self.follow_up_events(str(row["follow_up_id"]))
+        return result
+
+    def follow_up_events(self, follow_up_id: str) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM follow_up_events WHERE follow_up_id=? "
+                "ORDER BY id",
+                (follow_up_id,),
+            ).fetchall()
+        result = [dict(row) for row in rows]
+        for row in result:
+            row["detail"] = json.loads(row.pop("detail_json"))
         return result
 
     def follow_up_candidates(self) -> list[HunterCandidate]:
@@ -1077,6 +1322,7 @@ class HunterStore:
             "search_runs",
             "target_search_history",
             "follow_up_registry",
+            "follow_up_events",
         }
         with self.connect() as connection:
             integrity = str(connection.execute("PRAGMA integrity_check").fetchone()[0])
@@ -1093,11 +1339,35 @@ class HunterStore:
                     "WHERE c.snapshot_id IS NULL"
                 ).fetchone()[0]
             )
+            orphan_follow_up_events = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM follow_up_events AS e "
+                    "LEFT JOIN follow_up_registry AS f ON f.follow_up_id=e.follow_up_id "
+                    "WHERE f.follow_up_id IS NULL"
+                ).fetchone()[0]
+            )
+            orphan_parent_follow_ups = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM follow_up_registry AS child "
+                    "LEFT JOIN follow_up_registry AS parent "
+                    "ON parent.follow_up_id=child.parent_follow_up_id "
+                    "WHERE child.parent_follow_up_id IS NOT NULL "
+                    "AND parent.follow_up_id IS NULL"
+                ).fetchone()[0]
+            )
         missing = sorted(required_tables - tables)
         return {
-            "ok": integrity == "ok" and not missing and orphan_targets == 0,
+            "ok": (
+                integrity == "ok"
+                and not missing
+                and orphan_targets == 0
+                and orphan_follow_up_events == 0
+                and orphan_parent_follow_ups == 0
+            ),
             "sqlite_integrity": integrity,
             "missing_tables": missing,
             "orphan_manifest_targets": orphan_targets,
+            "orphan_follow_up_events": orphan_follow_up_events,
+            "orphan_parent_follow_ups": orphan_parent_follow_ups,
             "schema_version": HUNTER_SCHEMA_VERSION,
         }

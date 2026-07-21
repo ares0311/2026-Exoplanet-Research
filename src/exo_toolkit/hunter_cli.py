@@ -113,7 +113,11 @@ def _parser_follow_ups() -> argparse.ArgumentParser:
         description="Show actionable EXO-Hunter follow-up recommendations.",
     )
     parser.add_argument("--db", type=Path, default=DEFAULT_HUNTER_DB)
-    parser.add_argument("--status", default="open")
+    parser.add_argument(
+        "--status",
+        choices=("open", "scheduled", "completed", "deferred", "all"),
+        default="open",
+    )
     parser.add_argument("--json", action="store_true", dest="json_output")
     parser.add_argument("--no-color", action="store_true")
     return parser
@@ -763,6 +767,7 @@ def show_follow_ups(argv: Sequence[str] | None = None) -> int:
         table = Table(title=f"EXO-Hunter follow-ups — {args.status}")
         table.add_column("Priority", justify="right", style="green")
         table.add_column("Target", style="cyan")
+        table.add_column("Status")
         table.add_column("Search ready?", justify="center")
         table.add_column("Evidence / reason", overflow="fold")
         table.add_column("Prior search", overflow="fold")
@@ -786,6 +791,7 @@ def show_follow_ups(argv: Sequence[str] | None = None) -> int:
             table.add_row(
                 f"{float(row['priority']):.2f}",
                 str(row["target_id"]),
+                str(row["status"]),
                 "yes" if bool(row["search_eligible"]) else "no",
                 str(row["reason"]),
                 prior_label,
@@ -795,7 +801,11 @@ def show_follow_ups(argv: Sequence[str] | None = None) -> int:
         console.print("[bold]Prior-search provenance[/bold]")
         for detail in provenance_details:
             console.print(detail)
-        deferred = [row for row in rows if not bool(row["search_eligible"])]
+        deferred = [
+            row
+            for row in rows
+            if not bool(row["search_eligible"]) and row.get("revisit_reason")
+        ]
         if deferred:
             console.print("[bold]Revisit gates[/bold]")
             for row in deferred:

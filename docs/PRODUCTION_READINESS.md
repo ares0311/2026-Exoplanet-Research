@@ -9,13 +9,13 @@ was `no_external_added_value`. Phase 4 individual-transit diagnostics'
 depth/asymmetry/missing/extra-event bounded core is now complete
 (missing_transit_fraction, transit_asymmetry, extra_event_count); the next
 production task should be chosen fresh from readiness checks and roadmap
-state, not assumed to still be Phase 4. Version 0.3.4's Hunter orchestration is
-**PROD ACCEPTED**: merged-main live selection/execution is joined to one real,
-checksum-verified reviewed follow-up row with visible provenance,
-recommendation, and revisit gate. The deferred target cannot seed a new search;
-repeat import is idempotent; SQLite, foreign keys, Run Reports, CI, and 10/10
-quality gates pass. The corrected acceptance is
-`artifacts/manifests/hunter_live_acceptance_v2.json`.)
+state, not assumed to still be Phase 4. Hunter orchestration is temporarily
+**PARTIAL**: the real deferred-row evidence remains valid, but a fresh audit
+found that an actionable follow-up was never transitioned when scheduled or
+completed, allowing duplicate rescheduling. Version 0.3.5 adds append-only
+follow-up lifecycle events, consuming-search links, terminal disposition, and
+parent-child recommendations. Merged-main migration/evidence remains required;
+see `artifacts/manifests/hunter_live_acceptance_v2_reassessment.json`.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
 Test baseline: 3,057 default tests passing; 2 `integration_live` tests excluded by
@@ -43,15 +43,16 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.3.4 is the current development version. Version 0.3.2 added the durable,
+Version note: 0.3.5 is the current development version. Version 0.3.2 added the durable,
 non-AI-dependent Hunter workflow and exact `Create-New-Search`,
 `Run-New-Search`, and `Show-Follow-Ups` entry points. Candidate catalog,
 immutable manifest, run attempts, append-only target history, and follow-up
 registry are distinct versioned SQLite concepts; deterministic selection can
 freeze 100 targets from a 10,000-candidate universe, partial work is nonzero
 and resumable, and exact targets are never regenerated during execution. See
-`docs/HUNTER_PRODUCTION_WORKFLOW.md`. Hunter orchestration acceptance and the
-independently established underlying scorer acceptance are both PASS.
+`docs/HUNTER_PRODUCTION_WORKFLOW.md`. Hunter orchestration acceptance is
+PARTIAL pending the version 0.3.5 merged-main lifecycle migration; the
+independently established underlying scorer acceptance remains PASS.
 The first merged-main acceptance attempt failed before
 search creation because installed console scripts omitted the repository root
 from `sys.path`; 0.3.1 adds a fail-loud validated loader for the required
@@ -88,6 +89,13 @@ displays its prior-search provenance and conservative next action, while
 `Create-New-Search --mode follow-up` exits 2 and creates no search because the
 required event-covering observations do not yet exist. See
 `artifacts/manifests/hunter_live_acceptance_v2.json`.
+The 2026-07-21 loop audit then found that selecting an actionable registry row
+did not change its state or record the consuming search. Completion likewise
+left it open and eligible, so the same follow-up could be scheduled forever.
+Version 0.3.5 closes that gap with atomic `open → scheduled` consumption,
+append-only dispositions, terminal `completed`/`deferred` states, explicit
+parent relationships, and transactional stale-candidate rejection. The v2
+acceptance is preserved and reassessed rather than overwritten.
 
 Historical version note: 0.2.100 added target-selection progress/ETA. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,
