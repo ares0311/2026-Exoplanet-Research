@@ -1,1238 +1,426 @@
-# 2026 Exoplanet Research
+# EXO-Hunter — 2026 Exoplanet Research
 
 [![CI](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml/badge.svg)](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml)
-[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.3.7-blue.svg)](pyproject.toml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-6300%2B%20collected-informational.svg)](tests/)
-[![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
----
+EXO-Hunter is a reproducible exoplanet transit-search system for TESS,
+Kepler, K2, and JWST photometry. It acquires archive data, cleans light curves,
+finds periodic signals, computes interpretable diagnostics, scores competing
+astrophysical hypotheses, preserves complete search provenance, and recommends
+evidence-based follow-up without making confirmation or discovery claims.
 
-## Table of Contents
+The core application does not require AI. Its default Bayesian path and the
+entire Hunter search lifecycle are deterministic, explainable, and testable.
+XGBoost, CNN, and ensemble scorers are optional.
 
-- [Abstract](#abstract)
-- [Getting Started](#getting-started)
-  - [What you need before installing](#what-you-need-before-installing)
-  - [Five-minute setup](#five-minute-setup)
-  - [Your first result](#your-first-result-30-seconds)
-  - [Troubleshooting](#troubleshooting-installation)
-  - [How to find a star's TIC ID](#how-to-find-a-stars-tic-id)
-- [1. Introduction](#1-introduction)
-- [2. Pipeline Architecture](#2-pipeline-architecture)
-  - [ML Scoring Modes](#ml-scoring-modes)
-- [3. Methodology](#3-methodology)
-  - [3.1 Transit Photometry Fundamentals](#31-transit-photometry-fundamentals)
-  - [3.2 Box Least Squares Periodicity Search](#32-box-least-squares-periodicity-search)
-  - [3.3 Bayesian Multi-Hypothesis Scoring](#33-bayesian-multi-hypothesis-scoring)
-  - [3.4 Diagnostic Feature Extraction](#34-diagnostic-feature-extraction)
-  - [3.5 ML Scorer — XGBoost Tier-1](#35-ml-scorer--xgboost-tier-1)
-  - [3.6 Posterior Calibration](#36-posterior-calibration)
-  - [3.7 Submission Pathway Classification](#37-submission-pathway-classification)
-- [4. Installation](#4-installation)
-- [5. Quick Start](#5-quick-start)
-  - [CLI](#cli-simplest-way-to-run)
-  - [Understanding the output](#understanding-the-cli-output)
-  - [Python API](#python-api)
-  - [Training a Custom Scorer](#training-a-custom-scorer)
-- [6. Repository Structure](#6-repository-structure)
-- [7. Quality Assurance](#7-quality-assurance)
-- [8. Data Sources](#8-data-sources-and-target-selection)
-- [9. Guardrails](#9-guardrails-and-scientific-integrity)
-- [10. Submission Instructions](#10-submission-instructions)
-- [11. Project Roadmap](#11-project-roadmap)
-- [12. Diagnostics](#12-diagnostics)
-  - [End-to-end sanity check](#verify-the-pipeline-end-to-end-on-a-known-target)
-  - [Check model performance](#check-model-performance-roc-auc-and-f1)
-  - [Interpret calibration diagram](#interpret-the-reliability-calibration-diagram)
-  - [CNN Tier-2 label gate](#check-how-many-tess-labels-exist-cnn-tier-2-gate)
-  - [Diagnose a candidate's score](#diagnose-why-a-specific-candidate-scored-the-way-it-did)
-  - [Injection-recovery](#run-injection-recovery-to-measure-pipeline-completeness)
-- [13. Retraining and Recalibrating Models](#13-retraining-and-recalibrating-models)
-  - [When to retrain vs. recalibrate](#when-to-retrain-vs-recalibrate)
-  - [Baseline performance reference](#baseline-performance-reference)
-- [14. License](#14-license)
-- [Works Cited](#works-cited)
+## Current production state
 
----
+Version 0.3.7 is the current release state represented by this repository.
 
-## Abstract
+| Area | Status | Current evidence |
+|---|---|---|
+| EXO-Hunter lifecycle | **PROD accepted** | End-to-end launch, 10,000-candidate selection, exact manifest execution, durable history, follow-up creation, recovery, and idempotency pass in [`hunter_live_acceptance_v4.json`](artifacts/manifests/hunter_live_acceptance_v4.json) |
+| Bayesian scorer | **Production ready** | Default non-ML scorer; no model artifact required |
+| XGBoost scorer | **Production ready** | Trained on 7,586 Kepler KOIs; held-out AUC 0.992 |
+| XGBoost + Bayesian ensemble | **Production ready** | Conservative fallback when no CNN is supplied |
+| CNN scorer | **Production benchmark promoted** | `benchmark_cnn_v1`; validated for its Kepler domain, not unrestricted cross-mission use |
+| Full ensemble | **Production ready** | Calibrated weights: XGBoost 0.95, CNN 0.00, Bayesian 0.05 |
+| Dataset and model research | **Active, gated** | Manifested, leakage-safe experiments continue; failed model strategies are retained as evidence and not silently reused |
+| External submission | **Not implemented or authorized** | The system produces recommendations and evidence packages only |
 
-This repository implements a complete, reproducible computational pipeline for the detection, vetting, and probabilistic classification of exoplanet transit candidates in photometric time-series data from the Transiting Exoplanet Survey Satellite (TESS) and the Kepler/K2 missions. The pipeline proceeds through six deterministic stages — data acquisition, preprocessing, Box Least Squares (BLS) periodicity search, signal vetting, Bayesian multi-hypothesis scoring, and submission pathway classification — and outputs calibrated posterior probabilities over six competing astrophysical and instrumental hypotheses. A conservative log-score approximation to Bayes' theorem is employed in lieu of generative likelihood models, with posterior calibration implemented via Platt scaling and isotonic regression (Pool Adjacent Violators Algorithm). An optional Tier-1 XGBoost classifier and Tier-3 stacking meta-learner augment the Bayesian scorer when labelled training data are available. The system is designed around scientific caution: it never labels an internally detected signal as a confirmed planet, exposes all false-positive evidence alongside each candidate score, and defers to authoritative external catalogs for confirmation status. The current implementation comprises 27 package modules, an autonomous background search engine with SQLite-backed durable state, an autonomous star-scanner for priority-ranked target discovery, 120 standalone Skills utility scripts, 140 top-level test files, strict static typing (mypy), and continuous integration via GitHub Actions.
+“PROD accepted” refers to the application and its defined operating contract.
+It does not mean that every search must find a candidate, that a transit signal
+is a confirmed planet, or that the software may submit an alert automatically.
+Scientific null results and ineligible follow-up universes are valid outcomes
+when every candidate was evaluated and the reasons are preserved.
 
----
+The authoritative readiness narrative is
+[`docs/PRODUCTION_READINESS.md`](docs/PRODUCTION_READINESS.md). The active
+research sequence and completed bounded gates are recorded in
+[`docs/ROADMAP.md`](docs/ROADMAP.md).
 
-## Getting Started
+## Production workflow
 
-> This section is for anyone who wants to run the pipeline without reading the full paper. No astronomy background required.
+```text
+candidate universe
+→ identity and prior-history resolution
+→ eligibility
+→ deterministic ranking and selection
+→ immutable manifest
+→ durable pending search
+→ data acquisition and preprocessing
+→ signal search, vetting, and scoring
+→ composite interpretation
+→ append-only results and provenance
+→ follow-up registration
+→ recommended next action
+```
 
-### EXO-Hunter production workflow
+Each stage has an explicit input and output contract. A later command executes
+the exact pending manifest; it never regenerates or silently substitutes the
+target list. Partial work is reported as partial, failed work remains visible,
+and a restart resumes only unfinished or failed targets from that manifest.
 
-The production workflow can freeze and later execute an exact target search,
-resume failures without replacing targets, and preserve actionable follow-ups:
+## Install
+
+Requirements:
+
+- Python 3.11 or newer
+- Git
+- [`uv`](https://docs.astral.sh/uv/) for the supported development setup
+- Internet access for live NASA/MAST catalog and light-curve retrieval
+
+For a new checkout:
+
+```bash
+git clone https://github.com/ares0311/2026-Exoplanet-Research.git
+cd 2026-Exoplanet-Research
+git switch main
+git pull --ff-only origin main
+uv sync --all-extras --all-groups
+```
+
+For an existing checkout:
 
 ```bash
 git switch main
 git pull --ff-only origin main
-.venv/bin/Create-New-Search --targets 100 --mode new
-.venv/bin/Run-New-Search --workers 6 --scorer bayesian
-.venv/bin/Show-Follow-Ups
+uv sync --all-extras --all-groups
 ```
 
-The default Bayesian path requires no AI model. For searches above 100 targets,
-the create command writes a timestamped CSV for review; SQLite remains the
-durable system of record. See [the EXO-Hunter production workflow](docs/HUNTER_PRODUCTION_WORKFLOW.md).
+Verify the installed entry points:
 
-### What this tool does
+```bash
+git switch main
+git pull --ff-only origin main
+.venv/bin/exo --version
+.venv/bin/Create-New-Search --help
+.venv/bin/Run-New-Search --help
+.venv/bin/Show-Follow-Ups --help
+```
 
-You give it a star's ID number. It downloads the brightness measurements NASA has collected for that star, searches them for the tell-tale periodic dips that happen when a planet passes in front of the star, and then scores how likely each dip is to be a real planet versus a false alarm (a background binary star, an instrumental glitch, etc.). At the end it tells you what to do with the result — post it to a community forum, flag it for professional follow-up, or discard it.
+## Scan one target
 
-### What you need before installing
+The direct CLI runs fetch → clean → search → vet → score → classify for one
+target. It supports TESS, Kepler, K2, and JWST.
 
-| Requirement | How to check | Where to get it |
+```bash
+git switch main
+git pull --ff-only origin main
+caffeinate -i .venv/bin/exo "TIC 150428135" \
+  --mission TESS \
+  --scorer bayesian \
+  --output reports/tic_150428135.json
+```
+
+Useful options include:
+
+- `--pipeline SPOC|QLP|TGLC` to constrain the TESS archive product author;
+- `--exptime long|short|fast` to constrain cadence;
+- `--max-peaks` and `--max-period-grid-points` to bound the BLS search;
+- `--no-animation` for logs, CI, and redirected output;
+- `--scorer bayesian|xgboost|ensemble|cnn|full-ensemble` to select a scorer.
+
+Model-backed modes require the corresponding `--model-path` and/or
+`--cnn-checkpoint`. Cross-mission CNN use fails closed unless explicitly
+enabled because prior transfer experiments did not establish general validity.
+
+## Run EXO-Hunter
+
+The Hunter commands use `data/hunter_searches.sqlite3` by default. This ignored
+runtime database is the local durable system of record; CSV files are review
+exports only.
+
+### 1. Create a new-target search
+
+```bash
+git switch main
+git pull --ff-only origin main
+caffeinate -i .venv/bin/Create-New-Search --targets 100 --mode new
+```
+
+The live selector requests at least 10,000 TIC candidates when data permits,
+then applies deterministic metadata ranking, prior-search exclusions,
+ASAS-SN variable screening, QLP product availability, and estimated data cost.
+It freezes eligible and ineligible candidate snapshots with selection reasons.
+
+Searches of at most 100 targets render a terminal table. Larger searches write
+a timestamped review CSV under `reports/search_manifests/`; SQLite remains
+authoritative in both cases.
+
+### 2. Create a follow-up search
+
+```bash
+git switch main
+git pull --ff-only origin main
+.venv/bin/Create-New-Search --targets 10 --mode follow-up
+```
+
+The default command automatically and idempotently imports
+[`hunter_prior_search_history_v1.json`](data_selection/hunter_prior_search_history_v1.json)
+before ranking. That versioned contract normalizes seven preserved sources,
+608 search events, and 200 unique TIC targets without rewriting the source
+logs. Follow-up eligibility considers the latest result, prior work, evidence
+quality, current registry disposition, revisit policy, and data availability.
+
+If fewer targets qualify than requested, the command fails loudly and creates
+no search. It does not replace a scientifically ineligible target with another
+target or manufacture a result by rerunning frozen work.
+
+### 3. Execute or resume the exact pending search
+
+```bash
+git switch main
+git pull --ff-only origin main
+caffeinate -i .venv/bin/Run-New-Search --workers 6 --scorer bayesian
+```
+
+The parent process owns all SQLite writes while workers independently acquire
+and process targets. A partial or failed run returns nonzero. Repeating the
+command resumes the same manifest, records interrupted attempts, skips only
+terminal target outcomes, and retries unfinished or failed targets. A completed
+manifest cannot be executed again.
+
+### 4. Inspect follow-ups
+
+```bash
+git switch main
+git pull --ff-only origin main
+.venv/bin/Show-Follow-Ups --status all
+```
+
+Each row includes its target, evidence, reason, priority, prior-search
+provenance, current disposition, revisit condition, and recommended action.
+Lifecycle states are `open`, `scheduled`, `completed`, and `deferred`, with
+append-only transition events and links to the consuming search.
+
+### 5. Import a reviewed prior result
+
+```bash
+git switch main
+git pull --ff-only origin main
+.venv/bin/Import-Follow-Up \
+  --evidence-file artifacts/manifests/hunter_reviewed_followup_import_v1.json
+```
+
+Import validates source hashes and writes a completed historical manifest,
+run, history event, and stable follow-up row in one durable contract. Repeating
+the same import is idempotent. Source drift fails before database mutation.
+
+All four Hunter commands support `--json` and `--no-color` for automation.
+`Create-New-Search` can also consume a provenance-complete JSON or CSV candidate
+file. See the full operator contract in
+[`docs/HUNTER_PRODUCTION_WORKFLOW.md`](docs/HUNTER_PRODUCTION_WORKFLOW.md).
+
+## Durable state and provenance
+
+The Hunter database separates concepts that must not be collapsed:
+
+| Durable concept | Storage | Invariant |
 |---|---|---|
-| Python 3.11 or newer | `python --version` | [python.org/downloads](https://www.python.org/downloads/) |
-| pip (Python package manager) | `pip --version` | Comes with Python 3.4+ |
-| git | `git --version` | [git-scm.com](https://git-scm.com/) |
-| Internet connection | — | Needed to download star data from NASA |
-| ~500 MB free disk space | — | For Python packages and cached data |
+| Candidate catalog | `candidate_catalog` | Immutable snapshot per candidate and search creation |
+| Search manifest | `search_manifests`, `search_manifest_targets` | Exact ordered membership, configuration, selector version, and SHA-256 |
+| Search run | `search_runs` | One row per attempt; interruption and partial completion remain explicit |
+| Target search history | `target_search_history` | Append-only results, failures, method, source, timestamps, and provenance |
+| Search lifecycle | `search_state_events` | Append-only pending/running/interrupted/partial/failed/completed transitions |
+| Follow-up registry | `follow_up_registry` | Stable recommendation, disposition, revisit gate, and parent relationship |
+| Follow-up lifecycle | `follow_up_events` | Append-only transitions linked to consuming searches |
 
-### Five-minute setup
+Completed attempts also append small Git-visible Run Reports under
+`artifacts/manifests/run_reports/`. Runtime databases, caches, downloaded
+products, reports, and committed evidence have deliberately different
+retention policies.
 
-Open a terminal and run these commands one at a time:
+Every completed search preserves, where applicable:
 
-```bash
-# 1. Download the code
-git clone https://github.com/ares0311/2026-Exoplanet-Research.git
-cd 2026-Exoplanet-Research
+- exact target order and candidate snapshots;
+- configuration, selector, pipeline, code, scorer, and model versions;
+- archive product URIs and acquisition metadata;
+- preprocessing context and cadence counts;
+- every signal's diagnostics and scores;
+- composite result and conservative interpretation;
+- failures and execution state;
+- prior-search and follow-up relationships.
 
-# 2. Install all dependencies
-pip install -r requirements.txt
+## Scientific pipeline
 
-# 3. Make the package importable (do this once per terminal session,
-#    or add it to your shell profile so it's automatic)
-export PYTHONPATH=src
+The package implementation lives in `src/exo_toolkit/`:
 
-# 4. Verify the installation worked
-python -c "from exo_toolkit.scoring import score_candidate; print('Installation OK')"
-```
-
-You should see `Installation OK`. If you see an error, check the Troubleshooting section below.
-
-### Your first result (30 seconds)
-
-This runs the full pipeline on TOI-700 — a real confirmed-planet system that is a good sanity-check target:
-
-```bash
-exo 150428135
-```
-
-You will see a report printed to the terminal. The two most important lines are:
-
-```
-FPP:      0.083        ← False Positive Probability (lower is better; <0.35 is promising)
-Pathway:  tfop_ready   ← What to do with this candidate (see §10)
-```
-
-### Troubleshooting installation
-
-**`command not found: exo`**
-The CLI entry point is only available after `pip install -e .`. If you used
-`pip install -r requirements.txt` instead, run scripts with `python -m exo_toolkit.cli <TIC-ID>` or simply add `pip install -e .` and retry.
-
-**`ModuleNotFoundError: No module named 'exo_toolkit'`**
-You forgot to set `PYTHONPATH`. Run `export PYTHONPATH=src` in your terminal before running any `python` commands (or run `pip install -e .` once to avoid needing this).
-
-**`lightkurve` download errors / timeout**
-The NASA MAST archive is sometimes slow. Wait 30 seconds and retry. If the problem persists, check your internet connection.
-
-**`No light curves found` for a TIC ID**
-Not all stars have TESS data yet. Try a different TIC ID or check the MAST portal to confirm data exists for your target.
-
-### How to find a star's TIC ID
-
-Every star in the TESS sky has a number called a TIC ID (TESS Input Catalog). To find one:
-
-1. Go to [exofop.ipac.caltech.edu/tess](https://exofop.ipac.caltech.edu/tess/)
-2. Search by star name (e.g. "TOI-700") or coordinates
-3. The TIC ID is shown at the top of the star page
-
-You can also use the star name directly:
-
-```bash
-exo "TOI-700"       # by TOI name (if lightkurve can resolve it)
-exo 150428135       # by TIC number (always works)
-```
-
-## 🖥 Local System Profile
-
-Local development and batch-run sizing guidance is recorded in [`docs/SYSTEM_PROFILE.md`](docs/SYSTEM_PROFILE.md).
-
----
-
-## 1. Introduction
-
-The detection of transiting exoplanets from space-based photometry has undergone a paradigm shift from individual targeted observations toward large-scale automated surveys. The Kepler mission (Borucki et al.) surveyed approximately 150,000 stars continuously for four years, yielding more than 4,000 planet candidates and establishing the statistical framework for occurrence-rate studies (Fressin et al.; Bryson et al.). Its successor, the Transiting Exoplanet Survey Satellite (Ricker et al.), observes nearly the entire sky in 27-day sectors, generating a continuous stream of TESS Objects of Interest (TOIs) that require community vetting before resources are allocated for ground-based follow-up (Guerrero et al.).
-
-A persistent challenge across both missions is the high false-positive rate among photometric transit candidates. Background eclipsing binaries, on-target eclipsing binaries diluted by the target's flux, stellar variability masquerading as periodic dimming, and instrumental systematics collectively account for the majority of transit-like signals detected by automated pipelines (Fressin et al.; Morton). Rigorous vetting — combining photometric diagnostics, centroid analysis, catalog matching, and probabilistic modeling — is therefore a prerequisite for responsible candidate reporting. The Kepler mission's Robovetter system (Coughlin et al.; Thompson et al.) demonstrated that automated multi-criterion vetting can achieve high completeness and reliability when trained on a large labeled corpus; the same principles apply to TESS data, with appropriate corrections for differences in cadence, pixel scale, and systematic noise.
-
-Deep-learning approaches have extended the automated vetting paradigm further. Shallue and Vanderburg showed that a convolutional neural network trained on Kepler TCEs can match or exceed human performance on the classification of folded light curves, recovering an eighth planet in the Kepler-90 system. However, such models are mission-specific and require thousands of labeled examples before they generalize reliably (Shallue and Vanderburg). This repository now includes CNN training, checkpoint, calibration, inference, CLI, and stacking scaffolding, but no CNN checkpoint is production-approved. The production workflow is now dataset/model-training-first under `docs/exoplanet_exomoon_dataset_handoff.md`: verify source contracts, build leakage-safe manifests, train on real public labeled data, and promote only a checkpoint that passes held-out gates. The Bayesian log-score model and XGBoost tabular classifier remain the production-ready fallbacks in the interim.
-
-Citizen-science initiatives such as Planet Hunters have demonstrated that human inspection of phase-folded light curves can recover candidates missed by automated pipelines, particularly single-transit events and long-period systems (Fischer et al.). However, the volume of data produced by TESS renders manual inspection alone insufficient. A computational toolkit that automates the vetting and scoring workflow, while remaining interpretable and reproducible, occupies a productive niche between fully automated survey pipelines and ad hoc visual inspection.
-
-This project addresses that niche. The `exo_toolkit` Python package implements a fully automated, end-to-end pipeline from raw MAST data retrieval through calibrated candidate scoring and submission pathway routing. Every scoring decision is accompanied by a structured explanation enumerating positive evidence, negative evidence, and blocking issues. All intermediate results preserve full provenance. The system targets lightly-worked TESS targets — later sectors, fainter stars (TESS magnitude 10–14), and less-crowded fields — where the probability of genuine novel discoveries is highest relative to the existing literature.
-
----
-
-## 2. Pipeline Architecture
-
-The pipeline is organized as six sequential, independently testable stages:
-
-```
-┌─────────┐   ┌─────────┐   ┌──────────┐   ┌─────┐   ┌───────┐   ┌──────────┐
-│  Fetch  │──▶│  Clean  │──▶│  Search  │──▶│ Vet │──▶│ Score │──▶│ Classify │
-└─────────┘   └─────────┘   └──────────┘   └─────┘   └───────┘   └──────────┘
-```
-
-Each stage produces a typed, immutable result object and preserves provenance metadata. Stages communicate exclusively through these result objects; there is no shared mutable state.
-
-| Module | Stage | Responsibility | Tests |
-|---|---|---|---|
-| `fetch.py` | Fetch | MAST data retrieval via Lightkurve; records cadence, sectors, pipeline | 40 (+2 live) |
-| `clean.py` | Clean | NaN removal, sigma clipping, normalization, windowed detrending | 39 |
-| `search.py` | Search | BLS periodicity search; iterative transit masking for multi-planet systems | 43 |
-| `vet.py` | Vet | Per-transit depth measurement, odd/even comparison, secondary eclipse, transit shape, data-gap fraction | 47 |
-| `scoring.py` | Score | Log-score posterior computation; mission-prior hook; derived scores (FPP, detection confidence, novelty) | 48 |
-| `pathway.py` | Classify | Ordered gate-based submission pathway classification | 60 |
-| `schemas.py` | — | Immutable Pydantic data models for all pipeline types | 33 |
-| `features.py` | — | `RawDiagnostics` container; `extract_features()` mapping diagnostics to `[0,1]` scores; 37 features including `depth_scatter_chi2_score`, `transit_timing_variation_score` | 145 |
-| `hypotheses.py` | — | Per-hypothesis log-score functions; `depth_scatter_chi2_score` + `transit_timing_variation_score` wired into instrumental and planet hypotheses | 46 |
-| `priors.py` | — | Versioned conservative scoring-prior config loader and mission profile selection | 14 |
-| `calibration.py` | — | Platt scaling, PAVA isotonic regression, Brier score, reliability curves | 70 |
-| `cli.py` | — | `exo <TIC-ID>` entry point; `--scorer`, `--model-path`, `--cnn-checkpoint`, `--output` options | 54 |
-| `ml/xgboost_scorer.py` | — | XGBoost tabular classifier on 35 `OptScore` features | 45 |
-| `ml/stacking_scorer.py` | — | Weighted blend of XGBoost + CNN + Bayesian posteriors | 22 |
-| `ml/cnn_scorer.py` | — | CNN checkpoint wrapper with neutral fallback when unavailable | 21 |
-| `background/` | — | SQLite-backed automation: one-shot runner, priority scoring, draft reports | 16 |
-| **Package subtotal** | | | **758** |
-
-The repository also contains 120 standalone `Skills/` utilities with dedicated tests. See `docs/PROJECT_STATUS.md` for the latest validation note.
-
-### Operating Modes
-
-The toolkit supports two complementary operating modes that share the same scoring engine:
-
-1. **Interactive transit scan** (`exo <TIC-ID>`): one target, full pipeline (Fetch → Clean → Search → Vet → Score → Classify), Rich-formatted output. This is the default entry point.
-2. **Background automation** (`exo background-run-once`): one bounded run over the known-TESS fixture pool, ranked by an 8-factor composite priority score, persisted to a SQLite ledger (`logs/background_search.sqlite3`), with draft reports written to `reports/background/`. Designed to be invoked by an external scheduler (cron, launchd, systemd timer) — see `docs/SCHEDULER.md`. No external submission is performed without explicit human approval.
-
-A third utility, `Skills/star_scanner.py`, provides a lighter-weight TIC-catalog scan that queries `astroquery` for promising uncharacterized targets and runs the full pipeline against them in priority order. Unlike `background/`, it does not persist to SQLite and is intended for ad-hoc exploration rather than scheduled operation.
-
-### ML Scoring Modes
-
-The `--scorer` flag selects among five backends:
-
-| Mode | Flag | Description |
+| Stage | Primary module | Responsibility |
 |---|---|---|
-| Bayesian (default) | `--scorer bayesian` | Log-score softmax posterior; no labels required |
-| XGBoost Tier-1 | `--scorer xgboost --model-path model.json` | Tabular classifier on 35 feature scores |
-| Ensemble Tier-3 | `--scorer ensemble --model-path model.json` | Weighted blend `w·P_xgb + (1-w)·P_bayes` |
-| CNN Tier-2 | `--scorer cnn --cnn-checkpoint best.pt` | Experimental CNN checkpoint wrapper; production use gated |
-| Full ensemble | `--scorer full-ensemble --model-path model.json --cnn-checkpoint best.pt` | Experimental XGBoost + CNN + Bayesian blend |
+| Fetch | `fetch.py` | Mission-aware archive retrieval and raw-product provenance |
+| Clean | `clean.py` | finite-value filtering, clipping, normalization, and detrending |
+| Search | `search.py` | bounded Box Least Squares search and iterative signal masking |
+| Vet | `vet.py` | odd/even, secondary-eclipse, shape, contamination, event timing, duration, missing-event, asymmetry, and extra-event diagnostics |
+| Features | `features.py` | normalized, typed scientific features with explicit missingness |
+| Score | `scoring.py`, `hypotheses.py`, `ml/` | Bayesian and optional model-backed competing-hypothesis scores |
+| Classify | `pathway.py` | ordered conservative recommendation gates |
+| Orchestrate | `search_lifecycle.py`, `hunter_cli.py` | deterministic selection, durable execution, recovery, history, and follow-ups |
 
-The CNN implementation scaffolding is present, but production CNN training/use
-is gated by `docs/exoplanet_exomoon_dataset_handoff.md` and
-`docs/CNN_PRODUCTION_RUNBOOK.md`. Write
-offline readiness artifacts:
+The scoring output is a candidate assessment, not a validation. The system
+exposes positive evidence, false-positive evidence, missing diagnostics, FPP,
+detection confidence, and the recommended review pathway. The unchanged
+follow-up gate requires FPP below 0.15, detection confidence above 0.40, and an
+eligible pathway.
+
+Phase 4's bounded individual-event core now measures event midpoints and
+durations plus `missing_transit_fraction`, `transit_asymmetry`, and
+`extra_event_count`. These diagnostics help distinguish coherent planetary
+events from instrumental, stellar, or ephemeris-mismatch behavior. The exact
+scoring definitions and versioned weights are documented in
+[`docs/SCORING_MODEL.md`](docs/SCORING_MODEL.md).
+
+## Verified production evidence
+
+The replacement v0.3.7 acceptance artifact records:
+
+- a live 10,000-candidate new-target universe;
+- a completed real follow-up search for TIC 237884073;
+- nine exact QLP product URIs and 63,205 processed cadences;
+- zero failures in that follow-up execution;
+- schema-v4 SQLite integrity and zero foreign-key violations;
+- 608 normalized historical events plus existing live events, preserved as
+  611 append-only history rows;
+- a 202-target combined follow-up universe with an idempotent repeat import;
+- a real reviewed recommendation for TIC 355651994 with preserved
+  `open → deferred` lifecycle history;
+- all defined launch, selection, execution, provenance, follow-up, recovery,
+  no-AI, no-manual-bridge, and no-substitution requirements marked pass.
+
+At that acceptance snapshot, zero of the 202 follow-up targets was eligible:
+190 were incomplete or below the evidence gate, six had no signal, three had
+already been followed up, one was deferred, one had failed, and one had no
+data. That is not “there are no scientifically interesting targets in the
+sky.” It means none of the currently imported, previously searched targets
+meets every rule for scheduling an exact follow-up today. The software can
+still create new-target searches, ingest additional reliable history sources,
+and schedule a future follow-up when new evidence satisfies its revisit gate.
+
+TIC 355651994 is deferred specifically because currently available MAST
+products do not cover a predicted event and the independent-event requirement
+is not met. The row remains visible with its evidence and revisit condition;
+it is not erased, mislabeled as actionable, or replaced.
+
+## Data sources and research scope
+
+Supported mission paths:
+
+- **TESS:** SPOC, QLP, and other explicitly selected MAST light-curve products;
+- **Kepler and K2:** archive light curves, catalog labels, frozen calibration,
+  sensitivity, and benchmark roles;
+- **JWST:** time-series products converted to white-light curves before transit
+  search; spectral series are not passed directly to BLS.
+
+The project uses NASA Exoplanet Archive, MAST, ExoFOP-TESS, and verified public
+catalogs. Dataset roles are explicit: training, validation, calibration,
+frozen evaluation, live search, or follow-up live search. A live-search dataset
+cannot silently become training data, and unlabeled examples are not treated as
+negatives.
+
+The exoplanet classifier/ranker is the production path. Exomoon work remains a
+separate residual/anomaly-ranking research track because no large confirmed
+real-positive exomoon label set exists. The project does not claim a supervised
+exomoon detector.
+
+See [`docs/exoplanet_exomoon_dataset_handoff.md`](docs/exoplanet_exomoon_dataset_handoff.md)
+for the dataset contract and
+[`docs/exoplanet_detection_research_brief.md`](docs/exoplanet_detection_research_brief.md)
+for mission, method, literature, and responsible follow-up context.
+
+## Known limits
+
+- The live new-target selector's 126 cone-search tiles cover about 99 square
+  degrees, not the whole sky. Achieved coverage is recorded in each selector log.
+- Day-one Hunter execution uses archive-extracted light curves. Raw TESS FFI
+  photometric extraction is a separate gated phase.
+- Public catalog and MAST metadata can change. Reproducibility applies to the
+  frozen snapshot and exact provenance, not to future archive responses.
+- The committed follow-up history is complete for its seven known source logs,
+  not for every search ever performed by every external project.
+- `benchmark_cnn_v1` is a Kepler-domain benchmark. Cross-mission transfer is
+  not silently assumed.
+- The historical `star_scanner.py` run006/run008 scans are preserved evidence,
+  not the primary production workflow. `exo background-run-once` exercises
+  seven static fixtures and is a CI/automation check, not a discovery engine.
+- The system does not confirm planets, publish discoveries, contact authorities,
+  or submit candidates without independent human review and authorization.
+
+## Quality and verification
+
+The canonical local gate partitions all default test modules across six pytest
+shards with six xdist workers each while Ruff and strict mypy run concurrently.
+It also runs the repository's reliability controls and incomplete-implementation
+checks.
 
 ```bash
-.venv/bin/python Skills/tier2_progress_reporter.py \
-  --labels data/exofop_ctoi_labels.json \
-  --output reports/tier2_status.md \
-  --json-output reports/tier2_status.json
+git switch main
+git pull --ff-only origin main
+UV_CACHE_DIR=.uv-cache caffeinate -i \
+  .venv/bin/python Skills/run_quality_gates.py
 ```
 
-Check the live ExoFOP label count only when network access is intentionally
-approved:
-
-```bash
-.venv/bin/python Skills/count_tess_labels.py
-```
-
----
-
-## 3. Methodology
-
-### 3.1 Transit Photometry Fundamentals
-
-A transiting planet occults a fraction of its host star's disk, producing a periodic reduction in observed flux. For a planet of radius $R_p$ orbiting a star of radius $R_\star$, the fractional transit depth is
-
-$$\delta = \left(\frac{R_p}{R_\star}\right)^2.$$
-
-For a circular orbit with semi-major axis $a$, impact parameter $b = (a/R_\star)\cos i$, and ratio $k = R_p/R_\star$, the total transit duration (first to fourth contact) is
-
-$$T_{14} = \frac{P}{\pi} \arcsin\!\left(\frac{R_\star}{a} \sqrt{(1 + k)^2 - b^2}\right),$$
-
-where $P$ is the orbital period (Winn). The ingress/egress duration is
-
-$$T_{12} = \frac{P}{\pi} \arcsin\!\left(\frac{R_\star}{a} \sqrt{(1 - k)^2 - b^2}\right).$$
-
-A box-shaped (flat-bottomed) transit satisfies $T_{12} \ll T_{14}$, indicative of a small planet-to-star radius ratio and/or low impact parameter. The ratio $T_{12}/T_{14}$ is used in the pipeline as the transit shape diagnostic `ingress_egress_fraction`.
-
-### 3.2 Box Least Squares Periodicity Search
-
-Transit candidates are identified using the Box Least Squares algorithm of Kovács et al., as implemented in `astropy.timeseries.BoxLeastSquares`. For a light curve with $N$ cadences $(t_i, f_i, \sigma_i)$, define the inverse-variance weights $w_i = \sigma_i^{-2}$. For trial period $P$, reference epoch $t_0$, and fractional duration $q$, the phase of each observation is
-
-$$\phi_i = \frac{(t_i - t_0) \bmod P}{P} \in [0, 1).$$
-
-The in-transit index set is $\mathcal{T}(P, t_0, q) = \{i : \phi_i \leq q\}$ and the out-of-transit set is $\mathcal{O} = \{1,\ldots,N\} \setminus \mathcal{T}$. The weighted mean fluxes are
-
-$$\bar{f}_{\mathcal{T}} = \frac{\sum_{i \in \mathcal{T}} w_i f_i}{\sum_{i \in \mathcal{T}} w_i}, \qquad \bar{f}_{\mathcal{O}} = \frac{\sum_{i \in \mathcal{O}} w_i f_i}{\sum_{i \in \mathcal{O}} w_i},$$
-
-and the depth estimate is $\hat{s} = \bar{f}_{\mathcal{O}} - \bar{f}_{\mathcal{T}}$. The BLS power spectrum is evaluated over a grid of $(P, t_0, q)$ triples and the Signal Detection Efficiency is
-
-$$\mathrm{SDE}(P) = \frac{\hat{s}(P) - \langle \hat{s} \rangle}{\mathrm{std}(\hat{s})},$$
-
-where the mean and standard deviation are taken over all trial periods at fixed best $(t_0, q)$.
-
-The duration grid is capped at $q_{\max} = 0.9\, P_{\min} / 24$ hours to satisfy the strict BLS constraint that the maximum trial duration must be shorter than the minimum trial period (Kovács et al.). Multi-planet candidates are recovered by iterative transit masking: after each BLS peak the corresponding in-transit cadences are masked and the search is repeated on the residual series.
-
-### 3.3 Bayesian Multi-Hypothesis Scoring
-
-#### 3.3.1 Competing Hypotheses
-
-For each detected signal $\mathbf{D}$, the scoring engine evaluates six mutually exclusive hypotheses $H_i$:
-
-| Symbol | Hypothesis | Prior $P(H_i)$ |
-|---|---|---|
-| $H_\mathrm{pc}$ | Planet candidate | 0.10 |
-| $H_\mathrm{eb}$ | On-target eclipsing binary | 0.20 |
-| $H_\mathrm{beb}$ | Background eclipsing binary | 0.20 |
-| $H_\mathrm{sv}$ | Stellar variability | 0.20 |
-| $H_\mathrm{ia}$ | Instrumental artifact | 0.20 |
-| $H_\mathrm{ko}$ | Known catalog object | 0.10 |
-
-Priors are intentionally pessimistic regarding new planet candidates, consistent with the empirical false-positive rates reported by Fressin et al. and Morton.
-
-#### 3.3.2 Log-Score Approximation
-
-Because full generative likelihood models $P(\mathbf{D} \mid H_i)$ require detailed stellar and instrumental forward models not available in the early pipeline, the posterior is approximated via a log-score model (Díaz et al.):
-
-$$\ell_i = \log P(H_i) + \sum_{k} w_{ik}\, \phi_k(\mathbf{D}),$$
-
-where $\phi_k(\mathbf{D}) \in [0, 1]$ are normalized diagnostic feature scores and $w_{ik} \in \mathbb{R}$ are hypothesis-specific weights. Positive weights contribute evidence for $H_i$; negative weights contribute evidence against it. Features that are unavailable (e.g., because a catalog query was not performed) are assigned $\phi_k = 0$, contributing neither evidence for nor against any hypothesis.
-
-The normalized posterior is computed via a numerically stable softmax. Letting $\ell_{\max} = \max_i \ell_i$:
-
-$$p_i = P(H_i \mid \mathbf{D}) \approx \frac{\exp(\ell_i - \ell_{\max})}{\displaystyle\sum_{j=1}^{6} \exp(\ell_j - \ell_{\max})}.$$
-
-Subtracting $\ell_{\max}$ before exponentiation prevents floating-point overflow without affecting the normalized result.
-
-#### 3.3.3 False Positive Probability
-
-The false positive probability is defined as
-
-$$\mathrm{FPP} = 1 - p_{\mathrm{pc}}.$$
-
-When $p_{\mathrm{ko}} \geq 0.80$, the signal is reclassified as a known-object annotation and FPP is reported separately to avoid conflating genuine false positives with catalog matches.
-
-### 3.4 Diagnostic Feature Extraction
-
-All features $\phi_k : \mathbf{D} \to [0, 1]$ are typed as `OptScore = float | None`. A `None` value indicates the diagnostic was not computed (missing data or insufficient coverage) and contributes zero to all log scores.
-
-**Signal-to-noise score.**  Using a logarithmic transform for numerical stability across the wide dynamic range of survey SNR values:
-
-$$\phi_{\mathrm{SNR}} = \mathrm{clip}\!\left(\frac{\log\max(\mathrm{SNR},\, 1)}{\log 12},\; 0,\; 1\right).$$
-
-**Transit count score.**  Discrete mapping reflecting the requirement for repeated events:
-
-$$\phi_{\mathrm{tc}} = \begin{cases} 0.25 & n_\mathrm{transits} = 1 \\ 0.70 & n_\mathrm{transits} = 2 \\ 1.00 & n_\mathrm{transits} \geq 3 \end{cases}$$
-
-**Odd/even depth mismatch.**  An eclipsing binary with unequal primary and secondary depths will produce alternating transit depths when phase-folded at half the true period. The mismatch significance is
-
-$$\phi_{\mathrm{OE}} = \mathrm{clip}\!\left(\frac{|\delta_\mathrm{odd} - \delta_\mathrm{even}|}{5\,\sqrt{\sigma_\mathrm{odd}^2 + \sigma_\mathrm{even}^2}},\; 0,\; 1\right),$$
-
-where $\delta_\mathrm{odd}$, $\delta_\mathrm{even}$ are the inverse-variance-weighted mean depths of odd- and even-numbered transits (in ppm) and $\sigma$ are their propagated uncertainties.
-
-**Secondary eclipse SNR.**  The pipeline searches for a secondary eclipse at orbital phase $\phi = 0.5$ (superior conjunction, as expected for a circular orbit):
-
-$$\phi_{\mathrm{sec}} = \mathrm{clip}\!\left(\frac{\mathrm{SNR}_{\phi=0.5}}{7},\; 0,\; 1\right),$$
-
-where $\mathrm{SNR}_{\phi=0.5}$ is the depth divided by its propagated uncertainty in the secondary window, estimated relative to the out-of-transit baseline.
-
-**Transit shape (ingress/egress fraction).**  Comparing the mean depth in the outer half of the transit window ($T/4 < |t - t_c| \leq T/2$) to the inner half ($|t - t_c| \leq T/4$):
-
-$$\phi_{\mathrm{shape}} = \mathrm{clip}\!\left(\frac{\bar{\delta}_{\mathrm{outer}}}{\bar{\delta}_{\mathrm{inner}}},\; 0,\; 1\right).$$
-
-Values near 1 indicate a flat-bottomed (box-shaped) transit consistent with a planet; values near 0 indicate a V-shaped morphology consistent with a grazing eclipse.
-
-**Data gap fraction.**  The fraction of expected transit windows that contain fewer than three in-transit cadences:
-
-$$\phi_{\mathrm{gap}} = \frac{|\{n : |\{i : |t_i - t_n| \leq T/2\}| < 3\}|}{N_{\mathrm{windows}}},$$
-
-where $t_n = t_0 + nP$ are the predicted transit centers. This score enters as a penalty on detection confidence.
-
-**Depth scatter chi-square score.**  A statistically rigorous test of depth consistency using per-transit measurement errors. The weighted mean depth is
-
-$$\bar{\delta}_w = \frac{\sum_i \delta_i / \sigma_i^2}{\sum_i 1/\sigma_i^2},$$
-
-and the reduced chi-square is
-
-$$\chi^2_\nu = \frac{1}{N-1}\sum_{i=1}^{N}\left(\frac{\delta_i - \bar{\delta}_w}{\sigma_i}\right)^2.$$
-
-The score $\phi_{\chi^2} = \mathrm{clip}(\chi^2_\nu / 3,\, 0,\, 1)$ saturates at a threshold of three. A high score — depths inconsistent relative to their measurement noise — contributes positively to the instrumental artifact hypothesis and negatively to the planet candidate hypothesis.
-
-### 3.5 ML Scorer — XGBoost Tier-1
-
-When labelled training data are available the Bayesian scorer can be replaced or augmented by a gradient-boosted tree classifier. The XGBoost model takes as input the vector of 35 `OptScore` fields from `CandidateFeatures`, with `None` values passed as `NaN` and handled natively by XGBoost's missing-value splitting. The model is trained using stratified k-fold cross-validation (Coughlin et al.; Thompson et al.) on the Kepler DR25 cumulative planet candidate table or the TESS TOI disposition table, labelling confirmed planets as positive and false positives / eclipsing binaries as negative.
-
-Out-of-fold predicted probabilities are collected during cross-validation to fit Platt scaling parameters $(a, b)$ by minimizing the binary cross-entropy:
-
-$$\mathcal{L}(a, b) = -\frac{1}{N}\sum_{i=1}^N \left[y_i \log \sigma(a p_i + b) + (1-y_i)\log(1-\sigma(a p_i + b))\right],$$
-
-where $\sigma(x) = (1 + e^{-x})^{-1}$ and $p_i$ are the raw XGBoost probability outputs. The parameters $(a, b)$ are stored alongside the model weights in the metadata JSON and applied automatically at inference time.
-
-### 3.6 Posterior Calibration
-
-The initial log-score model is not calibrated by construction. Calibration maps raw model probabilities to empirical frequencies using labeled examples drawn from confirmed planets, TOIs, known false positives, and eclipsing binary catalogs.
-
-#### 3.6.1 Brier Score
-
-Model reliability is quantified per hypothesis using the Brier score (Brier):
-
-$$\mathrm{BS}_k = \frac{1}{N} \sum_{i=1}^{N} \left(p_{ik} - y_{ik}\right)^2,$$
-
-where $y_{ik} \in \{0, 1\}$ is the binary true-label indicator for hypothesis $k$ in sample $i$, and $p_{ik}$ is the model's posterior probability. A perfectly calibrated model achieves $\mathrm{BS}_k = 0$; the naive uniform prior achieves $\mathrm{BS}_k = 5/6 \cdot (1/6)^2 + 1/6 \cdot (5/6)^2 \approx 0.139$.
-
-#### 3.6.2 Platt Scaling
-
-Platt scaling (Platt) fits a logistic sigmoid to the raw model probabilities in a one-vs-rest framework. For hypothesis $k$, the calibrated probability is
-
-$$\tilde{p}_k = \sigma(a_k p_k + b_k), \qquad \sigma(x) = \frac{1}{1 + e^{-x}},$$
-
-where parameters $(a_k, b_k)$ are found by minimizing the negative log-likelihood of the sigmoid over the training labels via the Nelder-Mead simplex method (Scipy). The identity mapping $(a_k, b_k) = (1, 0)$ is used as a fallback when fewer than five training samples are available or when all labels are identical.
-
-#### 3.6.3 Isotonic Regression (PAVA)
-
-Isotonic regression (Barlow et al.) provides a non-parametric calibration mapping by fitting the largest monotone non-decreasing step function to the empirical $(p_k, y_k)$ pairs. The Pool Adjacent Violators Algorithm (PAVA) solves
-
-$$\min_{\tilde{p}} \sum_{i=1}^{N} \left(p_i - \tilde{p}_i\right)^2 \quad \text{subject to} \quad \tilde{p}_1 \leq \tilde{p}_2 \leq \cdots \leq \tilde{p}_N,$$
-
-in $O(N)$ time by merging blocks of adjacent violating values into their pooled mean. The pipeline implements PAVA in pure Python without any dependency on scikit-learn.
-
-After applying either calibration method in a one-vs-rest fashion, the six calibrated probabilities are renormalized to sum to unity before constructing the final `HypothesisPosterior`.
-
-### 3.7 Submission Pathway Classification
-
-Candidates are routed to one of six submission pathways by an ordered decision gate evaluated in strict sequence:
-
-| Priority | Condition | Pathway |
-|---|---|---|
-| 1 | $p_{\mathrm{ko}} \geq 0.80$ | `known_object_annotation` |
-| 2 | $\mathrm{FPP} \geq 0.70$ | `github_only_reproducibility` |
-| 3 | $n_{\mathrm{transits}} < 2$ | `planet_hunters_discussion` |
-| 4 | TESS + all 9 quality gates pass | `tfop_ready` |
-| 4 | TESS + detection confidence $\geq 0.45$ | `planet_hunters_discussion` |
-| 5 | Kepler/K2 + $p_{\mathrm{pc}} \geq 0.65$, novelty $\geq 0.70$, FPP $\leq 0.35$ | `kepler_archive_candidate` |
-| 6 | Fallback | `github_only_reproducibility` |
-
-The nine conditions for `tfop_ready` include: $\mathrm{SNR} \geq 8$, $n_{\mathrm{transits}} \geq 2$, $p_{\mathrm{pc}} \geq 0.65$, $\mathrm{FPP} \leq 0.35$, contamination score $< 0.50$, secondary eclipse score $< 0.40$, odd/even mismatch score $< 0.40$, no known-object match, and a valid provenance score. A `None` feature score conservatively fails any gate condition it participates in.
-
----
-
-## 4. Installation
-
-### Recommended: editable install (one-time setup)
-
-```bash
-git clone https://github.com/ares0311/2026-Exoplanet-Research.git
-cd 2026-Exoplanet-Research
-pip install -e .
-```
-
-The `-e` flag installs the package in "editable" mode so that the `exo` CLI command and all imports work from any directory without any extra `PYTHONPATH` setup.
-
-### Alternative: requirements only (no CLI)
-
-If you just want to import the library from within the project directory:
-
-```bash
-pip install -r requirements.txt
-export PYTHONPATH=src   # add to ~/.bashrc or ~/.zshrc to make permanent
-```
-
-### Verify the installation
-
-```bash
-python -c "from exo_toolkit.scoring import score_candidate; print('OK')"
-```
-
-For the `exo` CLI (only available after `pip install -e .`):
-
-```bash
-exo --help
-```
-
-### Virtual environments (recommended)
-
-Using a virtual environment keeps this project's dependencies isolated from your other Python projects:
-
-```bash
-python -m venv venv
-source venv/bin/activate      # macOS / Linux
-# venv\Scripts\activate       # Windows
-pip install -e .
-```
-
-### Dependencies
-
-| Package | Purpose |
-|---|---|
-| `numpy` | Array operations throughout |
-| `astropy` | BLS search (`timeseries.BoxLeastSquares`), units |
-| `lightkurve` | MAST data retrieval and light curve I/O |
-| `astroquery` | Catalog queries (TOI, KOI, Gaia, TIC) |
-| `pydantic` | Immutable typed data models |
-| `scipy` | Platt scaling optimization (Nelder-Mead) |
-| `xgboost` | Tier-1 ML classifier (optional; needed for `--scorer xgboost`) |
-| `pandas` | Training data I/O in Skills scripts |
-| `matplotlib` | ROC and reliability diagram export (optional) |
-
-Development dependencies (`pytest`, `ruff`, `mypy`) are listed in `pyproject.toml`.
-
----
-
-## 5. Quick Start
-
-### CLI (simplest way to run)
-
-```bash
-# Run the full pipeline on a TESS target (TIC ID 150428135 = TOI-700)
-exo 150428135
-
-# Use the XGBoost ML scorer instead of the default Bayesian scorer
-exo 150428135 --scorer xgboost --model-path data/model.json
-
-# Use the ensemble scorer (blends Bayesian + XGBoost)
-exo 150428135 --scorer ensemble --model-path data/model.json
-
-# Save the full results to a JSON file for later analysis
-exo 150428135 --output results/toi700.json
-
-# Restrict the TESS mission (useful if a star also has Kepler data)
-exo 150428135 --mission TESS
-
-# Run one iteration of the background search automation (writes to SQLite log)
-exo background-run-once
-
-# Dry-run — plan what the background run would do, without writing anything
-exo background-run-once --dry-run
-
-# Inspect run history and SQLite integrity
-exo run-summary
-exo sqlite-integrity
-```
-
-### Understanding the CLI output
-
-When you run `exo 150428135` you will see output like:
-
-```
-TIC 150428135  (TESS)
-─────────────────────────────────────────────────────
-Signals found: 2
-
-── Signal 1 ──────────────────────────────────────────
-  Period:              37.4210 d
-  Depth:               1 247 ppm     (0.12 % brightness drop)
-  Duration:            2.31 h
-  SNR:                 22.4
-
-  Posterior probabilities
-    planet_candidate         0.742   ← This is what we want to be high
-    eclipsing_binary         0.098
-    background_eb            0.071
-    stellar_variability      0.042
-    instrumental_artifact    0.031
-    known_object             0.016
-
-  False Positive Probability (FPP):   0.258   ← 1 − planet_candidate
-  Detection confidence:               0.871
-  Novelty score:                      0.943
-
-  Submission pathway:  tfop_ready     ← Action to take (see §10)
-
-  Positive evidence:
-    • SNR = 22.4 (strong signal)
-    • 6 transits observed (repeatable)
-    • Transit shape is box-like (planet-consistent morphology)
-
-  Negative evidence / caution:
-    • Contamination ratio 0.01 (low; not a concern here)
-
-── Signal 2 ──────────────────────────────────────────
-  ...
-```
-
-**Key numbers to focus on:**
-
-| Field | What it means | Good range |
-|---|---|---|
-| **FPP** | Probability this is NOT a planet. Lower = more planet-like. | < 0.35 is promising |
-| **planet_candidate** | Probability this IS a planet candidate. Higher = better. | > 0.65 is promising |
-| **SNR** | How clearly the dip stands out above the noise. | ≥ 8 for serious follow-up |
-| **Depth (ppm)** | How much the star dims. 1,000 ppm = 0.1%. Earth vs. Sun ≈ 84 ppm. | Any positive value |
-| **Period (days)** | How often the dip repeats. | Shorter periods are easier to confirm |
-| **Submission pathway** | What to do next. See §10 for instructions per pathway. | `tfop_ready` is highest confidence |
-
-**Red flags in the output to watch for:**
-
-- `eclipsing_binary` posterior > 0.30 — the signal is more likely a binary star
-- `Odd/even mismatch detected` — alternating deep/shallow transits = almost certainly a binary
-- `Secondary eclipse detected` — a second dip at half-orbit = binary star signature
-- FPP > 0.70 — the pipeline has low confidence this is a real planet
-- `Pathway: github_only_reproducibility` — does not meet criteria for external submission
-
-### Python API
-
-```python
-from exo_toolkit.fetch import fetch_lightcurve
-from exo_toolkit.clean import clean_lightcurve
-from exo_toolkit.search import search_lightcurve
-from exo_toolkit.vet import vet_signal
-from exo_toolkit.scoring import score_candidate
-from exo_toolkit.pathway import classify_submission_pathway
-
-# 1. Fetch — downloads PDCSAP photometry from MAST (requires internet)
-fetch_result = fetch_lightcurve("TIC 150428135", mission="TESS")
-
-# 2. Clean — removes bad data points, normalizes brightness to ~1.0
-clean_result = clean_lightcurve(fetch_result.light_curve)
-
-# 3. Search — scans for periodic dips; returns ranked list of candidates
-signals = search_lightcurve(clean_result.light_curve)
-print(f"Found {len(signals)} candidate signal(s)")
-
-if signals:
-    signal = signals[0]  # examine the strongest candidate first
-
-    # 4. Vet — measures dip properties and computes diagnostic scores
-    vet_result = vet_signal(
-        clean_result.light_curve,
-        signal,
-        stellar_radius_rsun=0.42,   # star size from TIC catalog (optional)
-        contamination_ratio=0.01,   # nearby-star flux fraction (optional)
-    )
-
-    # 5. Score — computes probability over 6 competing hypotheses
-    posterior, scores = score_candidate(signal, vet_result.features)
-
-    # 6. Classify — routes to one of 6 submission pathways
-    pathway = classify_submission_pathway(
-        signal, vet_result.features, posterior, scores
-    )
-
-    print(f"Period:             {signal.period_days:.4f} d")
-    print(f"Depth:              {signal.depth_ppm:.0f} ppm")
-    print(f"FPP:                {scores.false_positive_probability:.3f}")
-    print(f"Planet probability: {posterior.planet_candidate:.3f}")
-    print(f"Pathway:            {pathway}")
-```
-
-### Training a Custom Scorer
-
-```bash
-# Download Kepler KOI table
-python Skills/fetch_kepler_tce.py --output data/koi_table.csv
-
-# Build labelled training features
-python Skills/build_training_data.py \
-    --koi data/koi_table.csv --output data/kepler_training.pkl
-
-# Download TESS TOI table
-python Skills/fetch_tess_toi.py --output data/tess_toi.csv
-
-# Build TESS training features
-python Skills/build_tess_training_data.py \
-    --toi data/tess_toi.csv --output data/tess_training.pkl
-
-# Merge datasets (optional)
-python Skills/build_combined_training_data.py \
-    --kepler data/kepler_training.pkl \
-    --tess   data/tess_training.pkl \
-    --output data/combined_training.pkl
-
-# Train XGBoost with Platt calibration
-python Skills/train_xgboost.py \
-    --data data/combined_training.pkl --model data/model.json
-
-# Evaluate Bayesian vs XGBoost (ROC-AUC, F1, precision, recall)
-python Skills/evaluate_scorer.py \
-    --data data/combined_training.pkl \
-    --model data/model.json \
-    --plot reports/roc.png \
-    --reliability-plot reports/calibration.png
-```
-
----
-
-## 6. Repository Structure
-
-```
-2026-Exoplanet-Research/
-├── src/
-│   └── exo_toolkit/
-│       ├── schemas.py           # Pydantic data models (frozen, typed)
-│       ├── features.py          # RawDiagnostics; extract_features()
-│       ├── hypotheses.py        # Per-hypothesis log-score functions
-│       ├── priors.py            # Conservative default and mission prior profiles
-│       ├── scoring.py           # Softmax posterior; FPP; detection confidence
-│       ├── pathway.py           # Ordered gate → 6 submission pathways
-│       ├── fetch.py             # MAST retrieval via Lightkurve
-│       ├── clean.py             # Sigma clipping; normalization; detrending
-│       ├── search.py            # BLS search; iterative transit masking
-│       ├── vet.py               # Odd/even; secondary eclipse; transit shape
-│       ├── calibration.py       # Platt scaling; PAVA isotonic; Brier score
-│       ├── cli.py               # `exo <TIC-ID>` Rich-formatted CLI
-│       └── ml/
-│           ├── xgboost_scorer.py    # XGBoost binary classifier (Tier-1)
-│           ├── cnn_scorer.py        # CNN checkpoint wrapper (Tier-2 scaffold)
-│           └── stacking_scorer.py   # Weighted blend scorer (Tier-3)
-├── tests/                       # 140 top-level test files plus marked live tests
-│   ├── test_schemas.py          # 33 tests
-│   ├── test_features.py         # 145 tests
-│   ├── test_hypotheses.py       # 46 tests
-│   ├── test_priors.py           # 14 tests
-│   ├── test_scoring.py          # 48 tests
-│   ├── test_pathway.py          # 60 tests
-│   ├── test_fetch.py            # 55 tests (+2 live)
-│   ├── test_clean.py            # 39 tests
-│   ├── test_search.py           # 43 tests
-│   ├── test_vet.py              # 47 tests
-│   ├── test_calibration.py      # 70 tests
-│   ├── test_cli.py              # 54 tests
-│   ├── test_xgboost_scorer.py   # 45 tests
-│   ├── test_stacking_scorer.py  # 22 tests
-│   ├── test_cnn_scorer.py       # 21 tests
-│   ├── test_background_automation.py  # 16 tests
-│   └── ...                      # Skills tests
-├── Skills/                      # Reusable standalone utility scripts
-│   ├── fetch_kepler_tce.py      # Download Kepler KOI cumulative table
-│   ├── fetch_tess_toi.py        # Download TESS TOI table (CP/FP/EB)
-│   ├── build_training_data.py   # Kepler KOI → CandidateFeatures pickle
-│   ├── build_tess_training_data.py  # TESS TOI → CandidateFeatures pickle
-│   ├── build_combined_training_data.py  # Merge Kepler + TESS pickles
-│   ├── train_xgboost.py         # k-fold CV training with Platt calibration
-│   ├── evaluate_scorer.py       # Bayesian vs XGBoost comparison (ROC, F1)
-│   ├── injection_recovery.py    # Synthetic transit injection completeness maps
-│   ├── count_tess_labels.py     # Check CNN Tier-2 label gate (≥5,000 CP)
-│   ├── tess_label_check_summary.py  # Summarize live label-check SQLite logs
-│   ├── star_scanner.py          # TIC priority ranking and background scan loop
-│   ├── rank_candidates.py       # Composite rank scoring and Rich table output
-│   ├── batch_scan.py            # Bulk TIC-ID scanning with resume and JSON output
-│   ├── sector_coverage.py       # Query TESS sector availability without downloading
-│   ├── plot_lc.py               # Phase-folded light curve PNG from candidate JSON
-│   ├── watchlist.py             # Persistent JSON watchlist of follow-up TIC IDs
-│   ├── summary_report.py        # Markdown summary report from batch_scan output
-│   ├── toi_checker.py           # ExoFOP TOI lookup before investing pipeline time
-│   ├── export_candidates.py     # Export ranked candidates to CSV and Markdown
-│   └── alert_filter.py          # AND-logic threshold filter for batch results
-├── configs/                     # Versioned runtime configuration
-│   ├── background_search_v0.json  # Background automation thresholds and weights
-│   └── scoring_priors_v0.json     # Conservative default and mission-specific scoring priors
-├── logs/                        # Runtime SQLite logs (not tracked by git)
-│   └── background_search.sqlite3  # Background search run ledger (created at runtime)
-├── reports/                     # Generated candidate reports (not tracked by git)
-│   └── background/              # Draft reports from background-run-once
-├── notebooks/
-│   └── pipeline_demo.ipynb      # End-to-end demo on TOI-700 (TIC 150428135)
-├── docs/
-│   ├── SCORING_MODEL.md         # Full Bayesian scoring mathematical spec
-│   ├── PIPELINE_SPEC.md         # Stage-by-stage architecture details
-│   ├── ML_SCORING.md            # ML scorer modes, training pipeline, column maps
-│   ├── CNN_SPEC.md              # Tier-2 CNN architecture spec (gated)
-│   ├── DATA_SOURCES.md          # MAST, ExoFOP, NExSci endpoints and caching
-│   ├── CTOI_SOURCE_CONTRACT.md  # Fixture-backed opt-in CTOI label-source contract
-│   ├── DECISIONS.md             # Durable design decisions with rationale
-│   ├── BACKGROUND_SEARCH_AUTOMATION_BLUEPRINT.md  # Background automation design
-│   ├── BACKGROUND_SEARCH_SQLITE_SCHEMA.md  # SQLite schema reference
-│   ├── SCHEDULER.md             # cron/launchd/systemd integration guide
-│   ├── SYSTEM_PROFILE.md        # Hardware sizing and batch-run defaults
-│   ├── API_SPEC.md              # Local read-only candidate API contract
-│   ├── DASHBOARD_SPEC.md        # Static candidate dashboard contract
-│   ├── ROADMAP.md               # Milestones and future work
-│   ├── PROJECT_STATUS.md        # Current implementation status
-│   └── SKILLS_GUIDE.md          # User reference and quick inventory for Skills scripts
-├── data/                        # Local data cache (not tracked by git)
-├── pyproject.toml
-└── requirements.txt
-```
-
----
-
-## 7. Quality Assurance
-
-All three quality gates must pass before any commit is considered complete:
-
-```bash
-# Ruff + mypy + six disjoint pytest shards x six xdist workers
-.venv/bin/python Skills/run_quality_gates.py
-```
-
-See `docs/QUALITY_GATE_RUNNER.md` for logs, dry-run behavior, and focused-test
-fallbacks. The acquisition equivalent is `Skills/run_six_shards.py`, which
-supervises reviewed six-shard × six-worker download/processing workloads from
-one terminal after repo-identity and storage preflight.
-
-Continuous integration runs all three gates on every pull request via GitHub Actions. Live integration tests (requiring MAST network access) are excluded from CI and must be run manually:
-
-```bash
-PYTHONPATH=src .venv/bin/python -m pytest -m integration_live -n auto --dist=worksteal
-```
-
-### Test Coverage Summary
-
-| Module | Tests |
-|---|---|
-| `schemas.py` | 33 |
-| `features.py` | 145 |
-| `hypotheses.py` | 46 |
-| `priors.py` | 14 |
-| `scoring.py` | 48 |
-| `pathway.py` | 60 |
-| `fetch.py` | 55 (+2 live) |
-| `clean.py` | 39 |
-| `search.py` | 43 |
-| `vet.py` | 47 |
-| `calibration.py` | 70 |
-| `cli.py` | 54 |
-| `ml/xgboost_scorer.py` | 45 |
-| `ml/stacking_scorer.py` | 22 |
-| `ml/cnn_scorer.py` | 21 |
-| `background/` module | 16 |
-| Skills utilities | 415 scripts with dedicated tests |
-| **Current default suite** | See `docs/PROJECT_STATUS.md` |
-
----
-
-## 8. Data Sources and Target Selection
-
-| Source | URL / Access Method | Usage |
-|---|---|---|
-| TESS PDCSAP photometry | MAST via `lightkurve.search_lightcurve` | Primary light curves |
-| Kepler/K2 photometry | MAST via `lightkurve.search_lightcurve` | Archival search |
-| TESS Input Catalog (TIC) | `astroquery.mast.Catalogs` | Stellar parameters, contamination ratio |
-| TESS TOI catalog | ExoFOP-TESS (`exofop.ipac.caltech.edu`) | Known-object matching; training labels |
-| Kepler KOI cumulative table | NASA Exoplanet Archive DR25 (Thompson et al.) | Training labels (confirmed vs. FP) |
-| CTOI catalog | ExoFOP-TESS CTOI CSV | Opt-in community label source; fixture-backed contract in `docs/CTOI_SOURCE_CONTRACT.md` |
-| Gaia DR3 | `astroquery.gaia` | Crowding, centroid analysis |
-
-Rate limits and caching guidance are documented in `docs/DATA_SOURCES.md`. The TESS TOI table is downloaded as a CSV from ExoFOP-TESS and filtered to CP (confirmed planet), FP (false positive), and EB (eclipsing binary) dispositions. PC (planet candidate) entries are excluded from training labels due to label noise. The Kepler DR25 Robovetter outputs (Thompson et al.; Coughlin et al.) are used as training labels for the XGBoost classifier, restricting to `koi_disposition ∈ {CONFIRMED, FALSE POSITIVE}`.
-
-The pipeline preferentially targets later TESS sectors, stars with TESS magnitude 10–14, and fields with low Gaia source density. This parameter space is systematically underrepresented in the published TOI catalog, maximizing the expected yield of genuinely novel candidates relative to search effort.
-
----
-
-## 9. Guardrails and Scientific Integrity
-
-This system is designed to identify **candidate signals** for follow-up investigation. The following constraints are enforced by design and must not be circumvented:
-
-**No confirmation claims.** The pipeline never outputs "confirmed planet." All internally detected signals are labeled "candidate signal," "possible transit-like event," or "follow-up target." Confirmation status is governed exclusively by authoritative external catalogs (NASA Exoplanet Archive, TOI list, KOI list).
-
-**Mandatory false-positive exposure.** Every `ScoredCandidate` object carries a `CandidateExplanation` that enumerates positive evidence, negative evidence, and blocking issues. Candidates may not be routed to external pathways without a populated explanation. The FPP is always displayed alongside any candidate probability estimate.
-
-**Missing diagnostics fail conservatively.** A `None` feature score fails any gate condition it participates in rather than being treated as neutral. Specifically, `tfop_ready` requires non-`None` values for contamination, secondary eclipse, and odd/even mismatch scores; missing provenance score blocks the pathway entirely.
-
-**Suppression of formal submission when diagnostics are absent.** If key vetting diagnostics (secondary eclipse SNR, odd/even comparison, centroid shift) are unavailable due to insufficient data coverage, the pathway classifier falls back to `planet_hunters_discussion` or `github_only_reproducibility` regardless of the posterior probability.
-
-**ML classifiers require calibration validation.** XGBoost and ensemble scorers are not activated until Platt calibration has been fit and validated on a held-out set. Raw uncalibrated probabilities are not exposed to the pathway classifier.
-
-**Scoring model version provenance.** Every `ScoredCandidate` output records the model name, version, commit hash, and configuration hash via `ScoringMetadata`. This ensures all published candidate scores are reproducible.
-
-These guardrails reflect the broader ethical responsibility of automated astronomical pipelines to avoid generating premature or misleading claims that could misdirect telescope time allocation or public communication.
-
----
-
-## 10. Submission Instructions
-
-The submission pathway returned by `classify_submission_pathway()` determines the appropriate next action:
-
-### `tfop_ready`
-
-The candidate meets all nine TESS Follow-up Observing Program (TFOP) quality criteria. Steps:
-
-1. Verify stellar parameters against the TIC (Stassun et al.) and 2MASS catalogs.
-2. Prepare a follow-up report following the TFOP Working Group guidelines at `tess.mit.edu/followup`.
-3. Submit via the ExoFOP-TESS web interface (`exofop.ipac.caltech.edu/tess`), uploading the light curve, period, epoch, and depth with uncertainties.
-4. Tag the submission with the relevant TESS sector(s) and pipeline version.
-
-### `planet_hunters_discussion`
-
-The candidate warrants community review but does not yet satisfy formal TFOP criteria (e.g., fewer than two observed transits, moderate FPP, or missing vetting diagnostics). Steps:
-
-1. Create a discussion thread on the [Planet Hunters TESS](https://www.zooniverse.org/projects/nora-dot-eisner/planet-hunters-tess) platform, attaching the phase-folded light curve and scoring report.
-2. Note which vetting diagnostics are missing and what follow-up observations could resolve the ambiguity.
-
-### `kepler_archive_candidate`
-
-The candidate satisfies the Kepler/K2 quality criteria ($p_\mathrm{pc} \geq 0.65$, novelty $\geq 0.70$, FPP $\leq 0.35$). Steps:
-
-1. Cross-check against the KOI cumulative table (Thompson et al.) to confirm novelty.
-2. Submit to the NASA Exoplanet Archive Community Follow-up Program (CFOP) or post to the Kepler/K2 GitHub community repositories.
-
-### `known_object_annotation`
-
-The signal matches a known catalog object ($p_\mathrm{ko} \geq 0.80$). No new submission is warranted. Record the matched object ID and close the candidate.
-
-### `github_only_reproducibility`
-
-The candidate does not meet external submission criteria (high FPP, missing diagnostics, or fallback). Steps:
-
-1. Open a GitHub issue in this repository with the candidate ID, TIC number, period, and scoring report.
-2. Attach the phase-folded light curve image and the serialized `ScoredCandidate` JSON.
-3. Label the issue `candidate-low-confidence` for future review.
-
----
-
-## 11. Project Roadmap
-
-This table is the public progress tracker. `docs/ROADMAP.md` keeps the long
-historical milestone log, while `docs/PROJECT_STATUS.md` records the latest
-validated counts and active blockers.
-
-| Status | Increment | Scope | Tracking Evidence |
-|:---:|---|---|---|
-| ✅ | **Milestones 1-5 — Core pipeline** | Immutable schemas, normalized features, six-hypothesis Bayesian scoring, pathway classification, fetch/clean/search/vet stages, calibration, reporting, and CLI entry point. | `src/exo_toolkit/`, `tests/test_*`, `docs/SCORING_MODEL.md`, `docs/PIPELINE_SPEC.md` |
-| ✅ | **Milestones 6-8 — Validation and automation** | Injection-recovery, ML scorer foundation, background automation with top-level SQLite logs, scheduler docs, and deterministic known-TESS fixtures. | `Skills/injection_recovery.py`, `src/exo_toolkit/background/`, `docs/SCHEDULER.md` |
-| ✅ | **Milestones 8b-11 — Discovery workflow** | Star scanner, provenance scoring, candidate ranking, batch scans, sector coverage, phase-fold plots, watchlists, TOI checking, exports, and alert filtering. | `Skills/star_scanner.py`, `Skills/batch_scan.py`, `Skills/rank_candidates.py`, `Skills/toi_checker.py` |
-| ✅ | **Milestones 12-18 — Diagnostics and operations expansion** | Additional diagnostic scores, follow-up preparation, false-positive vetting, caching, period aliases, centroid checks, transit modeling, reporting, observability, and run-diff utilities. | `Skills/`, `tests/`, `docs/SKILLS_GUIDE.md` |
-| ✅ | **Milestones 19a-19d — Review surfaces** | Multi-sector phase comparison, static candidate dashboard, local read-only candidate API, and dependency-free browser UI. | `docs/DASHBOARD_SPEC.md`, `docs/API_SPEC.md`, `Skills/candidate_dashboard_export.py`, `Skills/candidate_api.py`, `Skills/candidate_browser_ui.py` |
-| ✅ | **Milestones 24-27 — CNN and label infrastructure** | CTOI/KOI/TOI label sources, multi-source label assembly, snippet building and normalization, CNN config/training/checkpoint/calibration/inference helpers, and model registry/evaluation utilities. | `docs/CTOI_SOURCE_CONTRACT.md`, `docs/CNN_SPEC.md`, `Skills/train_cnn.py`, `Skills/cnn_*`, `Skills/*label*` |
-| ✅ | **Milestone 28 — Tier-2 bridge tools** | TESS TCE ingestion, label balance and leakage checks, snippet cache management, deployment readiness, threshold optimization, ensemble evaluation, and Tier-2 status reporting. | `Skills/tess_tce_fetcher.py`, `Skills/deployment_readiness_checker.py`, `Skills/tier2_progress_reporter.py` |
-| ✅ | **Milestone 29 — Pipeline operations** | Pipeline health/freshness/drift/throughput monitors, candidate cross-reference, follow-up checklist generation, target selection optimization, prioritization reports, and batch archiving. | `Skills/pipeline_health_monitor.py`, `Skills/model_drift_detector.py`, `Skills/batch_result_archiver.py` |
-| ✅ | **Milestone 30 — Session planning and local model training** | Signal quality grading, session summaries, provenance logs, labeling export, config validation, confidence tracking, metadata stores, ephemeris updates, multi-target scheduling, archive support, and trained Kepler XGBoost model artifacts. | `models/xgboost_koi.json`, `models/xgboost_koi.xgb.json`, `Skills/session_summary_generator.py`, `Skills/candidate_archive.py` |
-| ✅ | **Milestones 34-39 — Physics, vetting, and planning utilities** | ML evaluation, photometry quality, transit vetting, noise budget, orbit simulation, stellar physics, TTV, occurrence-rate, contamination, RV, and observing-planning utilities. | Recent Milestone 34-39 commits; `Skills/`; `tests/` |
-| ✅ | **First real discovery scan evidence** | Run006 produced real QLP evidence and run008 targeted follow-up reproduced both filtered candidates. Version 0.2.10 candidate regeneration moved the two filtered candidates above the prior FPP < 0.15 escalation threshold, so this is retained as historical provenance, not the active production blocker. | `docs/DISCOVERY_RUNBOOK.md`, `docs/PRODUCTION_READINESS.md`, `docs/LOCAL_ARTIFACT_LEDGER.md` |
-| 🟡 | **Production CNN promotion readiness** | C1-C19 were rejected, but the T1-1 source-contract path produced a master Kepler corpus and a passing checkpoint: `checkpoints/cnn_t1_1_kepler_master/best.pt` reached raw test AUC 0.9572, calibrated F1 0.8347, Brier 0.0580, ECE 0.0142, and T=1.0. The new Astrometrics policy docs require a pre-promotion package before artifact promotion: temperature-calibration-aware promotion tooling, model card, reproducibility manifest, data-role registry, storage/retention record, and frozen benchmark designation. Only after those are committed should the human approve copying selected artifacts under `models/`. | `metadata/t1_1_kepler_training_manifest.jsonl`, `metadata/t1_1_kepler_dr24_expansion_manifest.jsonl`, `data_selection/data_selection_decision_log.md`, `docs/astrometrics_coding_agents_master_guide.md`, `docs/astrometrics_data_selection_policy.md`, `docs/astrometrics_external_and_cloud_storage_policy.md`, `docs/CNN_PRODUCTION_RUNBOOK.md`, `docs/PRODUCTION_READINESS.md` |
-| 🟡 | **Stacking calibration after CNN promotion** | Full-ensemble mode remains gated until the approved CNN artifact exists and a held-out calibration set is used to tune XGBoost/CNN/Bayesian blend weights. Do not tune stacking weights against training or frozen-eval data. | `src/exo_toolkit/ml/stacking_scorer.py`, `Skills/model_ensemble_evaluator.py`, `docs/PRODUCTION_READINESS.md` |
-| 🟡 | **Regime-specific priors** | Extend mission-level priors into period-, radius-, stellar-type-, and completeness-dependent profiles after calibration evidence exists. | Future update to `configs/scoring_priors_v0.json` and `docs/SCORING_MODEL.md` |
-| 🟡 | **Live target operations** | Use TOI checks, batch scans, ranking, watchlists, dashboards, and browser/API review surfaces for systematic follow-up while preserving human approval gates. | `Skills/toi_checker.py`, `Skills/batch_scan.py`, `Skills/watchlist.py`, `Skills/candidate_api.py` |
-
-✅ Complete &nbsp;&nbsp; 🟡 Planned / gated
-
----
-
-## 12. Diagnostics
-
-This section explains how to check whether the pipeline is working correctly, interpret its internal scores, and investigate why a particular candidate received the score it did.
-
-### Verify the pipeline end-to-end on a known target
-
-TOI-700 d is a confirmed habitable-zone planet — a reliable sanity-check target with well-known parameters:
-
-```bash
-exo 150428135
-```
-
-Expected result: FPP ≈ 0.08–0.25, pathway `tfop_ready` or `planet_hunters_discussion`, period ≈ 37.4 d. If you see very different values, check your installation.
-
-### Check model performance (ROC-AUC and F1)
-
-This requires a training dataset (see §5 "Training a Custom Scorer" to build one). Once you have it:
-
-```bash
-# Compare Bayesian scorer vs XGBoost on your labelled data
-python Skills/evaluate_scorer.py \
-    --data data/combined_training.pkl \
-    --model data/model.json \
-    --k-folds 5 \
-    --plot reports/roc_curves.png \
-    --reliability-plot reports/calibration.png
-```
-
-The script prints a table like:
-
-```
-Scorer           auc          f1   precision      recall         acc
-────────────────────────────────────────────────────────────────────
-bayesian      0.8124      0.7431      0.7892      0.7023      0.8041
-xgboost       0.8891      0.8213      0.8541      0.7913      0.8563
-```
-
-**What the columns mean:**
-
-| Metric | Plain English | Target |
-|---|---|---|
-| **AUC** | Area Under the ROC Curve. 1.0 = perfect, 0.5 = random guess. Measures overall ranking quality. | ≥ 0.85 is good |
-| **F1** | Harmonic mean of precision and recall. Penalizes both missing real planets and flagging false positives. | ≥ 0.80 is good |
-| **Precision** | Of everything the model called "planet", what fraction actually was one? | ≥ 0.80 is good |
-| **Recall** | Of all real planets in the dataset, what fraction did the model find? | ≥ 0.75 is good |
-| **Acc** | Overall accuracy (fraction of all examples classified correctly). | ≥ 0.80 is good |
-
-The `--plot` flag saves a ROC curve image. The `--reliability-plot` flag saves a calibration diagram showing whether the model's stated probabilities match actual frequencies (a perfectly calibrated model lies on the diagonal).
-
-### Interpret the reliability (calibration) diagram
-
-Open `reports/calibration.png`. The x-axis is the model's predicted probability; the y-axis is the actual fraction of real planets in that probability bin.
-
-- **On the diagonal**: perfectly calibrated — when the model says 70% probability, 70% of those cases really are planets.
-- **Curve above the diagonal**: the model is underconfident (true frequency is higher than it thinks).
-- **Curve below the diagonal**: the model is overconfident (true frequency is lower than it thinks).
-
-If the XGBoost curve deviates significantly from the diagonal, recalibrate the model (see §13).
-
-### Check how many TESS labels exist (CNN Tier-2 gate)
-
-Offline readiness report:
-
-```bash
-.venv/bin/python Skills/tier2_progress_reporter.py \
-  --labels data/exofop_ctoi_labels.json \
-  --output reports/tier2_status.md \
-  --json-output reports/tier2_status.json
-```
-
-Live ExoFOP count, when network access is intentionally approved:
-
-```bash
-.venv/bin/python Skills/count_tess_labels.py
-```
-
-Each live check writes a top-level SQLite audit log by default:
+Focused tests remain appropriate while diagnosing a change, but a production
+claim requires the full current-tree gate. Live-service tests are marked
+`integration_live` and excluded from the default suite; committed acceptance
+artifacts provide the audited live evidence.
+
+The test philosophy is fail-loud and behavior-first:
+
+- required dependency, schema, input, and archive failures return nonzero;
+- partial success never appears complete;
+- expected safe fallbacks are explicit and directly tested;
+- manifests, histories, and source files are checksum-verified;
+- selection is deterministic and exact manifests are immutable;
+- restart, interruption, idempotency, and stale-candidate races are tested.
+
+See [`docs/RELIABILITY_CONTROLS.md`](docs/RELIABILITY_CONTROLS.md) for the
+agent/repository controls and [`AGENTS.md`](AGENTS.md) for binding contribution
+rules.
+
+## Repository map
 
 ```text
-logs/tess_label_check.sqlite3
+src/exo_toolkit/       installable scientific pipeline and Hunter lifecycle
+tests/                 offline unit, integration, contract, and recovery tests
+Skills/                bounded acquisition, processing, evaluation, and QA tools
+docs/                  readiness, runbooks, methods, policies, and research plans
+data_selection/        versioned candidate/history/dataset contracts and decisions
+metadata/              frozen source, benchmark, and schema contracts
+models/                promoted model and calibration artifacts
+artifacts/manifests/   committed acceptance evidence and Run Reports
+reports/               generated local review output and manifest CSV exports
+data/                  ignored runtime databases and working data
 ```
 
-Inspect the latest local run without modifying the log:
-
-```bash
-sqlite3 logs/tess_label_check.sqlite3 \
-  "SELECT started_at, cp, fp, eb, total, gate_open, exit_code, status, error_message FROM tess_label_checks ORDER BY id DESC LIMIT 1;"
-```
-
-Or use the read-only summary helper:
-
-```bash
-python Skills/tess_label_check_summary.py
-python Skills/tess_label_check_summary.py --json
-```
-
-Sample output:
-
-```
-TESS TOI label counts:
-  Confirmed planets (CP): 987
-  False positives   (FP): 1,432
-  Eclipsing binaries(EB): 314
-  Total labeled         : 2,733
-
-✗ Gate CLOSED — need 4,013 more CP labels
-  → Continue collecting TESS data; re-check with this script
-```
-
-### Diagnose why a specific candidate scored the way it did
-
-Inspect the `CandidateExplanation` returned by the scorer:
-
-```python
-from exo_toolkit.scoring import score_candidate
-from exo_toolkit.pathway import classify_submission_pathway
-
-posterior, scores = score_candidate(signal, features)
-
-# See what evidence pushed the score up or down
-print("Positive evidence:")
-for item in scores.explanation.positive_evidence:
-    print(" +", item)
-
-print("Negative evidence:")
-for item in scores.explanation.negative_evidence:
-    print(" -", item)
-
-print("Blocking issues (prevent external submission):")
-for item in scores.explanation.blocking_issues:
-    print(" !", item)
-```
-
-### Run injection-recovery to measure pipeline completeness
-
-This injects synthetic planet transits into a real or simulated light curve to measure what fraction the pipeline successfully detects:
-
-```bash
-python Skills/injection_recovery.py \
-    --tic 150428135 \
-    --periods 5 10 20 40 \
-    --radii 1.0 1.5 2.0 3.0 \
-    --output reports/injection_recovery.png
-```
-
-The output grid shows recovery rate (0–100%) for each combination of orbital period and planet radius. Low recovery rates at short periods indicate noise limits; low recovery at small radii indicate depth limits.
-
----
-
-## 13. Retraining and Recalibrating Models
-
-Retrain when: you have new labelled data, the calibration diagram (§12) is off-diagonal, or model performance has drifted on recent targets.
-
-### Step 1 — Refresh the training data
-
-```bash
-# Re-download the latest Kepler KOI table from NASA Exoplanet Archive
-python Skills/fetch_kepler_tce.py --output data/koi_table.csv
-
-# Re-download the latest TESS TOI table from ExoFOP
-python Skills/fetch_tess_toi.py --output data/tess_toi.csv
-
-# Rebuild feature vectors from the updated tables
-python Skills/build_training_data.py \
-    --koi data/koi_table.csv \
-    --output data/kepler_training.pkl
-
-python Skills/build_tess_training_data.py \
-    --toi data/tess_toi.csv \
-    --output data/tess_training.pkl
-
-# Merge Kepler + TESS into one dataset
-python Skills/build_combined_training_data.py \
-    --kepler data/kepler_training.pkl \
-    --tess   data/tess_training.pkl \
-    --output data/combined_training.pkl
-```
-
-### Step 2 — Train a new XGBoost model
-
-```bash
-python Skills/train_xgboost.py \
-    --data data/combined_training.pkl \
-    --model data/model.json \
-    --k-folds 5
-```
-
-This runs 5-fold cross-validation, prints per-fold AUC scores, fits Platt scaling on the out-of-fold predictions, and saves the final model to `data/model.json` (weights) and `data/model.xgb.json` (XGBoost native format). The Platt scaling parameters `(a, b)` are embedded in `model.json` under `platt_calibration`.
-
-Expected console output:
-
-```
-Loaded 3,419 examples  (pos=987, neg=2,432)
-Running 5-fold stratified cross-validation …
-
-  Fold 1/5 — AUC=0.891  F1=0.824
-  Fold 2/5 — AUC=0.887  F1=0.818
-  ...
-  Mean AUC: 0.889 ± 0.004
-
-Platt calibration fitted: a=1.143, b=-0.218
-Model saved → data/model.json
-```
-
-### Step 3 — Evaluate the new model
-
-```bash
-python Skills/evaluate_scorer.py \
-    --data data/combined_training.pkl \
-    --model data/model.json \
-    --plot reports/roc_after_retrain.png \
-    --reliability-plot reports/calibration_after_retrain.png
-```
-
-Compare AUC and F1 to the previous run. If they improved, keep the new model. If they dropped, check whether the new training data has label noise (e.g., "PC" (planet candidate) entries should not be included — they are excluded automatically by `fetch_tess_toi.py`).
-
-### Step 4 — Apply Platt recalibration only (without full retraining)
-
-If the model weights are still good but the calibration diagram is off (e.g., after the TOI list has been substantially updated), you can refit just the Platt `(a, b)` parameters without retraining the tree model. Pass the existing model path and the new data:
-
-```bash
-python Skills/train_xgboost.py \
-    --data data/combined_training.pkl \
-    --model data/model.json \
-    --recalibrate-only
-```
-
-> **Note:** `--recalibrate-only` refits the Platt sigmoid on the current model's out-of-fold probabilities without touching the XGBoost weights.
-
-### Step 5 — Use the new model in the CLI
-
-```bash
-exo 150428135 --scorer xgboost --model-path data/model.json
-exo 150428135 --scorer ensemble --model-path data/model.json
-```
-
-### When to retrain vs. recalibrate
-
-| Situation | Action |
-|---|---|
-| New confirmed planets added to TOI list | Refresh data + full retrain (Steps 1–3) |
-| Calibration diagram is off-diagonal but AUC is unchanged | Recalibrate only (Step 4) |
-| AUC has dropped by > 0.02 from baseline | Full retrain with fresh data |
-| Model was trained on Kepler only and you are analyzing TESS targets | Retrain on combined Kepler + TESS dataset |
-| First time setting up | Full pipeline (Steps 1–3) |
-
-### Baseline performance reference
-
-Train on the Kepler DR25 + current TESS TOI table and you should see approximately:
-
-| Scorer | AUC | F1 |
-|---|---|---|
-| Bayesian (no training needed) | 0.81 | 0.74 |
-| XGBoost | 0.88–0.91 | 0.81–0.85 |
-| Ensemble (blend weight 0.6) | 0.89–0.92 | 0.82–0.86 |
-
-If your numbers are significantly lower, check for label noise in the training data or class imbalance (use `--max-per-source` in `build_combined_training_data.py` to cap the majority class).
-
----
-
-## 14. License
-
-- **Code:** Apache License 2.0 — see [`LICENSE`](LICENSE)
-- **Documentation:** Creative Commons Attribution 4.0 International (CC BY 4.0)
-
-Raw photometric data from TESS, Kepler, and K2 is provided by NASA and the MAST archive and is not relicensed by this repository.
-
----
-
-## Works Cited
-
-Astropy Collaboration, et al. "The Astropy Project: Building an Open-Science Project and Status of the 2018 Astropy Package." *The Astronomical Journal*, vol. 156, no. 3, 2018, p. 123. https://doi.org/10.3847/1538-3881/aabc4f.
-
-Barlow, Richard E., et al. *Statistical Inference under Order Restrictions: The Theory and Application of Isotonic Regression*. Wiley, 1972.
-
-Borucki, William J., et al. "Kepler Planet-Detection Mission: Introduction and First Results." *Science*, vol. 327, no. 5968, 2010, pp. 977–980. https://doi.org/10.1126/science.1185402.
-
-Brier, Glenn W. "Verification of Forecasts Expressed in Terms of Probability." *Monthly Weather Review*, vol. 78, no. 1, 1950, pp. 1–3. https://doi.org/10.1175/1520-0493(1950)078<0001:VOFEIT>2.0.CO;2.
-
-Bryson, Steve, et al. "The Occurrence of Rocky Habitable-Zone Planets around Solar-Like Stars from Kepler Data." *The Astronomical Journal*, vol. 161, no. 1, 2021, p. 36. https://doi.org/10.3847/1538-3881/abc418.
-
-Coughlin, Jeffrey L., et al. "Planetary Candidates Observed by Kepler. VII. Performance of Robovetter." *The Astrophysical Journal Supplement Series*, vol. 224, no. 1, 2016, p. 12. https://doi.org/10.3847/0067-0049/224/1/12.
-
-Díaz, Rodrigo F., et al. "PASTIS: Bayesian Extrasolar Planet Validation — I. General Framework, Models, and Performance." *Monthly Notices of the Royal Astronomical Society*, vol. 441, no. 2, 2014, pp. 983–1004. https://doi.org/10.1093/mnras/stu601.
-
-Fischer, Debra A., et al. "Planet Hunters: The First Two Planet Candidates Identified by the Public Using the Kepler Public Archive." *Monthly Notices of the Royal Astronomical Society*, vol. 419, no. 4, 2012, pp. 2900–2911. https://doi.org/10.1111/j.1365-2966.2011.19932.x.
-
-Fressin, François, et al. "The False Positive Rate of Kepler and the Occurrence of Planets." *The Astrophysical Journal*, vol. 766, no. 2, 2013, p. 81. https://doi.org/10.1088/0004-637X/766/2/81.
-
-Guerrero, Natalia M., et al. "TESS Objects of Interest Catalog from the TESS Prime Mission." *The Astrophysical Journal Supplement Series*, vol. 254, no. 2, 2021, p. 39. https://doi.org/10.3847/1538-4365/abefe1.
-
-Hippke, Michael, and René Heller. "Optimized Transit Detection Algorithm to Search for Periodic Transits of Small Planets." *Astronomy & Astrophysics*, vol. 623, 2019, p. A39. https://doi.org/10.1051/0004-6361/201834672.
-
-Howell, Steve B., et al. "The K2 Mission: Characterization and Early Results." *Publications of the Astronomical Society of the Pacific*, vol. 126, no. 938, 2014, pp. 398–408. https://doi.org/10.1086/676406.
-
-Kopparapu, Ravi Kumar, et al. "Habitable Zones around Main-Sequence Stars: Dependence on Planetary Mass." *The Astrophysical Journal Letters*, vol. 787, no. 2, 2014, p. L29. https://doi.org/10.1088/2041-8205/787/2/L29.
-
-Kovács, Géza, et al. "A Box-fitting Algorithm in the Search for Periodic Transits." *Astronomy & Astrophysics*, vol. 391, no. 1, 2002, pp. L23–L26. https://doi.org/10.1051/0004-6361:20020802.
-
-Lightkurve Collaboration, et al. "Lightkurve: Kepler and TESS Time Series Analysis in Python." *Astrophysics Source Code Library*, 2018, record ascl:1812.013.
-
-Morton, Timothy D. "An Efficient Automated Validation Procedure for Exoplanet Transit Candidates." *The Astrophysical Journal*, vol. 761, no. 1, 2012, p. 6. https://doi.org/10.1088/0004-637X/761/1/6.
-
-Platt, John. "Probabilistic Outputs for Support Vector Machines and Comparisons to Regularized Likelihood Methods." *Advances in Large Margin Classifiers*, edited by Alexander J. Smola et al., MIT Press, 1999, pp. 61–74.
-
-Ricker, George R., et al. "Transiting Exoplanet Survey Satellite (TESS)." *Journal of Astronomical Telescopes, Instruments, and Systems*, vol. 1, no. 1, 2015, p. 014003. https://doi.org/10.1117/1.JATIS.1.1.014003.
-
-Shallue, Christopher J., and Andrew Vanderburg. "Identifying Exoplanets with Deep Learning: A Five-Planet Resonant Chain around Kepler-80 and an Eighth Planet around Kepler-90." *The Astronomical Journal*, vol. 155, no. 2, 2018, p. 94. https://doi.org/10.3847/1538-3881/aa9e07.
-
-Stassun, Keivan G., et al. "The TESS Input Catalog and Candidate Target List." *The Astronomical Journal*, vol. 156, no. 3, 2018, p. 102. https://doi.org/10.3847/1538-3881/aad050.
-
-Thompson, Susan E., et al. "Planetary Candidates Observed by Kepler. VIII. Cumulative Planet Candidate Catalog." *The Astrophysical Journal Supplement Series*, vol. 235, no. 2, 2018, p. 38. https://doi.org/10.3847/1538-4365/aab4f9.
-
-VanderPlas, Jacob T. "Understanding the Lomb-Scargle Periodogram." *The Astrophysical Journal Supplement Series*, vol. 236, no. 1, 2018, p. 16. https://doi.org/10.3847/1538-4365/aab766.
-
-Winn, Joshua N. "Transits and Occultations." *Exoplanets*, edited by Sara Seager, University of Arizona Press, 2010, pp. 55–77.
+Start with these documents:
+
+1. [`docs/PRODUCTION_READINESS.md`](docs/PRODUCTION_READINESS.md) — current
+   acceptance, scorer status, and evidence.
+2. [`docs/HUNTER_PRODUCTION_WORKFLOW.md`](docs/HUNTER_PRODUCTION_WORKFLOW.md) —
+   operator contract and durable lifecycle semantics.
+3. [`docs/DISCOVERY_RUNBOOK.md`](docs/DISCOVERY_RUNBOOK.md) — live-search and
+   responsible review procedure.
+4. [`docs/ROADMAP.md`](docs/ROADMAP.md) — completed and next research gates.
+5. [`docs/astrometrics_data_selection_policy.md`](docs/astrometrics_data_selection_policy.md)
+   and [`docs/astrometrics_external_and_cloud_storage_policy.md`](docs/astrometrics_external_and_cloud_storage_policy.md)
+   — data roles, download limits, cache, external-drive, and retention rules.
+
+## Scientific and operational guardrails
+
+- Never call a transit-like signal a confirmed planet without authoritative
+  external confirmation.
+- Never silently replace missing data, targets, model outputs, or failed work.
+- Preserve every search event, failure, source, timestamp, and follow-up link.
+- Keep frozen evaluation and live-search data isolated from model training.
+- Verify public resource schemas before use; do not guess renamed fields or
+  substitute mirrors.
+- Estimate storage before acquisition and preserve enough provenance to
+  reproduce or re-download exact products.
+- Treat external submission, alerts, and authority-facing communication as
+  separate human-approved actions.
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE).
