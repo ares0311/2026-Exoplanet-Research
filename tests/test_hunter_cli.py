@@ -315,7 +315,7 @@ def test_import_reviewed_follow_up_verifies_sources_and_reports(
     output = capsys.readouterr().out  # type: ignore[attr-defined]
     assert '"created": true' in output
     assert show_follow_ups(
-        ["--db", str(tmp_path / "hunter.db"), "--json"]
+        ["--db", str(tmp_path / "hunter.db"), "--status", "deferred", "--json"]
     ) == 0
     output = capsys.readouterr().out  # type: ignore[attr-defined]
     assert '"search_eligible": false' in output

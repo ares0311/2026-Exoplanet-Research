@@ -7,7 +7,9 @@ The shell entry points share one durable SQLite system of record and can run
 without an AI model. Hunter acceptance is temporarily PARTIAL after a fresh
 audit found that consumed actionable follow-ups remained open and could be
 scheduled repeatedly. Version 0.3.5 adds durable scheduling/disposition events
-and parent-child recommendation relationships. The prior acceptance remains
+and parent-child recommendation relationships. Version 0.3.6 makes
+non-executable, revisit-gated recommendations canonically `deferred` rather
+than `open`. The prior acceptance remains
 preserved and is corrected by
 `artifacts/manifests/hunter_live_acceptance_v2_reassessment.json`:
 
@@ -153,6 +155,11 @@ outcome closes it as `completed`; a terminal no-data outcome marks it
 creating a duplicate pending search. `Show-Follow-Ups --status all` exposes the
 current state and complete event history in JSON.
 
+Recommendations created with `search_eligible=false` begin in `deferred`, not
+`open`; schema v4 migrates earlier rows append-only and preserves their revisit
+reason. Consequently `open` means actionable throughout the CLI and durable
+store instead of mixing actionable and waiting-for-data work.
+
 ## Known limits
 
 - The 126 cone-search tiles cover about 99 square degrees, not the whole sky.
@@ -184,5 +191,6 @@ visible deferral, and selection exclusion. The merged-main import created one
 real registry/history row; a repeated import returned the same stable IDs with
 no duplicate rows. That evidence remains valid, but it did not exercise
 consumption of an actionable row. Version 0.3.5 closes the resulting
-scheduling/disposition defect; merged-main migration and replacement
+scheduling/disposition defect. Version 0.3.6 closes the status-semantics gap
+exposed by the first real v3 migration; merged-main v4 migration and replacement
 acceptance remain required.

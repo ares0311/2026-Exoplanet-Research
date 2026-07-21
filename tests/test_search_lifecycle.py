@@ -288,7 +288,7 @@ def test_follow_up_registry_can_seed_later_follow_up_search(tmp_path: Path) -> N
     )
 
     source = store.list_follow_ups(status="completed")[0]
-    child = store.list_follow_ups()[0]
+    child = store.list_follow_ups(status="deferred")[0]
     assert source["follow_up_id"] == source_follow_up_id
     assert child["parent_follow_up_id"] == source_follow_up_id
     assert [event["state"] for event in source["events"]] == [
@@ -296,7 +296,7 @@ def test_follow_up_registry_can_seed_later_follow_up_search(tmp_path: Path) -> N
         "scheduled",
         "completed",
     ]
-    assert child["events"][0]["state"] == "open"
+    assert child["events"][0]["state"] == "deferred"
     assert store.follow_up_candidates() == []
     with pytest.raises(RuntimeError, match="is not open: state=completed"):
         store.create_search(
@@ -410,7 +410,8 @@ def test_deferred_follow_up_is_visible_but_not_search_eligible(tmp_path: Path) -
         search_id=search["search_id"],
     )
 
-    rows = store.list_follow_ups()
+    assert store.list_follow_ups() == []
+    rows = store.list_follow_ups(status="deferred")
     assert rows[0]["search_eligible"] is False
     assert rows[0]["revisit_reason"] == "four independent events are required"
     assert store.follow_up_candidates() == []
@@ -452,7 +453,8 @@ def test_reviewed_import_preserves_history_and_is_idempotent(tmp_path: Path) -> 
     assert store.get_search(first["search_id"])["state"] == "completed"
     assert store.open_searches() == []
     assert store.target_history("TIC 7")[0]["result"]["review_status"] == "plausible_but_weak"
-    assert len(store.list_follow_ups()) == 1
+    assert store.list_follow_ups() == []
+    assert len(store.list_follow_ups(status="deferred")) == 1
     assert store.follow_up_candidates() == []
 
 
@@ -476,7 +478,7 @@ def test_integrity_reports_all_required_durable_concepts(tmp_path: Path) -> None
         "orphan_manifest_targets": 0,
         "orphan_follow_up_events": 0,
         "orphan_parent_follow_ups": 0,
-        "schema_version": 3,
+        "schema_version": 4,
     }
     connection = sqlite3.connect(db_path)
     names = {
@@ -545,6 +547,57 @@ def test_schema_v1_follow_up_table_migrates_without_losing_rows(tmp_path: Path) 
     assert row["parent_follow_up_id"] is None
     assert row["events"][0]["state"] == "open"
     assert row["events"][0]["detail"] == {"migration_backfill": True}
+
+
+def test_schema_v3_non_executable_open_row_migrates_to_deferred(tmp_path: Path) -> None:
+    db_path = tmp_path / "hunter.sqlite3"
+    store = HunterStore(db_path)
+    search = _create(store, [_candidate(1)], count=1)
+    store.execute_search(
+        lambda _: TargetExecutionResult(
+            status="candidate_found",
+            result={},
+            provenance={},
+            follow_ups=(
+                FollowUpRecommendation(
+                    candidate_id="signal",
+                    priority=5.0,
+                    reason="insufficient observations",
+                    evidence={},
+                    recommended_action="wait for more observations",
+                    search_eligible=False,
+                    revisit_reason="a new sector must cover the event",
+                ),
+            ),
+        ),
+        search_id=search["search_id"],
+    )
+    connection = sqlite3.connect(db_path)
+    follow_up_id, source_search_id = connection.execute(
+        "SELECT follow_up_id, search_id FROM follow_up_registry"
+    ).fetchone()
+    connection.execute("UPDATE follow_up_registry SET status='open'")
+    connection.execute("DELETE FROM follow_up_events")
+    HunterStore._append_follow_up_event(
+        connection,
+        follow_up_id=str(follow_up_id),
+        state="open",
+        related_search_id=str(source_search_id),
+        detail={"migration_backfill": True},
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+    )
+    connection.execute("DELETE FROM schema_migrations WHERE version=4")
+    connection.execute("PRAGMA user_version = 3")
+    connection.commit()
+    connection.close()
+
+    migrated = HunterStore(db_path)
+    row = migrated.list_follow_ups(status="deferred")[0]
+    assert row["search_eligible"] is False
+    assert [event["state"] for event in row["events"]] == ["open", "deferred"]
+    assert row["events"][-1]["detail"]["migration_correction"].startswith(
+        "non-executable follow-up"
+    )
 
 
 def test_execute_refuses_completed_search(tmp_path: Path) -> None:

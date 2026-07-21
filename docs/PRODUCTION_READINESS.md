@@ -14,7 +14,10 @@ state, not assumed to still be Phase 4. Hunter orchestration is temporarily
 found that an actionable follow-up was never transitioned when scheduled or
 completed, allowing duplicate rescheduling. Version 0.3.5 adds append-only
 follow-up lifecycle events, consuming-search links, terminal disposition, and
-parent-child recommendations. Merged-main migration/evidence remains required;
+parent-child recommendations. The merged v3 migration was integrity-clean but
+exposed that the real non-executable row still used status `open`; version
+0.3.6 adds canonical `deferred` state and a v4 append-only correction. Merged-main
+migration/evidence remains required;
 see `artifacts/manifests/hunter_live_acceptance_v2_reassessment.json`.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
@@ -43,7 +46,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.3.5 is the current development version. Version 0.3.2 added the durable,
+Version note: 0.3.6 is the current development version. Version 0.3.2 added the durable,
 non-AI-dependent Hunter workflow and exact `Create-New-Search`,
 `Run-New-Search`, and `Show-Follow-Ups` entry points. Candidate catalog,
 immutable manifest, run attempts, append-only target history, and follow-up
@@ -51,7 +54,8 @@ registry are distinct versioned SQLite concepts; deterministic selection can
 freeze 100 targets from a 10,000-candidate universe, partial work is nonzero
 and resumable, and exact targets are never regenerated during execution. See
 `docs/HUNTER_PRODUCTION_WORKFLOW.md`. Hunter orchestration acceptance is
-PARTIAL pending the version 0.3.5 merged-main lifecycle migration; the
+PARTIAL pending the version 0.3.6 merged-main status migration and replacement
+acceptance; the
 independently established underlying scorer acceptance remains PASS.
 The first merged-main acceptance attempt failed before
 search creation because installed console scripts omitted the repository root
@@ -96,6 +100,12 @@ Version 0.3.5 closes that gap with atomic `open → scheduled` consumption,
 append-only dispositions, terminal `completed`/`deferred` states, explicit
 parent relationships, and transactional stale-candidate rejection. The v2
 acceptance is preserved and reassessed rather than overwritten.
+The first merged v3 production migration passed SQLite and foreign-key checks,
+preserved the real row, and added its backfill event. It also showed the row as
+`open|search_eligible=false`, mixing actionable state with waiting-for-data
+state. Version 0.3.6/schema v4 migrates that combination to `deferred` with an
+append-only correction event and creates future non-executable recommendations
+directly as deferred.
 
 Historical version note: 0.2.100 added target-selection progress/ETA. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,

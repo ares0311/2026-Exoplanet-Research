@@ -20,7 +20,7 @@ SearchMode = Literal["new", "follow-up"]
 TargetStatus = Literal["candidate_found", "no_signal", "no_data", "failed"]
 TERMINAL_TARGET_STATUSES = frozenset({"candidate_found", "no_signal", "no_data"})
 EXECUTABLE_SEARCH_STATES = frozenset({"pending", "running", "partial", "failed"})
-HUNTER_SCHEMA_VERSION = 3
+HUNTER_SCHEMA_VERSION = 4
 
 
 class PriorSearch(BaseModel):
@@ -333,13 +333,43 @@ class HunterStore:
                     detail={"migration_backfill": True},
                     created_at=created_at,
                 )
+            migration_at = _utc_now()
+            deferred_rows = connection.execute(
+                "SELECT follow_up_id, search_id, revisit_reason "
+                "FROM follow_up_registry "
+                "WHERE status='open' AND search_eligible=0"
+            ).fetchall()
+            for row in deferred_rows:
+                if row["revisit_reason"] is None:
+                    raise RuntimeError(
+                        "Non-executable follow-up is missing its required revisit reason: "
+                        f"{row['follow_up_id']}"
+                    )
+                connection.execute(
+                    "UPDATE follow_up_registry SET status='deferred' "
+                    "WHERE follow_up_id=?",
+                    (row["follow_up_id"],),
+                )
+                self._append_follow_up_event(
+                    connection,
+                    follow_up_id=str(row["follow_up_id"]),
+                    state="deferred",
+                    related_search_id=str(row["search_id"]),
+                    detail={
+                        "previous_state": "open",
+                        "migration_correction": (
+                            "non-executable follow-up with an explicit revisit gate"
+                        ),
+                    },
+                    created_at=migration_at,
+                )
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations "
                 "(version, applied_at, description) VALUES (?, ?, ?)",
                 (
                     HUNTER_SCHEMA_VERSION,
                     _utc_now().isoformat(),
-                    "Durable follow-up scheduling, disposition, and relationships",
+                    "Canonical deferred state for non-executable follow-ups",
                 ),
             )
             connection.execute(f"PRAGMA user_version = {HUNTER_SCHEMA_VERSION}")
@@ -1145,13 +1175,14 @@ class HunterStore:
         follow_up_id = hashlib.sha256(
             f"{search_id}:{candidate.target_id}:{follow_up.candidate_id}".encode()
         ).hexdigest()
+        initial_state = "open" if follow_up.search_eligible else "deferred"
         cursor = connection.execute(
             """
             INSERT OR IGNORE INTO follow_up_registry (
                 follow_up_id, search_id, target_id, candidate_id, priority, reason,
                 evidence_json, prior_search_provenance_json, recommended_action,
                 search_eligible, revisit_reason, parent_follow_up_id, status, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 follow_up_id,
@@ -1166,6 +1197,7 @@ class HunterStore:
                 int(follow_up.search_eligible),
                 follow_up.revisit_reason,
                 parent_follow_up_id,
+                initial_state,
                 created_at.isoformat(),
             ),
         )
@@ -1174,7 +1206,7 @@ class HunterStore:
             cls._append_follow_up_event(
                 connection,
                 follow_up_id=follow_up_id,
-                state="open",
+                state=initial_state,
                 related_search_id=search_id,
                 detail={
                     "target_id": candidate.target_id,
