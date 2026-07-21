@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "reassessment_id": "exo-hunter-live-acceptance-v2-reassessment",
+  "reassessed_at": "2026-07-21T17:15:00Z",
+  "original_artifact": "artifacts/manifests/hunter_live_acceptance_v2.json",
+  "original_acceptance_id": "exo-hunter-live-acceptance-v2",
+  "original_status": "pass",
+  "corrected_status": "partial",
+  "preservation_rule": "The original acceptance artifact is retained unchanged as historical provenance.",
+  "unsupported_claim": "complete follow-up lifecycle and duplicate-search prevention",
+  "finding": "An actionable open follow-up could be selected into an exact follow-up search, but the source registry row was never transitioned or linked to that consuming search. After the search completed, the source row remained open and search-eligible, allowing the same work to be scheduled repeatedly.",
+  "production_impact": "This violates durable follow-up disposition, explicit follow-up relationships, and the requirement to avoid duplicate searches. EXO-Hunter must not be called PROD again until scheduling and terminal disposition are append-only, related to the consuming search, migration-safe, and verified.",
+  "corrective_release": "0.3.5",
+  "corrective_plan": [
+    "Add append-only follow-up lifecycle events and parent-child recommendation relationships.",
+    "Atomically transition selected registry rows from open to scheduled with the consuming search ID.",
+    "Keep failed work scheduled for exact-search resume; close successful work and defer no-data outcomes.",
+    "Reject stale follow-up candidates transactionally so no duplicate pending search survives.",
+    "Migrate the production database, verify the real deferred row and event integrity, then issue replacement acceptance evidence."
+  ]
+}

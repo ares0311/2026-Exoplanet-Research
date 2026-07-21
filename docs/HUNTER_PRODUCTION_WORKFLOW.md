@@ -4,11 +4,12 @@
 
 Version 0.3.3 closes the reviewed-prior-result bridge left open by version 0.3.2.
 The shell entry points share one durable SQLite system of record and can run
-without an AI model. Version 0.3.4 Hunter acceptance is PASS after merged-main
-reviewed evidence import, display, selection exclusion, and idempotency checks.
-The unsupported version 0.3.2 conclusion remains preserved in its original and
-reassessment artifacts; corrected evidence is committed at
-`artifacts/manifests/hunter_live_acceptance_v2.json`:
+without an AI model. Hunter acceptance is temporarily PARTIAL after a fresh
+audit found that consumed actionable follow-ups remained open and could be
+scheduled repeatedly. Version 0.3.5 adds durable scheduling/disposition events
+and parent-child recommendation relationships. The prior acceptance remains
+preserved and is corrected by
+`artifacts/manifests/hunter_live_acceptance_v2_reassessment.json`:
 
 ```text
 candidate universe
@@ -96,7 +97,8 @@ completed attempt summaries GitHub-visible.
 | Search manifest | `search_manifests` + `search_manifest_targets` | Immutable target membership, ordering, config, selector version, and SHA-256 |
 | Search run | `search_runs` | One durable row per attempt; interrupted attempts are marked explicitly on resume |
 | Target search history | `target_search_history` | Append-only result, failure, and provenance events |
-| Follow-up registry | `follow_up_registry` | Stable evidence-based entries; duplicates are not rewritten |
+| Follow-up registry | `follow_up_registry` | Stable evidence-based entries with current disposition and explicit parent relationship |
+| Follow-up lifecycle | `follow_up_events` | Append-only transitions linked to consuming searches |
 
 `search_state_events` is append-only and records pending, running, interrupted,
 partial, failed, and completed transitions. CSV is operator review output, not
@@ -142,6 +144,15 @@ an eligible pathway. The recommendation never claims confirmation and asks for
 centroid/contamination, odd-even, secondary-eclipse, phase-fold, and additional
 event-covering evidence where needed.
 
+Selecting an actionable registry row atomically transitions it from `open` to
+`scheduled` and records the consuming search ID. Failed attempts leave it
+scheduled so only the exact search can resume. A terminal candidate/no-signal
+outcome closes it as `completed`; a terminal no-data outcome marks it
+`deferred` and non-executable. Any new recommendation records its source row as
+`parent_follow_up_id`. Stale candidates fail the transaction instead of
+creating a duplicate pending search. `Show-Follow-Ups --status all` exposes the
+current state and complete event history in JSON.
+
 ## Known limits
 
 - The 126 cone-search tiles cover about 99 square degrees, not the whole sky.
@@ -171,6 +182,7 @@ creation evidence. Version 0.3.3 adds checksum-verified import of a separate,
 already reviewed real result plus tests for migration, idempotency, provenance,
 visible deferral, and selection exclusion. The merged-main import created one
 real registry/history row; a repeated import returned the same stable IDs with
-no duplicate rows. The replacement acceptance passes 3,057 default tests plus
-Ruff, mypy, incomplete-implementation, and directive-integrity checks as 10/10
-canonical gates.
+no duplicate rows. That evidence remains valid, but it did not exercise
+consumption of an actionable row. Version 0.3.5 closes the resulting
+scheduling/disposition defect; merged-main migration and replacement
+acceptance remain required.

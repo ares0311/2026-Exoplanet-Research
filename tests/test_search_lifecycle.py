@@ -252,6 +252,7 @@ def test_follow_up_registry_can_seed_later_follow_up_search(tmp_path: Path) -> N
         search_id=search["search_id"],
     )
     candidates = store.follow_up_candidates()
+    source_follow_up_id = store.list_follow_ups()[0]["follow_up_id"]
     follow_search = store.create_search(
         candidates,
         requested_target_count=1,
@@ -262,6 +263,128 @@ def test_follow_up_registry_can_seed_later_follow_up_search(tmp_path: Path) -> N
     )
     assert follow_search["targets"][0]["target_id"] == "TIC 1"
     assert follow_search["targets"][0]["candidate"]["prior_searches"]
+    assert store.list_follow_ups() == []
+    assert store.list_follow_ups(status="scheduled")[0]["follow_up_id"] == source_follow_up_id
+    assert store.follow_up_candidates() == []
+
+    store.execute_search(
+        lambda _: TargetExecutionResult(
+            status="candidate_found",
+            result={"interpretation": "signal persists"},
+            provenance={"follow_up_search": follow_search["search_id"]},
+            follow_ups=(
+                FollowUpRecommendation(
+                    candidate_id="TIC1-s02",
+                    priority=80.0,
+                    reason="new evidence requires later observations",
+                    evidence={"events": 3},
+                    recommended_action="wait for another event",
+                    search_eligible=False,
+                    revisit_reason="four events are required",
+                ),
+            ),
+        ),
+        search_id=follow_search["search_id"],
+    )
+
+    source = store.list_follow_ups(status="completed")[0]
+    child = store.list_follow_ups()[0]
+    assert source["follow_up_id"] == source_follow_up_id
+    assert child["parent_follow_up_id"] == source_follow_up_id
+    assert [event["state"] for event in source["events"]] == [
+        "open",
+        "scheduled",
+        "completed",
+    ]
+    assert child["events"][0]["state"] == "open"
+    assert store.follow_up_candidates() == []
+    with pytest.raises(RuntimeError, match="is not open: state=completed"):
+        store.create_search(
+            candidates,
+            requested_target_count=1,
+            mode="follow-up",
+            selector_version="test-v1",
+            config={},
+            now=datetime(2026, 1, 3, tzinfo=UTC),
+        )
+    assert store.open_searches() == []
+
+
+def test_failed_follow_up_stays_scheduled_until_successful_resume(tmp_path: Path) -> None:
+    store = HunterStore(tmp_path / "hunter.sqlite3")
+    search = _create(store, [_candidate(1)], count=1)
+    store.execute_search(
+        lambda _: TargetExecutionResult(
+            status="candidate_found",
+            result={},
+            provenance={},
+            follow_ups=(
+                FollowUpRecommendation(
+                    candidate_id="TIC1-s01",
+                    priority=99.0,
+                    reason="unresolved signal",
+                    evidence={},
+                    recommended_action="repeat photometry",
+                ),
+            ),
+        ),
+        search_id=search["search_id"],
+    )
+    follow_search = _create(store, store.follow_up_candidates(), count=1, mode="follow-up")
+    assert store.execute_search(
+        lambda _: TargetExecutionResult(
+            status="failed",
+            result={},
+            provenance={},
+            error_message="temporary archive failure",
+        ),
+        search_id=follow_search["search_id"],
+    ).status == "failed"
+    assert store.list_follow_ups(status="scheduled")
+
+    assert store.execute_search(
+        lambda _: TargetExecutionResult(status="no_signal", result={}, provenance={}),
+        search_id=follow_search["search_id"],
+    ).status == "completed"
+    row = store.list_follow_ups(status="completed")[0]
+    assert [event["state"] for event in row["events"]] == [
+        "open",
+        "scheduled",
+        "attempt_failed",
+        "completed",
+    ]
+
+
+def test_no_data_follow_up_is_deferred_not_rescheduled(tmp_path: Path) -> None:
+    store = HunterStore(tmp_path / "hunter.sqlite3")
+    search = _create(store, [_candidate(1)], count=1)
+    store.execute_search(
+        lambda _: TargetExecutionResult(
+            status="candidate_found",
+            result={},
+            provenance={},
+            follow_ups=(
+                FollowUpRecommendation(
+                    candidate_id="TIC1-s01",
+                    priority=99.0,
+                    reason="unresolved signal",
+                    evidence={},
+                    recommended_action="obtain more data",
+                ),
+            ),
+        ),
+        search_id=search["search_id"],
+    )
+    follow_search = _create(store, store.follow_up_candidates(), count=1, mode="follow-up")
+    store.execute_search(
+        lambda _: TargetExecutionResult(status="no_data", result={}, provenance={}),
+        search_id=follow_search["search_id"],
+    )
+    row = store.list_follow_ups(status="deferred")[0]
+    assert row["search_eligible"] is False
+    assert "new archive products" in row["revisit_reason"]
+    assert row["events"][-1]["detail"]["outcome_status"] == "no_data"
+    assert store.follow_up_candidates() == []
 
 
 def test_deferred_follow_up_is_visible_but_not_search_eligible(tmp_path: Path) -> None:
@@ -351,7 +474,9 @@ def test_integrity_reports_all_required_durable_concepts(tmp_path: Path) -> None
         "sqlite_integrity": "ok",
         "missing_tables": [],
         "orphan_manifest_targets": 0,
-        "schema_version": 2,
+        "orphan_follow_up_events": 0,
+        "orphan_parent_follow_ups": 0,
+        "schema_version": 3,
     }
     connection = sqlite3.connect(db_path)
     names = {
@@ -365,6 +490,7 @@ def test_integrity_reports_all_required_durable_concepts(tmp_path: Path) -> None
         "search_runs",
         "target_search_history",
         "follow_up_registry",
+        "follow_up_events",
     } <= names
 
 
@@ -390,9 +516,19 @@ def test_schema_v1_follow_up_table_migrates_without_losing_rows(tmp_path: Path) 
         search_id=search["search_id"],
     )
     connection = sqlite3.connect(db_path)
+    connection.execute("PRAGMA foreign_keys = OFF")
+    connection.execute("DROP TABLE follow_up_events")
     connection.execute("ALTER TABLE follow_up_registry RENAME TO follow_up_registry_v2")
     connection.execute(
-        "CREATE TABLE follow_up_registry AS SELECT follow_up_id, search_id, target_id, "
+        "CREATE TABLE follow_up_registry ("
+        "follow_up_id TEXT PRIMARY KEY, search_id TEXT NOT NULL, target_id TEXT NOT NULL, "
+        "candidate_id TEXT NOT NULL, priority REAL NOT NULL, reason TEXT NOT NULL, "
+        "evidence_json TEXT NOT NULL, prior_search_provenance_json TEXT NOT NULL, "
+        "recommended_action TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, "
+        "FOREIGN KEY(search_id) REFERENCES search_manifests(search_id))"
+    )
+    connection.execute(
+        "INSERT INTO follow_up_registry SELECT follow_up_id, search_id, target_id, "
         "candidate_id, priority, reason, evidence_json, prior_search_provenance_json, "
         "recommended_action, status, created_at FROM follow_up_registry_v2"
     )
@@ -406,6 +542,9 @@ def test_schema_v1_follow_up_table_migrates_without_losing_rows(tmp_path: Path) 
     assert row["candidate_id"] == "signal"
     assert row["search_eligible"] is True
     assert row["revisit_reason"] is None
+    assert row["parent_follow_up_id"] is None
+    assert row["events"][0]["state"] == "open"
+    assert row["events"][0]["detail"] == {"migration_backfill": True}
 
 
 def test_execute_refuses_completed_search(tmp_path: Path) -> None:
