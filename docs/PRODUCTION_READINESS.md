@@ -22,7 +22,8 @@ contains only the two non-event-covering products, so the real row correctly
 remains deferred; the absence of an open registry row is a valid registry
 outcome, not proof that the broader history universe has no eligible target.
 Seven preserved discovery logs contain 608 search events across 200 targets,
-but default follow-up creation does not durably ingest or rank them. See
+and version 0.3.7 adds their automatic durable import and full-universe ranking.
+Merged-main production migration and replacement acceptance remain required. See
 `artifacts/manifests/hunter_live_acceptance_v3.json`.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
@@ -51,7 +52,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.3.6 is the current development version. Version 0.3.2 added the durable,
+Version note: 0.3.7 is the current development version. Version 0.3.2 added the durable,
 non-AI-dependent Hunter workflow and exact `Create-New-Search`,
 `Run-New-Search`, and `Show-Follow-Ups` entry points. Candidate catalog,
 immutable manifest, run attempts, append-only target history, and follow-up
@@ -59,7 +60,7 @@ registry are distinct versioned SQLite concepts; deterministic selection can
 freeze 100 targets from a 10,000-candidate universe, partial work is nonzero
 and resumable, and exact targets are never regenerated during execution. See
 `docs/HUNTER_PRODUCTION_WORKFLOW.md`. Hunter orchestration acceptance is
-PARTIAL pending durable prior-history universe ingestion; the independently
+PARTIAL pending merged-main prior-history import evidence; the independently
 established underlying scorer acceptance remains PASS.
 The first merged-main acceptance attempt failed before
 search creation because installed console scripts omitted the repository root
@@ -117,11 +118,11 @@ MAST query on 2026-07-21 found exactly the same TESS-SPOC sectors 1 and 28 and
 downloaded nothing. Since both products are already proven not to cover a
 predicted event, the row correctly remains deferred until its revisit gate is
 satisfied. This is a scientific limitation on that target, not a production
-readiness gap. The actual gap is that `Create-New-Search --mode follow-up`
-constructs its default universe only from open registry rows. It does not
-ingest the seven preserved legacy discovery logs (608 events across 200 unique
-TIC targets), so zero candidates cannot be interpreted as a universe-wide
-eligibility result.
+readiness gap. Version 0.3.7 corrects the actual gap: default follow-up creation
+idempotently imports seven preserved legacy discovery logs (608 events across
+200 unique TIC targets) into durable searches, runs, manifests, and target
+history, then ranks every identity-resolved target together with registry
+dispositions. Superseded or failed history remains visible and non-resumable.
 
 Historical version note: 0.2.100 added target-selection progress/ETA. 0.2.8 fixed QLP stitch
 normalization and feature serialization, 0.2.9 adds raw vetting diagnostics,

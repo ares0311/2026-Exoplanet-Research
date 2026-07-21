@@ -32,6 +32,11 @@ from exo_toolkit.search_lifecycle import (
 
 DEFAULT_HUNTER_DB = Path("data/hunter_searches.sqlite3")
 DEFAULT_MANIFEST_DIR = Path("reports/search_manifests")
+DEFAULT_HISTORY_MANIFEST = (
+    Path(__file__).resolve().parents[2]
+    / "data_selection"
+    / "hunter_prior_search_history_v1.json"
+)
 DEFAULT_POOL_SIZE = 10_000
 SELECTOR_VERSION = "exo_hunter_tic_v1"
 FOLLOW_UP_FPP_MAX = 0.15
@@ -79,6 +84,7 @@ def _parser_create() -> argparse.ArgumentParser:
     parser.add_argument("--mode", choices=("new", "follow-up"), required=True)
     parser.add_argument("--db", type=Path, default=DEFAULT_HUNTER_DB)
     parser.add_argument("--candidate-file", type=Path)
+    parser.add_argument("--history-manifest", type=Path, default=DEFAULT_HISTORY_MANIFEST)
     parser.add_argument("--pool-size", type=int)
     parser.add_argument("--workers", type=int, default=6)
     parser.add_argument("--tmag-min", type=float, default=12.0)
@@ -412,10 +418,14 @@ def create_new_search(
                 "candidate_universe_returned": len(candidates),
             }
         elif args.mode == "follow-up":
-            candidates = store.follow_up_candidates()
+            import_summary = store.import_history_manifest(args.history_manifest)
+            candidates = store.follow_up_universe()
             selector_log = {
-                "source": "follow_up_registry",
+                "source": "durable_prior_search_history_and_follow_up_registry",
+                "history_manifest": str(args.history_manifest),
+                "history_import": import_summary,
                 "candidate_universe_returned": len(candidates),
+                "eligible_candidate_count": sum(row.eligible for row in candidates),
             }
         else:
             candidates, selector_log = live_selector(
