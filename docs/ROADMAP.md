@@ -8,7 +8,7 @@ by itself satisfy a master-guide evidence requirement.
 
 ## Current Master-Guide Alignment — Production Priority Order
 
-- **Hunter production lifecycle (PRIOR-HISTORY UNIVERSE GAP):**
+- **Hunter production lifecycle (PROD ACCEPTED):**
   version 0.3.2 adds the missing durable bridge from a large candidate universe
   through exact pending-search execution and evidence-based follow-ups. The
   append-only SQLite contract separates candidate catalog, immutable manifest,
@@ -47,14 +47,16 @@ by itself satisfy a master-guide evidence requirement.
   only open registry rows while seven preserved discovery logs contain 608
   events across 200 targets. Version 0.3.7 adds a committed normalized history
   contract, idempotent durable import, exact preservation of failures and
-  repeated work, and deterministic full-universe eligibility/ranking. Merge,
-  migrate the production database, verify the 202-target combined universe,
-  and issue replacement acceptance evidence before reclaiming PROD. Future
-  observations may reopen the deferred row but are unrelated to this software
-  gap. See
+  repeated work, and deterministic full-universe eligibility/ranking.
+  Merged-main import and repeat-import evidence now pass: 608 source events are
+  durable, 202 targets are evaluated with explicit dispositions, integrity and
+  foreign keys are clean, and no empty-registry inference remains. Future
+  observations may reopen the deferred row but are unrelated to production
+  readiness. See
   `artifacts/manifests/hunter_live_acceptance_v3.json`,
   `artifacts/manifests/hunter_live_acceptance_v2_reassessment.json`, and
-  `docs/HUNTER_PRODUCTION_WORKFLOW.md`.
+  `docs/HUNTER_PRODUCTION_WORKFLOW.md`. Replacement acceptance is
+  `artifacts/manifests/hunter_live_acceptance_v4.json`.
 
 1. **Phase 1 — validated manifest contract (CONTRACT COMPLETE):** version 0.2.30 adds
    the shared schema, frozen Pydantic contract, fail-closed checksum/path
