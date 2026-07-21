@@ -35,8 +35,11 @@ by itself satisfy a master-guide evidence requirement.
   rows remained open after scheduling/completion and could be selected again.
   Version 0.3.5 adds append-only lifecycle events, consuming-search links,
   failure-safe resume semantics, terminal disposition, parent-child
-  recommendations, and stale-candidate rejection. Merge, migrate the real DB,
-  verify the existing deferred row/event integrity, then issue replacement
+  recommendations, and stale-candidate rejection. The first real migration was
+  integrity-clean and exposed one remaining mismatch: a non-executable row was
+  labeled `open`. Version 0.3.6/schema v4 corrects old rows append-only and
+  creates new waiting-for-data recommendations as `deferred`. Merge, migrate
+  the real DB, verify the row/event integrity, then issue replacement
   acceptance evidence. See
   `artifacts/manifests/hunter_live_acceptance_v2_reassessment.json` and
   `docs/HUNTER_PRODUCTION_WORKFLOW.md`.
