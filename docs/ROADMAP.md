@@ -8,7 +8,7 @@ by itself satisfy a master-guide evidence requirement.
 
 ## Current Master-Guide Alignment — Production Priority Order
 
-- **Hunter production lifecycle (FOLLOW-UP DISPOSITION ACCEPTANCE PENDING):**
+- **Hunter production lifecycle (PRIOR-HISTORY UNIVERSE GAP):**
   version 0.3.2 adds the missing durable bridge from a large candidate universe
   through exact pending-search execution and evidence-based follow-ups. The
   append-only SQLite contract separates candidate catalog, immutable manifest,
@@ -38,10 +38,19 @@ by itself satisfy a master-guide evidence requirement.
   recommendations, and stale-candidate rejection. The first real migration was
   integrity-clean and exposed one remaining mismatch: a non-executable row was
   labeled `open`. Version 0.3.6/schema v4 corrects old rows append-only and
-  creates new waiting-for-data recommendations as `deferred`. Merge, migrate
-  the real DB, verify the row/event integrity, then issue replacement
-  acceptance evidence. See
-  `artifacts/manifests/hunter_live_acceptance_v2_reassessment.json` and
+  creates new waiting-for-data recommendations as `deferred`. Both corrective
+  PRs are merged; production schema v4 is integrity-clean and the row has
+  append-only `open → deferred` history. A current metadata-only MAST check
+  still finds only sectors 1 and 28, neither event-covering, so the real row is
+  correctly deferred. That is an expected scientific state, not a product
+  blocker. The next audit found the actual gap: default follow-up creation reads
+  only open registry rows while seven preserved discovery logs contain 608
+  events across 200 targets. Durably ingest those histories, resolve identity
+  and revisit disposition, and rank the complete available follow-up universe
+  before reclaiming PROD. Future observations may reopen the deferred row but
+  are unrelated to this software gap. See
+  `artifacts/manifests/hunter_live_acceptance_v3.json`,
+  `artifacts/manifests/hunter_live_acceptance_v2_reassessment.json`, and
   `docs/HUNTER_PRODUCTION_WORKFLOW.md`.
 
 1. **Phase 1 — validated manifest contract (CONTRACT COMPLETE):** version 0.2.30 adds

@@ -4,14 +4,16 @@
 
 Version 0.3.3 closes the reviewed-prior-result bridge left open by version 0.3.2.
 The shell entry points share one durable SQLite system of record and can run
-without an AI model. Hunter acceptance is temporarily PARTIAL after a fresh
+without an AI model. Hunter acceptance remains PARTIAL after a fresh
 audit found that consumed actionable follow-ups remained open and could be
 scheduled repeatedly. Version 0.3.5 adds durable scheduling/disposition events
 and parent-child recommendation relationships. Version 0.3.6 makes
 non-executable, revisit-gated recommendations canonically `deferred` rather
 than `open`. The prior acceptance remains
 preserved and is corrected by
-`artifacts/manifests/hunter_live_acceptance_v2_reassessment.json`:
+`artifacts/manifests/hunter_live_acceptance_v2_reassessment.json`. Merged-main
+schema-v4 migration and current archive evidence are recorded in
+`artifacts/manifests/hunter_live_acceptance_v3.json`:
 
 ```text
 candidate universe
@@ -192,5 +194,13 @@ real registry/history row; a repeated import returned the same stable IDs with
 no duplicate rows. That evidence remains valid, but it did not exercise
 consumption of an actionable row. Version 0.3.5 closes the resulting
 scheduling/disposition defect. Version 0.3.6 closes the status-semantics gap
-exposed by the first real v3 migration; merged-main v4 migration and replacement
-acceptance remain required.
+exposed by the first real v3 migration. The merged-main v4 production migration
+is integrity-clean and the real row is now durably `deferred`. A 2026-07-21
+metadata-only MAST check still found only sectors 1 and 28, both already proven
+not to cover a predicted event. That leaves the real recommendation correctly
+deferred; it is a normal scientific data state, not a production blocker.
+However, default follow-up creation currently reads only open registry rows.
+Seven preserved discovery logs contain 608 events across 200 targets that are
+not part of Hunter's durable follow-up universe. Until those histories are
+ingested, identity-resolved, dispositioned, and ranked, an empty registry
+cannot support the broader production contract.
