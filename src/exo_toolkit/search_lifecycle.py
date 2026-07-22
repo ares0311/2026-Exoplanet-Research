@@ -14,110 +14,23 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from exo_toolkit.hunter_history import (
+    load_verified_history_manifest,
+    resolve_history_source_path,
+)
+from exo_toolkit.hunter_models import (
+    EXECUTABLE_SEARCH_STATES,
+    TERMINAL_TARGET_STATUSES,
+    ExecutionProvenance,
+    FollowUpRecommendation,
+    HunterCandidate,
+    PriorSearch,
+    SearchExecutionSummary,
+    SearchMode,
+    TargetExecutionResult,
+)
 
-SearchMode = Literal["new", "follow-up"]
-TargetStatus = Literal["candidate_found", "no_signal", "no_data", "failed"]
-TERMINAL_TARGET_STATUSES = frozenset({"candidate_found", "no_signal", "no_data"})
-EXECUTABLE_SEARCH_STATES = frozenset({"pending", "running", "partial", "failed"})
-HUNTER_SCHEMA_VERSION = 4
-
-
-class PriorSearch(BaseModel):
-    """One provenance-complete search performed by any reliable project."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    searched_by: str = Field(min_length=1)
-    searched_at: datetime
-    source_project: str = Field(min_length=1)
-    method_or_data: str = Field(min_length=1)
-    result: str = Field(min_length=1)
-    provenance_uri: str = Field(min_length=1)
-
-
-class HunterCandidate(BaseModel):
-    """Normalized candidate-universe row frozen into a search snapshot."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    target_id: str = Field(min_length=1)
-    canonical_id: str = Field(min_length=1)
-    aliases: tuple[str, ...] = ()
-    mission: Literal["TESS", "Kepler", "K2", "JWST"] = "TESS"
-    object_classification: str = Field(default="star", min_length=1)
-    source: str = Field(min_length=1)
-    source_provenance: dict[str, Any]
-    eligible: bool = True
-    eligibility_reason: str = Field(default="eligible", min_length=1)
-    distance_pc: float | None = Field(default=None, gt=0, allow_inf_nan=False)
-    estimated_download_gb: float | None = Field(default=None, ge=0, allow_inf_nan=False)
-    ranking_score: float = Field(allow_inf_nan=False)
-    selection_reason: str = Field(min_length=1)
-    metrics: dict[str, float | int | str | None]
-    prior_searches: tuple[PriorSearch, ...] = ()
-
-    @model_validator(mode="after")
-    def follow_up_rows_require_history(self) -> HunterCandidate:
-        if self.source_provenance.get("search_category") == "follow-up" and not self.prior_searches:
-            raise ValueError("follow-up candidates require prior_searches provenance")
-        return self
-
-
-class FollowUpRecommendation(BaseModel):
-    """Validated evidence and action for one follow-up registry entry."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    candidate_id: str = Field(min_length=1)
-    priority: float = Field(allow_inf_nan=False)
-    reason: str = Field(min_length=1)
-    evidence: dict[str, Any]
-    recommended_action: str = Field(min_length=1)
-    search_eligible: bool = True
-    revisit_reason: str | None = None
-
-    @model_validator(mode="after")
-    def deferred_follow_up_requires_reason(self) -> FollowUpRecommendation:
-        if not self.search_eligible and not self.revisit_reason:
-            raise ValueError("non-executable follow-up requires revisit_reason")
-        return self
-
-
-class TargetExecutionResult(BaseModel):
-    """One target's complete acquisition-through-interpretation outcome."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    status: TargetStatus
-    result: dict[str, Any]
-    provenance: dict[str, Any]
-    error_message: str | None = None
-    follow_ups: tuple[FollowUpRecommendation, ...] = ()
-
-    @model_validator(mode="after")
-    def failure_requires_error(self) -> TargetExecutionResult:
-        if self.status == "failed" and not self.error_message:
-            raise ValueError("failed target result requires error_message")
-        return self
-
-
-class SearchExecutionSummary(BaseModel):
-    """Structured result returned after one resumable run attempt."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    search_id: str
-    attempt_id: str
-    status: Literal["completed", "partial", "failed"]
-    started_at: datetime
-    completed_at: datetime
-    targets_total: int
-    targets_already_complete: int
-    targets_processed: int
-    targets_succeeded: int
-    targets_failed: int
-    follow_ups_registered: int
+HUNTER_SCHEMA_VERSION = 5
 
 
 class _ClosingConnection(sqlite3.Connection):
@@ -147,10 +60,10 @@ CREATE INDEX IF NOT EXISTS idx_candidate_catalog_target
 CREATE TABLE IF NOT EXISTS search_manifests (
     search_id TEXT PRIMARY KEY,
     schema_version INTEGER NOT NULL,
-    mode TEXT NOT NULL,
-    requested_target_count INTEGER NOT NULL,
-    selected_target_count INTEGER NOT NULL,
-    candidate_pool_count INTEGER NOT NULL,
+    mode TEXT NOT NULL CHECK(mode IN ('new', 'follow-up')),
+    requested_target_count INTEGER NOT NULL CHECK(requested_target_count > 0),
+    selected_target_count INTEGER NOT NULL CHECK(selected_target_count > 0),
+    candidate_pool_count INTEGER NOT NULL CHECK(candidate_pool_count >= selected_target_count),
     selector_version TEXT NOT NULL,
     config_json TEXT NOT NULL,
     manifest_sha256 TEXT NOT NULL,
@@ -174,7 +87,10 @@ CREATE TABLE IF NOT EXISTS search_manifest_targets (
 CREATE TABLE IF NOT EXISTS search_state_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     search_id TEXT NOT NULL,
-    state TEXT NOT NULL,
+    state TEXT NOT NULL CHECK(state IN (
+        'pending', 'running', 'interrupted', 'partial', 'failed',
+        'completed', 'archived_partial'
+    )),
     detail_json TEXT NOT NULL,
     created_at TEXT NOT NULL,
     FOREIGN KEY(search_id) REFERENCES search_manifests(search_id)
@@ -183,13 +99,15 @@ CREATE TABLE IF NOT EXISTS search_state_events (
 CREATE TABLE IF NOT EXISTS search_runs (
     attempt_id TEXT PRIMARY KEY,
     search_id TEXT NOT NULL,
-    status TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN (
+        'running', 'interrupted', 'partial', 'failed', 'completed'
+    )),
     started_at TEXT NOT NULL,
     completed_at TEXT,
     config_json TEXT NOT NULL,
-    items_processed INTEGER NOT NULL DEFAULT 0,
-    items_succeeded INTEGER NOT NULL DEFAULT 0,
-    items_failed INTEGER NOT NULL DEFAULT 0,
+    items_processed INTEGER NOT NULL DEFAULT 0 CHECK(items_processed >= 0),
+    items_succeeded INTEGER NOT NULL DEFAULT 0 CHECK(items_succeeded >= 0),
+    items_failed INTEGER NOT NULL DEFAULT 0 CHECK(items_failed >= 0),
     error_message TEXT,
     FOREIGN KEY(search_id) REFERENCES search_manifests(search_id)
 );
@@ -199,7 +117,9 @@ CREATE TABLE IF NOT EXISTS target_search_history (
     search_id TEXT NOT NULL,
     attempt_id TEXT NOT NULL,
     target_id TEXT NOT NULL,
-    status TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN (
+        'candidate_found', 'no_signal', 'no_data', 'failed'
+    )),
     result_json TEXT NOT NULL,
     provenance_json TEXT NOT NULL,
     error_message TEXT,
@@ -220,10 +140,10 @@ CREATE TABLE IF NOT EXISTS follow_up_registry (
     evidence_json TEXT NOT NULL,
     prior_search_provenance_json TEXT NOT NULL,
     recommended_action TEXT NOT NULL,
-    search_eligible INTEGER NOT NULL DEFAULT 1,
+    search_eligible INTEGER NOT NULL DEFAULT 1 CHECK(search_eligible IN (0, 1)),
     revisit_reason TEXT,
     parent_follow_up_id TEXT,
-    status TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('open', 'scheduled', 'completed', 'deferred')),
     created_at TEXT NOT NULL,
     FOREIGN KEY(search_id) REFERENCES search_manifests(search_id)
 );
@@ -232,7 +152,9 @@ CREATE TABLE IF NOT EXISTS follow_up_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     event_id TEXT NOT NULL UNIQUE,
     follow_up_id TEXT NOT NULL,
-    state TEXT NOT NULL,
+    state TEXT NOT NULL CHECK(state IN (
+        'open', 'scheduled', 'attempt_failed', 'completed', 'deferred'
+    )),
     related_search_id TEXT,
     detail_json TEXT NOT NULL,
     created_at TEXT NOT NULL,
@@ -247,6 +169,55 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     applied_at TEXT NOT NULL,
     description TEXT NOT NULL
 );
+
+CREATE TRIGGER IF NOT EXISTS hunter_immutable_candidate_catalog_update
+BEFORE UPDATE ON candidate_catalog BEGIN
+    SELECT RAISE(ABORT, 'candidate_catalog is append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS hunter_immutable_candidate_catalog_delete
+BEFORE DELETE ON candidate_catalog BEGIN
+    SELECT RAISE(ABORT, 'candidate_catalog is append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS hunter_immutable_search_manifests_update
+BEFORE UPDATE ON search_manifests BEGIN
+    SELECT RAISE(ABORT, 'search_manifests is append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS hunter_immutable_search_manifests_delete
+BEFORE DELETE ON search_manifests BEGIN
+    SELECT RAISE(ABORT, 'search_manifests is append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS hunter_immutable_manifest_targets_update
+BEFORE UPDATE ON search_manifest_targets BEGIN
+    SELECT RAISE(ABORT, 'search_manifest_targets is append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS hunter_immutable_manifest_targets_delete
+BEFORE DELETE ON search_manifest_targets BEGIN
+    SELECT RAISE(ABORT, 'search_manifest_targets is append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS hunter_immutable_search_state_update
+BEFORE UPDATE ON search_state_events BEGIN
+    SELECT RAISE(ABORT, 'search_state_events is append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS hunter_immutable_search_state_delete
+BEFORE DELETE ON search_state_events BEGIN
+    SELECT RAISE(ABORT, 'search_state_events is append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS hunter_immutable_target_history_update
+BEFORE UPDATE ON target_search_history BEGIN
+    SELECT RAISE(ABORT, 'target_search_history is append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS hunter_immutable_target_history_delete
+BEFORE DELETE ON target_search_history BEGIN
+    SELECT RAISE(ABORT, 'target_search_history is append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS hunter_immutable_follow_up_events_update
+BEFORE UPDATE ON follow_up_events BEGIN
+    SELECT RAISE(ABORT, 'follow_up_events is append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS hunter_immutable_follow_up_events_delete
+BEFORE DELETE ON follow_up_events BEGIN
+    SELECT RAISE(ABORT, 'follow_up_events is append-only');
+END;
 """
 
 
@@ -369,7 +340,7 @@ class HunterStore:
                 (
                     HUNTER_SCHEMA_VERSION,
                     _utc_now().isoformat(),
-                    "Canonical deferred state for non-executable follow-ups",
+                    "Storage-enforced immutable Hunter history and validity contract",
                 ),
             )
             connection.execute(f"PRAGMA user_version = {HUNTER_SCHEMA_VERSION}")
@@ -561,18 +532,16 @@ class HunterStore:
     def import_history_manifest(
         self,
         manifest: Path | Mapping[str, Any],
+        *,
+        source_root: Path | None = None,
     ) -> dict[str, int]:
         """Idempotently import provenance-complete historical project searches."""
-        payload = (
-            json.loads(manifest.read_text(encoding="utf-8"))
-            if isinstance(manifest, Path)
-            else dict(manifest)
+        payload = load_verified_history_manifest(
+            manifest,
+            source_root=source_root,
         )
-        if payload.get("schema_version") != 1:
-            raise ValueError("History manifest must use schema_version=1")
         sources = payload.get("sources")
-        if not isinstance(sources, list) or not sources:
-            raise ValueError("History manifest sources must be a non-empty list")
+        assert isinstance(sources, list)  # verified by load_verified_history_manifest
 
         sources_created = 0
         events_created = 0
@@ -682,6 +651,14 @@ class HunterStore:
                     "historical_import": True,
                     "source_path": source.get("source_path"),
                     "source_sha256": source.get("source_sha256"),
+                    "source_payload": source_payload,
+                    "source_artifact_path": str(
+                        resolve_history_source_path(
+                            manifest,
+                            str(source.get("source_path")),
+                            source_root=source_root,
+                        )
+                    ),
                     "method_or_data": source.get("method_or_data"),
                 }
                 connection.execute(
@@ -1215,16 +1192,41 @@ class HunterStore:
         def _safe_run(candidate: HunterCandidate) -> TargetExecutionResult:
             try:
                 raw = runner(candidate)
-                return (
+                outcome = (
                     raw
                     if isinstance(raw, TargetExecutionResult)
                     else TargetExecutionResult.model_validate(raw)
                 )
+                if isinstance(outcome.provenance, ExecutionProvenance):
+                    return outcome
+                normalized = ExecutionProvenance(
+                    candidate_snapshot=candidate,
+                    pipeline_context={
+                        "run_config": run_config_dict,
+                        "runner_provenance": outcome.provenance,
+                    },
+                    code_version=str(run_config_dict.get("code_version", "unknown")),
+                    git_commit=str(run_config_dict.get("git_commit", "unknown")),
+                    scorer=str(run_config_dict.get("scorer", "unknown")),
+                    model_artifacts=tuple(run_config_dict.get("model_artifacts", ())),
+                    runner=getattr(runner, "__name__", type(runner).__name__),
+                    failure_stage="runner" if outcome.status == "failed" else None,
+                )
+                return outcome.model_copy(update={"provenance": normalized})
             except Exception as exc:  # noqa: BLE001
                 return TargetExecutionResult(
                     status="failed",
                     result={},
-                    provenance={"runner": getattr(runner, "__name__", type(runner).__name__)},
+                    provenance=ExecutionProvenance(
+                        candidate_snapshot=candidate,
+                        pipeline_context={"run_config": run_config_dict},
+                        code_version=str(run_config_dict.get("code_version", "unknown")),
+                        git_commit=str(run_config_dict.get("git_commit", "unknown")),
+                        scorer=str(run_config_dict.get("scorer", "unknown")),
+                        model_artifacts=tuple(run_config_dict.get("model_artifacts", ())),
+                        runner=getattr(runner, "__name__", type(runner).__name__),
+                        failure_stage="runner",
+                    ),
                     error_message=f"{type(exc).__name__}: {exc}",
                 )
 
@@ -1234,6 +1236,7 @@ class HunterStore:
                 for done, future in enumerate(as_completed(futures), 1):
                     candidate = futures[future]
                     outcome = future.result()
+                    assert isinstance(outcome.provenance, ExecutionProvenance)
                     created_at = now_fn()
                     with self.connect() as connection:
                         connection.execute(
@@ -1249,7 +1252,7 @@ class HunterStore:
                                 candidate.target_id,
                                 outcome.status,
                                 _canonical_json(outcome.result),
-                                _canonical_json(outcome.provenance),
+                                _canonical_json(outcome.provenance.model_dump(mode="json")),
                                 outcome.error_message,
                                 created_at.isoformat(),
                             ),
@@ -1448,7 +1451,19 @@ class HunterStore:
                 follow_up.priority,
                 follow_up.reason,
                 _canonical_json(follow_up.evidence),
-                _canonical_json([row.model_dump(mode="json") for row in candidate.prior_searches]),
+                _canonical_json(
+                    [row.model_dump(mode="json") for row in candidate.prior_searches]
+                    + [
+                        {
+                            "searched_by": "EXO-Hunter",
+                            "searched_at": created_at.isoformat(),
+                            "source_project": "2026 Exoplanet Research",
+                            "method_or_data": "durable EXO-Hunter lifecycle execution",
+                            "result": follow_up.reason,
+                            "provenance_uri": f"hunter-search:{search_id}",
+                        }
+                    ]
+                ),
                 follow_up.recommended_action,
                 int(follow_up.search_eligible),
                 follow_up.revisit_reason,
@@ -1667,6 +1682,8 @@ class HunterStore:
                 }
                 metrics: dict[str, float | int | str | None] = {
                     "follow_up_priority": ranking_score,
+                    "expected_information_gain": ranking_score / 110.0,
+                    "scientific_suitability": ranking_score / 110.0,
                     "prior_search_count": len(prior_searches),
                     "registry_status": str(registry["status"]),
                 }
@@ -1715,6 +1732,12 @@ class HunterStore:
                     "latest_fpp": fpp,
                     "latest_detection_confidence": confidence,
                     "latest_pathway": pathway,
+                    "expected_information_gain": (
+                        (1.0 - fpp) * confidence
+                        if fpp is not None and confidence is not None
+                        else None
+                    ),
+                    "scientific_suitability": confidence,
                 }
 
             candidates.append(
@@ -1788,60 +1811,23 @@ class HunterStore:
         return path
 
     def integrity_summary(self) -> dict[str, Any]:
-        required_tables = {
-            "candidate_catalog",
-            "search_manifests",
-            "search_manifest_targets",
-            "search_state_events",
-            "search_runs",
-            "target_search_history",
-            "follow_up_registry",
-            "follow_up_events",
-        }
-        with self.connect() as connection:
-            integrity = str(connection.execute("PRAGMA integrity_check").fetchone()[0])
-            tables = {
-                str(row[0])
-                for row in connection.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
-                ).fetchall()
-            }
-            orphan_targets = int(
-                connection.execute(
-                    "SELECT COUNT(*) FROM search_manifest_targets AS t "
-                    "LEFT JOIN candidate_catalog AS c ON c.snapshot_id=t.snapshot_id "
-                    "WHERE c.snapshot_id IS NULL"
-                ).fetchone()[0]
+        """Backward-compatible alias for the comprehensive validity verifier."""
+        return self.validity_summary()
+
+    def validity_summary(self, *, history_manifest: Path | None = None) -> dict[str, Any]:
+        """Recompute the complete Hunter validity and provenance contract."""
+        from exo_toolkit.hunter_validity import validate_hunter_database
+
+        resolved_manifest = history_manifest
+        if resolved_manifest is None:
+            candidate = (
+                Path(__file__).resolve().parents[2]
+                / "data_selection"
+                / "hunter_prior_search_history_v1.json"
             )
-            orphan_follow_up_events = int(
-                connection.execute(
-                    "SELECT COUNT(*) FROM follow_up_events AS e "
-                    "LEFT JOIN follow_up_registry AS f ON f.follow_up_id=e.follow_up_id "
-                    "WHERE f.follow_up_id IS NULL"
-                ).fetchone()[0]
-            )
-            orphan_parent_follow_ups = int(
-                connection.execute(
-                    "SELECT COUNT(*) FROM follow_up_registry AS child "
-                    "LEFT JOIN follow_up_registry AS parent "
-                    "ON parent.follow_up_id=child.parent_follow_up_id "
-                    "WHERE child.parent_follow_up_id IS NOT NULL "
-                    "AND parent.follow_up_id IS NULL"
-                ).fetchone()[0]
-            )
-        missing = sorted(required_tables - tables)
-        return {
-            "ok": (
-                integrity == "ok"
-                and not missing
-                and orphan_targets == 0
-                and orphan_follow_up_events == 0
-                and orphan_parent_follow_ups == 0
-            ),
-            "sqlite_integrity": integrity,
-            "missing_tables": missing,
-            "orphan_manifest_targets": orphan_targets,
-            "orphan_follow_up_events": orphan_follow_up_events,
-            "orphan_parent_follow_ups": orphan_parent_follow_ups,
-            "schema_version": HUNTER_SCHEMA_VERSION,
-        }
+            resolved_manifest = candidate if candidate.is_file() else None
+        return validate_hunter_database(
+            self.db_path,
+            schema_version=HUNTER_SCHEMA_VERSION,
+            history_manifest=resolved_manifest,
+        )

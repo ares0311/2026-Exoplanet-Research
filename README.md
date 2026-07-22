@@ -1,7 +1,7 @@
 # EXO-Hunter — 2026 Exoplanet Research
 
 [![CI](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml/badge.svg)](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.3.7-blue.svg)](pyproject.toml)
+[![Version](https://img.shields.io/badge/version-0.3.8-blue.svg)](pyproject.toml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
@@ -17,7 +17,7 @@ XGBoost, CNN, and ensemble scorers are optional.
 
 ## Current production state
 
-Version 0.3.7 is the current release state represented by this repository.
+Version 0.3.8 is the current release state represented by this repository.
 
 | Area | Status | Current evidence |
 |---|---|---|

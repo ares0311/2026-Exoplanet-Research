@@ -7,6 +7,7 @@ import hashlib
 import importlib
 import json
 import math
+import subprocess
 import sys
 import time
 from collections.abc import Callable, Mapping, Sequence
@@ -21,12 +22,16 @@ from rich.table import Table
 
 from exo_toolkit import __version__
 from exo_toolkit.cli import run_pipeline
-from exo_toolkit.search_lifecycle import (
+from exo_toolkit.hunter_models import (
+    ArtifactIdentity,
+    ExecutionProvenance,
     FollowUpRecommendation,
     HunterCandidate,
-    HunterStore,
     SearchExecutionSummary,
     TargetExecutionResult,
+)
+from exo_toolkit.search_lifecycle import (
+    HunterStore,
     format_eta,
 )
 
@@ -48,6 +53,60 @@ FOLLOW_UP_PATHWAYS = {
 }
 VALID_SCORERS = {"bayesian", "xgboost", "ensemble", "cnn", "full-ensemble"}
 MAX_LIVE_WORKERS = 12
+
+
+def _artifact_identity(path: Path, role: str) -> ArtifactIdentity:
+    resolved = path.resolve()
+    return ArtifactIdentity(
+        role=role,
+        path=str(path),
+        sha256=hashlib.sha256(resolved.read_bytes()).hexdigest(),
+        size_bytes=resolved.stat().st_size,
+    )
+
+
+def _repository_git_commit() -> str:
+    repo_root = Path(__file__).resolve().parents[2]
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    commit = result.stdout.strip()
+    if not commit:
+        raise RuntimeError("Could not resolve the repository git commit")
+    return commit
+
+
+def _model_artifact_identities(
+    *,
+    scorer: str,
+    model_path: Path | None,
+    cnn_checkpoint: Path | None,
+) -> tuple[ArtifactIdentity, ...]:
+    artifacts: list[ArtifactIdentity] = []
+    if model_path is not None:
+        metadata = json.loads(model_path.read_text(encoding="utf-8"))
+        model_file = metadata.get("model_file")
+        if not isinstance(model_file, str) or not model_file:
+            raise RuntimeError(f"XGBoost metadata is missing model_file: {model_path}")
+        booster_path = model_path.parent / model_file
+        if not booster_path.is_file():
+            raise RuntimeError(f"Required XGBoost booster is missing: {booster_path}")
+        artifacts.extend(
+            (
+                _artifact_identity(booster_path, "xgboost_model"),
+                _artifact_identity(model_path, "xgboost_metadata"),
+            )
+        )
+    if cnn_checkpoint is not None:
+        artifacts.append(_artifact_identity(cnn_checkpoint, "cnn_checkpoint"))
+    context_path = Path("models/candidate_context_v1.json")
+    if scorer == "full-ensemble" and context_path.is_file():
+        artifacts.append(_artifact_identity(context_path, "score_context"))
+    return tuple(artifacts)
 
 
 def _load_project_skill(module_name: str) -> ModuleType:
@@ -325,8 +384,14 @@ def _select_live_new_candidates(
             row["priority"]
         )
         availability_score = min(product_count / 5.0, 1.0) if product_count else 0.0
+        expected_information_gain = base_priority * availability_score
         cost_penalty = _storage_penalty(estimated_gb) if estimated_gb is not None else 5.0
-        ranking_score = 80.0 * base_priority + 20.0 * availability_score - cost_penalty
+        ranking_score = (
+            70.0 * base_priority
+            + 20.0 * availability_score
+            + 10.0 * expected_information_gain
+            - cost_penalty
+        )
         candidates.append(
             HunterCandidate(
                 target_id=f"TIC {tic_id}",
@@ -355,6 +420,8 @@ def _select_live_new_candidates(
                     "contamination_ratio": row.get("contratio"),
                     "qlp_product_count": product_count,
                     "availability_score": availability_score,
+                    "expected_information_gain": expected_information_gain,
+                    "scientific_suitability": base_priority,
                     "storage_cost_penalty": cost_penalty,
                 },
             )
@@ -450,7 +517,13 @@ def create_new_search(
             selector_version=SELECTOR_VERSION,
             config=config,
         )
-        integrity = store.integrity_summary()
+        integrity = store.validity_summary(
+            history_manifest=(
+                args.history_manifest
+                if args.mode == "follow-up" and not args.candidate_file
+                else None
+            )
+        )
         if not integrity["ok"]:
             raise RuntimeError(f"Hunter database integrity failed: {integrity}")
 
@@ -537,9 +610,23 @@ def _pipeline_runner(
     cnn_checkpoint: Path | None,
     pipeline: str,
     exptime: str,
+    model_artifacts: tuple[ArtifactIdentity, ...] = (),
 ) -> Callable[[HunterCandidate], TargetExecutionResult]:
     def run(candidate: HunterCandidate) -> TargetExecutionResult:
         context: dict[str, Any] = {}
+
+        def provenance(*, failure_stage: str | None = None) -> ExecutionProvenance:
+            return ExecutionProvenance(
+                candidate_snapshot=candidate,
+                pipeline_context=context,
+                code_version=__version__,
+                git_commit=str(context.get("git_commit") or _repository_git_commit()),
+                scorer=scorer,
+                model_artifacts=model_artifacts,
+                runner="exo_toolkit.cli.run_pipeline",
+                failure_stage=failure_stage,
+            )
+
         try:
             rows = run_pipeline(
                 candidate.target_id,
@@ -551,7 +638,7 @@ def _pipeline_runner(
                 cnn_checkpoint_path=cnn_checkpoint,
                 run_context=context,
             )
-        except ValueError as exc:
+        except Exception as exc:  # noqa: BLE001
             message = str(exc)
             no_data_prefixes = (
                 "No TESS light curves",
@@ -560,8 +647,13 @@ def _pipeline_runner(
                 "No JWST data",
                 "No downloadable",
             )
-            if not message.startswith(no_data_prefixes):
-                raise
+            if not isinstance(exc, ValueError) or not message.startswith(no_data_prefixes):
+                return TargetExecutionResult(
+                    status="failed",
+                    result={"target_id": candidate.target_id},
+                    provenance=provenance(failure_stage="acquisition_or_pipeline"),
+                    error_message=f"{type(exc).__name__}: {exc}",
+                )
             return TargetExecutionResult(
                 status="no_data",
                 result={
@@ -570,12 +662,7 @@ def _pipeline_runner(
                     "composite_interpretation": "No requested archive data were available",
                     "no_data_reason": message,
                 },
-                provenance={
-                    "candidate_snapshot": candidate.model_dump(mode="json"),
-                    "pipeline_context": context,
-                    "code_version": __version__,
-                    "scorer": scorer,
-                },
+                provenance=provenance(),
             )
         if not rows:
             return TargetExecutionResult(
@@ -585,12 +672,7 @@ def _pipeline_runner(
                     "individual_scores": [],
                     "composite_interpretation": "No signal passed the configured BLS threshold",
                 },
-                provenance={
-                    "candidate_snapshot": candidate.model_dump(mode="json"),
-                    "pipeline_context": context,
-                    "code_version": __version__,
-                    "scorer": scorer,
-                },
+                provenance=provenance(),
             )
         strongest = min(
             rows,
@@ -611,12 +693,7 @@ def _pipeline_runner(
                     else "Transit-like signal found but evidence does not pass the follow-up gate"
                 ),
             },
-            provenance={
-                "candidate_snapshot": candidate.model_dump(mode="json"),
-                "pipeline_context": context,
-                "code_version": __version__,
-                "scorer": scorer,
-            },
+            provenance=provenance(),
             follow_ups=follow_ups,
         )
 
@@ -712,12 +789,19 @@ def run_new_search(
             raise RuntimeError(f"Required scorer model is missing: {model_path}")
         if cnn_checkpoint is not None and not cnn_checkpoint.is_file():
             raise RuntimeError(f"Required CNN checkpoint is missing: {cnn_checkpoint}")
+        git_commit = _repository_git_commit()
+        model_artifacts = _model_artifact_identities(
+            scorer=args.scorer,
+            model_path=model_path,
+            cnn_checkpoint=cnn_checkpoint,
+        )
         runner = runner_factory(
             scorer=args.scorer,
             model_path=model_path,
             cnn_checkpoint=cnn_checkpoint,
             pipeline=args.pipeline,
             exptime=args.exptime,
+            model_artifacts=model_artifacts,
         )
         store = HunterStore(args.db)
         if not args.json_output:
@@ -732,10 +816,14 @@ def run_new_search(
             workers=args.workers,
             run_config={
                 "code_version": __version__,
+                "git_commit": git_commit,
                 "scorer": args.scorer,
                 "pipeline": args.pipeline,
                 "exptime": args.exptime,
                 "workers": args.workers,
+                "model_artifacts": [
+                    artifact.model_dump(mode="json") for artifact in model_artifacts
+                ],
             },
             progress_fn=None if args.json_output else lambda line: print(line, flush=True),
         )
@@ -791,10 +879,15 @@ def show_follow_ups(argv: Sequence[str] | None = None) -> int:
                     f"{prior['source_project']} — {prior['searched_by']} — "
                     f"{prior['searched_at']}"
                 )
-                provenance_details.append(
-                    f"{row['target_id']}: {prior_label}; method/data={prior['method_or_data']}; "
-                    f"result={prior['result']}; provenance={prior['provenance_uri']}"
-                )
+                for prior_index, prior_entry in enumerate(prior_searches, 1):
+                    provenance_details.append(
+                        f"{row['target_id']} [{prior_index}/{len(prior_searches)}]: "
+                        f"{prior_entry['source_project']} — {prior_entry['searched_by']} — "
+                        f"{prior_entry['searched_at']}; "
+                        f"method/data={prior_entry['method_or_data']}; "
+                        f"result={prior_entry['result']}; "
+                        f"provenance={prior_entry['provenance_uri']}"
+                    )
             else:
                 prior_label = f"EXO-Hunter search {row['search_id']}"
                 provenance_details.append(f"{row['target_id']}: {prior_label}")

@@ -56,7 +56,11 @@ by itself satisfy a master-guide evidence requirement.
   `artifacts/manifests/hunter_live_acceptance_v3.json`,
   `artifacts/manifests/hunter_live_acceptance_v2_reassessment.json`, and
   `docs/HUNTER_PRODUCTION_WORKFLOW.md`. Replacement acceptance is
-  `artifacts/manifests/hunter_live_acceptance_v4.json`.
+  `artifacts/manifests/hunter_live_acceptance_v4.json`. Version 0.3.8 closes
+  the subsequent validity/provenance audit with byte-verified source imports,
+  typed execution/failure and model-artifact identity, schema-v5 storage
+  immutability, full content/relationship verification, explicit information-
+  gain ranking inputs, and evidence-derived acceptance tests.
 
 1. **Phase 1 — validated manifest contract (CONTRACT COMPLETE):** version 0.2.30 adds
    the shared schema, frozen Pydantic contract, fail-closed checksum/path

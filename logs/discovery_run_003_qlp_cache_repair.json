@@ -1,0 +1,18 @@
+{
+  "last_updated": "2026-06-28T19:19:32.777702+00:00",
+  "entries": {
+    "280800706": {
+      "tic_id": 280800706,
+      "scanned_at": "2026-06-28T19:19:32.777686+00:00",
+      "status": "error",
+      "n_signals": 0,
+      "best_period_days": null,
+      "best_fpp": null,
+      "best_pathway": null,
+      "priority_score": 0.8748772312800001,
+      "pipeline": "QLP",
+      "exptime": "long",
+      "error_message": "Error in reading Data product /Users/Rome/.lightkurve/cache/mastDownload/HLSP/hlsp_qlp_tess_ffi_s0001-0000000280800706_tess_v01_llc/hlsp_qlp_tess_ffi_s0001-0000000280800706_tess_v01_llc.fits of type QLP .\nThis file may be corrupt due to an interrupted download. Please remove it from your disk and try again."
+    }
+  }
+}

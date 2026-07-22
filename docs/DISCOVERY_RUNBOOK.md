@@ -10,6 +10,12 @@ for the next bounded live-search evidence run)
 
 ## Current Production Direction (Read This First)
 
+EXO-Hunter lifecycle validity and provenance requirements are canonical in
+`docs/HUNTER_PRODUCTION_WORKFLOW.md §Validity and provenance acceptance gates`.
+Do not accept a Hunter release from self-declared evidence strings: source
+hashes, model identities, SQLite relationships, immutable history, and
+restart/resume behavior must be recomputed on the exact accepted tree.
+
 The project is no longer spending its primary workflow on the run006/run008 QLP
 candidate-review loop. That loop produced useful scanner/debugging evidence,
 but it did not produce submission-ready candidates. The trained model, stacking
