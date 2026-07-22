@@ -1,0 +1,44 @@
+{
+  "last_updated": "2026-06-28T18:49:55.922127+00:00",
+  "entries": {
+    "198009664": {
+      "tic_id": 198009664,
+      "scanned_at": "2026-06-28T18:49:54.372513+00:00",
+      "status": "error",
+      "n_signals": 0,
+      "best_period_days": null,
+      "best_fpp": null,
+      "best_pathway": null,
+      "priority_score": 0.8736547725280001,
+      "pipeline": "QLP",
+      "exptime": "long",
+      "error_message": "Error in reading Data product /Users/Rome/.lightkurve/cache/mastDownload/HLSP/hlsp_qlp_tess_ffi_s0002-0000000198009664_tess_v01_llc/hlsp_qlp_tess_ffi_s0002-0000000198009664_tess_v01_llc.fits of type QLP .\nThis file may be corrupt due to an interrupted download. Please remove it from your disk and try again."
+    },
+    "425884922": {
+      "tic_id": 425884922,
+      "scanned_at": "2026-06-28T18:49:55.475400+00:00",
+      "status": "error",
+      "n_signals": 0,
+      "best_period_days": null,
+      "best_fpp": null,
+      "best_pathway": null,
+      "priority_score": 0.8749446518836,
+      "pipeline": "QLP",
+      "exptime": "long",
+      "error_message": "Error in reading Data product /Users/Rome/.lightkurve/cache/mastDownload/HLSP/hlsp_qlp_tess_ffi_s0001-0000000425884922_tess_v01_llc/hlsp_qlp_tess_ffi_s0001-0000000425884922_tess_v01_llc.fits of type QLP .\nThis file may be corrupt due to an interrupted download. Please remove it from your disk and try again."
+    },
+    "280800706": {
+      "tic_id": 280800706,
+      "scanned_at": "2026-06-28T18:49:55.922117+00:00",
+      "status": "error",
+      "n_signals": 0,
+      "best_period_days": null,
+      "best_fpp": null,
+      "best_pathway": null,
+      "priority_score": 0.8748772312800001,
+      "pipeline": "QLP",
+      "exptime": "long",
+      "error_message": "Error in reading Data product /Users/Rome/.lightkurve/cache/mastDownload/HLSP/hlsp_qlp_tess_ffi_s0001-0000000280800706_tess_v01_llc/hlsp_qlp_tess_ffi_s0001-0000000280800706_tess_v01_llc.fits of type QLP .\nThis file may be corrupt due to an interrupted download. Please remove it from your disk and try again."
+    }
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "schema_version": 2,
+  "acceptance_id": "exo-hunter-live-acceptance-v5",
+  "accepted_at": "2026-07-22T01:36:34Z",
+  "status": "pass",
+  "project": "2026 Exoplanet Research",
+  "product": "EXO-Hunter",
+  "code_version": "0.3.8",
+  "implementation_git_commit": "9623dc614302bc4431978624d6a591b938f959be",
+  "core_ai_dependency": false,
+  "supersedes": {
+    "artifact": "artifacts/manifests/hunter_live_acceptance_v4.json",
+    "reason": "Version 0.3.8 replaces source-digest syntax and self-attested requirement strings with byte-verified, content-derived validity evidence."
+  },
+  "source_contract": {
+    "path": "data_selection/hunter_prior_search_history_v1.json",
+    "source_count": 7,
+    "event_count": 608,
+    "unique_target_count": 200,
+    "source_files_committed": true,
+    "every_source_sha256_recomputed": true
+  },
+  "production_snapshot": {
+    "path": "artifacts/evidence/hunter_production_snapshot_v5.sqlite3.gz",
+    "compressed_sha256": "44aa9306f2bf4b64e3517f8b686bf55e6d2e87e3a56f9e77b124f59eca2c0b9c",
+    "database_sha256": "f31b80b0522455e5e69d779b8d33547806510b8479de1f942c7c25680ffe6a61",
+    "schema_version": 5,
+    "sqlite_integrity": "ok",
+    "foreign_key_violation_count": 0,
+    "immutable_trigger_count": 12,
+    "manifest_hashes_verified": 10,
+    "snapshot_hashes_verified": 10610,
+    "provenance_rows_verified": 611,
+    "counts": {
+      "manifests": 10,
+      "candidate_snapshots": 10610,
+      "manifest_targets": 611,
+      "runs": 10,
+      "history_rows": 611,
+      "search_state_events": 14,
+      "follow_up_registry": 1,
+      "follow_up_events": 2
+    },
+    "history_status_counts": {
+      "candidate_found": 199,
+      "failed": 206,
+      "no_data": 200,
+      "no_signal": 6
+    }
+  },
+  "requirements": {
+    "launch": {"verified": true, "evidence": "installed-entrypoint subprocess and offline lifecycle tests"},
+    "large_candidate_pool": {"verified": true, "evidence": "100-from-10000 deterministic selection test plus 10610 committed candidate snapshots"},
+    "identity_and_history_resolution": {"verified": true, "evidence": "608 byte-linked imported events resolve to 200 stable TIC identities"},
+    "eligibility_ranking_selection": {"verified": true, "evidence": "finite deterministic scores include named expected_information_gain and scientific_suitability inputs"},
+    "manifest_and_search_creation": {"verified": true, "evidence": "10 manifest hashes and 10610 candidate snapshot hashes recomputed"},
+    "acquisition_and_preprocessing": {"verified": true, "evidence": "existing live execution preserves exact raw-product and preprocessing context"},
+    "scoring_and_composite": {"verified": true, "evidence": "typed run provenance binds scorer, code, git commit, and required model artifacts"},
+    "durable_results_and_failures": {"verified": true, "evidence": "611 result/failure provenance rows and run counters recomputed"},
+    "follow_up_creation_and_recommendation": {"verified": true, "evidence": "registry evidence, inherited/current search lineage, lifecycle events, and next action reconciled"},
+    "restart_resume_recovery": {"verified": true, "evidence": "separate-process and partial-resume tests execute the unchanged pending manifest"},
+    "no_ai_dependency": {"verified": true, "evidence": "selection, lifecycle, Bayesian execution, and follow-up logic contain no required AI call"},
+    "no_manual_bridge": {"verified": true, "evidence": "default follow-up creation byte-verifies and imports the durable history contract before ranking"},
+    "no_silent_substitution": {"verified": true, "evidence": "exact target membership is append-only and failed/ineligible work remains explicit"},
+    "source_lineage": {"verified": true, "evidence": "all seven committed source files match declared SHA-256 bytes"},
+    "storage_immutability": {"verified": true, "evidence": "12 SQLite triggers and direct-mutation rejection tests"},
+    "evidence_derived_acceptance": {"verified": true, "evidence": "validator recomputes database, source, content, relationship, and artifact evidence"}
+  },
+  "verification": {
+    "focused_tests_passed": 50,
+    "focused_test_command": ".venv/bin/python -m pytest -o addopts='' tests/test_hunter_validity.py tests/test_search_lifecycle.py tests/test_hunter_cli.py -q",
+    "snapshot_validation_command": ".venv/bin/python Skills/validate_hunter_acceptance.py --db artifacts/evidence/hunter_production_snapshot_v5.sqlite3.gz",
+    "canonical_quality_gates_passed": 10,
+    "canonical_quality_gates_total": 10,
+    "default_tests_passed": 3072
+  },
+  "remaining_limitations": [
+    "The available reliable follow-up history is finite and may be extended only through the same byte-verified contract.",
+    "No target in the current 202-target follow-up universe passes every scheduling gate; this is an evaluated data result.",
+    "TIC 355651994 remains deferred until new event-covering observations satisfy its explicit revisit policy.",
+    "The live selector's achieved sky coverage is frozen in each selector log and is not full-sky.",
+    "No external submission, alert, confirmation, or discovery claim is authorized."
+  ]
+}

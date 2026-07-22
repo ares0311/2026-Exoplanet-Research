@@ -26,7 +26,12 @@ and version 0.3.7 adds their automatic durable import and full-universe ranking.
 Merged-main production import preserved all 608 events, evaluated 202 combined
 targets, passed integrity/idempotency checks, and created no search because all
 202 have explicit ineligible dispositions. See
-`artifacts/manifests/hunter_live_acceptance_v4.json`.)
+`artifacts/manifests/hunter_live_acceptance_v4.json`. Version 0.3.8 closes the
+stronger validity/provenance audit: source bytes, model artifacts, typed failure
+context, immutable-history triggers, relational/content hashes, and acceptance
+evidence are now fail-closed and independently recomputable from
+`artifacts/manifests/hunter_live_acceptance_v5.json` and its compressed
+schema-v5 production snapshot.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
 Test baseline: 3,057 default tests passing; 2 `integration_live` tests excluded by
@@ -54,7 +59,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.3.7 is the current development version. Version 0.3.2 added the durable,
+Version note: 0.3.8 is the current development version. Version 0.3.2 added the durable,
 non-AI-dependent Hunter workflow and exact `Create-New-Search`,
 `Run-New-Search`, and `Show-Follow-Ups` entry points. Candidate catalog,
 immutable manifest, run attempts, append-only target history, and follow-up

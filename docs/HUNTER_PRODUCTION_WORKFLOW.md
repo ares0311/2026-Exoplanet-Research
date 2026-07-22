@@ -4,7 +4,8 @@
 
 Version 0.3.3 closes the reviewed-prior-result bridge left open by version 0.3.2.
 The shell entry points share one durable SQLite system of record and can run
-without an AI model. Hunter acceptance is PROD on merged-main version 0.3.7.
+without an AI model. Hunter acceptance is PROD on version 0.3.8, with the
+recomputed evidence in `artifacts/manifests/hunter_live_acceptance_v5.json`.
 An earlier audit found that consumed actionable follow-ups remained open and
 could be scheduled repeatedly. Version 0.3.5 adds durable scheduling/disposition events
 and parent-child recommendation relationships. Version 0.3.6 makes
@@ -118,6 +119,82 @@ partial, failed, and completed transitions. CSV is operator review output, not
 the system of record. Searches of 100 targets or fewer render a terminal table;
 larger manifests are exported under `reports/search_manifests/`.
 
+## Validity and provenance acceptance gates
+
+Hunter production acceptance is evidence-derived, not a declaration stored in
+JSON. Every release that changes selection, execution, persistence, scoring, or
+follow-up behavior must pass all of these gates on the exact tree being
+accepted:
+
+1. **Source lineage:** every imported source path exists and its bytes match
+   the declared SHA-256 before any database mutation. A digest with valid syntax
+   but unverified content is not accepted provenance.
+2. **Typed execution provenance:** every target outcome, including unexpected
+   failures and no-data/null results, preserves the candidate snapshot, pipeline
+   configuration, code identity, scorer identity, and any acquisition context
+   collected before the failure. Empty or runner-name-only provenance is invalid.
+3. **Model and calibration identity:** model-backed runs preserve canonical
+   paths plus SHA-256 digests for every XGBoost model, CNN checkpoint,
+   calibration artifact, and score-context artifact actually used. The default
+   Bayesian path records explicitly that no external model artifact was used.
+4. **Relational validity:** the built-in integrity command runs SQLite integrity
+   and foreign-key checks, required-table/schema checks, manifest and candidate
+   snapshot hash recomputation, count reconciliation, exact-membership checks,
+   run/history counter reconciliation, JSON decoding and typed row validation,
+   and follow-up lifecycle reconciliation.
+5. **Storage-enforced history:** manifest membership, candidate snapshots,
+   target history, search-state events, and follow-up events are append-only at
+   the SQLite layer. Normal application transitions may update only explicitly
+   mutable attempt and follow-up disposition fields.
+6. **Evidence-derived acceptance:** committed acceptance tests recompute hashes,
+   counts, provenance completeness, lifecycle consistency, and source lineage
+   from the committed contracts and a production database snapshot/copy. Tests
+   must not treat a `"pass:"` string as proof of the underlying requirement.
+7. **Deterministic selection validity:** ranking inputs remain finite, typed,
+   and reproducible. New-target and follow-up selection record a named expected-
+   information-gain/suitability component in addition to novelty, availability,
+   scientific priority, and storage/compute cost.
+8. **Independent reproducibility:** the three installed Hunter entry points run
+   without AI or another repository, exact pending searches survive process
+   restart, and partial/failed work remains loud and resumable.
+
+The canonical verifier is `HunterStore.validity_summary()`. CLI creation and
+execution fail closed when it reports any issue. Acceptance artifacts may
+summarize a verified run, but the verifier output and exact-tree quality-gate
+summary are the evidence. If any gate above is not implemented and passing, the
+Hunter lifecycle is **PARTIAL**, not PROD.
+
+Run the standalone verifier against a live database or a committed compressed
+acceptance snapshot:
+
+```bash
+git switch main
+git pull --ff-only origin main
+.venv/bin/python Skills/validate_hunter_acceptance.py \
+  --db data/hunter_searches.sqlite3
+```
+
+## Session closure loop
+
+Before editing, reconstruct the current state from repository evidence rather
+than a previous agent's plan. Maintain this checklist in the PR handoff:
+
+- [ ] Last three PRs, their reviews, and recent relevant commits read
+- [ ] Current behavior and durable database state verified
+- [ ] Complete candidate-to-follow-up pipeline mapped
+- [ ] Highest-priority validity or provenance gap identified
+- [ ] Exact end-to-end path remains intact and restart-safe
+- [ ] No AI dependency introduced into core logic
+- [ ] Durable history and provenance preserved byte-for-byte
+- [ ] Relevant focused and canonical tests pass on the exact tree
+- [ ] Every PROD gate above checked from evidence
+- [ ] PR handoff records decisions, tests, risks, and exact next work
+
+After each meaningful work unit, re-run the verifier/tests, identify the next
+highest-priority failing gate, and continue. A failed strategy must yield new
+diagnosis and a changed approach; it must not be retried unchanged. Stop only
+at verified acceptance or a genuine external blocker.
+
 ## New-target selection
 
 The default metadata-only selector requests at least 10,000 TIC candidates and
@@ -217,4 +294,8 @@ remain visibly `archived_partial` and never masquerade as resumable work.
 Merged-main production import preserved 608 historical events, produced a
 202-target combined universe, and returned zero eligible targets with explicit
 dispositions and no search creation. A repeat invocation changed no durable
-row counts. Version 0.3.7 acceptance is therefore PASS.
+row counts. Version 0.3.7 acceptance is therefore PASS. Version 0.3.8 replaces
+digest-syntax and self-attested checks with source-byte verification, typed
+execution and model-artifact identities, schema-v5 append-only triggers,
+comprehensive content/relationship verification, and an executable acceptance
+validator.

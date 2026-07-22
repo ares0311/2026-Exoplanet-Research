@@ -206,6 +206,10 @@ def test_default_follow_up_imports_and_ranks_durable_history(
 ) -> None:
     db = tmp_path / "hunter.sqlite3"
     history = tmp_path / "history.json"
+    source = tmp_path / "logs" / "prior.json"
+    source.parent.mkdir(parents=True)
+    source.write_text("prior search evidence", encoding="utf-8")
+    source_sha256 = __import__("hashlib").sha256(source.read_bytes()).hexdigest()
     history.write_text(
         json.dumps(
             {
@@ -220,7 +224,7 @@ def test_default_follow_up_imports_and_ranks_durable_history(
                         "source_project": "legacy project",
                         "method_or_data": "TESS QLP",
                         "source_path": "logs/prior.json",
-                        "source_sha256": "a" * 64,
+                        "source_sha256": source_sha256,
                         "provenance_uri": "artifact:prior-new",
                         "entries": [
                             {
@@ -260,6 +264,7 @@ def test_default_follow_up_imports_and_ranks_durable_history(
     assert output["candidate_pool_count"] == 1
     stored = HunterStore(db)
     assert len(stored.target_history("TIC 42")) == 1
+    assert stored.validity_summary()["ok"] is True
     search = stored.get_search(output["search_id"])
     assert search["targets"][0]["target_id"] == "TIC 42"
 
@@ -540,7 +545,7 @@ def test_invalid_scorer_fails_before_starting_attempt(tmp_path: Path) -> None:
     assert store.open_searches()[0]["state"] == "pending"
 
 
-def test_live_acceptance_manifest_covers_prod_contract_and_run_reports() -> None:
+def test_historical_acceptance_chain_is_preserved_without_self_attestation() -> None:
     acceptance = json.loads(
         Path("artifacts/manifests/hunter_live_acceptance_v2.json").read_text(
             encoding="utf-8"
@@ -561,16 +566,11 @@ def test_live_acceptance_manifest_covers_prod_contract_and_run_reports() -> None
             encoding="utf-8"
         )
     )
-    assert acceptance["status"] == "pass"
     assert acceptance["core_ai_dependency"] is False
     assert acceptance["live_search_execution"]["candidate_pool_count"] >= 10_000
     assert acceptance["live_search_execution"]["live_items_failed"] == 0
     assert acceptance["reviewed_follow_up_import"]["initial_import_created"] is True
     assert acceptance["reviewed_follow_up_import"]["search_eligible"] is False
-    assert all(
-        str(evidence).startswith("pass:")
-        for evidence in acceptance["prod_requirements"].values()
-    )
     assert reassessment["original_acceptance_id"] == acceptance["acceptance_id"]
     assert reassessment["corrected_status"] == "partial"
     assert current["status"] == "partial"
@@ -584,17 +584,12 @@ def test_live_acceptance_manifest_covers_prod_contract_and_run_reports() -> None
     assert current["highest_priority_gap"]["evidence"].startswith(
         "The default CLI calls follow_up_candidates()"
     )
-    assert replacement["status"] == "pass"
     assert replacement["supersedes"]["partial_artifact"].endswith(
         "hunter_live_acceptance_v3.json"
     )
     assert replacement["history_contract"]["event_count"] == 608
     assert replacement["follow_up_universe"]["evaluated_target_count"] == 202
     assert replacement["follow_up_universe"]["eligible_target_count"] == 0
-    assert all(
-        str(evidence).startswith("pass:")
-        for evidence in replacement["prod_requirements"].values()
-    )
 
     report_lines = Path(
         acceptance["durable_state"]["run_report_path"]
@@ -603,11 +598,16 @@ def test_live_acceptance_manifest_covers_prod_contract_and_run_reports() -> None
 
 
 def test_committed_hunter_history_manifest_preserves_available_project_universe() -> None:
+    from exo_toolkit.hunter_history import load_verified_history_manifest
+
     payload = json.loads(
         Path("data_selection/hunter_prior_search_history_v1.json").read_text(
             encoding="utf-8"
         )
     )
+    assert load_verified_history_manifest(
+        Path("data_selection/hunter_prior_search_history_v1.json")
+    ) == payload
     sources = payload["sources"]
     events = [entry for source in sources for entry in source["entries"]]
     assert payload["schema_version"] == 1
@@ -615,4 +615,8 @@ def test_committed_hunter_history_manifest_preserves_available_project_universe(
     assert len(events) == 608
     assert len({entry["target_id"] for entry in events}) == 200
     assert {source["mode"] for source in sources} == {"new", "follow-up"}
-    assert all(len(source["source_sha256"]) == 64 for source in sources)
+    assert all(
+        __import__("hashlib").sha256(Path(source["source_path"]).read_bytes()).hexdigest()
+        == source["source_sha256"]
+        for source in sources
+    )

@@ -1,6 +1,7 @@
 """Tests for the durable EXO-Hunter search lifecycle."""
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -66,7 +67,13 @@ def _create(
     )
 
 
-def _history_manifest(*, include_follow_up: bool = True) -> dict[str, Any]:
+def _history_manifest(
+    tmp_path: Path, *, include_follow_up: bool = True
+) -> dict[str, Any]:
+    prior_source = tmp_path / "prior.json"
+    prior_source.write_text("historical new search", encoding="utf-8")
+    follow_up_source = tmp_path / "prior-follow-up.json"
+    follow_up_source.write_text("historical follow-up search", encoding="utf-8")
     source = {
         "search_id": "historical-new-search",
         "mode": "new",
@@ -75,8 +82,8 @@ def _history_manifest(*, include_follow_up: bool = True) -> dict[str, Any]:
         "searched_by": "EXO-Hunter",
         "source_project": "legacy project",
         "method_or_data": "TESS QLP",
-        "source_path": "logs/prior.json",
-        "source_sha256": "a" * 64,
+        "source_path": str(prior_source),
+        "source_sha256": hashlib.sha256(prior_source.read_bytes()).hexdigest(),
         "provenance_uri": "artifact:prior-new",
         "entries": [
             {
@@ -113,8 +120,8 @@ def _history_manifest(*, include_follow_up: bool = True) -> dict[str, Any]:
                 "mode": "follow-up",
                 "started_at": "2025-02-01T00:00:00+00:00",
                 "completed_at": "2025-02-01T01:00:00+00:00",
-                "source_path": "logs/prior-follow-up.json",
-                "source_sha256": "b" * 64,
+                "source_path": str(follow_up_source),
+                "source_sha256": hashlib.sha256(follow_up_source.read_bytes()).hexdigest(),
                 "provenance_uri": "artifact:prior-follow-up",
                 "entries": [
                     {
@@ -146,7 +153,7 @@ def test_history_manifest_import_is_idempotent_and_preserves_repeated_work(
     tmp_path: Path,
 ) -> None:
     store = HunterStore(tmp_path / "hunter.sqlite3")
-    manifest = _history_manifest()
+    manifest = _history_manifest(tmp_path)
 
     assert store.import_history_manifest(manifest) == {
         "sources_total": 2,
@@ -170,7 +177,7 @@ def test_history_manifest_import_is_idempotent_and_preserves_repeated_work(
 
 def test_historical_partial_run_is_visible_but_not_resumable(tmp_path: Path) -> None:
     store = HunterStore(tmp_path / "hunter.sqlite3")
-    manifest = _history_manifest(include_follow_up=False)
+    manifest = _history_manifest(tmp_path, include_follow_up=False)
     failed_entry = manifest["sources"][0]["entries"][1]
     failed_entry["status"] = "failed"
     failed_entry["error_message"] = "historical fetch failed"
@@ -186,7 +193,7 @@ def test_historical_partial_run_is_visible_but_not_resumable(tmp_path: Path) -> 
 
 def test_history_universe_selects_unfollowed_qualifying_new_result(tmp_path: Path) -> None:
     store = HunterStore(tmp_path / "hunter.sqlite3")
-    store.import_history_manifest(_history_manifest(include_follow_up=False))
+    store.import_history_manifest(_history_manifest(tmp_path, include_follow_up=False))
 
     universe = store.follow_up_universe()
     assert len(universe) == 2
@@ -282,7 +289,11 @@ def test_results_and_provenance_are_append_only(tmp_path: Path) -> None:
     assert store.execute_search(succeed, search_id=search["search_id"]).status == "completed"
     history = store.target_history("TIC 1")
     assert [row["status"] for row in history] == ["failed", "no_signal"]
-    assert [row["provenance"]["attempt"] for row in history] == [1, 2]
+    assert [
+        row["provenance"]["pipeline_context"]["runner_provenance"]["attempt"]
+        for row in history
+    ] == [1, 2]
+    assert all(row["provenance"]["schema_version"] == 1 for row in history)
 
 
 def test_new_mode_excludes_targets_with_terminal_history(tmp_path: Path) -> None:
@@ -588,15 +599,13 @@ def test_manifest_csv_is_operator_review_artifact_not_system_of_record(tmp_path:
 def test_integrity_reports_all_required_durable_concepts(tmp_path: Path) -> None:
     db_path = tmp_path / "hunter.sqlite3"
     store = HunterStore(db_path)
-    assert store.integrity_summary() == {
-        "ok": True,
-        "sqlite_integrity": "ok",
-        "missing_tables": [],
-        "orphan_manifest_targets": 0,
-        "orphan_follow_up_events": 0,
-        "orphan_parent_follow_ups": 0,
-        "schema_version": 4,
-    }
+    summary = store.validity_summary()
+    assert summary["ok"] is True
+    assert summary["issues"] == []
+    assert summary["sqlite_integrity"] == "ok"
+    assert summary["foreign_key_violation_count"] == 0
+    assert summary["schema_version"] == 5
+    assert summary["immutable_trigger_count"] == 12
     connection = sqlite3.connect(db_path)
     names = {
         row[0]
@@ -694,6 +703,7 @@ def test_schema_v3_non_executable_open_row_migrates_to_deferred(tmp_path: Path) 
         "SELECT follow_up_id, search_id FROM follow_up_registry"
     ).fetchone()
     connection.execute("UPDATE follow_up_registry SET status='open'")
+    connection.execute("DROP TRIGGER hunter_immutable_follow_up_events_delete")
     connection.execute("DELETE FROM follow_up_events")
     HunterStore._append_follow_up_event(
         connection,

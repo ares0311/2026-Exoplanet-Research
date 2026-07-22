@@ -403,6 +403,7 @@ def run_pipeline(
                 "fetch_provenance": fetch_result.provenance.model_dump(mode="json"),
                 "preprocess_version": f"exo-toolkit-{__version__}:clean_lightcurve",
                 "toolkit_version": __version__,
+                "git_commit": _git_commit_short(),
             }
         )
     if on_stage is not None:
