@@ -11,7 +11,12 @@ import pytest
 
 from exo_toolkit.hunter_history import load_verified_history_manifest
 from exo_toolkit.hunter_models import ArtifactIdentity, ExecutionProvenance
-from exo_toolkit.hunter_ranking import NEW_SELECTOR_VERSION, selection_contract
+from exo_toolkit.hunter_ranking import (
+    FOLLOW_UP_SELECTOR_VERSION,
+    NEW_SELECTOR_VERSION,
+    OPERATOR_SELECTOR_VERSION,
+    selection_contract,
+)
 from exo_toolkit.search_lifecycle import HunterCandidate, HunterStore, TargetExecutionResult
 
 
@@ -216,4 +221,36 @@ def test_committed_acceptance_snapshot_matches_structured_evidence() -> None:
     assert all(
         requirement["verified"] is True
         for requirement in acceptance["requirements"].values()
+    )
+
+
+def test_current_acceptance_matches_executable_selector_contracts() -> None:
+    acceptance = json.loads(
+        Path("artifacts/manifests/hunter_live_acceptance_v6.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    baseline = json.loads(
+        Path(acceptance["baseline_acceptance"]["artifact"]).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert acceptance["baseline_acceptance"]["acceptance_id"] == baseline["acceptance_id"]
+    assert (
+        acceptance["baseline_acceptance"]["compressed_snapshot_sha256"]
+        == baseline["production_snapshot"]["compressed_sha256"]
+    )
+    assert acceptance["selector_contracts"]["new"] == selection_contract("new")
+    assert acceptance["selector_contracts"]["follow-up"] == selection_contract("follow-up")
+    assert acceptance["selector_contracts"]["operator"] == selection_contract(
+        "new", operator_supplied=True
+    )
+    assert acceptance["selector_contracts"]["new"]["selector_version"] == (
+        NEW_SELECTOR_VERSION
+    )
+    assert acceptance["selector_contracts"]["follow-up"]["selector_version"] == (
+        FOLLOW_UP_SELECTOR_VERSION
+    )
+    assert acceptance["selector_contracts"]["operator"]["selector_version"] == (
+        OPERATOR_SELECTOR_VERSION
     )

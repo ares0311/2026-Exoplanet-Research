@@ -21,7 +21,7 @@ Version 0.3.9 is the current release state represented by this repository.
 
 | Area | Status | Current evidence |
 |---|---|---|
-| EXO-Hunter lifecycle | **PROD accepted** | End-to-end behavior plus independently recomputed source, schema-v5, content-hash, provenance, immutability, and recovery evidence in [`hunter_live_acceptance_v5.json`](artifacts/manifests/hunter_live_acceptance_v5.json) |
+| EXO-Hunter lifecycle | **PROD accepted** | Recomputed schema-v5/source evidence plus verifier-enforced versioned ranking contracts in [`hunter_live_acceptance_v6.json`](artifacts/manifests/hunter_live_acceptance_v6.json) |
 | Bayesian scorer | **Production ready** | Default non-ML scorer; no model artifact required |
 | XGBoost scorer | **Production ready** | Trained on 7,586 Kepler KOIs; held-out AUC 0.992 |
 | XGBoost + Bayesian ensemble | **Production ready** | Conservative fallback when no CNN is supplied |
@@ -274,7 +274,7 @@ scoring definitions and versioned weights are documented in
 
 ## Verified production evidence
 
-The current v0.3.8 acceptance artifact records:
+The v0.3.8 baseline and current v0.3.9 acceptance artifacts record:
 
 - a live 10,000-candidate new-target universe;
 - a completed real follow-up search for TIC 237884073;

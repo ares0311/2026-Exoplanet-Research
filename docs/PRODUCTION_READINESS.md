@@ -73,6 +73,9 @@ ranking changes still carried the older generic selector ID. New, follow-up,
 and operator-supplied searches now have distinct versioned contracts, with
 formula, weights, information-gain definition, thresholds, and candidate/
 manifest agreement enforced by the validity verifier.
+Current acceptance is `artifacts/manifests/hunter_live_acceptance_v6.json`,
+which binds these executable contracts to the unchanged recomputed v5
+production snapshot.
 The first merged-main acceptance attempt failed before
 search creation because installed console scripts omitted the repository root
 from `sys.path`; 0.3.1 adds a fail-loud validated loader for the required

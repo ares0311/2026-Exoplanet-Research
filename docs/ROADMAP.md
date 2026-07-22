@@ -67,6 +67,7 @@ by itself satisfy a master-guide evidence requirement.
   0.3.9 closes that provenance gap with distinct new/follow-up/operator
   selector versions and verifier-enforced frozen formulas, weights, thresholds,
   information-gain definitions, and candidate/manifest identity agreement.
+  Current acceptance is `artifacts/manifests/hunter_live_acceptance_v6.json`.
 
 1. **Phase 1 — validated manifest contract (CONTRACT COMPLETE):** version 0.2.30 adds
    the shared schema, frozen Pydantic contract, fail-closed checksum/path
