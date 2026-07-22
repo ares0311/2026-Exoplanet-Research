@@ -4,7 +4,8 @@
 
 Version 0.3.3 closes the reviewed-prior-result bridge left open by version 0.3.2.
 The shell entry points share one durable SQLite system of record and can run
-without an AI model. Hunter acceptance is PROD on merged-main version 0.3.7.
+without an AI model. Hunter acceptance is PROD on version 0.3.8, with the
+recomputed evidence in `artifacts/manifests/hunter_live_acceptance_v5.json`.
 An earlier audit found that consumed actionable follow-ups remained open and
 could be scheduled repeatedly. Version 0.3.5 adds durable scheduling/disposition events
 and parent-child recommendation relationships. Version 0.3.6 makes

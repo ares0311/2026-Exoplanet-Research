@@ -21,7 +21,7 @@ Version 0.3.8 is the current release state represented by this repository.
 
 | Area | Status | Current evidence |
 |---|---|---|
-| EXO-Hunter lifecycle | **PROD accepted** | End-to-end launch, 10,000-candidate selection, exact manifest execution, durable history, follow-up creation, recovery, and idempotency pass in [`hunter_live_acceptance_v4.json`](artifacts/manifests/hunter_live_acceptance_v4.json) |
+| EXO-Hunter lifecycle | **PROD accepted** | End-to-end behavior plus independently recomputed source, schema-v5, content-hash, provenance, immutability, and recovery evidence in [`hunter_live_acceptance_v5.json`](artifacts/manifests/hunter_live_acceptance_v5.json) |
 | Bayesian scorer | **Production ready** | Default non-ML scorer; no model artifact required |
 | XGBoost scorer | **Production ready** | Trained on 7,586 Kepler KOIs; held-out AUC 0.992 |
 | XGBoost + Bayesian ensemble | **Production ready** | Conservative fallback when no CNN is supplied |
@@ -274,20 +274,24 @@ scoring definitions and versioned weights are documented in
 
 ## Verified production evidence
 
-The replacement v0.3.7 acceptance artifact records:
+The current v0.3.8 acceptance artifact records:
 
 - a live 10,000-candidate new-target universe;
 - a completed real follow-up search for TIC 237884073;
 - nine exact QLP product URIs and 63,205 processed cadences;
 - zero failures in that follow-up execution;
-- schema-v4 SQLite integrity and zero foreign-key violations;
+- schema-v5 SQLite integrity, zero foreign-key violations, and 12 append-only
+  storage triggers;
 - 608 normalized historical events plus existing live events, preserved as
   611 append-only history rows;
 - a 202-target combined follow-up universe with an idempotent repeat import;
 - a real reviewed recommendation for TIC 355651994 with preserved
   `open → deferred` lifecycle history;
+- recomputed hashes for all 10 manifests and 10,610 candidate snapshots;
+- byte-level SHA-256 verification of all seven committed history sources;
 - all defined launch, selection, execution, provenance, follow-up, recovery,
-  no-AI, no-manual-bridge, and no-substitution requirements marked pass.
+  no-AI, no-manual-bridge, and no-substitution requirements represented by
+  structured evidence rather than self-attested pass strings.
 
 At that acceptance snapshot, zero of the 202 follow-up targets was eligible:
 190 were incomplete or below the evidence gate, six had no signal, three had

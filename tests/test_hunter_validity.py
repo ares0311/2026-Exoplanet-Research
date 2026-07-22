@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
@@ -153,3 +154,41 @@ def test_acceptance_validator_returns_nonzero_for_invalid_database(tmp_path: Pat
         connection.execute("DROP TRIGGER hunter_immutable_search_manifests_delete")
 
     assert main(["--db", str(db)]) == 2
+
+
+def test_committed_acceptance_snapshot_matches_structured_evidence() -> None:
+    from Skills.validate_hunter_acceptance import _validate
+
+    acceptance = json.loads(
+        Path("artifacts/manifests/hunter_live_acceptance_v5.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    snapshot = Path(acceptance["production_snapshot"]["path"])
+    evidence = _validate(
+        snapshot,
+        Path("data_selection/hunter_prior_search_history_v1.json"),
+    )
+    assert evidence["ok"] is True
+    assert evidence["issues"] == []
+    for field in (
+        "compressed_snapshot_sha256",
+        "database_sha256",
+        "schema_version",
+        "sqlite_integrity",
+        "foreign_key_violation_count",
+        "immutable_trigger_count",
+        "manifest_hashes_verified",
+        "snapshot_hashes_verified",
+        "provenance_rows_verified",
+        "counts",
+        "history_status_counts",
+    ):
+        expected_field = field.removeprefix("compressed_snapshot_")
+        if field == "compressed_snapshot_sha256":
+            expected_field = "compressed_sha256"
+        assert evidence[field] == acceptance["production_snapshot"][expected_field]
+    assert all(
+        requirement["verified"] is True
+        for requirement in acceptance["requirements"].values()
+    )

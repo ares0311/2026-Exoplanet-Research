@@ -29,7 +29,9 @@ targets, passed integrity/idempotency checks, and created no search because all
 `artifacts/manifests/hunter_live_acceptance_v4.json`. Version 0.3.8 closes the
 stronger validity/provenance audit: source bytes, model artifacts, typed failure
 context, immutable-history triggers, relational/content hashes, and acceptance
-evidence are now fail-closed and independently recomputable.)
+evidence are now fail-closed and independently recomputable from
+`artifacts/manifests/hunter_live_acceptance_v5.json` and its compressed
+schema-v5 production snapshot.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
 Test baseline: 3,057 default tests passing; 2 `integration_live` tests excluded by
