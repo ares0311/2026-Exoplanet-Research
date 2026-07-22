@@ -29,6 +29,12 @@ from exo_toolkit.hunter_models import (
     SearchMode,
     TargetExecutionResult,
 )
+from exo_toolkit.hunter_ranking import (
+    FOLLOW_UP_CONFIDENCE_MIN,
+    FOLLOW_UP_FPP_MAX,
+    FOLLOW_UP_PATHWAYS,
+    FOLLOW_UP_SELECTOR_VERSION,
+)
 
 HUNTER_SCHEMA_VERSION = 5
 
@@ -1676,6 +1682,7 @@ class HunterStore:
                 selection_reason = str(registry["reason"])
                 source_provenance = {
                     "search_category": "follow-up",
+                    "selector_version": FOLLOW_UP_SELECTOR_VERSION,
                     "follow_up_id": registry["follow_up_id"],
                     "search_id": registry["search_id"],
                     "history_event_count": len(histories),
@@ -1694,15 +1701,11 @@ class HunterStore:
                     latest["mode"] == "new"
                     and latest["status"] == "candidate_found"
                     and fpp is not None
-                    and fpp < 0.15
+                    and fpp < FOLLOW_UP_FPP_MAX
                     and confidence is not None
-                    and confidence > 0.40
+                    and confidence > FOLLOW_UP_CONFIDENCE_MIN
                     and pathway
-                    in {
-                        "tfop_ready",
-                        "planet_hunters_discussion",
-                        "kepler_archive_candidate",
-                    }
+                    in FOLLOW_UP_PATHWAYS
                 )
                 if latest["mode"] == "follow-up":
                     eligibility_reason = "latest durable search already performed follow-up"
@@ -1722,6 +1725,7 @@ class HunterStore:
                 selection_reason = f"Durable prior-search evaluation: {summary}"
                 source_provenance = {
                     "search_category": "follow-up",
+                    "selector_version": FOLLOW_UP_SELECTOR_VERSION,
                     "search_id": latest["search_id"],
                     "history_event_count": len(histories),
                 }

@@ -30,6 +30,16 @@ from exo_toolkit.hunter_models import (
     SearchExecutionSummary,
     TargetExecutionResult,
 )
+from exo_toolkit.hunter_ranking import (
+    FOLLOW_UP_CONFIDENCE_MIN,
+    FOLLOW_UP_FPP_MAX,
+    FOLLOW_UP_PATHWAYS,
+    FOLLOW_UP_SELECTOR_VERSION,
+    NEW_RANKING_WEIGHTS,
+    NEW_SELECTOR_VERSION,
+    OPERATOR_SELECTOR_VERSION,
+    selection_contract,
+)
 from exo_toolkit.search_lifecycle import (
     HunterStore,
     format_eta,
@@ -43,14 +53,6 @@ DEFAULT_HISTORY_MANIFEST = (
     / "hunter_prior_search_history_v1.json"
 )
 DEFAULT_POOL_SIZE = 10_000
-SELECTOR_VERSION = "exo_hunter_tic_v1"
-FOLLOW_UP_FPP_MAX = 0.15
-FOLLOW_UP_CONFIDENCE_MIN = 0.40
-FOLLOW_UP_PATHWAYS = {
-    "tfop_ready",
-    "planet_hunters_discussion",
-    "kepler_archive_candidate",
-}
 VALID_SCORERS = {"bayesian", "xgboost", "ensemble", "cnn", "full-ensemble"}
 MAX_LIVE_WORKERS = 12
 
@@ -387,10 +389,11 @@ def _select_live_new_candidates(
         expected_information_gain = base_priority * availability_score
         cost_penalty = _storage_penalty(estimated_gb) if estimated_gb is not None else 5.0
         ranking_score = (
-            70.0 * base_priority
-            + 20.0 * availability_score
-            + 10.0 * expected_information_gain
-            - cost_penalty
+            NEW_RANKING_WEIGHTS["tic_priority"] * base_priority
+            + NEW_RANKING_WEIGHTS["availability"] * availability_score
+            + NEW_RANKING_WEIGHTS["expected_information_gain"]
+            * expected_information_gain
+            + NEW_RANKING_WEIGHTS["storage_cost_penalty"] * cost_penalty
         )
         candidates.append(
             HunterCandidate(
@@ -400,7 +403,7 @@ def _select_live_new_candidates(
                 source="MAST TIC and QLP product metadata",
                 source_provenance={
                     "search_category": "new",
-                    "selector_version": SELECTOR_VERSION,
+                    "selector_version": NEW_SELECTOR_VERSION,
                     "pool_ordinal": index + 1,
                     "product_metadata": product or {},
                 },
@@ -484,6 +487,7 @@ def create_new_search(
                 "candidate_file": str(args.candidate_file),
                 "candidate_universe_returned": len(candidates),
             }
+            selector_version = OPERATOR_SELECTOR_VERSION
         elif args.mode == "follow-up":
             import_summary = store.import_history_manifest(args.history_manifest)
             candidates = store.follow_up_universe()
@@ -494,6 +498,7 @@ def create_new_search(
                 "candidate_universe_returned": len(candidates),
                 "eligible_candidate_count": sum(row.eligible for row in candidates),
             }
+            selector_version = FOLLOW_UP_SELECTOR_VERSION
         else:
             candidates, selector_log = live_selector(
                 targets=args.targets,
@@ -503,18 +508,24 @@ def create_new_search(
                 store=store,
                 progress_fn=lambda line: print(line, file=sys.stderr, flush=True),
             )
+            selector_version = NEW_SELECTOR_VERSION
+        contract = selection_contract(
+            args.mode,
+            operator_supplied=bool(args.candidate_file),
+        )
         config = {
             "code_version": __version__,
             "workers": args.workers,
             "tmag_range": [args.tmag_min, args.tmag_max],
             "pool_size_requested": pool_size,
             "selector_log": selector_log,
+            "selection_contract": contract,
         }
         search = store.create_search(
             candidates,
             requested_target_count=args.targets,
             mode=args.mode,
-            selector_version=SELECTOR_VERSION,
+            selector_version=selector_version,
             config=config,
         )
         integrity = store.validity_summary(

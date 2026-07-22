@@ -4,8 +4,9 @@
 
 Version 0.3.3 closes the reviewed-prior-result bridge left open by version 0.3.2.
 The shell entry points share one durable SQLite system of record and can run
-without an AI model. Hunter acceptance is PROD on version 0.3.8, with the
-recomputed evidence in `artifacts/manifests/hunter_live_acceptance_v5.json`.
+without an AI model. Hunter acceptance is PROD on version 0.3.9. The recomputed
+production snapshot is in `hunter_live_acceptance_v5.json`; the current
+selector-contract delta is in `hunter_live_acceptance_v6.json`.
 An earlier audit found that consumed actionable follow-ups remained open and
 could be scheduled repeatedly. Version 0.3.5 adds durable scheduling/disposition events
 and parent-child recommendation relationships. Version 0.3.6 makes
@@ -214,6 +215,15 @@ Ranking is stable by score, canonical ID, and target ID. The manifest freezes
 the archive-derived result so `Run-New-Search` never regenerates or substitutes
 targets. `selector_log` records requested/returned pool size, tile failures,
 coverage, stage-two count, exclusions, and eligible count.
+
+Version 0.3.9 gives each selection path a distinct immutable identity:
+`exo_hunter_tic_v2`, `exo_hunter_follow_up_v2`, or
+`exo_hunter_operator_candidates_v1`. Every manifest also freezes the complete
+JSON ranking contract: formula, weights, information-gain definition,
+eligibility thresholds, and accepted pathways. Candidate snapshots created by
+the built-in selectors carry the same selector ID. The validity verifier fails
+if candidate, manifest, or contract identities disagree, so a future ranking
+change must receive a new selector version rather than silently reusing one.
 
 ## Execution and recovery
 

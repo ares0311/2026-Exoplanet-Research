@@ -11,6 +11,12 @@ import pytest
 
 from exo_toolkit.hunter_history import load_verified_history_manifest
 from exo_toolkit.hunter_models import ArtifactIdentity, ExecutionProvenance
+from exo_toolkit.hunter_ranking import (
+    FOLLOW_UP_SELECTOR_VERSION,
+    NEW_SELECTOR_VERSION,
+    OPERATOR_SELECTOR_VERSION,
+    selection_contract,
+)
 from exo_toolkit.search_lifecycle import HunterCandidate, HunterStore, TargetExecutionResult
 
 
@@ -19,7 +25,10 @@ def _candidate() -> HunterCandidate:
         target_id="TIC 1",
         canonical_id="TIC 1",
         source="validity fixture",
-        source_provenance={"search_category": "new"},
+        source_provenance={
+            "search_category": "new",
+            "selector_version": NEW_SELECTOR_VERSION,
+        },
         ranking_score=1.0,
         selection_reason="deterministic validity fixture",
         metrics={"expected_information_gain": 0.5, "scientific_suitability": 0.5},
@@ -95,6 +104,27 @@ def test_validity_detects_candidate_content_tampering(tmp_path: Path) -> None:
     assert summary["ok"] is False
     assert any("invalid candidate" in issue for issue in summary["issues"])
     assert any("missing immutable-history triggers" in issue for issue in summary["issues"])
+
+
+def test_validity_detects_selector_contract_drift(tmp_path: Path) -> None:
+    store = HunterStore(tmp_path / "hunter.sqlite3")
+    store.create_search(
+        [_candidate()],
+        requested_target_count=1,
+        mode="new",
+        selector_version=NEW_SELECTOR_VERSION,
+        config={"selection_contract": selection_contract("new")},
+    )
+    assert store.validity_summary()["ok"] is True
+    with store.connect() as connection:
+        connection.execute("DROP TRIGGER hunter_immutable_search_manifests_update")
+        connection.execute(
+            "UPDATE search_manifests SET config_json=?",
+            ('{"selection_contract":{"selector_version":"wrong"}}',),
+        )
+    summary = store.validity_summary()
+    assert summary["ok"] is False
+    assert any("selection contract does not match" in issue for issue in summary["issues"])
 
 
 def test_validity_detects_model_artifact_drift(tmp_path: Path) -> None:
@@ -191,4 +221,36 @@ def test_committed_acceptance_snapshot_matches_structured_evidence() -> None:
     assert all(
         requirement["verified"] is True
         for requirement in acceptance["requirements"].values()
+    )
+
+
+def test_current_acceptance_matches_executable_selector_contracts() -> None:
+    acceptance = json.loads(
+        Path("artifacts/manifests/hunter_live_acceptance_v6.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    baseline = json.loads(
+        Path(acceptance["baseline_acceptance"]["artifact"]).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert acceptance["baseline_acceptance"]["acceptance_id"] == baseline["acceptance_id"]
+    assert (
+        acceptance["baseline_acceptance"]["compressed_snapshot_sha256"]
+        == baseline["production_snapshot"]["compressed_sha256"]
+    )
+    assert acceptance["selector_contracts"]["new"] == selection_contract("new")
+    assert acceptance["selector_contracts"]["follow-up"] == selection_contract("follow-up")
+    assert acceptance["selector_contracts"]["operator"] == selection_contract(
+        "new", operator_supplied=True
+    )
+    assert acceptance["selector_contracts"]["new"]["selector_version"] == (
+        NEW_SELECTOR_VERSION
+    )
+    assert acceptance["selector_contracts"]["follow-up"]["selector_version"] == (
+        FOLLOW_UP_SELECTOR_VERSION
+    )
+    assert acceptance["selector_contracts"]["operator"]["selector_version"] == (
+        OPERATOR_SELECTOR_VERSION
     )

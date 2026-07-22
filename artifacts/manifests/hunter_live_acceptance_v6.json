@@ -1,0 +1,68 @@
+{
+  "schema_version": 2,
+  "acceptance_id": "exo-hunter-live-acceptance-v6",
+  "accepted_at": "2026-07-22T01:51:44Z",
+  "status": "pass",
+  "project": "2026 Exoplanet Research",
+  "product": "EXO-Hunter",
+  "code_version": "0.3.9",
+  "implementation_git_commit": "21a33833b3ba1175224df5e5a504a2a2382c7d00",
+  "core_ai_dependency": false,
+  "baseline_acceptance": {
+    "acceptance_id": "exo-hunter-live-acceptance-v5",
+    "artifact": "artifacts/manifests/hunter_live_acceptance_v5.json",
+    "production_snapshot": "artifacts/evidence/hunter_production_snapshot_v5.sqlite3.gz",
+    "compressed_snapshot_sha256": "44aa9306f2bf4b64e3517f8b686bf55e6d2e87e3a56f9e77b124f59eca2c0b9c",
+    "reason": "The durable production rows and source bytes are unchanged; v6 adds the missing version identity for future ranking decisions."
+  },
+  "selector_contracts": {
+    "new": {
+      "selector_version": "exo_hunter_tic_v2",
+      "ranking_formula": "70*tic_priority + 20*availability + 10*expected_information_gain - storage_cost_penalty",
+      "weights": {
+        "tic_priority": 70.0,
+        "availability": 20.0,
+        "expected_information_gain": 10.0,
+        "storage_cost_penalty": -1.0
+      },
+      "expected_information_gain": "tic_priority * availability",
+      "eligibility": "novel target; strict ASAS-SN exclusion; advanced to metadata stage; at least one QLP product"
+    },
+    "follow-up": {
+      "selector_version": "exo_hunter_follow_up_v2",
+      "history_ranking_formula": "100*(1-fpp) + 10*detection_confidence",
+      "registry_ranking_formula": "durable follow_up_priority",
+      "expected_information_gain": "(1-fpp)*detection_confidence",
+      "fpp_max_exclusive": 0.15,
+      "confidence_min_exclusive": 0.4,
+      "eligible_pathways": [
+        "kepler_archive_candidate",
+        "planet_hunters_discussion",
+        "tfop_ready"
+      ],
+      "latest_search_must_be_new": true
+    },
+    "operator": {
+      "selector_version": "exo_hunter_operator_candidates_v1",
+      "ranking": "operator-supplied values preserved without substitution"
+    }
+  },
+  "derived_evidence": {
+    "candidate_manifest_selector_agreement_enforced": true,
+    "manifest_contract_equality_enforced": true,
+    "selector_mode_agreement_enforced": true,
+    "ranking_change_requires_new_version": true,
+    "built_in_information_gain_formula_executed_by_test": true,
+    "old_manifest_versions_remain_valid_and_unchanged": true
+  },
+  "verification": {
+    "focused_tests_passed": 53,
+    "focused_test_command": ".venv/bin/python -m pytest -o addopts='' tests/test_hunter_validity.py tests/test_search_lifecycle.py tests/test_hunter_cli.py -q"
+  },
+  "remaining_limitations": [
+    "The selector weights are conservative versioned project policy, not a claim of a universally optimal scientific ranking.",
+    "Live archive/catalog inputs can change; reproducibility attaches to the frozen candidate snapshot and contract.",
+    "The current follow-up universe remains scientifically ineligible under the recorded gates.",
+    "No external submission, alert, confirmation, or discovery claim is authorized."
+  ]
+}
