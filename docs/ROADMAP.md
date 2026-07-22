@@ -62,7 +62,11 @@ by itself satisfy a master-guide evidence requirement.
   immutability, full content/relationship verification, explicit information-
   gain ranking inputs, and evidence-derived acceptance tests. The recomputed
   schema-v5 snapshot and structured requirement evidence are recorded in
-  `artifacts/manifests/hunter_live_acceptance_v5.json`.
+  `artifacts/manifests/hunter_live_acceptance_v5.json`. A post-merge loop found
+  that the changed ranking still used an older generic selector ID. Version
+  0.3.9 closes that provenance gap with distinct new/follow-up/operator
+  selector versions and verifier-enforced frozen formulas, weights, thresholds,
+  information-gain definitions, and candidate/manifest identity agreement.
 
 1. **Phase 1 — validated manifest contract (CONTRACT COMPLETE):** version 0.2.30 adds
    the shared schema, frozen Pydantic contract, fail-closed checksum/path

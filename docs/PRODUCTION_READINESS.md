@@ -59,7 +59,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.3.8 is the current development version. Version 0.3.2 added the durable,
+Version note: 0.3.9 is the current development version. Version 0.3.2 added the durable,
 non-AI-dependent Hunter workflow and exact `Create-New-Search`,
 `Run-New-Search`, and `Show-Follow-Ups` entry points. Candidate catalog,
 immutable manifest, run attempts, append-only target history, and follow-up
@@ -68,6 +68,11 @@ freeze 100 targets from a 10,000-candidate universe, partial work is nonzero
 and resumable, and exact targets are never regenerated during execution. See
 `docs/HUNTER_PRODUCTION_WORKFLOW.md`. Hunter orchestration acceptance and the
 independently established underlying scorer acceptance are both PASS.
+Version 0.3.9 closes the final post-merge provenance audit finding: the 0.3.8
+ranking changes still carried the older generic selector ID. New, follow-up,
+and operator-supplied searches now have distinct versioned contracts, with
+formula, weights, information-gain definition, thresholds, and candidate/
+manifest agreement enforced by the validity verifier.
 The first merged-main acceptance attempt failed before
 search creation because installed console scripts omitted the repository root
 from `sys.path`; 0.3.1 adds a fail-loud validated loader for the required

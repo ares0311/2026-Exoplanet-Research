@@ -8,16 +8,24 @@ import sys
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from exo_toolkit.hunter_cli import (
     _commit_run_report,
     _pipeline_runner,
+    _select_live_new_candidates,
     create_new_search,
     import_follow_up,
     run_new_search,
     show_follow_ups,
+)
+from exo_toolkit.hunter_ranking import (
+    FOLLOW_UP_SELECTOR_VERSION,
+    NEW_SELECTOR_VERSION,
+    OPERATOR_SELECTOR_VERSION,
+    selection_contract,
 )
 from exo_toolkit.search_lifecycle import (
     FollowUpRecommendation,
@@ -34,7 +42,10 @@ def _candidates(count: int) -> list[HunterCandidate]:
             target_id=f"TIC {index}",
             canonical_id=f"TIC {index}",
             source="offline test catalog",
-            source_provenance={"search_category": "new"},
+            source_provenance={
+                "search_category": "new",
+                "selector_version": NEW_SELECTOR_VERSION,
+            },
             ranking_score=float(count - index),
             selection_reason="offline deterministic rank",
             metrics={"rank": index},
@@ -92,6 +103,10 @@ def test_create_run_show_complete_offline_path(tmp_path: Path, capsys: object) -
     assert '"status": "completed"' in output
     assert '"follow_ups"' in output
     assert "review candidate packet" in output
+    completed = HunterStore(db).target_history("TIC 0")[0]
+    stored = HunterStore(db).get_search(completed["search_id"])
+    assert stored["selector_version"] == NEW_SELECTOR_VERSION
+    assert stored["config"]["selection_contract"] == selection_contract("new")
 
 
 def test_create_failure_is_nonzero_and_leaves_no_manifest(tmp_path: Path) -> None:
@@ -106,6 +121,42 @@ def test_create_failure_is_nonzero_and_leaves_no_manifest(tmp_path: Path) -> Non
     )
     assert code == 2
     assert HunterStore(db).open_searches() == []
+
+
+def test_live_selector_stamps_versioned_information_gain_contract(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scanner = SimpleNamespace(
+        _load_toi_tic_ids=lambda **_: set(),
+        _load_ctoi_tic_ids=lambda **_: set(),
+        _load_confirmed_host_tic_ids=lambda **_: set(),
+        _load_asassn_variable_tic_ids=lambda *_args, **_kwargs: set(),
+        select_targets=lambda *_args, **_kwargs: [
+            {"tic_id": 42, "priority": 0.7, "tmag": 10.0}
+        ],
+        inspect_target_products=lambda *_args, **_kwargs: {
+            "products": ["product-1", "product-2"],
+            "total_bytes": 1_000_000_000,
+            "priority": 0.8,
+        },
+    )
+    monkeypatch.setattr("exo_toolkit.hunter_cli._load_project_skill", lambda _: scanner)
+
+    candidates, search_log = _select_live_new_candidates(
+        targets=1,
+        pool_size=1,
+        workers=1,
+        tmag_range=(6.0, 13.5),
+        store=HunterStore(tmp_path / "hunter.sqlite3"),
+        progress_fn=None,
+    )
+
+    candidate = candidates[0]
+    assert candidate.source_provenance["selector_version"] == NEW_SELECTOR_VERSION
+    assert candidate.metrics["expected_information_gain"] == pytest.approx(0.32)
+    assert candidate.metrics["scientific_suitability"] == pytest.approx(0.8)
+    assert candidate.ranking_score == pytest.approx(67.2)
+    assert search_log["stage_two_eligible_count"] == 1
 
 
 def test_invalid_target_count_fails_before_live_selection(tmp_path: Path) -> None:
@@ -198,6 +249,10 @@ def test_candidate_json_file_supports_external_follow_up_provenance(tmp_path: Pa
     )
     search = HunterStore(db).open_searches()[0]
     restored = HunterStore(db).get_search(search["search_id"])
+    assert restored["selector_version"] == OPERATOR_SELECTOR_VERSION
+    assert restored["config"]["selection_contract"] == selection_contract(
+        "follow-up", operator_supplied=True
+    )
     assert restored["targets"][0]["candidate"]["prior_searches"][0]["searched_by"] == "Researcher"
 
 
@@ -266,6 +321,8 @@ def test_default_follow_up_imports_and_ranks_durable_history(
     assert len(stored.target_history("TIC 42")) == 1
     assert stored.validity_summary()["ok"] is True
     search = stored.get_search(output["search_id"])
+    assert search["selector_version"] == FOLLOW_UP_SELECTOR_VERSION
+    assert search["config"]["selection_contract"] == selection_contract("follow-up")
     assert search["targets"][0]["target_id"] == "TIC 42"
 
 

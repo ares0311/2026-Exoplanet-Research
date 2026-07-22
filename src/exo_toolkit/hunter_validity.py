@@ -9,10 +9,16 @@ from collections import Counter
 from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from exo_toolkit.hunter_history import load_verified_history_manifest
-from exo_toolkit.hunter_models import ExecutionProvenance, HunterCandidate
+from exo_toolkit.hunter_models import ExecutionProvenance, HunterCandidate, SearchMode
+from exo_toolkit.hunter_ranking import (
+    FOLLOW_UP_SELECTOR_VERSION,
+    NEW_SELECTOR_VERSION,
+    OPERATOR_SELECTOR_VERSION,
+    selection_contract,
+)
 
 REQUIRED_TABLE_COLUMNS: dict[str, frozenset[str]] = {
     "candidate_catalog": frozenset(
@@ -328,6 +334,35 @@ def validate_hunter_database(
                     selected_candidates.append(selected_candidate_json)
 
             selector_version = str(manifest["selector_version"])
+            known_selectors = {
+                NEW_SELECTOR_VERSION: ("new", False),
+                FOLLOW_UP_SELECTOR_VERSION: ("follow-up", False),
+                OPERATOR_SELECTOR_VERSION: (str(manifest["mode"]), True),
+            }
+            if selector_version in known_selectors:
+                contract_mode, operator_supplied = known_selectors[selector_version]
+                if str(manifest["mode"]) != contract_mode:
+                    issues.append(
+                        f"{search_id}: selector {selector_version} is invalid for "
+                        f"mode={manifest['mode']}"
+                    )
+                expected_contract = selection_contract(
+                    cast(SearchMode, contract_mode),
+                    operator_supplied=operator_supplied,
+                )
+                if config.get("selection_contract") != expected_contract:
+                    issues.append(
+                        f"{search_id}: selection contract does not match "
+                        f"{selector_version}"
+                    )
+                if not operator_supplied:
+                    for candidate_json in candidate_by_snapshot.values():
+                        provenance = candidate_json.get("source_provenance", {})
+                        if provenance.get("selector_version") != selector_version:
+                            issues.append(
+                                f"{search_id}: candidate selector provenance does not "
+                                f"match {selector_version}"
+                            )
             expected_manifest_hash: str | None = None
             if search_id in sources:
                 expected_manifest_hash = _hash_json(sources[search_id])

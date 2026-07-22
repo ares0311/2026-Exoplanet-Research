@@ -215,6 +215,15 @@ the archive-derived result so `Run-New-Search` never regenerates or substitutes
 targets. `selector_log` records requested/returned pool size, tile failures,
 coverage, stage-two count, exclusions, and eligible count.
 
+Version 0.3.9 gives each selection path a distinct immutable identity:
+`exo_hunter_tic_v2`, `exo_hunter_follow_up_v2`, or
+`exo_hunter_operator_candidates_v1`. Every manifest also freezes the complete
+JSON ranking contract: formula, weights, information-gain definition,
+eligibility thresholds, and accepted pathways. Candidate snapshots created by
+the built-in selectors carry the same selector ID. The validity verifier fails
+if candidate, manifest, or contract identities disagree, so a future ranking
+change must receive a new selector version rather than silently reusing one.
+
 ## Execution and recovery
 
 `Run-New-Search` uses six I/O workers by default on the recorded M4 Max. Every
