@@ -16,8 +16,17 @@ double. Execution (light-curve fetch) for the freshly-discovered targets did
 not complete in that session — a sandbox filesystem write restriction on
 `~/.lightkurve/cache` specific to that interactive agent session, not a code
 defect (the failure was recorded correctly per Fail Loudly, not swallowed).
-Full new-mode create-through-execution on genuinely fresh targets remains open
-pending either a human-run reproduction or a session with that path writable.
+`hunter_live_acceptance_v11.json` then closed this fully: Lightkurve honors
+`XDG_CACHE_HOME` if `$XDG_CACHE_HOME/lightkurve` already exists, so a
+repo-local, git-ignored cache directory was pre-created and the same pending
+search was re-run with that env var set (no source change). All 5 freshly-
+discovered targets fetched real light curves, ran BLS/vet/Bayesian scoring,
+and reached `candidate_found`, registering 16 new follow-up recommendations.
+The full directive-required "New targets" scenario — discover broadly,
+adaptively expand, create the exact durable search, execute exact targets,
+persist real typed results/provenance, update follow-up eligibility — is now
+demonstrated live end to end. See AGENTS.md's Python Environment Policy for
+the reusable sandbox notes this session recorded.
 
 **Version 0.3.10** corrects the follow-up selection contract itself, not just
 its identity. Versions 0.3.3-0.3.9 all treated "zero targets clear the strict

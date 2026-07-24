@@ -1,0 +1,65 @@
+{
+  "schema_version": 2,
+  "acceptance_id": "exo-hunter-live-acceptance-v11",
+  "accepted_at": "2026-07-24T13:06:00Z",
+  "status": "pass",
+  "project": "2026 Exoplanet Research",
+  "product": "EXO-Hunter",
+  "code_version": "0.3.11",
+  "implementation_git_commit": "58dd1cc",
+  "core_ai_dependency": false,
+  "extends": {
+    "acceptance_id": "exo-hunter-live-acceptance-v10",
+    "artifact": "artifacts/manifests/hunter_live_acceptance_v10.json",
+    "reason": "v10 proved live discovery/adaptive-expansion but execution failed for all 5 freshly-discovered targets with PermissionError writing to ~/.lightkurve/cache, which sits outside the interactive agent session's sandbox-writable paths. v11 fixes the environment cause (not a code change) and re-runs the identical pending search to completion, closing the full directive-required 'New targets' scenario end to end: discover broadly -> adaptive expansion -> create exact durable search -> execute exact targets -> persist results/provenance -> update follow-up eligibility."
+  },
+  "environment_fix": {
+    "root_cause": "Lightkurve's default cache directory (~/.lightkurve/cache) is outside this interactive Claude Code session's sandbox-writable paths.",
+    "fix": "Lightkurve honors the XDG_CACHE_HOME environment variable: if it is set and $XDG_CACHE_HOME/lightkurve already exists, that directory is used instead of the default. Pre-created data/.xdg_cache_sandbox/lightkurve/ (inside the repo, sandbox-writable, git-ignored) and set XDG_CACHE_HOME=<repo>/data/.xdg_cache_sandbox before invoking Run-New-Search. No source code changes were needed.",
+    "reusability_note": "Any future sandboxed agent session doing live light-curve acquisition in this environment should set XDG_CACHE_HOME the same way rather than rediscovering this. See AGENTS.md's Python Environment Policy section, where this is now recorded."
+  },
+  "full_new_mode_scenario_evidence": {
+    "search_id": "exo-search-20260724T124908Z-9c6da64818d1",
+    "discovery": "See hunter_live_acceptance_v10.json: real 126-tile MAST sweep at Tmag 4.0-4.1 returned 0 raw candidates, live-widened to 4.0-5.1, second real sweep found 13, create_search() selected the full requested 5 with zero shortfall.",
+    "execution_command": "XDG_CACHE_HOME=<repo>/data/.xdg_cache_sandbox Run-New-Search --db data/hunter_searches.disposable_new_mode_live_acceptance.sqlite3 --search-id exo-search-20260724T124908Z-9c6da64818d1 --scorer bayesian --workers 5 --json",
+    "execution_raw_result": {
+      "attempt_id": "attempt-20260724T130434Z-b53d49cd462a",
+      "started_at": "2026-07-24T13:04:34.437840Z",
+      "completed_at": "2026-07-24T13:05:35.422244Z",
+      "status": "completed",
+      "targets_processed": 5,
+      "targets_succeeded": 5,
+      "targets_failed": 0,
+      "targets_already_complete": 0,
+      "follow_ups_registered": 16
+    },
+    "per_target_status": [
+      {"target_id": "TIC 101767697", "history_status": "candidate_found"},
+      {"target_id": "TIC 367137925", "history_status": "candidate_found"},
+      {"target_id": "TIC 372914091", "history_status": "candidate_found"},
+      {"target_id": "TIC 409104974", "history_status": "candidate_found"},
+      {"target_id": "TIC 418416600", "history_status": "candidate_found"}
+    ],
+    "resume_note": "The earlier v10 'failed' rows for these same 5 targets remain in target_search_history (append-only, never overwritten); completed_target_ids() only treats candidate_found/no_signal/no_data as terminal, so Run-New-Search correctly retried all 5 rather than skipping them, demonstrating the resume/interruption contract works under a real prior failure, not just a synthetic one.",
+    "sample_scientific_output": "Real per-target output includes full CandidateFeatures (46 fields), RawDiagnostics, HypothesisPosterior (6-way softmax), CandidateScores (fpp/detection_confidence/novelty_score), typed FetchProvenance with real MAST URIs and sector lists, and ExecutionProvenance -- not placeholder or mocked data. Example (TIC 101767697, one of multiple signals found): period_days=99.09, snr=388.6, pathway=planet_hunters_discussion, posterior.planet_candidate=0.309, scores.false_positive_probability=0.691."
+  },
+  "database_integrity": {
+    "disposable_db_integrity_check": "ok",
+    "real_production_db_md5_before_v10_probe": "d7b84569cf27f947e811409823f9b287",
+    "real_production_db_md5_after_v11_probe": "d7b84569cf27f947e811409823f9b287",
+    "real_production_db_mutated": false
+  },
+  "verification": {
+    "quality_gate_command": "mcp__exo_guard__quality_gates (equivalent to .venv/bin/python Skills/run_quality_gates.py)",
+    "quality_gate_result": "10/10 gates passed, 3081 default tests, prior to this live probe; the probe itself made no source changes, only documentation and this evidence artifact"
+  },
+  "directive_scenario_closure": {
+    "scenario": "New targets: request N new targets -> autonomously explore broadly enough -> find best available N -> create exact durable search -> execute exact targets -> persist results/provenance -> update future target eligibility",
+    "status": "CLOSED. All seven steps demonstrated live in this session (v10 discovery/expansion + v11 execution/persistence/follow-up), against real MAST data, on a disposable copy of the real production database that was never mutated."
+  },
+  "remaining_limitations": [
+    "This is one live run on 5 targets selected via a deliberately extreme discovery window (Tmag 4.0-5.1, very bright stars), not a broad production-scale run -- see v4-v8 for the existing 10,000-candidate/202-target scale evidence.",
+    "The environment fix (XDG_CACHE_HOME redirect) is documented for future sandboxed sessions but is not itself wired into any script's defaults -- an operator or agent running outside this sandbox does not need it and should not set it unnecessarily.",
+    "No external submission, alert, confirmation, or discovery claim is authorized. This remains local, disposable evidence."
+  ]
+}
