@@ -1,0 +1,109 @@
+{
+  "schema_version": 2,
+  "acceptance_id": "exo-hunter-live-acceptance-v7",
+  "accepted_at": "2026-07-23T00:00:00Z",
+  "status": "pass",
+  "project": "2026 Exoplanet Research",
+  "product": "EXO-Hunter",
+  "code_version": "0.3.10",
+  "implementation_git_commit": "0ddd3e0",
+  "core_ai_dependency": false,
+  "baseline_acceptance": {
+    "acceptance_id": "exo-hunter-live-acceptance-v5",
+    "artifact": "artifacts/manifests/hunter_live_acceptance_v5.json",
+    "production_snapshot": "artifacts/evidence/hunter_production_snapshot_v5.sqlite3.gz",
+    "compressed_snapshot_sha256": "44aa9306f2bf4b64e3517f8b686bf55e6d2e87e3a56f9e77b124f59eca2c0b9c",
+    "reason": "The durable production rows and source bytes are unchanged since v5; v7, like v6, builds on that same snapshot."
+  },
+  "supersedes": {
+    "acceptance_id": "exo-hunter-live-acceptance-v6",
+    "artifact": "artifacts/manifests/hunter_live_acceptance_v6.json",
+    "reason": "v6 recorded the selector-identity fix but kept the hard FPP/confidence eligibility gate that made follow-up selection return zero targets; v7 corrects that selection semantics defect. v6 remains valid historical evidence and is not modified."
+  },
+  "corrected_defect": {
+    "summary": "create_search() hard-failed and created no search whenever fewer candidates than requested passed the follow-up scientific quality gate (FPP<0.15, confidence>0.40, eligible pathway), instead of returning the best available N with quality reported separately.",
+    "prior_framing": "v3-v6 all recorded 'zero eligible from 202 evaluated, no search created' as the scientifically correct outcome. Given the current business requirement that a normal top-N request must return the best available N and never fail purely because none clear a quality bar, that framing was itself the defect, not a valid terminal state.",
+    "fix": "eligibility is now availability (not already scheduled/completed/deferred, and an unfollowed candidate_found signal exists); the FPP/confidence/pathway gate is reported per-candidate as meets_strict_follow_up_bar instead of removing candidates from the selectable pool. create_search() only raises when zero candidates are available at all."
+  },
+  "selector_contracts": {
+    "new": {
+      "selector_version": "exo_hunter_tic_v2",
+      "ranking_formula": "70*tic_priority + 20*availability + 10*expected_information_gain - storage_cost_penalty",
+      "weights": {
+        "tic_priority": 70.0,
+        "availability": 20.0,
+        "expected_information_gain": 10.0,
+        "storage_cost_penalty": -1.0
+      },
+      "expected_information_gain": "tic_priority * availability",
+      "eligibility": "novel target; strict ASAS-SN exclusion; advanced to metadata stage; at least one QLP product"
+    },
+    "follow-up": {
+      "selector_version": "exo_hunter_follow_up_v3",
+      "history_ranking_formula": "100*(1-fpp) + 10*detection_confidence",
+      "registry_ranking_formula": "durable follow_up_priority",
+      "expected_information_gain": "(1-fpp)*detection_confidence",
+      "selection_semantics": "rank by priority across every currently available (non-duplicate, data-confirmed) follow-up candidate; return the best available N even when fewer than N clear the strict production bar below",
+      "strict_production_bar_fpp_max_exclusive": 0.15,
+      "strict_production_bar_confidence_min_exclusive": 0.4,
+      "strict_production_bar_pathways": [
+        "kepler_archive_candidate",
+        "planet_hunters_discussion",
+        "tfop_ready"
+      ],
+      "latest_search_must_be_new": true
+    },
+    "operator": {
+      "selector_version": "exo_hunter_operator_candidates_v1",
+      "ranking": "operator-supplied values preserved without substitution"
+    }
+  },
+  "derived_evidence": {
+    "candidate_manifest_selector_agreement_enforced": true,
+    "manifest_contract_equality_enforced": true,
+    "selector_mode_agreement_enforced": true,
+    "ranking_change_requires_new_version": true,
+    "old_manifest_versions_remain_valid_and_unchanged": true,
+    "shortfall_never_blocks_search_creation": true,
+    "zero_available_candidates_still_fails_closed": true
+  },
+  "live_business_validation": {
+    "method": "HunterStore API invoked directly (same code path Create-New-Search uses) against a disposable local copy of the real production database data/hunter_searches.sqlite3; the real file was never mutated, and the disposable copy was deleted after the probe.",
+    "follow_up_universe_before_fix": {
+      "evaluated_target_count": 202,
+      "available_target_count": 0,
+      "source": "artifacts/manifests/hunter_live_acceptance_v4.json and v6.json, both recording zero eligible targets under the old hard FPP/confidence gate"
+    },
+    "follow_up_universe_after_fix": {
+      "evaluated_target_count": 202,
+      "available_target_count": 190,
+      "meets_strict_follow_up_bar_count": 0,
+      "interpretation": "All 190 unfollowed candidate_found signals in the real durable history are below the strict FPP<0.15/confidence>0.40/pathway bar, which is why v3-v6 saw zero eligible targets under the old hard-gate design. They are nonetheless real, ranked, previously-invisible follow-up candidates."
+    },
+    "create_search_after_fix": {
+      "mode": "follow-up",
+      "requested_target_count": 10,
+      "selected_target_count": 10,
+      "candidate_pool_count": 202,
+      "shortfall": 0,
+      "database_integrity_before": true,
+      "database_integrity_after": true
+    },
+    "not_yet_demonstrated_live": "The 'new' mode shortfall path (create_search never hard-failing when fewer than N new candidates are available) is covered by focused unit/integration tests against synthetic pools, not a live MAST sweep exhaustion, since the current default pool sizing (>=10,000 candidates for typical N) has not been observed to run dry against the live TIC catalog."
+  },
+  "verification": {
+    "focused_tests_passed": 57,
+    "focused_test_command": ".venv/bin/python -m pytest -o addopts='' tests/test_hunter_validity.py tests/test_search_lifecycle.py tests/test_hunter_cli.py -q",
+    "full_suite_command": ".venv/bin/python -m pytest",
+    "full_suite_tests_passed": 3079,
+    "quality_gate_command": ".venv/bin/python Skills/run_quality_gates.py",
+    "quality_gate_result": "10/10 gates passed in 26.1 seconds under the canonical 6x6 topology"
+  },
+  "remaining_limitations": [
+    "The strict production bar (FPP<0.15, confidence>0.40, eligible pathway) is unchanged as a scientific quality signal; it is now reported per-candidate rather than used to silently remove candidates from the selectable pool.",
+    "The selector weights are conservative versioned project policy, not a claim of a universally optimal scientific ranking.",
+    "Live archive/catalog inputs can change; reproducibility attaches to the frozen candidate snapshot and contract.",
+    "New-mode adaptive discovery expansion (widening the search when the live sweep itself returns fewer raw candidates than requested) is not yet implemented; current default pool sizing makes this rare but not impossible as the exclusion set grows with repeated real usage.",
+    "No external submission, alert, confirmation, or discovery claim is authorized."
+  ]
+}

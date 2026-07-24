@@ -4,9 +4,33 @@
 
 Version 0.3.3 closes the reviewed-prior-result bridge left open by version 0.3.2.
 The shell entry points share one durable SQLite system of record and can run
-without an AI model. Hunter acceptance is PROD on version 0.3.9. The recomputed
+without an AI model. Hunter acceptance is PROD on version 0.3.10. The recomputed
 production snapshot is in `hunter_live_acceptance_v5.json`; the current
-selector-contract delta is in `hunter_live_acceptance_v6.json`.
+follow-up selection-semantics delta is in `hunter_live_acceptance_v7.json`.
+
+**Version 0.3.10** corrects the follow-up selection contract itself, not just
+its identity. Versions 0.3.3-0.3.9 all treated "zero targets clear the strict
+FPP<0.15/confidence>0.40/pathway gate" as a valid terminal outcome and had
+`create_search()` raise and create nothing whenever fewer candidates than
+requested cleared that gate, in either `new` or `follow-up` mode. That is a
+business-requirement violation, not a scientific finding: a normal top-N
+request must return the best available N, with absolute quality reported
+separately, and must fail only when fewer than N valid candidates exist at
+all. `follow_up_universe()` now treats availability (not already scheduled,
+completed, or revisit-deferred; a real unfollowed `candidate_found` signal
+exists) as eligibility; the strict FPP/confidence/pathway bar is reported
+per-candidate as `meets_strict_follow_up_bar` instead of removing candidates
+from the selectable pool. Verified against a disposable copy of the real
+production database: the 202-target durable follow-up universe now reports
+190 available candidates (zero under the old gate), and requesting 10
+follow-up targets returns exactly 10 best-available targets instead of
+raising. See `artifacts/manifests/hunter_live_acceptance_v7.json`.
+New-mode adaptive discovery expansion (widening the live sweep itself when it
+returns fewer raw candidates than requested) is not yet implemented; current
+default pool sizing (>=10,000 candidates for typical N) has not been observed
+to run dry against the live TIC catalog, but the fixed 126-tile/tmag-range
+sweep will eventually exhaust as more targets are excluded by repeated real
+usage. That is the next highest-priority Hunter gap.
 An earlier audit found that consumed actionable follow-ups remained open and
 could be scheduled repeatedly. Version 0.3.5 adds durable scheduling/disposition events
 and parent-child recommendation relationships. Version 0.3.6 makes
@@ -59,8 +83,10 @@ The default source is
 automatically and idempotently. `--history-manifest` may point to another
 schema-v1 provenance-complete manifest for isolated or scripted operation.
 The candidate-pool count includes every evaluated prior target, including
-ineligible rows, so zero selected targets is supported by an auditable
-universe rather than inferred from an empty registry.
+ineligible rows, so any shortfall (selected < requested) is an auditable,
+reported fact rather than an inferred one. `Create-New-Search` returns the
+best available N and only fails outright when zero candidates are available
+at all (version 0.3.10).
 
 Execute or resume the exact pending manifest:
 
@@ -238,9 +264,12 @@ uses the same manifest, records an interrupted prior attempt if necessary,
 skips only terminal target outcomes, and retries failed/unwritten targets. A
 completed manifest cannot be executed again.
 
-Candidate signals enter the follow-up registry only when the existing
-conservative gate is met: FPP below 0.15, detection confidence above 0.40, and
-an eligible pathway. The recommendation never claims confirmation and asks for
+Every detected candidate signal enters the follow-up registry (version 0.3.10):
+priority is a continuous function of FPP and detection confidence, and each
+row also records `meets_strict_production_bar` — whether it clears the
+conservative bar (FPP below 0.15, detection confidence above 0.40, an eligible
+pathway) — as informational evidence, not a filter on whether the row exists.
+The recommendation never claims confirmation and asks for
 centroid/contamination, odd-even, secondary-eclipse, phase-fold, and additional
 event-covering evidence where needed.
 

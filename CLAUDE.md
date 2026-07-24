@@ -638,6 +638,37 @@ console-output-only change.
 The version 0.2.100 release gate passed 3,022 default tests plus Ruff/mypy as
 10/10 supervised gates in 31.2 seconds under the canonical 6x6 topology.
 
+Version 0.3.10 corrects a genuine Hunter business-requirement defect that
+versions 0.3.3-0.3.9 had all signed off as scientifically correct:
+`create_search()` hard-failed and created no search whenever fewer candidates
+than requested cleared the follow-up quality gate (FPP<0.15,
+confidence>0.40, eligible pathway), including the documented "zero eligible
+from 202 evaluated" outcome. The current business requirement is explicit
+that a normal top-N request must return the best available N with quality
+reported separately, and must fail only when zero valid candidates exist at
+all. `follow_up_universe()` eligibility is now availability (not already
+scheduled/completed/deferred; an unfollowed `candidate_found` signal exists),
+not the strict FPP/confidence/pathway bar, which is now reported per-
+candidate as `meets_strict_follow_up_bar` instead of removing candidates from
+the selectable pool; `hunter_cli._follow_up_from_row()` likewise always
+builds a recommendation instead of silently dropping sub-threshold signals.
+`FOLLOW_UP_SELECTOR_VERSION` bumped to `exo_hunter_follow_up_v3` so
+historical v2-stamped manifests keep their old identity during validity
+replay. Verified against a disposable copy of the real production database
+(the real file was never mutated): the 202-target durable follow-up universe
+now reports 190 available candidates versus zero under the old gate, and a
+10-target follow-up request returns exactly 10 best-available targets
+instead of raising, with database integrity intact before and after. See
+`artifacts/manifests/hunter_live_acceptance_v7.json` and
+`docs/HUNTER_PRODUCTION_WORKFLOW.md`. New-mode adaptive discovery expansion
+(widening the live TIC sweep itself when it returns too few raw candidates)
+remains open as the next highest-priority Hunter gap; current default pool
+sizing has not been observed to run dry against the live catalog, but the
+fixed 126-tile/tmag-range sweep will eventually exhaust as more targets are
+excluded by repeated real usage.
+The version 0.3.10 release gate passed 3,079 default tests plus Ruff/mypy as
+10/10 supervised gates in 26.1 seconds under the canonical 6x6 topology.
+
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.

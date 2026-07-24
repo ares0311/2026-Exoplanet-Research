@@ -224,9 +224,22 @@ def test_committed_acceptance_snapshot_matches_structured_evidence() -> None:
     )
 
 
-def test_current_acceptance_matches_executable_selector_contracts() -> None:
+def test_v6_acceptance_selector_contracts_remain_historically_frozen() -> None:
+    """v6 is superseded (see v7); its own frozen content must not silently drift."""
     acceptance = json.loads(
         Path("artifacts/manifests/hunter_live_acceptance_v6.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert acceptance["selector_contracts"]["follow-up"]["selector_version"] == (
+        "exo_hunter_follow_up_v2"
+    )
+    assert acceptance["selector_contracts"]["follow-up"]["fpp_max_exclusive"] == 0.15
+
+
+def test_current_acceptance_matches_executable_selector_contracts() -> None:
+    acceptance = json.loads(
+        Path("artifacts/manifests/hunter_live_acceptance_v7.json").read_text(
             encoding="utf-8"
         )
     )
@@ -254,3 +267,12 @@ def test_current_acceptance_matches_executable_selector_contracts() -> None:
     assert acceptance["selector_contracts"]["operator"]["selector_version"] == (
         OPERATOR_SELECTOR_VERSION
     )
+    assert acceptance["live_business_validation"]["create_search_after_fix"] == {
+        "mode": "follow-up",
+        "requested_target_count": 10,
+        "selected_target_count": 10,
+        "candidate_pool_count": 202,
+        "shortfall": 0,
+        "database_integrity_before": True,
+        "database_integrity_after": True,
+    }
