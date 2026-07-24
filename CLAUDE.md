@@ -704,6 +704,27 @@ and after. See `artifacts/manifests/hunter_live_acceptance_v9.json`.
 The version 0.3.11 evidence-release gate passed 3,081 default tests plus
 Ruff/mypy as 10/10 supervised gates under the canonical 6x6 topology.
 
+A later session closed the one gap v9 explicitly left open: the new-mode
+adaptive-discovery-expansion loop had only ever been verified against an
+offline scripted double. Using the same disposable-database pattern, a live
+`Create-New-Search --mode new` run with a deliberately narrow, bright Tmag
+4.0-4.1 window returned 0 raw candidates from a real 126-tile MAST sweep;
+the loop widened it to 4.0-5.1 exactly as designed, and a second real sweep
+found 13 candidates, satisfying the requested 5 targets with zero shortfall
+(verified directly from the disposable database's `selector_log`, not just
+console output). Executing those freshly-discovered targets then failed —
+all 5 hit `PermissionError` writing to `~/.lightkurve/cache`, which sits
+outside this interactive agent session's sandbox-writable paths. This is not
+a code defect: the failure was recorded correctly per Fail Loudly (typed
+error_message per target, non-zero exit, no false success), not swallowed.
+The real production database was confirmed byte-identical before and after;
+the disposable database passed integrity and foreign-key checks. Full
+new-mode create-through-execution on genuinely fresh (never-cached) targets
+remains open pending a human-run reproduction or a session with that path
+writable — see `artifacts/manifests/hunter_live_acceptance_v10.json` and
+`docs/PRODUCTION_READINESS.md`'s Outside Blockers table for the exact
+reproduction command.
+
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
