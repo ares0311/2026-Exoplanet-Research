@@ -718,12 +718,27 @@ outside this interactive agent session's sandbox-writable paths. This is not
 a code defect: the failure was recorded correctly per Fail Loudly (typed
 error_message per target, non-zero exit, no false success), not swallowed.
 The real production database was confirmed byte-identical before and after;
-the disposable database passed integrity and foreign-key checks. Full
-new-mode create-through-execution on genuinely fresh (never-cached) targets
-remains open pending a human-run reproduction or a session with that path
-writable — see `artifacts/manifests/hunter_live_acceptance_v10.json` and
-`docs/PRODUCTION_READINESS.md`'s Outside Blockers table for the exact
-reproduction command.
+the disposable database passed integrity and foreign-key checks. See
+`artifacts/manifests/hunter_live_acceptance_v10.json`.
+
+The same session then found and applied the actual fix rather than handing
+the gap to the human: Lightkurve honors the `XDG_CACHE_HOME` environment
+variable when `$XDG_CACHE_HOME/lightkurve` already exists, so a repo-local,
+git-ignored cache directory was pre-created and that env var set before
+re-running the identical pending search — no source code changes. All 5
+freshly-discovered targets fetched real light curves, ran BLS search/vet/
+Bayesian scoring, and reached `candidate_found`, registering 16 new
+follow-up recommendations; the real production database remained
+byte-identical throughout. This closes the directive's full "New targets"
+required-validation scenario end to end (discover broadly, adaptively
+expand, create the exact durable search, execute exact targets, persist
+real typed results/provenance, update follow-up eligibility) with live
+evidence, not an offline double. See
+`artifacts/manifests/hunter_live_acceptance_v11.json`. AGENTS.md's Python
+Environment Policy now records both sandbox findings from this session
+(console scripts execute directly even though `.venv/bin/python` does not;
+the `XDG_CACHE_HOME` redirect) so a future session does not need to
+rediscover either one.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.

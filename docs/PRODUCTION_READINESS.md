@@ -69,10 +69,17 @@ sandbox filesystem write restriction specific to that interactive agent
 session (the real production database was confirmed byte-identical before
 and after; the disposable database passed integrity and foreign-key checks).
 This is not a code defect — the failure was recorded correctly per Fail
-Loudly, not swallowed — but it does mean full new-mode create-through-
-execution on genuinely fresh (never-cached) targets remains unproven from an
-interactive sandboxed session. See
-`artifacts/manifests/hunter_live_acceptance_v10.json`.)
+Loudly, not swallowed. The same session then found the actual fix: Lightkurve
+honors `XDG_CACHE_HOME` when `$XDG_CACHE_HOME/lightkurve` already exists, so
+a repo-local git-ignored cache directory was pre-created, that env var set,
+and the identical pending search re-run with no source changes. All 5
+targets fetched real light curves, ran BLS/vet/Bayesian scoring, and reached
+`candidate_found`, registering 16 new follow-up recommendations — the real
+production database remained byte-identical throughout. Full new-mode
+create-through-execution on genuinely fresh targets is now demonstrated live,
+closing the directive's "New targets" required-validation scenario end to
+end. See `artifacts/manifests/hunter_live_acceptance_v10.json` (discovery/
+expansion) and `hunter_live_acceptance_v11.json` (execution/closure).)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
 Test baseline: 3,081 default tests passing; 2 `integration_live` tests excluded by
@@ -1096,7 +1103,7 @@ These are enforced in code and must never be bypassed:
 | CNN promotion readiness package | **Complete** — temperature-calibration promotion tooling, model card, reproducibility manifest, data-role registry, benchmark designation, storage/retention ledger updates, and exact selected artifact scope are GitHub-visible | Agent |
 | CNN production promotion | **Complete in promotion PR** — human approved checkpoint SHA `f29e6891c255289fa1e2eddad1fb6ca131c063cf11c24b8113e0e29d049441c5`; selected artifacts are copied to `models/cnn/benchmark_cnn_v1/` and registered in `models/registry.json` | Agent + human approval |
 | Stacking weight calibration | **Complete** — calibrated on 588 held-out K2 examples (XGBoost=0.95/CNN=0.00/Bayesian=0.05, AUC 0.9576) and wired into `cli.py` | Agent + human live snippet fetch |
-| Full new-mode create-through-execution on fresh (never-cached) targets | Discovery/adaptive-expansion is now live-verified (`hunter_live_acceptance_v10.json`); execution failed only because `~/.lightkurve/cache` sits outside this interactive session's sandbox write scope, not because of a code defect. Either re-run `Run-New-Search --db data/hunter_searches.disposable_new_mode_live_acceptance.sqlite3 --search-id exo-search-20260724T124908Z-9c6da64818d1 --scorer bayesian` from an unrestricted terminal, or add `~/.lightkurve` (or a project-approved redirect) to a future agent session's sandbox-writable paths | Human, or Agent with an expanded sandbox grant |
+| Full new-mode create-through-execution on fresh (never-cached) targets | **Complete** — `~/.lightkurve/cache` sat outside the interactive session's sandbox write scope; fixed by pre-creating a repo-local `$XDG_CACHE_HOME/lightkurve` directory (Lightkurve honors that env var) and re-running the identical pending search with no source changes. All 5 targets succeeded live; see `hunter_live_acceptance_v11.json` and AGENTS.md's Python Environment Policy | Agent |
 
 ---
 

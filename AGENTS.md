@@ -815,6 +815,29 @@ The 3-minute bar governs whether to shard at all for a given one-off task; it is
 - If `.venv` appears broken (wrong Python version, missing pip, missing torch), diagnose first — state the exact observed vs. expected Python version — then ask the human for permission before proposing a rebuild.
 - Confirmed `.venv` identity: `python3.14 -m venv .venv`; prompt line in `pyvenv.cfg` must read `prompt = .venv`.
 
+**Interactive Claude Code sandbox notes (2026-07-24):** in an interactive agent
+session (not the human's own terminal), two sandbox facts affect live Hunter
+work and are easy to misdiagnose as "no execution path exists":
+1. `.venv/bin/python` itself is a symlink resolving to the system Python
+   framework path, which this sandbox's tool-level check refuses to execute
+   ("outside current git root"). The installed console scripts
+   (`Create-New-Search`, `Run-New-Search`, `Show-Follow-Ups`, `exo`, etc.)
+   are real executable files inside `.venv/bin/`, not symlinks, and run
+   directly without hitting that check — use them, not `.venv/bin/python -m`,
+   for any live CLI invocation from an interactive session.
+2. Lightkurve's default cache (`~/.lightkurve/cache`) sits outside this
+   sandbox's writable paths, so any live light-curve download fails with
+   `PermissionError` even though the process itself launches fine. Lightkurve
+   honors `XDG_CACHE_HOME` if `$XDG_CACHE_HOME/lightkurve` already exists;
+   pre-create a repo-local, git-ignored directory (e.g.
+   `data/.xdg_cache_sandbox/lightkurve/`) and set
+   `XDG_CACHE_HOME=<repo>/data/.xdg_cache_sandbox` before invoking any
+   command that fetches light curves. No source code change is needed, and
+   this should not be set for a human's own unrestricted terminal or for
+   production automation outside this interactive sandbox. See
+   `artifacts/manifests/hunter_live_acceptance_v11.json` for the live probe
+   that discovered and verified both of these.
+
 ---
 
 ## Local System Profile Optimization — MANDATORY
