@@ -109,14 +109,42 @@ def test_create_run_show_complete_offline_path(tmp_path: Path, capsys: object) -
     assert stored["config"]["selection_contract"] == selection_contract("new")
 
 
-def test_create_failure_is_nonzero_and_leaves_no_manifest(tmp_path: Path) -> None:
+def test_create_reports_shortfall_and_still_creates_best_available_search(
+    tmp_path: Path, capsys: object
+) -> None:
+    """A request for more targets than are available must return the best
+    available N, not fail outright (directive: return fewer than N only when
+    fewer than N valid candidates actually exist)."""
     db = tmp_path / "hunter.sqlite3"
 
     def selector(**_: object) -> tuple[list[HunterCandidate], dict[str, object]]:
         return _candidates(1), {}
 
     code = create_new_search(
-        ["--targets", "2", "--mode", "new", "--db", str(db)],
+        ["--targets", "2", "--mode", "new", "--db", str(db), "--json"],
+        live_selector=selector,
+    )
+    assert code == 0
+    output = json.loads(capsys.readouterr().out)  # type: ignore[attr-defined]
+    assert output["requested_targets"] == 2
+    assert output["selected_targets"] == 1
+    assert output["shortfall"] == 1
+    open_searches = HunterStore(db).open_searches()
+    assert len(open_searches) == 1
+    assert open_searches[0]["selected_target_count"] == 1
+
+
+def test_create_fails_when_zero_candidates_are_available(tmp_path: Path) -> None:
+    db = tmp_path / "hunter.sqlite3"
+
+    def selector(**_: object) -> tuple[list[HunterCandidate], dict[str, object]]:
+        candidate = _candidates(1)[0].model_copy(
+            update={"eligible": False, "eligibility_reason": "already searched"}
+        )
+        return [candidate], {}
+
+    code = create_new_search(
+        ["--targets", "1", "--mode", "new", "--db", str(db)],
         live_selector=selector,
     )
     assert code == 2
@@ -566,7 +594,13 @@ def test_pipeline_runner_consumes_production_nested_score_schema(
     outcome = runner(_candidates(1)[0])
 
     assert outcome.result["composite_result"]["candidate_id"] == "follow-up-candidate"
-    assert [row.candidate_id for row in outcome.follow_ups] == ["follow-up-candidate"]
+    # Every detected signal gets a recommendation now (rank, not a hard quality
+    # gate, decides selection); the strict production bar is reported per-row.
+    by_id = {row.candidate_id: row for row in outcome.follow_ups}
+    assert set(by_id) == {"higher-fpp", "follow-up-candidate"}
+    assert by_id["higher-fpp"].evidence["meets_strict_production_bar"] is False
+    assert by_id["follow-up-candidate"].evidence["meets_strict_production_bar"] is True
+    assert by_id["follow-up-candidate"].priority > by_id["higher-fpp"].priority
 
 
 def test_pipeline_runner_fails_loudly_when_required_scores_are_missing(

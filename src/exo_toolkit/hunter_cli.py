@@ -542,12 +542,14 @@ def create_new_search(
         if len(search["targets"]) > 100:
             manifest_path = args.manifest_dir / f"{search['search_id']}.csv"
             store.export_manifest_csv(search["search_id"], manifest_path)
+        shortfall = search["requested_target_count"] - search["selected_target_count"]
         payload = {
             "search_id": search["search_id"],
             "state": search["state"],
             "mode": search["mode"],
             "requested_targets": search["requested_target_count"],
             "selected_targets": search["selected_target_count"],
+            "shortfall": shortfall,
             "candidate_pool_count": search["candidate_pool_count"],
             "manifest_sha256": search["manifest_sha256"],
             "manifest_csv": str(manifest_path) if manifest_path else None,
@@ -560,6 +562,12 @@ def create_new_search(
                 f"[green]Created exact pending search[/green] {search['search_id']} "
                 f"from {search['candidate_pool_count']} frozen candidates."
             )
+            if shortfall > 0:
+                console.print(
+                    f"[yellow]Returned the best available {search['selected_target_count']} "
+                    f"of {search['requested_target_count']} requested targets[/yellow]: "
+                    "fewer valid candidates exist after exploring the full evaluated pool."
+                )
             if manifest_path:
                 console.print(f"Manifest CSV: [cyan]{manifest_path}[/cyan]")
             else:
@@ -588,25 +596,33 @@ def _required_score(row: Mapping[str, Any], name: str) -> float:
     return numeric
 
 
-def _follow_up_from_row(row: Mapping[str, Any]) -> FollowUpRecommendation | None:
+def _follow_up_from_row(row: Mapping[str, Any]) -> FollowUpRecommendation:
+    """Build a follow-up recommendation for every detected candidate signal.
+
+    Every row here already passed the full search/vet/score pipeline for a real
+    detected transit-like signal; FPP/confidence/pathway are continuous evidence
+    about that signal, not a gate on whether it exists. Rank (priority, driven by
+    these same values) and absolute quality (meets_strict_production_bar) are
+    reported separately so a request for N follow-up targets can still return the
+    best available N even when none clear the strict production bar.
+    """
     fpp = _required_score(row, "false_positive_probability")
     confidence = _required_score(row, "detection_confidence")
     pathway = row.get("pathway")
-    if (
-        fpp >= FOLLOW_UP_FPP_MAX
-        or confidence <= FOLLOW_UP_CONFIDENCE_MIN
-        or pathway not in FOLLOW_UP_PATHWAYS
-    ):
-        return None
+    meets_production_bar = bool(
+        fpp < FOLLOW_UP_FPP_MAX
+        and confidence > FOLLOW_UP_CONFIDENCE_MIN
+        and pathway in FOLLOW_UP_PATHWAYS
+    )
     priority = 100.0 * (1.0 - fpp) + 10.0 * confidence
     return FollowUpRecommendation(
         candidate_id=str(row.get("candidate_id", "unknown-candidate")),
         priority=priority,
         reason=(
-            f"candidate signal passed follow-up gate: FPP={fpp:.4f}, "
-            f"confidence={confidence:.4f}, pathway={pathway}"
+            f"candidate signal: FPP={fpp:.4f}, confidence={confidence:.4f}, "
+            f"pathway={pathway}; meets strict production bar={meets_production_bar}"
         ),
-        evidence=dict(row),
+        evidence={**dict(row), "meets_strict_production_bar": meets_production_bar},
         recommended_action=(
             "Review phase-fold, centroid/contamination, odd-even, and secondary-eclipse "
             "evidence; obtain event-covering photometry if key diagnostics remain unavailable"
@@ -689,9 +705,7 @@ def _pipeline_runner(
             rows,
             key=lambda row: _required_score(row, "false_positive_probability"),
         )
-        follow_ups = tuple(
-            follow_up for row in rows if (follow_up := _follow_up_from_row(row)) is not None
-        )
+        follow_ups = tuple(_follow_up_from_row(row) for row in rows)
         return TargetExecutionResult(
             status="candidate_found",
             result={
@@ -700,8 +714,6 @@ def _pipeline_runner(
                 "composite_result": strongest,
                 "composite_interpretation": (
                     "Candidate signal requires conservative false-positive review"
-                    if follow_ups
-                    else "Transit-like signal found but evidence does not pass the follow-up gate"
                 ),
             },
             provenance=provenance(),

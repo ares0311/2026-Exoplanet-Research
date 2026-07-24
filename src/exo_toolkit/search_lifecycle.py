@@ -832,10 +832,9 @@ class HunterStore:
             eligible = [row for row in validated if row.eligible and row.prior_searches]
 
         eligible.sort(key=lambda row: (-row.ranking_score, row.canonical_id, row.target_id))
-        if len(eligible) < requested_target_count:
+        if not eligible:
             raise RuntimeError(
-                f"Requested {requested_target_count} {mode} targets but only "
-                f"{len(eligible)} eligible candidates are available from "
+                f"No {mode} candidates are currently available from "
                 f"{len(validated)} evaluated candidates; no search was created"
             )
         selected = eligible[:requested_target_count]
@@ -1664,15 +1663,19 @@ class HunterStore:
             if registry_rows:
                 registry_rows.sort(
                     key=lambda row: (
-                        not (row["status"] == "open" and row["search_eligible"]),
+                        row["status"] != "open",
                         -float(row["priority"]),
                         str(row["follow_up_id"]),
                     )
                 )
                 registry = registry_rows[0]
-                eligible = bool(
-                    registry["status"] == "open" and registry["search_eligible"]
-                )
+                # Availability, not scientific quality: a registry row already
+                # encodes true non-availability (already scheduled/completed, or
+                # explicitly revisit-gated for missing data) as a non-"open"
+                # status. FPP/confidence/pathway are reported separately as the
+                # strict production bar; they never remove a real signal from
+                # the ranked follow-up pool (see selection_contract()).
+                eligible = bool(registry["status"] == "open")
                 eligibility_reason = (
                     "actionable evidence-based registry recommendation"
                     if eligible
@@ -1693,30 +1696,36 @@ class HunterStore:
                     "scientific_suitability": ranking_score / 110.0,
                     "prior_search_count": len(prior_searches),
                     "registry_status": str(registry["status"]),
+                    "meets_strict_follow_up_bar": registry["evidence"].get(
+                        "meets_strict_production_bar"
+                    ),
                 }
             else:
                 latest = histories[-1]
                 summary, fpp, confidence, pathway = self._history_result_summary(latest)
-                eligible = bool(
-                    latest["mode"] == "new"
-                    and latest["status"] == "candidate_found"
-                    and fpp is not None
+                # Availability, not scientific quality: any unfollowed candidate_found
+                # signal is a legitimate follow-up candidate. FPP/confidence/pathway
+                # inform ranking_score and the reported strict-bar flag below; they no
+                # longer remove real signals from the selectable pool (directive: rank
+                # and absolute quality are different).
+                eligible = bool(latest["mode"] == "new" and latest["status"] == "candidate_found")
+                meets_strict_bar = bool(
+                    fpp is not None
                     and fpp < FOLLOW_UP_FPP_MAX
                     and confidence is not None
                     and confidence > FOLLOW_UP_CONFIDENCE_MIN
-                    and pathway
-                    in FOLLOW_UP_PATHWAYS
+                    and pathway in FOLLOW_UP_PATHWAYS
                 )
                 if latest["mode"] == "follow-up":
                     eligibility_reason = "latest durable search already performed follow-up"
                 elif latest["status"] != "candidate_found":
                     eligibility_reason = f"latest result={latest['status']}"
-                elif not eligible:
-                    eligibility_reason = (
-                        "latest evidence is incomplete or does not pass follow-up gate"
-                    )
+                elif meets_strict_bar:
+                    eligibility_reason = "new-search evidence passes strict follow-up bar"
                 else:
-                    eligibility_reason = "new-search evidence passes follow-up gate"
+                    eligibility_reason = (
+                        "new-search evidence found a signal below the strict follow-up bar"
+                    )
                 ranking_score = (
                     100.0 * (1.0 - fpp) + 10.0 * confidence
                     if fpp is not None and confidence is not None
@@ -1742,6 +1751,7 @@ class HunterStore:
                         else None
                     ),
                     "scientific_suitability": confidence,
+                    "meets_strict_follow_up_bar": meets_strict_bar if eligible else None,
                 }
 
             candidates.append(

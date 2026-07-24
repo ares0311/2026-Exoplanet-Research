@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any, Literal
 
 NEW_SELECTOR_VERSION = "exo_hunter_tic_v2"
-FOLLOW_UP_SELECTOR_VERSION = "exo_hunter_follow_up_v2"
+FOLLOW_UP_SELECTOR_VERSION = "exo_hunter_follow_up_v3"
 OPERATOR_SELECTOR_VERSION = "exo_hunter_operator_candidates_v1"
 
 NEW_RANKING_WEIGHTS = {
@@ -52,8 +52,13 @@ def selection_contract(
         "history_ranking_formula": "100*(1-fpp) + 10*detection_confidence",
         "registry_ranking_formula": "durable follow_up_priority",
         "expected_information_gain": "(1-fpp)*detection_confidence",
-        "fpp_max_exclusive": FOLLOW_UP_FPP_MAX,
-        "confidence_min_exclusive": FOLLOW_UP_CONFIDENCE_MIN,
-        "eligible_pathways": list(FOLLOW_UP_PATHWAYS),
+        "selection_semantics": (
+            "rank by priority across every currently available (non-duplicate, "
+            "data-confirmed) follow-up candidate; return the best available N even "
+            "when fewer than N clear the strict production bar below"
+        ),
+        "strict_production_bar_fpp_max_exclusive": FOLLOW_UP_FPP_MAX,
+        "strict_production_bar_confidence_min_exclusive": FOLLOW_UP_CONFIDENCE_MIN,
+        "strict_production_bar_pathways": list(FOLLOW_UP_PATHWAYS),
         "latest_search_must_be_new": True,
     }
