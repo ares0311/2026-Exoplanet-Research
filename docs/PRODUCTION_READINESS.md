@@ -31,7 +31,21 @@ stronger validity/provenance audit: source bytes, model artifacts, typed failure
 context, immutable-history triggers, relational/content hashes, and acceptance
 evidence are now fail-closed and independently recomputable from
 `artifacts/manifests/hunter_live_acceptance_v5.json` and its compressed
-schema-v5 production snapshot.)
+schema-v5 production snapshot. Version 0.3.10 then closed a genuine business-
+requirement defect that versions 0.3.3-0.3.9 had all signed off as correct:
+`create_search()` hard-failed and created no search whenever fewer candidates
+than requested cleared the follow-up quality gate, including the documented
+"zero eligible from 202 evaluated" outcome. A normal top-N request must return
+the best available N with quality reported separately, never fail outright
+because none clear a quality bar. `follow_up_universe()` eligibility is now
+availability, not the strict FPP/confidence/pathway bar; that bar is reported
+per-candidate instead of removing candidates from the pool. Verified against a
+disposable copy of the real production database: the 202-target durable
+universe now reports 190 available follow-up candidates (zero before), and a
+10-target follow-up request returns exactly 10 best-available targets instead
+of raising. See `artifacts/manifests/hunter_live_acceptance_v7.json`. New-mode
+adaptive discovery expansion when the live sweep itself returns too few raw
+candidates remains open as the next highest-priority Hunter gap.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
 Test baseline: 3,057 default tests passing; 2 `integration_live` tests excluded by
@@ -59,7 +73,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.3.9 is the current development version. Version 0.3.2 added the durable,
+Version note: 0.3.10 is the current development version. Version 0.3.2 added the durable,
 non-AI-dependent Hunter workflow and exact `Create-New-Search`,
 `Run-New-Search`, and `Show-Follow-Ups` entry points. Candidate catalog,
 immutable manifest, run attempts, append-only target history, and follow-up

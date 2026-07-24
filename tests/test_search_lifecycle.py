@@ -205,6 +205,34 @@ def test_history_universe_selects_unfollowed_qualifying_new_result(tmp_path: Pat
     assert len(search["targets"][0]["candidate"]["prior_searches"]) == 1
 
 
+def test_follow_up_universe_includes_signals_below_strict_production_bar(
+    tmp_path: Path,
+) -> None:
+    """A real candidate_found detection that misses the strict FPP/confidence bar
+    must remain a selectable (lower-ranked) follow-up candidate, not disappear
+    entirely (directive: do not fail a normal top-N request because no candidate
+    crosses an arbitrary quality threshold)."""
+    store = HunterStore(tmp_path / "hunter.sqlite3")
+    manifest = _history_manifest(tmp_path, include_follow_up=False)
+    weak_entry = manifest["sources"][0]["entries"][0]
+    weak_entry["best_fpp"] = 0.42
+    weak_entry["best_detection_confidence"] = 0.55
+    weak_entry["best_pathway"] = "planet_hunters_discussion"
+    store.import_history_manifest(manifest)
+
+    universe = {row.target_id: row for row in store.follow_up_universe()}
+    weak = universe["TIC 1"]
+    assert weak.eligible is True
+    # HunterCandidate.metrics is float|int|str|None typed, so bool coerces to 0.0/1.0.
+    assert bool(weak.metrics["meets_strict_follow_up_bar"]) is False
+    assert weak.eligibility_reason == (
+        "new-search evidence found a signal below the strict follow-up bar"
+    )
+
+    search = _create(store, list(universe.values()), count=1, mode="follow-up")
+    assert search["targets"][0]["target_id"] == "TIC 1"
+
+
 def test_ineligible_candidates_never_enter_manifest(tmp_path: Path) -> None:
     store = HunterStore(tmp_path / "hunter.sqlite3")
     rejected = _candidate(99).model_copy(
@@ -214,10 +242,29 @@ def test_ineligible_candidates_never_enter_manifest(tmp_path: Path) -> None:
     assert search["targets"][0]["target_id"] == "TIC 1"
 
 
-def test_insufficient_eligible_pool_fails_without_creating_search(tmp_path: Path) -> None:
+def test_insufficient_pool_returns_best_available_fewer_than_requested(
+    tmp_path: Path,
+) -> None:
+    """A shortfall must never block a normal top-N request (directive: rank and
+    absolute quality are different; return fewer than N only when fewer than N
+    valid candidates actually exist)."""
     store = HunterStore(tmp_path / "hunter.sqlite3")
-    with pytest.raises(RuntimeError, match="only 1 eligible"):
-        _create(store, [_candidate(1)], count=2)
+    search = _create(store, [_candidate(1)], count=2)
+    assert search["requested_target_count"] == 2
+    assert search["selected_target_count"] == 1
+    assert search["targets"][0]["target_id"] == "TIC 1"
+    assert store.open_searches()[0]["search_id"] == search["search_id"]
+
+
+def test_zero_available_candidates_still_fails_without_creating_search(
+    tmp_path: Path,
+) -> None:
+    store = HunterStore(tmp_path / "hunter.sqlite3")
+    rejected = _candidate(1).model_copy(
+        update={"eligible": False, "eligibility_reason": "already searched"}
+    )
+    with pytest.raises(RuntimeError, match="No new candidates are currently available"):
+        _create(store, [rejected], count=1)
     assert store.open_searches() == []
 
 
