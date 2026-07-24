@@ -48,7 +48,14 @@ closed that remaining gap: `_select_live_new_candidates()` now widens the Tmag
 window (bounded retries) and retries before handing the result to
 `create_search()`, instead of raising when the sweep is thin. Verified
 offline against a scripted discovery double; no live 126-tile MAST sweep was
-run from this session. See `artifacts/manifests/hunter_live_acceptance_v8.json`.)
+run from this session. See `artifacts/manifests/hunter_live_acceptance_v8.json`.
+A follow-up live probe then closed the one remaining directive-required
+scenario without live evidence: full create-through-follow-up-registration
+execution (not just selection) on a real target (TIC 261136679, pi Mensae c)
+against a disposable copy of the real production database, using the actual
+production pipeline path. It completed with zero errors, real typed
+provenance, one new follow-up registration, and clean integrity before and
+after. See `artifacts/manifests/hunter_live_acceptance_v9.json`.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
 Test baseline: 3,057 default tests passing; 2 `integration_live` tests excluded by
