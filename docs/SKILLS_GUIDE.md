@@ -95,7 +95,23 @@ See `docs/REPRESENTATION_PREPROCESSING_BENCHMARK.md`.
 
 ## Target discovery workflow
 
-The typical discovery workflow chains several Skills:
+**This section describes a manual/exploratory Skills chain, not the
+canonical production discovery path.** The canonical system for "given a
+request for N targets, return the best available N targets to search next"
+is EXO-Hunter: `Create-New-Search` / `Run-New-Search` / `Show-Follow-Ups`
+(see `docs/HUNTER_PRODUCTION_WORKFLOW.md`). Hunter durably tracks every
+target it has searched and excludes them from future `new`-mode selection;
+running the manual chain below does **not** write to Hunter's durable
+system, so Hunter has no way to know a target was already covered this way
+and could select it again as "novel." If you use this manual chain for real
+target selection (not just ad hoc exploration of a specific TIC list you
+already have), reconcile the results into Hunter's history yourself before
+relying on Hunter's novelty exclusion for those targets — the pattern is
+the same one used to import the seven legacy discovery logs into
+`data_selection/hunter_prior_search_history_v1.json` (see
+`src/exo_toolkit/hunter_history.py`).
+
+The typical manual/exploratory discovery workflow chains several Skills:
 
 ```
 star_scanner → batch_scan → alert_filter → rank_candidates → watchlist
