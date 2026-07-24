@@ -10,6 +10,25 @@ for the next bounded live-search evidence run)
 
 ## Current Production Direction (Read This First)
 
+**Superseded notice (added 2026-07-24):** this file predates EXO-Hunter
+(last content update 2026-07-11; Hunter reached PROD afterward) and its
+"Discovery Workflow" section below still calls the manual
+`star_scanner.py`/`batch_scan.py` chain "The Only Authorized Loop." That is
+no longer true. EXO-Hunter (`Create-New-Search` / `Run-New-Search` /
+`Show-Follow-Ups`, see `docs/HUNTER_PRODUCTION_WORKFLOW.md`) is now the
+canonical, autonomous "given a request for N targets, return the best
+available N targets to search next" production path — adaptive discovery,
+durable identity/history exclusion, ranking, execution, and follow-up
+tracking in one integrated system. The step-by-step loop below remains
+useful as a manual/exploratory reference (e.g. checking one TIC ID you
+already have in mind), but running it does **not** write to Hunter's
+durable history, so Hunter cannot exclude those targets from future
+`new`-mode selection unless the results are reconciled into Hunter's
+history the same way the seven legacy discovery logs were (see
+`src/exo_toolkit/hunter_history.py` and
+`data_selection/hunter_prior_search_history_v1.json`). Do not treat this
+file's older workflow as the primary path for real target selection.
+
 EXO-Hunter lifecycle validity and provenance requirements are canonical in
 `docs/HUNTER_PRODUCTION_WORKFLOW.md §Validity and provenance acceptance gates`.
 Do not accept a Hunter release from self-declared evidence strings: source
@@ -72,7 +91,12 @@ The output of this project is a **ranked candidate list** that survives algorith
 
 ---
 
-## The Discovery Workflow (The Only Authorized Loop)
+## The Discovery Workflow (Manual/Exploratory Reference — See Superseded Notice Above)
+
+For real target selection, use EXO-Hunter (`Create-New-Search --mode new`,
+`Run-New-Search`, `Show-Follow-Ups`) instead of Steps 1-2 below. Steps 3-4
+(algorithmic rejection and escalation criteria) remain accurate reference
+regardless of which selection path produced the candidate.
 
 ```
 Step 1: SELECT targets from unanalyzed data feeds
@@ -80,7 +104,9 @@ Step 1: SELECT targets from unanalyzed data feeds
          → Prioritize: Tmag 12–15, recent sectors, long-baseline targets
 
 Step 2: SCAN with BLS
-         → Skills/star_scanner.py or Skills/batch_scan.py
+         → Skills/star_scanner.py or Skills/batch_scan.py (manual/exploratory
+           only; see superseded notice above — use EXO-Hunter for real
+           target selection)
          → Per-target: exo <TIC-ID> --scorer [bayesian|xgboost|ensemble]
          → Collect candidates where FPP < 0.50 and detection_confidence > 0.30
 

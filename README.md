@@ -17,11 +17,11 @@ XGBoost, CNN, and ensemble scorers are optional.
 
 ## Current production state
 
-Version 0.3.9 is the current release state represented by this repository.
+Version 0.3.11 is the current release state represented by this repository.
 
 | Area | Status | Current evidence |
 |---|---|---|
-| EXO-Hunter lifecycle | **PROD accepted** | Recomputed schema-v5/source evidence plus verifier-enforced versioned ranking contracts in [`hunter_live_acceptance_v6.json`](artifacts/manifests/hunter_live_acceptance_v6.json) |
+| EXO-Hunter lifecycle | **PROD accepted** | Best-available-N selection (new and follow-up), adaptive discovery expansion, and live create-through-execution evidence in [`hunter_live_acceptance_v9.json`](artifacts/manifests/hunter_live_acceptance_v9.json) (extends v8/v7; see `docs/HUNTER_PRODUCTION_WORKFLOW.md`) |
 | Bayesian scorer | **Production ready** | Default non-ML scorer; no model artifact required |
 | XGBoost scorer | **Production ready** | Trained on 7,586 Kepler KOIs; held-out AUC 0.992 |
 | XGBoost + Bayesian ensemble | **Production ready** | Conservative fallback when no CNN is supplied |
