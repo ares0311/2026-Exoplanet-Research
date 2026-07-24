@@ -1,0 +1,49 @@
+{
+  "schema_version": 2,
+  "acceptance_id": "exo-hunter-live-acceptance-v8",
+  "accepted_at": "2026-07-24T00:00:00Z",
+  "status": "pass",
+  "project": "2026 Exoplanet Research",
+  "product": "EXO-Hunter",
+  "code_version": "0.3.11",
+  "implementation_git_commit": "41e1b06",
+  "core_ai_dependency": false,
+  "baseline_acceptance": {
+    "acceptance_id": "exo-hunter-live-acceptance-v5",
+    "artifact": "artifacts/manifests/hunter_live_acceptance_v5.json",
+    "production_snapshot": "artifacts/evidence/hunter_production_snapshot_v5.sqlite3.gz",
+    "compressed_snapshot_sha256": "44aa9306f2bf4b64e3517f8b686bf55e6d2e87e3a56f9e77b124f59eca2c0b9c",
+    "reason": "The durable production rows and source bytes are unchanged; v8, like v6 and v7, builds on that same snapshot."
+  },
+  "supersedes": {
+    "acceptance_id": "exo-hunter-live-acceptance-v7",
+    "artifact": "artifacts/manifests/hunter_live_acceptance_v7.json",
+    "reason": "v7 fixed the follow-up hard-eligibility-gate defect but explicitly named new-mode adaptive discovery expansion as a remaining gap. v8 closes that gap. v7 remains valid historical evidence and is not modified."
+  },
+  "corrected_defect": {
+    "summary": "_select_live_new_candidates() raised RuntimeError immediately whenever the fixed-magnitude-window live TIC sweep returned fewer raw candidates than requested, with no attempt to broaden the search before giving up.",
+    "why_it_matters": "The directive's canonical selection loop is explicit: candidate pools are adaptive, never arbitrarily fixed, and discovery should expand when the top-N result is not sufficiently supported before falling back to fewer than N. A hard raise at the first thin sweep violates that directly, independent of the follow-up-mode defect v7 fixed.",
+    "fix": "Bounded expansion loop (up to 3 retries, +/-1.0 Tmag per step, clamped to [4.0, 18.0] Tmag): widen the magnitude window and retry when the sweep at the current window returns fewer raw candidates than requested. Never raises for insufficiency; every attempt is recorded in search_log, and the final best-effort raw pool (however large) is handed to create_search(), which alone decides whether to return fewer than N or fail closed on genuine zero."
+  },
+  "derived_evidence": {
+    "discovery_never_hard_fails_on_thin_sweep": true,
+    "expansion_bounded_and_logged": true,
+    "final_insufficiency_decision_delegated_to_create_search": true,
+    "hard_tmag_bounds_respected": [4.0, 18.0]
+  },
+  "verification": {
+    "method": "Offline: a scripted double for Skills.star_scanner.select_targets returning a thin result at the starting Tmag window and a richer result once widened, verifying the widening loop actually retries, records every attempt, and terminates without raising even when the expansion budget is exhausted and the pool is still short.",
+    "focused_tests_passed": 59,
+    "focused_test_command": ".venv/bin/python -m pytest -o addopts='' tests/test_hunter_validity.py tests/test_search_lifecycle.py tests/test_hunter_cli.py -q",
+    "full_suite_command": ".venv/bin/python -m pytest",
+    "full_suite_tests_passed": 3081,
+    "quality_gate_command": ".venv/bin/python Skills/run_quality_gates.py",
+    "not_yet_demonstrated_live": "No live 126-tile MAST sweep was run from this session to prove the widening loop end-to-end against the real catalog; this sandbox has no execution path to a live star_scanner run outside the fixed exo_guard MCP commands. The underlying select_targets()/tmag_range query mechanism this loop drives was already proven live in prior star_scanner work (0.2.98-0.2.100); what is new here (the retry/widen orchestration) is offline-verified only."
+  },
+  "remaining_limitations": [
+    "The 126-tile grid itself (not just the magnitude window) remains a fixed, documented sample of the sky (~99 sq deg); this release widens magnitude range only, not tile coverage.",
+    "Expansion bounds (3 retries, 1.0 Tmag step, [4.0, 18.0] hard clamp) are conservative versioned project policy, not a claim of optimal search-breadth tuning.",
+    "The widening loop's real-catalog behavior is offline-verified only (see not_yet_demonstrated_live above).",
+    "No external submission, alert, confirmation, or discovery claim is authorized."
+  ]
+}

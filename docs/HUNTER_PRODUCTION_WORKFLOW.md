@@ -4,9 +4,10 @@
 
 Version 0.3.3 closes the reviewed-prior-result bridge left open by version 0.3.2.
 The shell entry points share one durable SQLite system of record and can run
-without an AI model. Hunter acceptance is PROD on version 0.3.10. The recomputed
+without an AI model. Hunter acceptance is PROD on version 0.3.11. The recomputed
 production snapshot is in `hunter_live_acceptance_v5.json`; the current
-follow-up selection-semantics delta is in `hunter_live_acceptance_v7.json`.
+adaptive-selection delta is in `hunter_live_acceptance_v8.json` (which
+supersedes `hunter_live_acceptance_v7.json`).
 
 **Version 0.3.10** corrects the follow-up selection contract itself, not just
 its identity. Versions 0.3.3-0.3.9 all treated "zero targets clear the strict
@@ -25,12 +26,17 @@ production database: the 202-target durable follow-up universe now reports
 190 available candidates (zero under the old gate), and requesting 10
 follow-up targets returns exactly 10 best-available targets instead of
 raising. See `artifacts/manifests/hunter_live_acceptance_v7.json`.
-New-mode adaptive discovery expansion (widening the live sweep itself when it
-returns fewer raw candidates than requested) is not yet implemented; current
-default pool sizing (>=10,000 candidates for typical N) has not been observed
-to run dry against the live TIC catalog, but the fixed 126-tile/tmag-range
-sweep will eventually exhaust as more targets are excluded by repeated real
-usage. That is the next highest-priority Hunter gap.
+**Version 0.3.11** closes that remaining gap: `_select_live_new_candidates()`
+no longer raises when the fixed-magnitude-window sweep returns fewer raw
+candidates than requested. It widens the Tmag window (up to 3 retries, ±1.0
+mag per step, clamped to [4.0, 18.0]) and retries before handing whatever it
+found to `create_search()`, which alone decides whether to return fewer than
+N or fail closed on genuine zero. Every attempt (Tmag range, raw candidate
+count) is recorded in `selector_log.discovery_expansion_attempts`. The
+126-tile grid itself remains a fixed, documented ~99 sq deg sample; this
+widens the magnitude window per tile, not tile coverage. Verified offline
+against a scripted discovery double (no live 126-tile MAST sweep was run from
+this session — see `artifacts/manifests/hunter_live_acceptance_v8.json`).
 An earlier audit found that consumed actionable follow-ups remained open and
 could be scheduled repeatedly. Version 0.3.5 adds durable scheduling/disposition events
 and parent-child recommendation relationships. Version 0.3.6 makes
