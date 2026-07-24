@@ -410,6 +410,9 @@ Start with these documents:
 5. [`docs/astrometrics_data_selection_policy.md`](docs/astrometrics_data_selection_policy.md)
    and [`docs/astrometrics_external_and_cloud_storage_policy.md`](docs/astrometrics_external_and_cloud_storage_policy.md)
    — data roles, download limits, cache, external-drive, and retention rules.
+6. [`docs/HUNTER_CROSS_PROJECT_INTERFACE.md`](docs/HUNTER_CROSS_PROJECT_INTERFACE.md)
+   — if you arrived here from `2026 Technosignatures` or
+   `2026 Near Earth Objects`, start there instead of here.
 
 ## Scientific and operational guardrails
 

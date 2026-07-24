@@ -1005,6 +1005,10 @@ The project is close to having a strong external research plan. The remaining mi
 
 1. Decide whether the three repos should share one package, `astrometrics_ml_hardening`, or copy a common folder structure into each repo.
 2. Decide where durable data manifests and candidate ledgers live: inside each repo, in a shared data repo, or in an external database.
+   **Answered for `2026 Exoplanet Research`, 2026-07-24: inside this repo,
+   with a portable hash-verified export for sibling repos to read/copy — see
+   `docs/HUNTER_CROSS_PROJECT_INTERFACE.md` and
+   `docs/research/agent_decision_log.md`.**
 3. Decide the first canonical eval set for each repo. This is the most important near-term scientific control.
 4. Decide whether human review will be notebook-based first or whether a small local web UI is worth building.
 5. Decide how large local training should be allowed to get on your Mac before moving GPU-heavy work elsewhere.
