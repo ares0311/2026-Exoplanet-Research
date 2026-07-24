@@ -1,6 +1,6 @@
 # PRODUCTION READINESS
 
-Last reviewed: 2026-07-19 (formal production-ensemble acceptance remains PASS: the
+Last reviewed: 2026-07-24 (formal production-ensemble acceptance remains PASS: the
 catalog ephemeris for pi Mensae c was recovered within 0.005% with ensemble
 FPP 0.4405, while the TOI-146.01 false-positive control produced no signal.
 No Tier 1 gaps remain open; the bounded Phase 3 representation variability/
@@ -58,8 +58,8 @@ provenance, one new follow-up registration, and clean integrity before and
 after. See `artifacts/manifests/hunter_live_acceptance_v9.json`.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
-Test baseline: 3,057 default tests passing; 2 `integration_live` tests excluded by
-the configured marker expression (2026-07-19; 6×6 gate: 10/10 gates
+Test baseline: 3,081 default tests passing; 2 `integration_live` tests excluded by
+the configured marker expression (2026-07-24; 6×6 gate: 10/10 gates
 including two verifiable-agent-reliability checks — see
 `docs/RELIABILITY_CONTROLS.md`)
 
