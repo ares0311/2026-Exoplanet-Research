@@ -5,9 +5,11 @@
 Version 0.3.3 closes the reviewed-prior-result bridge left open by version 0.3.2.
 The shell entry points share one durable SQLite system of record and can run
 without an AI model. Hunter acceptance is PROD on version 0.3.11. The recomputed
-production snapshot is in `hunter_live_acceptance_v5.json`; the current
-adaptive-selection delta is in `hunter_live_acceptance_v8.json` (which
-supersedes `hunter_live_acceptance_v7.json`).
+production snapshot is in `hunter_live_acceptance_v5.json`; the adaptive-
+selection delta is in `hunter_live_acceptance_v8.json` (which supersedes
+`hunter_live_acceptance_v7.json`); `hunter_live_acceptance_v9.json` adds live
+create-through-follow-up-registration execution evidence on a real target
+(additive to v8, not a correction).
 
 **Version 0.3.10** corrects the follow-up selection contract itself, not just
 its identity. Versions 0.3.3-0.3.9 all treated "zero targets clear the strict

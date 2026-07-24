@@ -1,0 +1,57 @@
+{
+  "schema_version": 2,
+  "acceptance_id": "exo-hunter-live-acceptance-v9",
+  "accepted_at": "2026-07-24T06:24:54Z",
+  "status": "pass",
+  "project": "2026 Exoplanet Research",
+  "product": "EXO-Hunter",
+  "code_version": "0.3.11",
+  "implementation_git_commit": "bd229f6",
+  "core_ai_dependency": false,
+  "baseline_acceptance": {
+    "acceptance_id": "exo-hunter-live-acceptance-v5",
+    "artifact": "artifacts/manifests/hunter_live_acceptance_v5.json",
+    "production_snapshot": "artifacts/evidence/hunter_production_snapshot_v5.sqlite3.gz",
+    "compressed_snapshot_sha256": "44aa9306f2bf4b64e3517f8b686bf55e6d2e87e3a56f9e77b124f59eca2c0b9c",
+    "reason": "The durable production rows and source bytes are unchanged; v9 adds live end-to-end execution evidence, not a data or contract change."
+  },
+  "extends": {
+    "acceptance_id": "exo-hunter-live-acceptance-v8",
+    "artifact": "artifacts/manifests/hunter_live_acceptance_v8.json",
+    "reason": "v7/v8 proved best-available-N selection (creation only) against real durable history. v9 closes the one remaining directive-required scenario neither had live evidence for: full create -> execute -> persist -> follow-up-registration on a real target, using the exact fixed create_search()/follow_up code path. v7/v8 remain valid unmodified evidence; v9 is additive, not a correction."
+  },
+  "live_execution_evidence": {
+    "method": "HunterStore/execute_search() API invoked directly (the same code _pipeline_runner/run_pipeline path Run-New-Search uses) against a disposable local copy of the real production database data/hunter_searches.sqlite3; the real file was never mutated, and the disposable copy was deleted after the probe. Scorer: bayesian (no external model artifacts). Target: TIC 261136679 (pi Mensae c), a real TESS target with a documented reliable confirmed signal used elsewhere in this project's own formal acceptance evidence.",
+    "steps_proven": [
+      "create_search(mode=follow-up, requested=1) created an exact pending manifest",
+      "execute_search() performed a real live MAST fetch, clean, BLS search, vet, and Bayesian score for the real target",
+      "target_search_history recorded status=candidate_found with zero error, one individual_scores row, and complete typed ExecutionProvenance (candidate_snapshot, code_version, git_commit, scorer, pipeline_context, runner)",
+      "the detected signal was registered as a follow-up recommendation (follow_ups_registered=1), joining the pre-existing durable registry",
+      "integrity_summary() remained ok with zero issues after the live write"
+    ],
+    "raw_result": {
+      "search_status": "completed",
+      "targets_processed": 1,
+      "targets_succeeded": 1,
+      "targets_failed": 0,
+      "follow_ups_registered": 1,
+      "history_status": "candidate_found",
+      "history_error": null,
+      "individual_scores_count": 1,
+      "follow_up_registry_rows_after": 2,
+      "integrity_ok": true,
+      "integrity_issues": []
+    }
+  },
+  "verification": {
+    "full_suite_command": ".venv/bin/python -m pytest",
+    "full_suite_tests_passed": 3081,
+    "live_probe_note": "The live-execution probe itself was a temporary, non-committed test file removed immediately after capturing this evidence; it is not part of the regression suite."
+  },
+  "remaining_limitations": [
+    "This is one live execution on one known-good real target with the bayesian scorer; it is a proof that the pipeline works end to end, not a broad live-scale acceptance run (see the existing 10,000-candidate / 202-target durable-history evidence in v4-v8 for scale).",
+    "xgboost/ensemble/cnn/full-ensemble scorer modes were not exercised by this probe; they were already covered by prior acceptance evidence (v1-v2) and are unaffected by the 0.3.10/0.3.11 changes.",
+    "No external submission, alert, confirmation, or discovery claim is authorized.",
+    "New-mode adaptive discovery expansion's widening loop itself (as opposed to the execution path proven here) remains offline-verified only per v8; this probe did not exercise a live 126-tile sweep."
+  ]
+}

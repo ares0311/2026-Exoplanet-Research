@@ -690,6 +690,20 @@ execution path to one outside the fixed `exo_guard` MCP commands. See
 The version 0.3.11 release gate passed 3,081 default tests plus Ruff/mypy as
 10/10 supervised gates under the canonical 6x6 topology.
 
+Version 0.3.11's follow-up PR also closes the one remaining directive-
+required business-validation scenario that neither 0.3.10 nor 0.3.11 had
+live evidence for: a genuine live create -> execute -> persist -> follow-up-
+registration run, not just candidate selection. Using a disposable copy of
+the real production database (the real file was never mutated), a real
+follow-up search was created for TIC 261136679 (pi Mensae c) and executed
+with the Bayesian scorer through the actual `_pipeline_runner`/`run_pipeline`
+path: real MAST fetch/clean/BLS search/vet/score completed with zero errors,
+one individual-signal row, complete typed `ExecutionProvenance`, one new
+follow-up recommendation registered, and `integrity_summary()` clean before
+and after. See `artifacts/manifests/hunter_live_acceptance_v9.json`.
+The version 0.3.11 evidence-release gate passed 3,081 default tests plus
+Ruff/mypy as 10/10 supervised gates under the canonical 6x6 topology.
+
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
