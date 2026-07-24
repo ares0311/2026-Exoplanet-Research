@@ -185,6 +185,99 @@ def test_live_selector_stamps_versioned_information_gain_contract(
     assert candidate.metrics["scientific_suitability"] == pytest.approx(0.8)
     assert candidate.ranking_score == pytest.approx(67.2)
     assert search_log["stage_two_eligible_count"] == 1
+    assert search_log["discovery_expansion_attempts"] == [
+        {"attempt": 0, "tmag_range": [6.0, 13.5], "raw_candidates_returned": 1}
+    ]
+    assert search_log["final_tmag_range"] == [6.0, 13.5]
+
+
+def test_live_selector_widens_tmag_range_when_sweep_is_thin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Directive: candidate pools are adaptive, never arbitrarily fixed — expand
+    discovery before settling for fewer than requested."""
+    calls: list[tuple[float, float]] = []
+
+    def fake_select_targets(
+        _n: int,
+        *,
+        tmag_range: tuple[float, float],
+        exclude_tic_ids: set[int],
+        full_sweep: bool,
+        max_workers: int,
+        search_log: dict[str, object],
+    ) -> list[dict[str, object]]:
+        calls.append(tmag_range)
+        if tmag_range == (12.0, 14.5):
+            return [{"tic_id": 1, "priority": 0.5, "tmag": 13.0}]
+        return [
+            {"tic_id": 1, "priority": 0.5, "tmag": 13.0},
+            {"tic_id": 2, "priority": 0.6, "tmag": 12.0},
+            {"tic_id": 3, "priority": 0.7, "tmag": 14.0},
+        ]
+
+    scanner = SimpleNamespace(
+        _load_toi_tic_ids=lambda **_: set(),
+        _load_ctoi_tic_ids=lambda **_: set(),
+        _load_confirmed_host_tic_ids=lambda **_: set(),
+        _load_asassn_variable_tic_ids=lambda *_args, **_kwargs: set(),
+        select_targets=fake_select_targets,
+        inspect_target_products=lambda *_args, **_kwargs: {
+            "products": ["product-1"],
+            "total_bytes": 1_000_000,
+            "priority": 0.5,
+        },
+    )
+    monkeypatch.setattr("exo_toolkit.hunter_cli._load_project_skill", lambda _: scanner)
+
+    candidates, search_log = _select_live_new_candidates(
+        targets=3,
+        pool_size=10,
+        workers=1,
+        tmag_range=(12.0, 14.5),
+        store=HunterStore(tmp_path / "hunter.sqlite3"),
+        progress_fn=None,
+    )
+
+    assert calls == [(12.0, 14.5), (11.0, 15.5)]
+    assert len(candidates) == 3
+    attempts = search_log["discovery_expansion_attempts"]
+    assert [a["raw_candidates_returned"] for a in attempts] == [1, 3]
+    assert search_log["final_tmag_range"] == [11.0, 15.5]
+
+
+def test_live_selector_expansion_never_raises_when_still_thin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Discovery must never hard-fail; create_search() decides best-available-N."""
+    scanner = SimpleNamespace(
+        _load_toi_tic_ids=lambda **_: set(),
+        _load_ctoi_tic_ids=lambda **_: set(),
+        _load_confirmed_host_tic_ids=lambda **_: set(),
+        _load_asassn_variable_tic_ids=lambda *_args, **_kwargs: set(),
+        select_targets=lambda *_args, **_kwargs: [
+            {"tic_id": 1, "priority": 0.5, "tmag": 13.0}
+        ],
+        inspect_target_products=lambda *_args, **_kwargs: {
+            "products": ["product-1"],
+            "total_bytes": 1_000_000,
+            "priority": 0.5,
+        },
+    )
+    monkeypatch.setattr("exo_toolkit.hunter_cli._load_project_skill", lambda _: scanner)
+
+    candidates, search_log = _select_live_new_candidates(
+        targets=100,
+        pool_size=10,
+        workers=1,
+        tmag_range=(12.0, 14.5),
+        store=HunterStore(tmp_path / "hunter.sqlite3"),
+        progress_fn=None,
+    )
+
+    assert len(candidates) == 1
+    assert len(search_log["discovery_expansion_attempts"]) == 4  # initial + 3 expansions
+    assert search_log["final_tmag_range"] == [9.0, 17.5]
 
 
 def test_invalid_target_count_fails_before_live_selection(tmp_path: Path) -> None:
