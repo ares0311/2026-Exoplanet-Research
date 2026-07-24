@@ -9,7 +9,15 @@ production snapshot is in `hunter_live_acceptance_v5.json`; the adaptive-
 selection delta is in `hunter_live_acceptance_v8.json` (which supersedes
 `hunter_live_acceptance_v7.json`); `hunter_live_acceptance_v9.json` adds live
 create-through-follow-up-registration execution evidence on a real target
-(additive to v8, not a correction).
+(additive to v8, not a correction). `hunter_live_acceptance_v10.json` closes
+the one gap v9 explicitly left open: a real live 126-tile MAST sweep exercising
+the new-mode adaptive-discovery-expansion loop itself, not just an offline
+double. Execution (light-curve fetch) for the freshly-discovered targets did
+not complete in that session — a sandbox filesystem write restriction on
+`~/.lightkurve/cache` specific to that interactive agent session, not a code
+defect (the failure was recorded correctly per Fail Loudly, not swallowed).
+Full new-mode create-through-execution on genuinely fresh targets remains open
+pending either a human-run reproduction or a session with that path writable.
 
 **Version 0.3.10** corrects the follow-up selection contract itself, not just
 its identity. Versions 0.3.3-0.3.9 all treated "zero targets clear the strict
@@ -36,9 +44,13 @@ found to `create_search()`, which alone decides whether to return fewer than
 N or fail closed on genuine zero. Every attempt (Tmag range, raw candidate
 count) is recorded in `selector_log.discovery_expansion_attempts`. The
 126-tile grid itself remains a fixed, documented ~99 sq deg sample; this
-widens the magnitude window per tile, not tile coverage. Verified offline
-against a scripted discovery double (no live 126-tile MAST sweep was run from
-this session — see `artifacts/manifests/hunter_live_acceptance_v8.json`).
+widens the magnitude window per tile, not tile coverage. Originally verified
+offline only against a scripted discovery double (see
+`artifacts/manifests/hunter_live_acceptance_v8.json`); a later session then
+ran it live against real MAST data (see `hunter_live_acceptance_v10.json`
+above) — a deliberately narrow Tmag 4.0-4.1 window returned 0 raw candidates
+from a real 126-tile sweep, the loop widened it to 4.0-5.1, and a second real
+sweep found 13, enough to satisfy the requested 5 with zero shortfall.
 An earlier audit found that consumed actionable follow-ups remained open and
 could be scheduled repeatedly. Version 0.3.5 adds durable scheduling/disposition events
 and parent-child recommendation relationships. Version 0.3.6 makes

@@ -55,7 +55,24 @@ execution (not just selection) on a real target (TIC 261136679, pi Mensae c)
 against a disposable copy of the real production database, using the actual
 production pipeline path. It completed with zero errors, real typed
 provenance, one new follow-up registration, and clean integrity before and
-after. See `artifacts/manifests/hunter_live_acceptance_v9.json`.)
+after. See `artifacts/manifests/hunter_live_acceptance_v9.json`. A later
+session then closed the one gap v9 explicitly left open: the new-mode
+adaptive-discovery-expansion loop was verified live against real MAST, not
+just an offline double. A deliberately narrow, bright Tmag 4.0-4.1 window
+returned 0 raw candidates from a real 126-tile sweep; the loop widened it to
+4.0-5.1 and a second real sweep found 13, satisfying the requested 5 targets
+with zero shortfall (verified directly from the disposable database's
+`selector_log.discovery_expansion_attempts`, not just console output).
+Executing those freshly-discovered targets did not complete in that session:
+all 5 failed with `PermissionError` writing to `~/.lightkurve/cache`, a
+sandbox filesystem write restriction specific to that interactive agent
+session (the real production database was confirmed byte-identical before
+and after; the disposable database passed integrity and foreign-key checks).
+This is not a code defect — the failure was recorded correctly per Fail
+Loudly, not swallowed — but it does mean full new-mode create-through-
+execution on genuinely fresh (never-cached) targets remains unproven from an
+interactive sandboxed session. See
+`artifacts/manifests/hunter_live_acceptance_v10.json`.)
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
 Test baseline: 3,081 default tests passing; 2 `integration_live` tests excluded by
@@ -1079,6 +1096,7 @@ These are enforced in code and must never be bypassed:
 | CNN promotion readiness package | **Complete** — temperature-calibration promotion tooling, model card, reproducibility manifest, data-role registry, benchmark designation, storage/retention ledger updates, and exact selected artifact scope are GitHub-visible | Agent |
 | CNN production promotion | **Complete in promotion PR** — human approved checkpoint SHA `f29e6891c255289fa1e2eddad1fb6ca131c063cf11c24b8113e0e29d049441c5`; selected artifacts are copied to `models/cnn/benchmark_cnn_v1/` and registered in `models/registry.json` | Agent + human approval |
 | Stacking weight calibration | **Complete** — calibrated on 588 held-out K2 examples (XGBoost=0.95/CNN=0.00/Bayesian=0.05, AUC 0.9576) and wired into `cli.py` | Agent + human live snippet fetch |
+| Full new-mode create-through-execution on fresh (never-cached) targets | Discovery/adaptive-expansion is now live-verified (`hunter_live_acceptance_v10.json`); execution failed only because `~/.lightkurve/cache` sits outside this interactive session's sandbox write scope, not because of a code defect. Either re-run `Run-New-Search --db data/hunter_searches.disposable_new_mode_live_acceptance.sqlite3 --search-id exo-search-20260724T124908Z-9c6da64818d1 --scorer bayesian` from an unrestricted terminal, or add `~/.lightkurve` (or a project-approved redirect) to a future agent session's sandbox-writable paths | Human, or Agent with an expanded sandbox grant |
 
 ---
 

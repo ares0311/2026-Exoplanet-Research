@@ -1,0 +1,72 @@
+{
+  "schema_version": 2,
+  "acceptance_id": "exo-hunter-live-acceptance-v10",
+  "accepted_at": "2026-07-24T12:52:00Z",
+  "status": "partial_pass",
+  "project": "2026 Exoplanet Research",
+  "product": "EXO-Hunter",
+  "code_version": "0.3.11",
+  "implementation_git_commit": "f7cd34d",
+  "core_ai_dependency": false,
+  "extends": {
+    "acceptance_id": "exo-hunter-live-acceptance-v9",
+    "artifact": "artifacts/manifests/hunter_live_acceptance_v9.json",
+    "reason": "v9 explicitly named the one remaining directive-required scenario without live evidence: 'New-mode adaptive discovery expansion's widening loop itself ... remains offline-verified only per v8; this probe did not exercise a live 126-tile sweep.' v10 closes the discovery/expansion half of that gap with real live MAST evidence and attempts (but does not close) the execution half. v7/v8/v9 remain valid unmodified evidence; v10 is additive."
+  },
+  "method": "Create-New-Search and Run-New-Search console entry points invoked directly (not via .venv/bin/python, which this interactive session's sandbox cannot execute) against a disposable local copy of the real production database data/hunter_searches.disposable_new_mode_live_acceptance.sqlite3. The real file data/hunter_searches.sqlite3 was never mutated (MD5 d7b84569cf27f947e811409823f9b287 confirmed identical before and after). The disposable copy was retained (not deleted) alongside this evidence for independent reproduction; it is git-ignored (data/*.sqlite3).",
+  "discovery_and_expansion_evidence": {
+    "goal": "Prove live, against real MAST, that a request for N new targets can still return the best available N when the initial discovery window is thin, via the 0.3.11 adaptive-expansion loop -- the exact scenario v8/v9 only verified against an offline scripted double.",
+    "design": "Requested only 5 targets starting from a deliberately narrow, bright Tmag 4.0-4.1 window (near the hard clamp _TMAG_HARD_MIN=4.0) so a full 126-tile live sweep would very likely return zero raw candidates before exclusions, forcing at least one real widen-and-retry cycle.",
+    "command": "Create-New-Search --db data/hunter_searches.disposable_new_mode_live_acceptance.sqlite3 --targets 5 --mode new --tmag-min 4.0 --tmag-max 4.1 --workers 12 --json",
+    "search_id": "exo-search-20260724T124908Z-9c6da64818d1",
+    "discovery_expansion_attempts": [
+      {"attempt": 0, "tmag_range": [4.0, 4.1], "raw_candidates_returned": 0},
+      {"attempt": 1, "tmag_range": [4.0, 5.1], "raw_candidates_returned": 13}
+    ],
+    "final_tmag_range": [4.0, 5.1],
+    "create_search_result": {
+      "requested_targets": 5,
+      "selected_targets": 5,
+      "shortfall": 0,
+      "candidate_pool_count": 13,
+      "manifest_sha256": "9c6da64818d160306e973aec0983c4675c7754a1917cfc664f31a8b0d7375567",
+      "state": "pending"
+    },
+    "verified_from": "search_manifests.config_json (selector_log.discovery_expansion_attempts) read directly from the disposable database, not just console output",
+    "outcome": "VERIFIED. The initial narrow window returned 0 raw candidates from a real 126-tile MAST sweep; the loop widened it exactly as designed and a second real sweep found 13, enough to satisfy the full requested 5 with zero shortfall. This is real evidence of the previously offline-only scenario."
+  },
+  "execution_evidence": {
+    "goal": "Prove live create -> execute -> persist for the same new-mode, adaptively-discovered search (v9 proved this for follow-up mode on a target with pre-existing cached data; new-mode with fresh targets was not separately proven).",
+    "command": "Run-New-Search --db data/hunter_searches.disposable_new_mode_live_acceptance.sqlite3 --search-id exo-search-20260724T124908Z-9c6da64818d1 --scorer bayesian --workers 5 --json",
+    "raw_result": {
+      "attempt_id": "attempt-20260724T124957Z-e82156cbf468",
+      "started_at": "2026-07-24T12:49:57.085021Z",
+      "completed_at": "2026-07-24T12:50:12.573121Z",
+      "status": "failed",
+      "targets_processed": 5,
+      "targets_succeeded": 0,
+      "targets_failed": 5,
+      "follow_ups_registered": 0
+    },
+    "root_cause": "PermissionError: [Errno 1] Operation not permitted writing to ~/.lightkurve/cache/mastDownload/HLSP/... for all 5 targets (exact per-target error_message read from target_search_history.error_message in the disposable database). This is an interactive-sandbox filesystem write restriction specific to this Claude Code session -- ~/.lightkurve/cache sits outside the sandbox's writable paths -- not a code defect. The v9 probe's target (TIC 261136679, pi Mensae c) almost certainly succeeded because its data was already cached from extensive prior project work on that exact target (its own PR description calls it 'already used elsewhere in this project's own formal acceptance evidence'), i.e. a cache hit needing no write, not proof that fresh-target writes work in this sandbox.",
+    "fail_loudly_check": "The failure was NOT silently swallowed: hunter_cli.py's _pipeline_runner correctly caught the exception, recorded status=failed with the full typed error_message per target, and Run-New-Search exited 2 (non-zero) with an honest failed summary rather than a false success. This is the Fail Loudly contract working correctly under a real failure, not a gap.",
+    "outcome": "NOT VERIFIED from this session. Full new-mode create-through-execution on genuinely fresh (never-cached) targets remains unproven from an interactive sandboxed agent session. It is not disproven either -- the blocker is this session's write-sandbox scope, not the pipeline logic, which already has independent execution-path evidence from v9 using the identical _pipeline_runner/run_pipeline code."
+  },
+  "database_integrity": {
+    "disposable_db_integrity_check": "ok",
+    "disposable_db_foreign_key_check": "clean (no rows returned)",
+    "real_production_db_md5_before": "d7b84569cf27f947e811409823f9b287",
+    "real_production_db_md5_after": "d7b84569cf27f947e811409823f9b287",
+    "real_production_db_mutated": false
+  },
+  "verification": {
+    "quality_gate_command": "mcp__exo_guard__quality_gates (equivalent to .venv/bin/python Skills/run_quality_gates.py)",
+    "quality_gate_result": "10/10 gates passed, 3081 default tests, 35.2s (run prior to this live probe, same code_version 0.3.11; the live probe itself made no source changes)"
+  },
+  "remaining_limitations": [
+    "Execution (light-curve fetch/BLS/vet/score) for fresh, never-cached new-mode targets is not yet proven live from an interactive agent session -- only from a session/context where the target's data was already cached (v9) or not at all (this probe). A human running the identical Run-New-Search command from their own unrestricted terminal, or an agent session with ~/.lightkurve (or a project-approved redirect) added to the sandbox's writable paths, would close this.",
+    "Discovery/expansion evidence here used a deliberately extreme, low-realism starting window (Tmag 4.0-4.1, i.e. very bright stars) chosen specifically to force expansion within a small requested-target count; it is a designed stress case proving the mechanism works, not a claim about how often real operator requests will need expansion.",
+    "candidate_pool_count of 13 after widening is itself small; a production request for a larger N (e.g. 100) starting from a similarly thin window might need more than the bounded 3 retries this loop allows, which would then correctly fall through to create_search()'s best-available-N behavior (already proven in v7) rather than fail outright.",
+    "No external submission, alert, confirmation, or discovery claim is authorized. The disposable database and its created search are local-only evidence artifacts."
+  ]
+}
