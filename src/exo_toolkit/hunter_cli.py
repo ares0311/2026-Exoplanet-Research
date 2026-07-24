@@ -285,6 +285,12 @@ def _storage_penalty(estimated_gb: float) -> float:
     return 5.0
 
 
+_TMAG_HARD_MIN = 4.0
+_TMAG_HARD_MAX = 18.0
+_MAX_DISCOVERY_EXPANSIONS = 3
+_DISCOVERY_EXPANSION_STEP = 1.0
+
+
 def _select_live_new_candidates(
     *,
     targets: int,
@@ -294,7 +300,14 @@ def _select_live_new_candidates(
     store: HunterStore,
     progress_fn: Callable[[str], None] | None = print,
 ) -> tuple[list[HunterCandidate], dict[str, Any]]:
-    """Two-stage metadata-only TIC selection over a large reproducible pool."""
+    """Two-stage metadata-only TIC selection over a large reproducible pool.
+
+    Never raises for insufficiency: if the fixed-magnitude-window sweep
+    returns fewer raw candidates than requested, this widens the magnitude
+    window and retries (bounded) before returning whatever it has. The final
+    "not enough valid candidates exist" decision belongs to create_search(),
+    which returns the best available N rather than failing outright.
+    """
     scanner = _load_project_skill("star_scanner")
     excluded = set(store.searched_target_ids())
     excluded_tics = {
@@ -303,19 +316,47 @@ def _select_live_new_candidates(
     excluded_tics.update(scanner._load_toi_tic_ids(strict=True))
     excluded_tics.update(scanner._load_ctoi_tic_ids(strict=True))
     excluded_tics.update(scanner._load_confirmed_host_tic_ids(strict=True))
+
     search_log: dict[str, Any] = {}
-    raw_targets = scanner.select_targets(
-        pool_size,
-        tmag_range=tmag_range,
-        exclude_tic_ids=excluded_tics,
-        full_sweep=True,
-        max_workers=workers,
-        search_log=search_log,
-    )
-    if len(raw_targets) < targets:
-        raise RuntimeError(
-            f"Wide TIC sweep returned {len(raw_targets)} candidates for {targets} requested targets"
+    expansion_attempts: list[dict[str, Any]] = []
+    current_range = tmag_range
+    raw_targets: list[dict[str, Any]] = []
+    for attempt in range(_MAX_DISCOVERY_EXPANSIONS + 1):
+        tile_log: dict[str, Any] = {}
+        raw_targets = scanner.select_targets(
+            pool_size,
+            tmag_range=current_range,
+            exclude_tic_ids=excluded_tics,
+            full_sweep=True,
+            max_workers=workers,
+            search_log=tile_log,
         )
+        expansion_attempts.append(
+            {
+                "attempt": attempt,
+                "tmag_range": list(current_range),
+                "raw_candidates_returned": len(raw_targets),
+            }
+        )
+        search_log = tile_log
+        if len(raw_targets) >= targets:
+            break
+        widened = (
+            max(current_range[0] - _DISCOVERY_EXPANSION_STEP, _TMAG_HARD_MIN),
+            min(current_range[1] + _DISCOVERY_EXPANSION_STEP, _TMAG_HARD_MAX),
+        )
+        if widened == current_range or attempt == _MAX_DISCOVERY_EXPANSIONS:
+            break
+        if progress_fn is not None:
+            progress_fn(
+                f"EXO-Hunter discovery sweep returned {len(raw_targets)} raw candidates "
+                f"for {targets} requested; widening Tmag range "
+                f"{current_range[0]:.1f}-{current_range[1]:.1f} -> "
+                f"{widened[0]:.1f}-{widened[1]:.1f} and retrying"
+            )
+        current_range = widened
+    search_log["discovery_expansion_attempts"] = expansion_attempts
+    search_log["final_tmag_range"] = list(current_range)
 
     stage_two_goal = min(len(raw_targets), max(targets * 3, targets))
     known_variables = scanner._load_asassn_variable_tic_ids(

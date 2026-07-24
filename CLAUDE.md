@@ -669,6 +669,27 @@ excluded by repeated real usage.
 The version 0.3.10 release gate passed 3,079 default tests plus Ruff/mypy as
 10/10 supervised gates in 26.1 seconds under the canonical 6x6 topology.
 
+Version 0.3.11 closes the gap version 0.3.10 explicitly flagged as remaining:
+`_select_live_new_candidates()` (new-target discovery) raised immediately
+whenever the fixed-magnitude-window live TIC sweep returned fewer raw
+candidates than requested, with no attempt to broaden the search first. The
+directive's canonical selection loop requires candidate pools to be adaptive,
+never arbitrarily fixed, and discovery to expand before a top-N request is
+allowed to fall short. A bounded expansion loop (up to 3 retries, ±1.0 Tmag
+per step, clamped to [4.0, 18.0]) now widens the magnitude window and
+retries when the sweep is thin; every attempt is recorded in
+`selector_log.discovery_expansion_attempts`, and the function never raises
+for insufficiency — that decision is delegated entirely to `create_search()`,
+consistent with how follow-up mode already works after 0.3.10. The 126-tile
+grid itself remains a fixed ~99 sq deg sample; this widens the magnitude
+window per tile, not tile coverage. Verified offline against a scripted
+discovery double (thin at the starting window, richer once widened); no live
+126-tile MAST sweep was run from this session, since this sandbox has no
+execution path to one outside the fixed `exo_guard` MCP commands. See
+`artifacts/manifests/hunter_live_acceptance_v8.json`.
+The version 0.3.11 release gate passed 3,081 default tests plus Ruff/mypy as
+10/10 supervised gates under the canonical 6x6 topology.
+
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
