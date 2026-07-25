@@ -82,6 +82,39 @@ scanner doubles exercising both fixes (a sweep that returns enough raw rows
 but too few eligible ones must still keep expanding; tile coverage must grow
 and cap correctly) — no live 126+-tile MAST sweep was run from this session.
 
+**Version 0.3.13** closes a real bypass of "no production command bypasses
+the canonical optimizer or durable pipeline": `Skills/star_scanner.py`'s and
+`Skills/batch_scan.py`'s standalone CLI scan modes wrote only to a local
+`ScanLog`/JSON results file, invisible to Hunter's durable
+`target_search_history`. `src/exo_toolkit/hunter_history.py` gains
+`build_manual_scan_source()`, which builds one history-manifest "source"
+from a completed manual scan's log file and result entries using exactly
+the schema `HunterStore.import_history_manifest()` already verifies for the
+seven curated legacy-log imports (byte-for-byte source hash, typed entries)
+— no manifest file needs to be written to disk; the dict is passed straight
+to `import_history_manifest()`. Both CLIs now call this after a real scan
+(new `--hunter-db`/`--no-hunter-bridge` flags, bridging on by default):
+`star_scanner.py`'s `--target` and default background-scan modes (via a new
+`scanned_this_run` field in `run_background_scan()`'s return, additive to
+the existing contract) and `batch_scan.py`'s CLI (via a new optional
+`new_entries` out-parameter on `batch_scan()`, so `--resume` runs bridge
+only the freshly-scanned targets, not the full accumulated results). Per
+the plan, library-import usage by Hunter itself
+(`_select_live_new_candidates()`'s calls into `select_targets()`/
+`inspect_target_products()`) and the shard launcher's
+`--execute-prepared-batch` path are untouched — the bridge is wired only
+into the two real standalone-scan CLI entry points, verified by dedicated
+tests proving `--execute-prepared-batch` and `--prepare-only` never call it.
+A real integration bug was caught before merge: the manifest builder and
+`import_history_manifest()` must resolve the same relative `source_path`
+against the *same* root, or a log file living outside the repo tree (or a
+CWD that differs from where the file was built) causes a fail-closed hash
+mismatch; both bridges now explicitly pass the log file's own parent
+directory as `source_root` to both calls rather than relying on either
+function's independent default. Verified offline: real `ScanLog`/
+`batch_scan()` entries round-trip through `import_history_manifest()` into
+`HunterStore.searched_target_ids()`/`target_history()`.
+
 An earlier audit found that consumed actionable follow-ups remained open and
 could be scheduled repeatedly. Version 0.3.5 adds durable scheduling/disposition events
 and parent-child recommendation relationships. Version 0.3.6 makes

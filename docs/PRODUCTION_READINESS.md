@@ -90,10 +90,17 @@ after stage-two eligibility and adds a second, disjoint 180-tile expansion
 ring (`TOTAL_SEARCH_TILES = 306`) that `max_tiles` now widens alongside Tmag,
 both bounded and logged per attempt. Verified offline with scanner doubles
 exercising both fixes; no live 126+-tile MAST sweep was run from this
-session. See `docs/HUNTER_PRODUCTION_WORKFLOW.md`.
+session. See `docs/HUNTER_PRODUCTION_WORKFLOW.md`. Version 0.3.13 then closed
+a real bypass: `star_scanner.py`'s and `batch_scan.py`'s standalone CLI scan
+modes wrote only to a local log/results file, invisible to Hunter's durable
+`target_search_history`. Both now bridge to Hunter by default after a real
+scan via `build_manual_scan_source()`, using the exact schema
+`import_history_manifest()` already verifies for the seven curated
+legacy-log imports; Hunter's own library usage and the shard launcher's
+`--execute-prepared-batch` path stay untouched, proven by dedicated tests.
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
-Test baseline: 3,091 default tests passing; 2 `integration_live` tests excluded by
+Test baseline: 3,119 default tests passing; 2 `integration_live` tests excluded by
 the configured marker expression (2026-07-24; 6×6 gate: 10/10 gates
 including two verifiable-agent-reliability checks — see
 `docs/RELIABILITY_CONTROLS.md`)
@@ -118,7 +125,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.3.12 is the current development version. Version 0.3.2 added the durable,
+Version note: 0.3.13 is the current development version. Version 0.3.2 added the durable,
 non-AI-dependent Hunter workflow and exact `Create-New-Search`,
 `Run-New-Search`, and `Show-Follow-Ups` entry points. Candidate catalog,
 immutable manifest, run attempts, append-only target history, and follow-up

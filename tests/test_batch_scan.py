@@ -9,7 +9,16 @@ from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from Skills.batch_scan import _cli, _write_run_report, batch_scan, read_tic_ids  # noqa: E402
+from Skills.batch_scan import (  # noqa: E402
+    _bridge_manual_scan_to_hunter,
+    _cli,
+    _manual_scan_history_entry,
+    _write_run_report,
+    batch_scan,
+    read_tic_ids,
+)
+
+from exo_toolkit.search_lifecycle import HunterStore  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # read_tic_ids
@@ -140,6 +149,158 @@ class TestBatchScan:
             [10, 20, 30], output_path=out, run_pipeline_fn=_make_pipeline_fn({})
         )
         assert len(result) == 3
+
+    def test_new_entries_populated_with_only_this_calls_scans(
+        self, tmp_path: Path
+    ) -> None:
+        out = tmp_path / "results.json"
+        out.write_text(json.dumps([{"tic_id": 100, "status": "scanned_clear", "signals": []}]))
+        new_entries: list[dict[str, Any]] = []
+
+        batch_scan(
+            [100, 200],
+            output_path=out,
+            resume=True,
+            run_pipeline_fn=_make_pipeline_fn({}),
+            new_entries=new_entries,
+        )
+
+        assert [e["tic_id"] for e in new_entries] == [200]
+
+
+# ---------------------------------------------------------------------------
+# Hunter durable-history bridge
+# ---------------------------------------------------------------------------
+
+
+class TestManualScanHistoryEntry:
+    def test_candidate_found_maps_through_unchanged(self) -> None:
+        entry = _manual_scan_history_entry(
+            {"target_id": "TIC 1", "status": "candidate_found", "signals": [{}]},
+            mission="TESS",
+        )
+        assert entry["status"] == "candidate_found"
+        assert entry["metrics"]["n_signals"] == 1
+        assert "error_message" not in entry
+
+    def test_scanned_clear_maps_to_no_signal(self) -> None:
+        entry = _manual_scan_history_entry(
+            {"target_id": "TIC 1", "status": "scanned_clear", "signals": []},
+            mission="TESS",
+        )
+        assert entry["status"] == "no_signal"
+
+    def test_error_maps_to_failed_with_error_message(self) -> None:
+        entry = _manual_scan_history_entry(
+            {
+                "target_id": "TIC 1",
+                "status": "error",
+                "signals": [],
+                "error": "Traceback...\nRuntimeError: boom",
+            },
+            mission="TESS",
+        )
+        assert entry["status"] == "failed"
+        assert "boom" in entry["error_message"]
+
+
+class TestBridgeManualScanToHunter:
+    def test_empty_entries_is_a_noop(self, tmp_path: Path) -> None:
+        assert (
+            _bridge_manual_scan_to_hunter(
+                log_path=tmp_path / "results.json",
+                mission="TESS",
+                entries=[],
+                started_at=None,  # type: ignore[arg-type]
+                completed_at=None,  # type: ignore[arg-type]
+                hunter_db_path=tmp_path / "hunter.sqlite3",
+            )
+            is None
+        )
+
+    def test_real_scan_durably_recorded_in_hunter_store(self, tmp_path: Path) -> None:
+        from datetime import UTC, datetime
+
+        out = tmp_path / "results.json"
+        results = batch_scan(
+            [777], output_path=out, run_pipeline_fn=_make_pipeline_fn({})
+        )
+        hunter_db = tmp_path / "hunter.sqlite3"
+
+        summary = _bridge_manual_scan_to_hunter(
+            log_path=out,
+            mission="TESS",
+            entries=results,
+            started_at=datetime(2026, 7, 24, tzinfo=UTC),
+            completed_at=datetime.now(UTC),
+            hunter_db_path=hunter_db,
+        )
+
+        assert summary is not None
+        assert summary["sources_created"] == 1
+        store = HunterStore(hunter_db)
+        assert "TIC 777" in store.searched_target_ids()
+        assert store.target_history("TIC 777")[0]["status"] == "no_signal"
+
+    def test_missing_log_file_warns_but_returns_none(
+        self, tmp_path: Path, capsys: Any
+    ) -> None:
+        from datetime import UTC, datetime
+
+        result = _bridge_manual_scan_to_hunter(
+            log_path=tmp_path / "does_not_exist.json",
+            mission="TESS",
+            entries=[{"target_id": "TIC 1", "status": "scanned_clear", "signals": []}],
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+            hunter_db_path=tmp_path / "hunter.sqlite3",
+        )
+        assert result is None
+        assert "Warning" in capsys.readouterr().err
+
+
+class TestCliHunterBridgeWiring:
+    def test_cli_bridges_new_scan_by_default(self, tmp_path: Path) -> None:
+        targets = tmp_path / "targets.txt"
+        targets.write_text("777\n")
+        out = tmp_path / "results.json"
+        hunter_db = tmp_path / "hunter.sqlite3"
+
+        with (
+            patch("exo_toolkit.cli.run_pipeline", side_effect=lambda *a, **k: []),
+            patch("Skills.batch_scan.run_and_commit_report", return_value=True),
+        ):
+            exit_code = _cli(
+                [str(targets), "--output", str(out), "--hunter-db", str(hunter_db)]
+            )
+
+        assert exit_code == 0
+        assert hunter_db.exists()
+        assert "TIC 777" in HunterStore(hunter_db).searched_target_ids()
+
+    def test_no_hunter_bridge_flag_skips_durable_recording(self, tmp_path: Path) -> None:
+        targets = tmp_path / "targets.txt"
+        targets.write_text("777\n")
+        out = tmp_path / "results.json"
+        hunter_db = tmp_path / "hunter.sqlite3"
+
+        with (
+            patch("exo_toolkit.cli.run_pipeline", side_effect=lambda *a, **k: []),
+            patch("Skills.batch_scan.run_and_commit_report", return_value=True),
+        ):
+            exit_code = _cli(
+                [
+                    str(targets),
+                    "--output",
+                    str(out),
+                    "--hunter-db",
+                    str(hunter_db),
+                    "--no-hunter-bridge",
+                ]
+            )
+
+        assert exit_code == 0
+        assert not hunter_db.exists()
 
 
 # ---------------------------------------------------------------------------

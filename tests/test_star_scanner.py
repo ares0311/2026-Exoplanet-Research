@@ -5,6 +5,7 @@ import csv
 import json
 import sys
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -31,10 +32,12 @@ from Skills.star_scanner import (  # noqa: E402
     TOTAL_SEARCH_TILES,
     PreparedLiveSearchBundle,
     ScanLog,
+    _bridge_manual_scan_to_hunter,
     _ledger_record_for_outcome,
     _load_asassn_variable_tic_ids,
     _load_prior_discovery_tic_ids,
     _load_toi_tic_ids,
+    _manual_scan_history_entry,
     _search_centers,
     _write_run_report,
     inspect_target_products,
@@ -54,6 +57,7 @@ from exo_toolkit.dataset_manifest import (  # noqa: E402
     sha256_file,
     validate_dataset_manifest,
 )
+from exo_toolkit.search_lifecycle import HunterStore  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -1059,6 +1063,9 @@ class TestLiveSearchPreparation:
                 return_value=summary,
             ) as execute,
             patch("Skills.star_scanner.select_targets") as select,
+            patch(
+                "Skills.star_scanner._bridge_manual_scan_to_hunter"
+            ) as bridge,
         ):
             code = main(
                 [
@@ -1080,6 +1087,9 @@ class TestLiveSearchPreparation:
         execute.assert_called_once()
         assert execute.call_args.kwargs["heartbeat_interval_seconds"] == 30.0
         select.assert_not_called()
+        # The prepared-batch shard-launcher path must stay untouched by the
+        # manual-scan Hunter durable-history bridge.
+        bridge.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -1234,6 +1244,21 @@ class TestRunBackgroundScan:
         log = ScanLog(log_path)
         assert log.is_scanned(1001)
         assert log.is_scanned(1002)
+
+    def test_scanned_this_run_lists_exactly_this_runs_targets(
+        self, tmp_path: Path
+    ) -> None:
+        log_path = tmp_path / "log.json"
+        with (
+            patch("Skills.star_scanner._load_toi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_ctoi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_confirmed_host_tic_ids", return_value=frozenset()),
+            patch("Skills.star_scanner.select_targets", return_value=self._targets()),
+            patch("Skills.star_scanner.run_pipeline", return_value=[]),
+        ):
+            summary = run_background_scan(log_path, n_targets=10)
+        scanned_tic_ids = {row["tic_id"] for row in summary["scanned_this_run"]}
+        assert scanned_tic_ids == {1001, 1002}
 
     def test_background_scan_prints_workers_elapsed_and_eta(
         self,
@@ -1458,3 +1483,225 @@ class TestRunBackgroundScan:
         ):
             run_background_scan(log_path, n_targets=10)
         assert not (tmp_path / "search_manifest.json").exists()
+
+
+# ---------------------------------------------------------------------------
+# Hunter durable-history bridge
+# ---------------------------------------------------------------------------
+
+
+class TestManualScanHistoryEntry:
+    def test_candidate_found_maps_through_unchanged(self) -> None:
+        entry = _manual_scan_history_entry(
+            1, mission="TESS", result={"status": "candidate_found", "best_fpp": 0.1}
+        )
+        assert entry["target_id"] == "TIC 1"
+        assert entry["status"] == "candidate_found"
+        assert entry["metrics"]["best_fpp"] == 0.1
+        assert "error_message" not in entry
+
+    def test_scanned_clear_maps_to_no_signal(self) -> None:
+        entry = _manual_scan_history_entry(1, mission="TESS", result={"status": "scanned_clear"})
+        assert entry["status"] == "no_signal"
+
+    def test_no_data_maps_through_unchanged(self) -> None:
+        entry = _manual_scan_history_entry(1, mission="TESS", result={"status": "no_data"})
+        assert entry["status"] == "no_data"
+
+    def test_error_maps_to_failed_with_error_message(self) -> None:
+        entry = _manual_scan_history_entry(
+            1,
+            mission="TESS",
+            result={"status": "error", "error_message": "network failure"},
+        )
+        assert entry["status"] == "failed"
+        assert entry["error_message"] == "network failure"
+
+
+class TestBridgeManualScanToHunter:
+    def test_empty_entries_is_a_noop(self, tmp_path: Path) -> None:
+        assert (
+            _bridge_manual_scan_to_hunter(
+                script="star_scanner",
+                log_path=tmp_path / "log.json",
+                mission="TESS",
+                entries=[],
+                started_at=datetime.now(UTC),
+                completed_at=datetime.now(UTC),
+                hunter_db_path=tmp_path / "hunter.sqlite3",
+                method_or_data="TESS QLP manual scan",
+            )
+            is None
+        )
+
+    def test_real_scan_durably_recorded_in_hunter_store(self, tmp_path: Path) -> None:
+        log_path = tmp_path / "log.json"
+        log = ScanLog(log_path)
+        log.record(555, "candidate_found", {"best_fpp": 0.05})
+        hunter_db = tmp_path / "hunter.sqlite3"
+
+        summary = _bridge_manual_scan_to_hunter(
+            script="star_scanner",
+            log_path=log_path,
+            mission="TESS",
+            entries=[
+                _manual_scan_history_entry(
+                    555, mission="TESS", result={"status": "candidate_found"}
+                )
+            ],
+            started_at=datetime(2026, 7, 24, tzinfo=UTC),
+            completed_at=datetime.now(UTC),
+            hunter_db_path=hunter_db,
+            method_or_data="TESS QLP manual scan",
+        )
+
+        assert summary is not None
+        assert summary["sources_created"] == 1
+        store = HunterStore(hunter_db)
+        assert "TIC 555" in store.searched_target_ids()
+
+    def test_missing_log_file_warns_but_returns_none(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        result = _bridge_manual_scan_to_hunter(
+            script="star_scanner",
+            log_path=tmp_path / "does_not_exist.json",
+            mission="TESS",
+            entries=[
+                _manual_scan_history_entry(
+                    1, mission="TESS", result={"status": "scanned_clear"}
+                )
+            ],
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+            hunter_db_path=tmp_path / "hunter.sqlite3",
+            method_or_data="TESS QLP manual scan",
+        )
+        assert result is None
+        assert "Warning" in capsys.readouterr().err
+
+
+class TestCliHunterBridgeWiring:
+    def test_target_mode_bridges_by_default(self, tmp_path: Path) -> None:
+        log_path = tmp_path / "log.json"
+        hunter_db = tmp_path / "hunter.sqlite3"
+        with (
+            patch("Skills.star_scanner.run_pipeline", return_value=[]),
+            patch(
+                "Skills.star_scanner.run_and_commit_report", return_value=True
+            ),
+        ):
+            exit_code = main(
+                [
+                    "--target",
+                    "42",
+                    "--log",
+                    str(log_path),
+                    "--hunter-db",
+                    str(hunter_db),
+                ]
+            )
+        assert exit_code == 0
+        assert hunter_db.exists()
+        assert "TIC 42" in HunterStore(hunter_db).searched_target_ids()
+
+    def test_target_mode_no_hunter_bridge_flag_skips_it(self, tmp_path: Path) -> None:
+        log_path = tmp_path / "log.json"
+        hunter_db = tmp_path / "hunter.sqlite3"
+        with (
+            patch("Skills.star_scanner.run_pipeline", return_value=[]),
+            patch(
+                "Skills.star_scanner.run_and_commit_report", return_value=True
+            ),
+        ):
+            exit_code = main(
+                [
+                    "--target",
+                    "42",
+                    "--log",
+                    str(log_path),
+                    "--hunter-db",
+                    str(hunter_db),
+                    "--no-hunter-bridge",
+                ]
+            )
+        assert exit_code == 0
+        assert not hunter_db.exists()
+
+    def test_background_scan_mode_bridges_scanned_targets(self, tmp_path: Path) -> None:
+        log_path = tmp_path / "log.json"
+        hunter_db = tmp_path / "hunter.sqlite3"
+        targets = [
+            {"tic_id": 1001, "tmag": 12.0, "teff": 4500.0,
+             "contratio": 0.01, "priority": 0.90},
+        ]
+        with (
+            patch("Skills.star_scanner._load_toi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_ctoi_tic_ids", return_value=set()),
+            patch(
+                "Skills.star_scanner._load_confirmed_host_tic_ids",
+                return_value=frozenset(),
+            ),
+            patch("Skills.star_scanner.select_targets", return_value=targets),
+            patch("Skills.star_scanner.run_pipeline", return_value=[]),
+            patch(
+                "Skills.star_scanner.run_and_commit_report", return_value=True
+            ),
+        ):
+            exit_code = main(
+                [
+                    "--log",
+                    str(log_path),
+                    "--max-stars",
+                    "10",
+                    "--hunter-db",
+                    str(hunter_db),
+                ]
+            )
+        assert exit_code == 0
+        assert hunter_db.exists()
+        assert "TIC 1001" in HunterStore(hunter_db).searched_target_ids()
+
+    def test_prepare_only_mode_never_bridges(self, tmp_path: Path) -> None:
+        log_path = tmp_path / "log.json"
+        hunter_db = tmp_path / "hunter.sqlite3"
+        target = {
+            "tic_id": 101, "tmag": 12.0, "teff": 4500.0,
+            "contratio": 0.01, "radius_rsun": 1.0, "priority": 0.9,
+        }
+        with (
+            patch("Skills.star_scanner._load_toi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_ctoi_tic_ids", return_value=set()),
+            patch(
+                "Skills.star_scanner._load_confirmed_host_tic_ids",
+                return_value=frozenset(),
+            ),
+            patch("Skills.star_scanner.select_targets", return_value=[target]),
+            patch("Skills.star_scanner.prepare_live_search_snapshot"),
+            patch(
+                "Skills.star_scanner._bridge_manual_scan_to_hunter"
+            ) as bridge,
+            patch(
+                "Skills.star_scanner.run_and_commit_report", return_value=True
+            ),
+        ):
+            main(
+                [
+                    "--prepare-only",
+                    "--log",
+                    str(log_path),
+                    "--queue-path",
+                    str(tmp_path / "queue.csv"),
+                    "--queue-snapshot-path",
+                    str(tmp_path / "snapshot.csv"),
+                    "--batch-manifest-path",
+                    str(tmp_path / "batch.json"),
+                    "--dataset-manifest-path",
+                    str(tmp_path / "dataset.json"),
+                    "--hunter-db",
+                    str(hunter_db),
+                    "--no-git-report",
+                ]
+            )
+        bridge.assert_not_called()
+        assert not hunter_db.exists()
