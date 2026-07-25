@@ -926,6 +926,28 @@ timing by chance.
 The version 0.3.20 release gate passed 3,140 default tests plus Ruff/mypy as
 10/10 supervised gates in 29.1 seconds under the canonical 6x6 topology.
 
+Version 0.3.21 continues the hardening sweep: `calibration.py`'s
+`_fit_platt()` wrapped `scipy.optimize.minimize()` in a bare
+`except Exception: return PlattParams(slope=1.0, intercept=0.0)` —
+indistinguishable, in its return value, from the documented and tested
+"too few samples" identity fallback, but firing on any genuine optimizer
+failure with zero signal to the caller that fitting actually broke. It
+also never checked `res.success`: scipy can return a non-converged result
+without raising at all, which the old bare try/except would not have
+caught either. Since `apply_calibration()` is wired into the live CLI path
+via `--calibration-path`, a silently-broken fit for one hypothesis could
+have shipped into production scoring undetected. `_fit_platt()` now raises
+`RuntimeError` on both failure modes (exception, or `res.success is
+False`) instead of silently returning the identity fallback; the
+insufficient-data path is unchanged since it is the intentional, tested,
+documented case. `fit_calibration()`'s docstring records the new possible
+`RuntimeError`. 2 new regression tests force each failure mode via a
+monkeypatched `minimize` and assert the raise; the existing real-data
+fit test (`test_fit_reduces_brier_score`, seeded RNG, 50 samples) and all
+three insufficient-data fallback tests are unaffected and still pass.
+The version 0.3.21 release gate passed 3,145 default tests plus Ruff/mypy as
+10/10 supervised gates in 29.1 seconds under the canonical 6x6 topology.
+
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
