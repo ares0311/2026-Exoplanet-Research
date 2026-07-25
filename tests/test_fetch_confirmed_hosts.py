@@ -294,7 +294,37 @@ class TestRunReport:
             exit_code = _cli(["--output", str(out)])
 
         assert exit_code == 1
-        assert json.loads(out.read_text()) == []
+        # Regression: a failed fetch must NOT write an empty exclusion list
+        # -- the output file is simply never touched on failure.
+        assert not out.exists()
         report, _path = commit.call_args.args
         assert report.status == "failed"
         assert "no TIC IDs" in report.notes
+
+    def test_cli_failure_does_not_overwrite_existing_good_output(
+        self, tmp_path
+    ) -> None:
+        from unittest.mock import patch
+
+        from Skills.fetch_confirmed_hosts import _cli
+
+        out = tmp_path / "hosts.json"
+        out.write_text(json.dumps([10, 20, 30]))
+
+        with (
+            patch(
+                "Skills.fetch_confirmed_hosts.fetch_confirmed_host_tic_ids",
+                side_effect=RuntimeError("NEA archive unavailable"),
+            ),
+            patch(
+                "Skills.fetch_confirmed_hosts.run_and_commit_report",
+                return_value=True,
+            ),
+        ):
+            exit_code = _cli(["--output", str(out)])
+
+        assert exit_code == 1
+        # Regression: a transient outage during a scheduled re-run must not
+        # destroy yesterday's valid exclusion list by overwriting it with
+        # an empty one.
+        assert json.loads(out.read_text()) == [10, 20, 30]
