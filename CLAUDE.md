@@ -1146,18 +1146,23 @@ correctly-reported failure. `Skills/fetch_tess_k2_overlap_snippets.py`'s
 `KeyError` (the discovered/guessed column name absent from that row) was
 caught by the same `except (KeyError, TypeError, ValueError): continue`
 used for ordinary malformed values, so a fully schema-drifted response
-silently returned `[]`. `KeyError` is now tracked separately; if every
-raw row hits it, the function raises instead of returning empty --
-ordinary per-row malformed-value filtering (a bad float, an unrecognized
-disposition) is unaffected since those never raise `KeyError`. Neither
-function had any dedicated test coverage before this fix. 2 new tests for
-`_default_search()` (raises on missing column via a real `astropy.table.Table`
-missing `t_exptime`; unaffected normal-row behavior) and 4 new tests for
-`fetch_k2_table()` (valid rows, empty body returns `[]` without raising,
-renamed column raises, malformed-vs-valid rows mixed together still skip
-only the malformed one).
-The version 0.3.30 release gate passed 3,173 default tests plus Ruff/mypy
-as 10/10 supervised gates in 37.2 seconds under the canonical 6x6
+silently returned `[]`. Self-review of the first version of this fix
+(which counted `KeyError`s per row and raised only if every row hit one)
+found it could not say *which* column was actually missing in its error
+message, unlike the `fetch_jwst_targets.py` fix in the same PR --
+`fetch_k2_table()` now checks the CSV response's header (`reader.fieldnames`)
+against the discovered/guessed columns once, before reading any row, and
+names exactly the missing column(s); ordinary per-row malformed-value
+filtering (a bad float, an unrecognized disposition) is unaffected.
+Neither function had any dedicated test coverage before this fix. 2 new
+tests for `_default_search()` (raises on missing column via a real
+`astropy.table.Table` missing `t_exptime`; unaffected normal-row
+behavior) and 5 new tests for `fetch_k2_table()` (valid rows, empty body
+returns `[]` without raising, renamed column raises, the error names only
+the actually-missing column, malformed-vs-valid rows mixed together still
+skip only the malformed one).
+The version 0.3.30 release gate passed 3,174 default tests plus Ruff/mypy
+as 10/10 supervised gates in 31.3 seconds under the canonical 6x6
 topology.
 
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.

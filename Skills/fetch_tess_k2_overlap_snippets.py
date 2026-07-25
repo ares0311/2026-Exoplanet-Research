@@ -55,11 +55,12 @@ The CLI entry point writes a structured completion record via
 ``Skills/run_report.py`` after each run (AGENTS.md Run Report Policy,
 Rule 7) and commits/pushes only that record.
 
-``fetch_k2_table()`` raises ``RuntimeError`` if every returned row is
-missing a discovered/guessed column key (schema drift), instead of
+``fetch_k2_table()`` checks the CSV response's header against the
+discovered/guessed column names before reading any row, and raises
+``RuntimeError`` naming the missing column(s) on drift, instead of
 letting the per-row ``KeyError`` be silently swallowed by the same
-``continue`` used for ordinary malformed values, which previously made a
-fully broken response indistinguishable from "zero K2 rows currently
+``continue`` used for ordinary malformed values -- which previously made
+a fully broken response indistinguishable from "zero K2 rows currently
 match this query."
 """
 from __future__ import annotations
@@ -303,11 +304,20 @@ def fetch_k2_table(url: str | None = None) -> list[K2Row]:
         ) from exc
 
     reader = csv.DictReader(io.StringIO(raw_csv))
+    # Check the CSV header against the discovered/guessed columns before
+    # reading any row: a per-row KeyError can't tell us *which* column is
+    # actually absent, only that some row's lookup failed, so schema drift
+    # is checked once against the real header instead.
+    fieldnames = set(reader.fieldnames or [])
+    required_columns = sorted(set(col.values()))
+    missing_columns = [c for c in required_columns if c not in fieldnames]
+    if missing_columns:
+        raise RuntimeError(
+            f"K2 TAP response missing expected column(s): {missing_columns}"
+        )
+
     rows: list[K2Row] = []
-    n_raw_rows = 0
-    n_missing_column = 0
     for rec in reader:
-        n_raw_rows += 1
         try:
             raw_epic = str(rec[col["epic_id"]]).strip()
             # Handle "EPIC 211311380.01" (epic_candname) or plain integer (k2c_objid)
@@ -317,14 +327,7 @@ def fetch_k2_table(url: str | None = None) -> list[K2Row]:
             disposition = str(rec[col["disposition"]]).strip().upper()
             period = float(rec[col["period"]])
             epoch_bjd = float(rec[col["epoch"]])
-        except KeyError:
-            # The discovered/guessed column name isn't a key in this row at
-            # all -- schema drift, not a malformed value. If every row hits
-            # this, fail closed below instead of returning an empty result
-            # indistinguishable from "zero K2 rows currently match."
-            n_missing_column += 1
-            continue
-        except (TypeError, ValueError):
+        except (KeyError, TypeError, ValueError):
             continue
         if not math.isfinite(period) or period <= 0:
             continue
@@ -338,12 +341,6 @@ def fetch_k2_table(url: str | None = None) -> list[K2Row]:
             period_days=period,
             epoch_bjd=epoch_bjd,
         ))
-
-    if n_raw_rows > 0 and n_missing_column == n_raw_rows:
-        raise RuntimeError(
-            f"K2 TAP response missing expected column(s) {sorted(set(col.values()))} "
-            f"in all {n_raw_rows} row(s) -- likely a NASA archive column rename"
-        )
     return rows
 
 

@@ -112,6 +112,23 @@ class TestFetchK2Table:
         with pytest.raises(RuntimeError, match="missing expected column"):
             fetch_k2_table(f"file://{f}")
 
+    def test_renamed_column_error_names_only_the_actually_missing_column(
+        self, tmp_path
+    ) -> None:
+        # Precision check: the header-based check must name only the column
+        # that is actually absent, not every candidate column, since
+        # "disposition"/"period"/"t0" are genuinely present here.
+        csv_body = (
+            "epic_identifier,disposition,period,t0\n"
+            "211311380,CONFIRMED,2.4706,2457100.7285\n"
+        )
+        f = tmp_path / "k2.csv"
+        f.write_text(csv_body, encoding="utf-8")
+        with pytest.raises(RuntimeError) as exc_info:
+            fetch_k2_table(f"file://{f}")
+        assert "epic_id" in str(exc_info.value)
+        assert "disposition" not in str(exc_info.value)
+
     def test_some_rows_malformed_others_valid_skips_only_malformed(
         self, tmp_path
     ) -> None:
