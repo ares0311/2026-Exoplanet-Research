@@ -562,6 +562,156 @@ def test_no_data_follow_up_is_deferred_not_rescheduled(tmp_path: Path) -> None:
     assert store.follow_up_candidates() == []
 
 
+def _deferred_follow_up(tmp_path: Path) -> tuple[HunterStore, str]:
+    """Build a real no_data-deferred follow-up row and return (store, follow_up_id)."""
+    store = HunterStore(tmp_path / "hunter.sqlite3")
+    search = _create(store, [_candidate(1)], count=1)
+    store.execute_search(
+        lambda _: TargetExecutionResult(
+            status="candidate_found",
+            result={},
+            provenance={},
+            follow_ups=(
+                FollowUpRecommendation(
+                    candidate_id="TIC1-s01",
+                    priority=99.0,
+                    reason="unresolved signal",
+                    evidence={},
+                    recommended_action="obtain more data",
+                ),
+            ),
+        ),
+        search_id=search["search_id"],
+    )
+    follow_search = _create(store, store.follow_up_candidates(), count=1, mode="follow-up")
+    store.execute_search(
+        lambda _: TargetExecutionResult(status="no_data", result={}, provenance={}),
+        search_id=follow_search["search_id"],
+    )
+    follow_up_id = store.list_follow_ups(status="deferred")[0]["follow_up_id"]
+    return store, str(follow_up_id)
+
+
+class TestRecordSectorRecheck:
+    def test_first_recheck_with_any_sectors_flips_to_open(self, tmp_path: Path) -> None:
+        store, follow_up_id = _deferred_follow_up(tmp_path)
+
+        result = store.record_sector_recheck(
+            follow_up_id, sectors=[42], checked_at=datetime.now(UTC)
+        )
+
+        assert result["grew"] is True
+        assert result["new_sectors"] == [42]
+        assert store.list_follow_ups(status="open")
+        assert store.list_follow_ups(status="deferred") == []
+
+    def test_recheck_with_zero_sectors_stays_deferred(self, tmp_path: Path) -> None:
+        store, follow_up_id = _deferred_follow_up(tmp_path)
+
+        result = store.record_sector_recheck(
+            follow_up_id, sectors=[], checked_at=datetime.now(UTC)
+        )
+
+        assert result["grew"] is False
+        assert store.list_follow_ups(status="deferred")
+        assert store.list_follow_ups(status="open") == []
+
+    def test_recheck_always_advances_baseline_and_timestamp(self, tmp_path: Path) -> None:
+        store, follow_up_id = _deferred_follow_up(tmp_path)
+        checked_at = datetime(2026, 7, 24, tzinfo=UTC)
+
+        store.record_sector_recheck(follow_up_id, sectors=[], checked_at=checked_at)
+
+        row = store.list_follow_ups(status="deferred")[0]
+        assert row["last_known_sectors"] == "[]"
+        assert row["last_mast_checked_at"] == checked_at.isoformat()
+
+    def test_second_recheck_only_flips_on_real_growth_since_last_check(
+        self, tmp_path: Path
+    ) -> None:
+        # Simulate a deferred row that already has a recorded baseline from an
+        # earlier recheck that did not grow (a fresh row's baseline is always
+        # empty, so growth from a truly empty baseline flips immediately --
+        # this proves the comparison is against the *last recorded* baseline,
+        # not always-empty original deferral state).
+        store, follow_up_id = _deferred_follow_up(tmp_path)
+        with store.connect() as connection:
+            connection.execute(
+                "UPDATE follow_up_registry SET last_known_sectors=? WHERE follow_up_id=?",
+                ("[10, 11]", follow_up_id),
+            )
+
+        same_result = store.record_sector_recheck(
+            follow_up_id, sectors=[10, 11], checked_at=datetime.now(UTC)
+        )
+        assert same_result["grew"] is False
+        assert store.list_follow_ups(status="deferred")
+
+        grown_result = store.record_sector_recheck(
+            follow_up_id, sectors=[10, 11, 12], checked_at=datetime.now(UTC)
+        )
+        assert grown_result["grew"] is True
+        assert grown_result["new_sectors"] == [12]
+        assert store.list_follow_ups(status="open")
+
+    def test_recheck_appends_event_log_entry_even_when_not_grown(
+        self, tmp_path: Path
+    ) -> None:
+        store, follow_up_id = _deferred_follow_up(tmp_path)
+
+        store.record_sector_recheck(follow_up_id, sectors=[], checked_at=datetime.now(UTC))
+
+        events = store.follow_up_events(follow_up_id)
+        assert events[-1]["state"] == "deferred"
+        assert events[-1]["detail"]["recheck"] is True
+        assert events[-1]["detail"]["grew"] is False
+
+    def test_recheck_appends_open_transition_event_when_grown(
+        self, tmp_path: Path
+    ) -> None:
+        store, follow_up_id = _deferred_follow_up(tmp_path)
+
+        store.record_sector_recheck(follow_up_id, sectors=[5], checked_at=datetime.now(UTC))
+
+        events = store.follow_up_events(follow_up_id)
+        assert events[-1]["state"] == "open"
+        assert events[-1]["detail"]["recheck"] is True
+        assert events[-1]["detail"]["new_sectors"] == [5]
+
+    def test_unknown_follow_up_id_raises(self, tmp_path: Path) -> None:
+        store = HunterStore(tmp_path / "hunter.sqlite3")
+        with pytest.raises(RuntimeError, match="Unknown follow-up registry row"):
+            store.record_sector_recheck(
+                "does-not-exist", sectors=[1], checked_at=datetime.now(UTC)
+            )
+
+    def test_non_deferred_follow_up_raises(self, tmp_path: Path) -> None:
+        store = HunterStore(tmp_path / "hunter.sqlite3")
+        search = _create(store, [_candidate(1)], count=1)
+        store.execute_search(
+            lambda _: TargetExecutionResult(
+                status="candidate_found",
+                result={},
+                provenance={},
+                follow_ups=(
+                    FollowUpRecommendation(
+                        candidate_id="TIC1-s01",
+                        priority=99.0,
+                        reason="unresolved signal",
+                        evidence={},
+                        recommended_action="obtain more data",
+                    ),
+                ),
+            ),
+            search_id=search["search_id"],
+        )
+        open_follow_up_id = store.list_follow_ups(status="open")[0]["follow_up_id"]
+        with pytest.raises(RuntimeError, match="is not deferred"):
+            store.record_sector_recheck(
+                open_follow_up_id, sectors=[1], checked_at=datetime.now(UTC)
+            )
+
+
 def test_deferred_follow_up_is_visible_but_not_search_eligible(tmp_path: Path) -> None:
     store = HunterStore(tmp_path / "hunter.sqlite3")
     search = _create(store, [_candidate(1)], count=1)
