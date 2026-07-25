@@ -216,6 +216,10 @@ def fit_calibration(
 
     Raises:
         ValueError: labeled_candidates is empty or method is unrecognised.
+        RuntimeError: method="platt" and the Platt-scaling optimizer failed
+            (raised or did not converge) for one of the six hypotheses --
+            distinct from the documented insufficient-data identity
+            fallback, which is not an error.
     """
     if len(labeled_candidates) == 0:
         raise ValueError("labeled_candidates must not be empty")
@@ -510,7 +514,17 @@ def _pava(y: np.ndarray) -> np.ndarray:
 
 
 def _fit_platt(probs: np.ndarray, labels: np.ndarray) -> PlattParams:
-    """Fit Platt scaling via MLE.  Falls back to identity if data are insufficient."""
+    """Fit Platt scaling via MLE.
+
+    Falls back to the identity mapping ONLY for the documented, tested
+    insufficient-data case (too few samples, or a single-class label set).
+    A genuine optimizer failure -- an exception, or a non-converged result
+    scipy returns without raising -- is NOT silently folded into that same
+    fallback: it raises instead. Returning the identical PlattParams for
+    both "legitimately nothing to fit" and "the fit actually broke" would
+    make a broken calibration for one hypothesis indistinguishable from a
+    correct identity mapping, letting it ship into production undetected.
+    """
     n_pos = int(labels.sum())
     if len(probs) < _MIN_FIT_SAMPLES or n_pos == 0 or n_pos == len(labels):
         return PlattParams(slope=1.0, intercept=0.0)
@@ -528,9 +542,17 @@ def _fit_platt(probs: np.ndarray, labels: np.ndarray) -> PlattParams:
             method="Nelder-Mead",
             options={"maxiter": 2000, "xatol": 1e-7, "fatol": 1e-7},
         )
-        return PlattParams(slope=float(res.x[0]), intercept=float(res.x[1]))
-    except Exception:
-        return PlattParams(slope=1.0, intercept=0.0)
+    except Exception as exc:
+        raise RuntimeError(
+            f"Platt scaling optimizer raised on {len(probs)} samples "
+            f"({n_pos} positive): {type(exc).__name__}: {exc}"
+        ) from exc
+    if not res.success:
+        raise RuntimeError(
+            f"Platt scaling optimizer did not converge on {len(probs)} "
+            f"samples ({n_pos} positive): {res.message}"
+        )
+    return PlattParams(slope=float(res.x[0]), intercept=float(res.x[1]))
 
 
 def _fit_isotonic(probs: np.ndarray, labels: np.ndarray) -> IsotonicKnots:

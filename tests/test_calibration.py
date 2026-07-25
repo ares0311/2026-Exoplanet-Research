@@ -6,9 +6,12 @@ and verifiable by hand.
 """
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 
+import exo_toolkit.calibration as calibration_module
 from exo_toolkit.calibration import (
     CalibrationMetrics,
     IsotonicKnots,
@@ -444,6 +447,39 @@ class TestPlattScaling:
         cal_probs = np.array([_apply_platt(p, params) for p in probs])
         cal_brier = float(np.mean((cal_probs - labels) ** 2))
         assert cal_brier <= raw_brier + 0.05  # calibrated should be similar or better
+
+    def test_optimizer_exception_raises_not_silently_falls_back(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Regression: a real optimizer crash must not be silently folded
+        # into the same identity-fallback PlattParams the documented
+        # insufficient-data path returns -- that would make a broken fit
+        # indistinguishable from a correct identity mapping.
+        def raising_minimize(*args: object, **kwargs: object) -> None:
+            raise ValueError("synthetic optimizer crash")
+
+        monkeypatch.setattr(calibration_module, "minimize", raising_minimize)
+        probs = np.array([0.2, 0.8, 0.5, 0.6, 0.3, 0.9])
+        labels = np.array([0.0, 1.0, 1.0, 0.0, 0.0, 1.0])
+        with pytest.raises(RuntimeError, match="optimizer raised"):
+            _fit_platt(probs, labels)
+
+    def test_optimizer_non_convergence_raises_not_silently_falls_back(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # scipy.optimize.minimize can return success=False WITHOUT raising
+        # -- this must be caught explicitly, not just wrapped in a
+        # try/except that only handles exceptions.
+        fake_result = SimpleNamespace(
+            success=False, x=np.array([1.0, 0.0]), message="did not converge"
+        )
+        monkeypatch.setattr(
+            calibration_module, "minimize", lambda *args, **kwargs: fake_result
+        )
+        probs = np.array([0.2, 0.8, 0.5, 0.6, 0.3, 0.9])
+        labels = np.array([0.0, 1.0, 1.0, 0.0, 0.0, 1.0])
+        with pytest.raises(RuntimeError, match="did not converge"):
+            _fit_platt(probs, labels)
 
 
 # ---------------------------------------------------------------------------
