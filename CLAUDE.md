@@ -911,6 +911,21 @@ stellar parameter is missing and non-`None` when present.
 The version 0.3.19 release gate passed 3,143 default tests plus Ruff/mypy as
 10/10 supervised gates in 28.1 seconds under the canonical 6x6 topology.
 
+Version 0.3.20 continues the hardening sweep: `Skills/run_quality_gates.py`
+captured `git_head_sha`/`git_dirty` *after* `supervise_gates()` returned, not
+before, so its summary JSON could misattribute a commit landing during the
+~20-30s gate run (plausible in this repo, which has 15+ scripts that
+auto-commit Run Reports) to a result that never actually verified that SHA —
+directly undermining the field's own stated purpose. `main()` now captures
+git state immediately before the gates start and gains injectable
+`supervise_gates_fn`/`git_state_fn` parameters (matching this repo's
+existing dependency-injection pattern, e.g. `git_run_fn` elsewhere) so a new
+regression test can prove the fix by call order, not just by output value: a
+stale `git_state_fn` could otherwise coincidentally match the old buggy
+timing by chance.
+The version 0.3.20 release gate passed 3,140 default tests plus Ruff/mypy as
+10/10 supervised gates in 29.1 seconds under the canonical 6x6 topology.
+
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
