@@ -92,12 +92,17 @@ class CandidateTimeline:
         """
         candidate_id = str(row.get("candidate_id", "unknown"))
 
-        fpp = (
-            row.get("scores", {}).get("false_positive_probability")
-            or row.get("best_fpp")
-            or 0.0
-        )
-        planet_posterior = row.get("posterior", {}).get("planet_candidate") or 0.0
+        # is-None checks throughout, not `or`: a genuinely perfect FPP of
+        # 0.0 (or a definitive-non-planet posterior of 0.0) is falsy in
+        # Python and must not be silently replaced by a different field.
+        fpp = row.get("scores", {}).get("false_positive_probability")
+        if fpp is None:
+            fpp = row.get("best_fpp")
+        if fpp is None:
+            fpp = 0.0
+        planet_posterior = row.get("posterior", {}).get("planet_candidate")
+        if planet_posterior is None:
+            planet_posterior = 0.0
         pathway = row.get("pathway", "unknown")
         scorer = row.get("meta", {}).get("scorer", "bayesian")
         period_days = float(row.get("period_days") or 0.0)

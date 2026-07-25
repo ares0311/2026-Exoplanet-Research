@@ -54,6 +54,31 @@ class TestCandidateTimeline:
         assert latest is not None
         assert latest.fpp == pytest.approx(0.10)
 
+    def test_genuine_zero_fpp_is_not_replaced_by_stale_best_fpp(
+        self, tmp_path: Path
+    ) -> None:
+        # Regression: `or`-chaining treated a real 0.0 (perfect FPP) as
+        # falsy and silently fell through to a different, possibly stale
+        # field. A genuine 0.0 in scores.false_positive_probability must
+        # win outright, never best_fpp.
+        tl = CandidateTimeline(tmp_path)
+        tl.record(
+            _row(
+                scores={"false_positive_probability": 0.0},
+                best_fpp=0.85,
+            )
+        )
+        latest = tl.latest("TIC1_01")
+        assert latest is not None
+        assert latest.fpp == pytest.approx(0.0)
+
+    def test_genuine_zero_planet_posterior_is_preserved(self, tmp_path: Path) -> None:
+        tl = CandidateTimeline(tmp_path)
+        tl.record(_row(posterior={"planet_candidate": 0.0}))
+        latest = tl.latest("TIC1_01")
+        assert latest is not None
+        assert latest.planet_posterior == pytest.approx(0.0)
+
     def test_summary_n_runs_correct(self, tmp_path: Path) -> None:
         tl = CandidateTimeline(tmp_path)
         tl.record(_row())

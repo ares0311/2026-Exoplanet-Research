@@ -192,8 +192,15 @@ def _scan_log_to_rows(log: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _fpp(row: dict[str, Any]) -> float | None:
-    """Extract FPP from either top-level or scores sub-dict."""
-    val = row.get("false_positive_probability") or row.get("best_fpp")
+    """Extract FPP from either top-level or scores sub-dict.
+
+    Uses ``is None`` checks throughout, not ``or`` -- a genuinely perfect
+    FPP of ``0.0`` is falsy in Python and must not be silently replaced by
+    a different (possibly stale) field.
+    """
+    val = row.get("false_positive_probability")
+    if val is None:
+        val = row.get("best_fpp")
     if val is None:
         val = row.get("scores", {}).get("false_positive_probability")
     try:
