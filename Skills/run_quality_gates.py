@@ -4,8 +4,10 @@ The test suite is partitioned by file so every test module belongs to exactly
 one shard. Each shard then uses pytest-xdist for in-shard execution. Ruff,
 mypy, the incomplete-implementation scan, and the directive-integrity check
 run beside the test shards under the same supervising parent process. The
-summary JSON records the exact git HEAD SHA and working-tree dirty state this
-run verified, per AGENTS.md "No Unsupported Completion Claims".
+summary JSON records the exact git HEAD SHA and working-tree dirty state
+captured immediately before the gates start running (not after they finish),
+so a commit landing mid-run is never silently attributed to the result, per
+AGENTS.md "No Unsupported Completion Claims".
 """
 from __future__ import annotations
 
@@ -267,7 +269,12 @@ def supervise_gates(
     return tuple(completed[spec.name] for spec in specs)
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(
+    argv: list[str] | None = None,
+    *,
+    supervise_gates_fn: Callable[..., tuple[GateOutcome, ...]] = supervise_gates,
+    git_state_fn: Callable[[Path], dict[str, Any]] = _git_state,
+) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tests-only", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
@@ -294,8 +301,13 @@ def main(argv: list[str] | None = None) -> int:
 
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     log_dir = REPO_ROOT / "logs" / "quality_gates" / run_id
+    # Captured BEFORE the gates run, not after: this is the tree state the
+    # gates actually verified. A commit landing during the ~20-30s gate run
+    # (plausible in this repo, which has 15+ scripts that auto-commit Run
+    # Reports) must not be silently attributed to this summary.
+    git_state = git_state_fn(REPO_ROOT)
     overall_started = time.monotonic()
-    outcomes = supervise_gates(specs, log_dir, heartbeat_seconds=args.heartbeat_seconds)
+    outcomes = supervise_gates_fn(specs, log_dir, heartbeat_seconds=args.heartbeat_seconds)
     elapsed = time.monotonic() - overall_started
     failures = [outcome for outcome in outcomes if outcome.returncode]
     summary = {
@@ -306,7 +318,7 @@ def main(argv: list[str] | None = None) -> int:
         "total_test_workers": TOTAL_TEST_WORKERS,
         "elapsed_seconds": elapsed,
         "outcomes": [outcome.__dict__ for outcome in outcomes],
-        **_git_state(REPO_ROOT),
+        **git_state,
     }
     summary_path = log_dir / "quality_gate_summary.json"
     summary_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")

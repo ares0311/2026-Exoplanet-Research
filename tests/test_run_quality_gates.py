@@ -1,16 +1,22 @@
 from __future__ import annotations
 
+import json
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
+import Skills.run_quality_gates as run_quality_gates_module
 from Skills.run_quality_gates import (
     TEST_SHARD_COUNT,
     TOTAL_TEST_WORKERS,
     WORKERS_PER_SHARD,
+    GateOutcome,
     GateSpec,
     _git_state,
     build_gate_specs,
+    main,
     partition_test_files,
     supervise_gates,
 )
@@ -149,3 +155,65 @@ class TestGitState:
         assert state["git_head_sha"] is None
         assert state["git_dirty"] is None
         assert "git_state_error" in state
+
+
+class TestMainCapturesGitStateBeforeGatesRun:
+    def test_git_state_is_captured_before_supervise_gates_runs(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Regression: the summary JSON must record the tree state the gates
+        # actually verified, not whatever state exists after they finish --
+        # a commit landing during the run (plausible in this repo, which has
+        # 15+ scripts that auto-commit Run Reports) must not be silently
+        # attributed to the result. Proven here via call order, not just the
+        # final summary contents, since a stale git_state_fn could otherwise
+        # coincidentally produce the same value regardless of when it's called.
+        #
+        # PYTHON is monkeypatched to sys.executable: main()'s own
+        # `PYTHON.is_file()` preflight check must not depend on this exact
+        # environment having a checked-out .venv/bin/python (CI's runner
+        # sets up Python differently and has no .venv at all).
+        monkeypatch.setattr(run_quality_gates_module, "PYTHON", Path(sys.executable))
+        call_order: list[str] = []
+        created_log_dirs: list[Path] = []
+
+        def fake_git_state(repo_root: Path) -> dict[str, object]:
+            call_order.append("git_state")
+            return {"git_head_sha": "before-sha", "git_dirty": False}
+
+        def fake_supervise(
+            specs: tuple[GateSpec, ...], log_dir: Path, *, heartbeat_seconds: float
+        ) -> tuple[GateOutcome, ...]:
+            call_order.append("supervise_gates")
+            created_log_dirs.append(log_dir)
+            log_dir.mkdir(parents=True, exist_ok=True)
+            outcomes = []
+            for spec in specs:
+                log_path = log_dir / f"{spec.name}.log"
+                log_path.write_text("ok\n")
+                outcomes.append(
+                    GateOutcome(
+                        name=spec.name,
+                        returncode=0,
+                        elapsed_seconds=0.01,
+                        log_path=str(log_path),
+                    )
+                )
+            return tuple(outcomes)
+
+        try:
+            exit_code = main(
+                ["--heartbeat-seconds", "1.0"],
+                supervise_gates_fn=fake_supervise,
+                git_state_fn=fake_git_state,
+            )
+            assert exit_code == 0
+            assert call_order == ["git_state", "supervise_gates"]
+            summary = json.loads(
+                (created_log_dirs[0] / "quality_gate_summary.json").read_text()
+            )
+            assert summary["git_head_sha"] == "before-sha"
+            assert summary["git_dirty"] is False
+        finally:
+            for log_dir in created_log_dirs:
+                shutil.rmtree(log_dir, ignore_errors=True)
