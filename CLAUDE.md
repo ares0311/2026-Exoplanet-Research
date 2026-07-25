@@ -841,6 +841,31 @@ closed without the override, then succeeds with it.
 The version 0.3.15 release gate passed 3,132 default tests plus Ruff/mypy as
 10/10 supervised gates in 29.1 seconds under the canonical 6x6 topology.
 
+Version 0.3.16 starts a whole-repo hardening sweep (a parallel fragility
+audit found ~40 real findings across src/exo_toolkit/, the ML scorers,
+Hunter, and all Skills scripts; being worked as a prioritized backlog of
+focused PRs, not one bulk change) with its own highest-leverage item first:
+the two AGENTS.md reliability-checker backstops had real false-negative
+gaps. `Skills/check_incomplete_implementations.py`'s TODO/FIXME detection
+was a case-sensitive raw substring match (missed `# todo:`/`# Fixme later`,
+the common real-world casing, and could false-positive on identifiers like
+`AUTODOC_ENABLED`); its `_scan_raise` only recognized a bare
+`raise NotImplementedError(...)`, missing a module-qualified raise
+(`raise builtins.NotImplementedError(...)`) or an indirect raise via a
+stored variable (`err = NotImplementedError(...); raise err`).
+`Skills/check_directive_integrity.py`'s required-section check was an
+unanchored substring search of AGENTS.md's raw text, so a demoted heading
+(`## Fail Loudly` → `### Fail Loudly`) or a mere prose/TOC mention of the
+phrase would satisfy it even with the real H2 heading gone. All four are
+now fixed: word-boundary case-insensitive marker matching, an
+`ast.Attribute`/indirect-alias-aware raise scan, and heading detection
+anchored to actual markdown heading lines. 9 new regression tests prove
+each previously-missed case is now caught and that the real repository
+tree (including AGENTS.md's real headings) still passes cleanly with the
+stricter logic.
+The version 0.3.16 release gate passed 3,139 default tests plus Ruff/mypy as
+10/10 supervised gates in 28.1 seconds under the canonical 6x6 topology.
+
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.

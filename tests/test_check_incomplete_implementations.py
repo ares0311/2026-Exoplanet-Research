@@ -70,6 +70,15 @@ def placeholder() -> None:
 """
         assert scan_source(source, rel_path="documented.py") == []
 
+    def test_identifier_containing_marker_substring_is_not_flagged(self) -> None:
+        # Word-boundary regression: "AUTODOC" and "TODOIST_TOKEN" contain the
+        # substring "TODO" but are not TODO markers.
+        source = """
+AUTODOC_ENABLED = True
+TODOIST_TOKEN = "unused"
+"""
+        assert scan_source(source, rel_path="not_a_marker.py") == []
+
 
 class TestScanSourceKnownBad:
     def test_bare_pass_stub_is_flagged(self) -> None:
@@ -135,6 +144,41 @@ class Scorer:
         violations = scan_source(source, rel_path="nested.py")
         assert len(violations) == 1
         assert violations[0].kind == "bare_pass_stub"
+
+    def test_lowercase_todo_marker_is_flagged(self) -> None:
+        source = """
+def compute_score(x: float) -> float:
+    # todo: handle negative depths
+    return x
+"""
+        violations = scan_source(source, rel_path="lower_todo.py")
+        assert len(violations) == 1
+        assert violations[0].kind == "todo_marker"
+
+    def test_mixed_case_fixme_marker_is_flagged(self) -> None:
+        source = "x = 1  # Fixme later\n"
+        violations = scan_source(source, rel_path="mixed_fixme.py")
+        assert len(violations) == 1
+        assert violations[0].kind == "todo_marker"
+
+    def test_qualified_not_implemented_error_is_flagged(self) -> None:
+        source = """
+def compute_score(x: float) -> float:
+    raise builtins.NotImplementedError("fill this in")
+"""
+        violations = scan_source(source, rel_path="qualified_raise.py")
+        assert len(violations) == 1
+        assert violations[0].kind == "not_implemented"
+
+    def test_indirect_not_implemented_error_via_variable_is_flagged(self) -> None:
+        source = """
+def compute_score(x: float) -> float:
+    err = NotImplementedError("fill this in")
+    raise err
+"""
+        violations = scan_source(source, rel_path="indirect_raise.py")
+        assert len(violations) == 1
+        assert violations[0].kind == "not_implemented"
 
 
 class TestAllowlistMarker:

@@ -107,6 +107,32 @@ class TestKnownBadMissingSections:
         problems = check_required_sections_present(tmp_path)
         assert len(problems) == len(_REQUIRED_SECTIONS)
 
+    def test_demoted_heading_level_is_caught(self, tmp_path: Path) -> None:
+        # Regression: a substring search would find "## Fail Loudly" inside
+        # "### Fail Loudly" and wrongly report the section present even
+        # though the real H2 heading is gone.
+        _write_good_tree(tmp_path)
+        text = (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
+        mutated = text.replace("## Fail Loudly", "### Fail Loudly")
+        (tmp_path / "AGENTS.md").write_text(mutated, encoding="utf-8")
+        problems = check_required_sections_present(tmp_path)
+        assert len(problems) == 1
+        assert "Fail Loudly" in problems[0]
+
+    def test_prose_mention_without_real_heading_is_caught(self, tmp_path: Path) -> None:
+        # Regression: a substring search would find the phrase inside a TOC
+        # entry or inline prose mention and wrongly report the section
+        # present even though no real heading line exists.
+        _write_good_tree(tmp_path)
+        text = (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
+        mutated = text.replace(
+            "## Fail Loudly", "See the ## Fail Loudly policy referenced elsewhere"
+        )
+        (tmp_path / "AGENTS.md").write_text(mutated, encoding="utf-8")
+        problems = check_required_sections_present(tmp_path)
+        assert len(problems) == 1
+        assert "Fail Loudly" in problems[0]
+
 
 class TestKnownBadClaudePointer:
     def test_missing_claude_md_fails(self, tmp_path: Path) -> None:
