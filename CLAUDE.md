@@ -974,6 +974,30 @@ The version 0.3.22 release gate passed 3,153 default tests plus Ruff/mypy
 as 10/10 supervised gates in 29.2 seconds under the canonical 6x6
 topology.
 
+Version 0.3.24 is a same-session follow-up to 0.3.22: this project's own
+post-merge self-review (the `/review` skill run against every hardening-
+sweep PR before merge) caught that `predict_proba`'s new try/except was
+dead code -- `predict_proba` always delegates to
+`self.predict_proba_batch([snippet])[0]`, and `predict_proba_batch`
+already catches every inference-time exception internally and never
+raises to its caller, so a wrapping try/except in `predict_proba` could
+never actually fire. The review finding was made and a correction commit
+written before 0.3.22 merged, but a repository auto-merge fired on green
+CI before the correction could be pushed (a real GitHub connectivity
+outage in this session delayed the push past the merge) -- so 0.3.22
+shipped with the harmless-but-misleading dead code intact, and this
+version is the follow-up PR applying the already-written fix.
+`predict_proba` now delegates directly with no try/except of its own;
+`predict_proba_batch`'s own warning (the one that actually matters) is
+unchanged. The two regression tests are updated to describe this
+accurately: one proves `predict_proba_batch`'s warning fires directly,
+the other proves `predict_proba` (single-snippet API) correctly surfaces
+that same warning through delegation, rather than claiming two
+independently-reachable except blocks.
+The version 0.3.24 release gate passed 3,153 default tests plus Ruff/mypy
+as 10/10 supervised gates in 30.2 seconds under the canonical 6x6
+topology.
+
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
