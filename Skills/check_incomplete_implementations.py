@@ -24,6 +24,7 @@ Presence".
 from __future__ import annotations
 
 import ast
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -36,7 +37,10 @@ EXCLUDE_DIR_NAMES = {"__pycache__"}
 EXCLUDE_FILES = {Path(__file__).resolve()}
 ALLOWLIST_MARKER = "# allow-stub:"
 _ABSTRACT_DECORATOR_NAMES = {"abstractmethod", "abstractproperty"}
-_TODO_MARKERS = ("TODO", "FIXME")
+# Case-insensitive with word boundaries: catches "# todo:", "# Fixme later"
+# (the common real-world casing) without false-positiving on identifiers
+# that merely contain the substring, e.g. "AUTODOC" or "TODOIST_TOKEN".
+_TODO_MARKER_PATTERN = re.compile(r"\b(TODO|FIXME)\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -121,16 +125,65 @@ def _scan_function(
     )
 
 
+def _named_exception(expr: ast.expr | None) -> str | None:
+    """Resolve the exception class name from a `raise <expr>` target.
+
+    Handles the bare-name form (`NotImplementedError`), the call form
+    (`NotImplementedError(...)`), and both forms module/attribute-qualified
+    (`builtins.NotImplementedError`, `builtins.NotImplementedError(...)`) —
+    `ast.Attribute.attr` is always the final segment regardless of prefix
+    depth, so no import-resolution is needed to recognize the class name.
+    """
+    if isinstance(expr, ast.Call):
+        expr = expr.func
+    if isinstance(expr, ast.Name):
+        return expr.id
+    if isinstance(expr, ast.Attribute):
+        return expr.attr
+    return None
+
+
+def _collect_not_implemented_aliases(tree: ast.AST) -> set[str]:
+    """Find simple local names assigned a `NotImplementedError` instance.
+
+    Catches the indirect-raise pattern (`err = NotImplementedError(...);
+    raise err`), which a direct `raise`-target check alone would miss.
+    Collected whole-file rather than per-function scope: a same-named local
+    in an unrelated function could in principle cause an over-broad flag,
+    but that only makes this checker MORE conservative (a false positive
+    with a documented `# allow-stub:` escape hatch), never less — consistent
+    with this checker being presence-only detection, not proof of a bug.
+    """
+    aliases: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            targets: list[ast.expr] = node.targets
+            value = node.value
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            targets = [node.target]
+            value = node.value
+        else:
+            continue
+        if _named_exception(value) != "NotImplementedError":
+            continue
+        for target in targets:
+            if isinstance(target, ast.Name):
+                aliases.add(target.id)
+    return aliases
+
+
 def _scan_raise(
-    node: ast.Raise, *, rel_path: str, source_lines: list[str]
+    node: ast.Raise,
+    *,
+    rel_path: str,
+    source_lines: list[str],
+    indirect_aliases: set[str],
 ) -> Violation | None:
     exc = node.exc
-    name = None
-    if isinstance(exc, ast.Name):
-        name = exc.id
-    elif isinstance(exc, ast.Call) and isinstance(exc.func, ast.Name):
-        name = exc.func.id
-    if name != "NotImplementedError":
+    name = _named_exception(exc)
+    if name != "NotImplementedError" and not (
+        isinstance(exc, ast.Name) and exc.id in indirect_aliases
+    ):
         return None
     if _line_has_allowlist_marker(source_lines, node.lineno):
         return None
@@ -144,17 +197,16 @@ def _scan_todo_markers(*, rel_path: str, source_lines: list[str]) -> list[Violat
     for index, line in enumerate(source_lines, 1):
         if ALLOWLIST_MARKER in line:
             continue
-        for marker in _TODO_MARKERS:
-            if marker in line:
-                violations.append(
-                    Violation(
-                        path=rel_path,
-                        line=index,
-                        kind="todo_marker",
-                        detail=f"contains unresolved '{marker}' marker",
-                    )
+        match = _TODO_MARKER_PATTERN.search(line)
+        if match:
+            violations.append(
+                Violation(
+                    path=rel_path,
+                    line=index,
+                    kind="todo_marker",
+                    detail=f"contains unresolved {match.group(1)!r} marker",
                 )
-                break
+            )
     return violations
 
 
@@ -166,6 +218,7 @@ def scan_source(source: str, *, rel_path: str) -> list[Violation]:
     """
     tree = ast.parse(source, filename=rel_path)
     source_lines = source.splitlines()
+    indirect_aliases = _collect_not_implemented_aliases(tree)
     violations: list[Violation] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
@@ -173,7 +226,12 @@ def scan_source(source: str, *, rel_path: str) -> list[Violation]:
             if found is not None:
                 violations.append(found)
         elif isinstance(node, ast.Raise):
-            found = _scan_raise(node, rel_path=rel_path, source_lines=source_lines)
+            found = _scan_raise(
+                node,
+                rel_path=rel_path,
+                source_lines=source_lines,
+                indirect_aliases=indirect_aliases,
+            )
             if found is not None:
                 violations.append(found)
     violations.extend(_scan_todo_markers(rel_path=rel_path, source_lines=source_lines))

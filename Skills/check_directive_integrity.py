@@ -67,15 +67,28 @@ def check_agents_md_present(repo_root: Path) -> list[str]:
 
 
 def check_required_sections_present(repo_root: Path) -> list[str]:
-    """Confirm the mandatory reliability-controls directives are present."""
+    """Confirm the mandatory reliability-controls directives are present.
+
+    Matched against actual markdown heading lines, not an unanchored
+    substring search of the raw text — a substring match would report a
+    demoted heading (e.g. "## Fail Loudly" demoted to "### Fail Loudly") or
+    a mere prose/TOC mention of the phrase as if the real H2 heading were
+    still present, exactly the silent-drift class this checker exists to
+    catch.
+    """
     agents_md = repo_root / "AGENTS.md"
     if not agents_md.is_file():
         return []  # already reported by check_agents_md_present
-    text = agents_md.read_text(encoding="utf-8")
+    headings = {
+        stripped
+        for line in agents_md.read_text(encoding="utf-8").splitlines()
+        if (stripped := line.strip()).startswith("#")
+    }
     return [
-        f"{agents_md} is missing required section header: {section!r}"
+        f"{agents_md} is missing required section header: {section!r} "
+        "(as an actual markdown heading, not merely mentioned in prose)"
         for section in _REQUIRED_AGENTS_MD_SECTIONS
-        if section not in text
+        if not any(heading.startswith(section) for heading in headings)
     ]
 
 
