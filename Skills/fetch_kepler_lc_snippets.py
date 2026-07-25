@@ -14,7 +14,7 @@ Output is a JSONL file (one JSON object per line) in the same format as
 Public API
 ----------
 KoiSnippetResult(kepid, label, flux, period_days, epoch_bjd, n_bins, flag)
-fetch_koi_table(max_rows) -> list[dict]
+fetch_koi_table(max_rows, *, query_fn) -> list[dict]
 build_kepler_snippet(kepid, label, period_days, epoch_bjd, *, n_bins,
                      lc_fetcher) -> KoiSnippetResult
 build_kepler_snippets(koi_rows, *, n_bins, output_path, lc_fetcher,
@@ -23,6 +23,11 @@ build_kepler_snippets(koi_rows, *, n_bins, output_path, lc_fetcher,
 The CLI entry point writes a structured completion record via
 ``Skills/run_report.py`` after each run (AGENTS.md Run Report Policy,
 Rule 7) and commits/pushes only that record.
+
+``fetch_koi_table()`` raises ``RuntimeError`` if the TAP response is not a
+JSON list, instead of silently falling back to an empty result via
+``response.get("data", [])`` -- a malformed or error response must not be
+indistinguishable from "zero KOIs currently match this query."
 """
 from __future__ import annotations
 
@@ -182,32 +187,54 @@ _KOI_QUERY = (
 )
 
 
-def fetch_koi_table(max_rows: int = 10000) -> list[dict]:
-    """Fetch KOI cumulative table from NASA Exoplanet Archive.
-
-    Args:
-        max_rows: Maximum number of rows to return.
-
-    Returns:
-        List of dicts with keys: kepid, kepoi_name, koi_disposition,
-        koi_pdisposition, koi_period, koi_time0bk.
-    """
+def _default_koi_query(url: str) -> Any:
     import ssl
     try:
         import certifi
         ctx: ssl.SSLContext | None = ssl.create_default_context(cafile=certifi.where())
     except ImportError:
         ctx = None
+    with urlopen(url, timeout=60, context=ctx) as resp:  # noqa: S310
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def fetch_koi_table(
+    max_rows: int = 10000,
+    *,
+    query_fn: Callable[[str], Any] | None = None,
+) -> list[dict]:
+    """Fetch KOI cumulative table from NASA Exoplanet Archive.
+
+    Args:
+        max_rows: Maximum number of rows to return.
+        query_fn: Injectable transport callable (url -> parsed JSON). Defaults
+            to a urlopen-based fetcher; supply a mock in tests.
+
+    Returns:
+        List of dicts with keys: kepid, kepoi_name, koi_disposition,
+        koi_pdisposition, koi_period, koi_time0bk.
+
+    Raises:
+        RuntimeError: If the response is not a JSON list -- this TAP
+            endpoint's successful responses are always a bare array (see
+            the identical query in fetch_tess_kepler_overlap_snippets.py,
+            which iterates the parsed response directly with no dict-
+            wrapping fallback); any other shape (an error payload, a
+            schema-drifted wrapper object, etc.) is a real failure and
+            must not be silently treated as zero available rows.
+    """
+    _query = query_fn or _default_koi_query
     params = urlencode({
         "QUERY": _KOI_QUERY + f" TOP {max_rows}",
         "FORMAT": "json",
     })
     url = f"{_NEA_TAP_URL}?{params}"
-    with urlopen(url, timeout=60, context=ctx) as resp:  # noqa: S310
-        data = json.loads(resp.read().decode("utf-8"))
-    if isinstance(data, list):
-        return data
-    return data.get("data", [])
+    data = _query(url)
+    if not isinstance(data, list):
+        raise RuntimeError(
+            f"Unexpected KOI table response shape: expected a list, got {type(data).__name__}"
+        )
+    return data
 
 
 # ---------------------------------------------------------------------------
