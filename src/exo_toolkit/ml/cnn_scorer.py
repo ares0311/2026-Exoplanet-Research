@@ -202,7 +202,21 @@ class CnnScorer:
             return 0.5
         try:
             return self.predict_proba_batch([snippet])[0]
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
+            # Unlike the "not available" cases above (documented, silent),
+            # this is a real inference-time failure on a loaded model --
+            # e.g. a shape mismatch or a NaN propagating into a torch op.
+            # Silently falling back to 0.5 with no warning is exactly the
+            # loading-path incident this module's docstring already
+            # documents (588 flat-0.5 K2 scores feeding a bogus stacking
+            # weight), just at inference time instead of load time.
+            warnings.warn(
+                f"CnnScorer inference failed on a single snippet "
+                f"({type(exc).__name__}: {exc}); falling back to the "
+                "neutral 0.5 for this prediction only.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
             return 0.5
 
     def predict_proba_batch(self, snippets: list[list[float]]) -> list[float]:
@@ -235,7 +249,18 @@ class CnnScorer:
                 out = self._model(tensor)
                 probs: list[float] = out.flatten().tolist()
             return [self._apply_calibration(max(0.0, min(1.0, float(p)))) for p in probs]
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
+            # Same reasoning as predict_proba's inference-time except block:
+            # a loaded model failing during actual inference is a real
+            # failure, not the documented "not available" case, and must
+            # not be silently indistinguishable from it.
+            warnings.warn(
+                f"CnnScorer inference failed on a batch of {len(snippets)} "
+                f"snippet(s) ({type(exc).__name__}: {exc}); falling back to "
+                "the neutral 0.5 for this batch only.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
             return [0.5] * len(snippets)
 
     # ------------------------------------------------------------------
