@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
 import Skills.fetch_tess_k2_overlap_snippets as k2_overlap
 from Skills.fetch_tess_k2_overlap_snippets import (
     K2Row,
@@ -20,6 +21,7 @@ from Skills.fetch_tess_k2_overlap_snippets import (
     _write_run_report,
     build_k2_tess_snippet,
     build_k2_tess_snippets,
+    fetch_k2_table,
 )
 
 # ---------------------------------------------------------------------------
@@ -62,6 +64,67 @@ def _no_data_fetcher(epic_id: int, period: float, epoch_bjd: float):
 
 def _error_fetcher(epic_id: int, period: float, epoch_bjd: float):
     raise RuntimeError("connection refused")
+
+
+# ---------------------------------------------------------------------------
+# fetch_k2_table
+# ---------------------------------------------------------------------------
+
+
+class TestFetchK2Table:
+    """fetch_k2_table(url=...) uses fixed column names {epic_id, disposition,
+    period, t0} for the test-override branch (see the function's own `col`
+    dict when `url is not None`), and always requests csv format."""
+
+    def test_parses_valid_rows(self, tmp_path) -> None:
+        csv_body = (
+            "epic_id,disposition,period,t0\n"
+            "211311380,CONFIRMED,2.4706,2457100.7285\n"
+            "211399359,FALSE POSITIVE,2.2047,2457065.9417\n"
+        )
+        f = tmp_path / "k2.csv"
+        f.write_text(csv_body, encoding="utf-8")
+        rows = fetch_k2_table(f"file://{f}")
+        assert len(rows) == 2
+        assert {r.disposition for r in rows} == {"CONFIRMED", "FALSE POSITIVE"}
+
+    def test_empty_body_returns_empty_not_raise(self, tmp_path) -> None:
+        f = tmp_path / "k2.csv"
+        f.write_text("epic_id,disposition,period,t0\n", encoding="utf-8")
+        rows = fetch_k2_table(f"file://{f}")
+        assert rows == []
+
+    def test_renamed_column_raises_instead_of_silently_returning_empty(
+        self, tmp_path
+    ) -> None:
+        # Regression: every row missing the expected "epic_id" key (e.g. the
+        # archive renamed the column) previously hit the same
+        # `except (KeyError, TypeError, ValueError): continue` as an
+        # ordinary malformed value, so a fully broken response silently
+        # returned [] -- indistinguishable from "zero K2 rows match."
+        csv_body = (
+            "epic_identifier,disposition,period,t0\n"
+            "211311380,CONFIRMED,2.4706,2457100.7285\n"
+            "211399359,FALSE POSITIVE,2.2047,2457065.9417\n"
+        )
+        f = tmp_path / "k2.csv"
+        f.write_text(csv_body, encoding="utf-8")
+        with pytest.raises(RuntimeError, match="missing expected column"):
+            fetch_k2_table(f"file://{f}")
+
+    def test_some_rows_malformed_others_valid_skips_only_malformed(
+        self, tmp_path
+    ) -> None:
+        csv_body = (
+            "epic_id,disposition,period,t0\n"
+            "211311380,CONFIRMED,2.4706,2457100.7285\n"
+            "not-a-number,CONFIRMED,2.2047,2457065.9417\n"
+        )
+        f = tmp_path / "k2.csv"
+        f.write_text(csv_body, encoding="utf-8")
+        rows = fetch_k2_table(f"file://{f}")
+        assert len(rows) == 1
+        assert rows[0].epic_id == 211311380
 
 
 # ---------------------------------------------------------------------------
