@@ -71,6 +71,37 @@ def test_invalid_response():
     assert r.flag == "INVALID"
 
 
+def test_missing_required_column_returns_invalid_not_ok():
+    # Regression: a renamed/dropped upstream column (e.g. "ticid" -> "tic_id")
+    # must not silently parse as tic_id=0/period_days=0.0/disposition="" and
+    # still be reported as a successful "OK" fetch.
+    drifted_rows = [
+        {k: v for k, v in row.items() if k != "ticid"} for row in _ROWS
+    ]
+    r = fetch_tce_table(fetch_fn=lambda url: drifted_rows)
+    assert r.flag == "INVALID"
+    assert r.error_message is not None
+    assert "ticid" in r.error_message
+    assert r.n_total == 0
+
+
+def test_missing_disposition_column_alone_returns_invalid():
+    # A single renamed column (not a whole-schema rename) must also be
+    # caught, not silently treated as legitimate "not dispositioned" data.
+    drifted_rows = [
+        {k: v for k, v in row.items() if k != "tce_disposition"} for row in _ROWS
+    ]
+    r = fetch_tce_table(fetch_fn=lambda url: drifted_rows)
+    assert r.flag == "INVALID"
+    assert r.error_message is not None
+    assert "tce_disposition" in r.error_message
+
+
+def test_all_required_columns_present_still_reports_ok():
+    r = fetch_tce_table(fetch_fn=_mock_fetch)
+    assert r.flag == "OK"
+
+
 def test_network_error():
     def bad_fetch(url: str) -> list[dict]:
         raise ConnectionError("no network")
