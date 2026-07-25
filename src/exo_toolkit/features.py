@@ -743,16 +743,28 @@ def extract_features(
     Features whose required diagnostics are absent are set to None.
     """
     d = diagnostics
-    r_rsun = d.stellar_radius_rsun if d.stellar_radius_rsun is not None else 1.0
-    m_msun = d.stellar_mass_msun if d.stellar_mass_msun is not None else 1.0
+    # Deliberately NOT defaulted to solar (1.0 R_Sun / 1.0 M_Sun) when
+    # missing: these feed duration_plausibility_score/
+    # duration_implausibility_score/companion_radius_too_large_score below,
+    # and silently assuming a solar host would inject a wrong-but-plausible
+    # bias into planet-vs-EB scoring rather than leaving the diagnostic
+    # absent, per this module's stated invariant that "features whose
+    # required diagnostics are absent are set to None" — the same pattern
+    # stellar_density_consistency_score already follows correctly. Missing
+    # stellar params are common for fainter stars (Tmag 10-14), the exact
+    # population this project targets.
+    r_rsun = d.stellar_radius_rsun
+    m_msun = d.stellar_mass_msun
 
     # --- detection quality (always computable from signal) ---
     snr_s = snr_score(signal.snr)
     log_snr_s = log_snr_score(signal.snr)
     tc_s = transit_count_score(signal.transit_count)
-    dur_plaus_s = duration_plausibility_score(
-        signal.duration_hours, signal.period_days, r_rsun, m_msun
-    )
+    dur_plaus_s: float | None = None
+    if r_rsun is not None and m_msun is not None:
+        dur_plaus_s = duration_plausibility_score(
+            signal.duration_hours, signal.period_days, r_rsun, m_msun
+        )
 
     depth_cons_s: float | None = None
     depth_chi2_s: float | None = None
@@ -797,12 +809,18 @@ def extract_features(
         v_s = v_shape_score(d.ingress_egress_fraction)
         non_box_s = non_box_shape_score(d.ingress_egress_fraction)
 
-    # --- eclipsing binary (always computable from signal + optional stellar params) ---
+    # --- eclipsing binary ---
     large_d_s = large_depth_score(signal.depth_ppm)
-    comp_r_s = companion_radius_too_large_score(signal.depth_ppm, r_rsun)
-    dur_implaus_s = duration_implausibility_score(
-        signal.duration_hours, signal.period_days, r_rsun, m_msun
-    )
+
+    comp_r_s: float | None = None
+    if r_rsun is not None:
+        comp_r_s = companion_radius_too_large_score(signal.depth_ppm, r_rsun)
+
+    dur_implaus_s: float | None = None
+    if r_rsun is not None and m_msun is not None:
+        dur_implaus_s = duration_implausibility_score(
+            signal.duration_hours, signal.period_days, r_rsun, m_msun
+        )
 
     odd_even_s: float | None = None
     if (
@@ -916,10 +934,9 @@ def extract_features(
         cm_motion_s = centroid_motion_score(d.centroid_motion_arcsec)
 
     ld_s: float | None = None
-    if d.ingress_egress_fraction is not None:
-        teff = d.stellar_teff_k if d.stellar_teff_k is not None else 5778.0
+    if d.ingress_egress_fraction is not None and d.stellar_teff_k is not None:
         ld_s = limb_darkening_plausibility_score(
-            d.ingress_egress_fraction, signal.depth_ppm, teff
+            d.ingress_egress_fraction, signal.depth_ppm, d.stellar_teff_k
         )
 
     # --- known object ---
