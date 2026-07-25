@@ -742,6 +742,32 @@ rediscover either one.
 
 Its release gate passed the unchanged 2,759 default tests plus Ruff/mypy as
 8/8 supervised gates in 27.3 seconds under the canonical 6×6 topology.
+
+Version 0.3.12 fixes two real gaps a post-acceptance audit of
+`_select_live_new_candidates()` found, still open after 0.3.11. First, its
+sufficiency check compared the sweep's raw candidate count against the
+target count, but known-variable exclusion and QLP-product-availability
+filtering only run on the raw sweep's top `targets * 3` rows — so a sweep
+that cleared the raw threshold could still leave the *eligible* pool short of
+N with no further expansion ever triggered. The check now runs after
+stage-two inspection, on the eligible count, and expansion (both axes below)
+continues whenever eligible candidates are short, not just when the raw
+sweep is thin. Second, only the Tmag magnitude window ever widened; the
+126-tile sky sweep was permanently fixed regardless of retries. `Skills/
+star_scanner.py` gains a second, disjoint 180-tile expansion ring
+(`_EXPANSION_SEARCH_CENTERS` — interleaved offset bands plus two polar
+bands never reached by the base grid; `TOTAL_SEARCH_TILES = 306`), and
+`_select_live_new_candidates()` now widens `max_tiles` (+60 tiles per bounded
+retry, capped at the scanner's declared total) alongside Tmag widening, both
+logged per attempt (`max_tiles`, `eligible_candidates`) and as
+`final_max_tiles` in `selector_log`. Verified offline with scanner doubles
+exercising both fixes directly: a sweep returning enough raw rows but too
+few eligible ones now keeps expanding instead of stopping short, and tile
+coverage grows and caps correctly. No live 126+-tile MAST sweep was run from
+this session. See `docs/HUNTER_PRODUCTION_WORKFLOW.md`.
+The version 0.3.12 release gate passed 3,091 default tests plus Ruff/mypy as
+10/10 supervised gates in 27.1 seconds under the canonical 6x6 topology.
+
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.

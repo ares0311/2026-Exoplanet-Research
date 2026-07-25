@@ -60,6 +60,28 @@ ran it live against real MAST data (see `hunter_live_acceptance_v10.json`
 above) — a deliberately narrow Tmag 4.0-4.1 window returned 0 raw candidates
 from a real 126-tile sweep, the loop widened it to 4.0-5.1, and a second real
 sweep found 13, enough to satisfy the requested 5 with zero shortfall.
+**Version 0.3.12** fixes two real gaps a post-acceptance audit found in
+`_select_live_new_candidates()` itself. First, its sufficiency check compared
+the *raw* sweep count against the target count before known-variable
+exclusion and QLP-product-availability filtering ever ran (those only inspect
+the raw sweep's top `targets * 3` rows), so a sweep that cleared the raw
+threshold but left the *eligible* pool short of N never triggered further
+expansion. The check now runs after stage-two inspection, on the eligible
+count, and `stage_two_goal` effectively grows because expansion itself
+continues (widening Tmag range and tile coverage) whenever eligible
+candidates fall short — not just when the raw sweep is thin. Second, the
+126-tile grid was permanently fixed regardless of how many expansion retries
+ran; `Skills/star_scanner.py` now has a second, disjoint 180-tile expansion
+ring (`_EXPANSION_SEARCH_CENTERS` — interleaved offset bands plus two polar
+bands, `TOTAL_SEARCH_TILES = 306`), and `_select_live_new_candidates()` widens
+`max_tiles` (bounded, +60 tiles per retry, capped at the scanner's declared
+total) alongside the existing Tmag widening, both logged per attempt in
+`selector_log.discovery_expansion_attempts` (`max_tiles`,
+`eligible_candidates`) and as `final_max_tiles`. Verified offline with
+scanner doubles exercising both fixes (a sweep that returns enough raw rows
+but too few eligible ones must still keep expanding; tile coverage must grow
+and cap correctly) — no live 126+-tile MAST sweep was run from this session.
+
 An earlier audit found that consumed actionable follow-ups remained open and
 could be scheduled repeatedly. Version 0.3.5 adds durable scheduling/disposition events
 and parent-child recommendation relationships. Version 0.3.6 makes
