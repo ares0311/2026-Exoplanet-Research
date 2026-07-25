@@ -360,13 +360,22 @@ class TestEnsureRepoRootOnSysPath:
 
 
 class TestInferenceFailureWarnings:
-    """Regression: predict_proba/predict_proba_batch's inference-time except
-    blocks used to silently fall back to 0.5 with no warning -- distinct
-    from _ensure_model()'s load-time except blocks (TestEnsureModelWarnings
+    """Regression: predict_proba_batch's inference-time except block used to
+    silently fall back to 0.5 with no warning -- distinct from
+    _ensure_model()'s load-time except blocks (TestEnsureModelWarnings
     below), which already warn correctly. These tests mock loading to
     *succeed* (a fake, non-None model), so the failure below happens
     specifically inside predict_proba_batch's own try block, not during
     loading -- exercising the exact code path this fix changes.
+
+    predict_proba(single snippet) always delegates to predict_proba_batch()
+    and has no try/except of its own (removed during this fix's own
+    self-review: predict_proba_batch() already catches every failure
+    internally and never raises to its caller, so a wrapping try/except in
+    predict_proba would be permanently dead code). The single-snippet test
+    below therefore verifies the *delegation* surfaces predict_proba_batch's
+    warning correctly to a single-prediction caller, not a second
+    independent except block.
     """
 
     def _scorer_with_fake_loaded_model(
@@ -403,7 +412,7 @@ class TestInferenceFailureWarnings:
             result = scorer.predict_proba_batch([_snippet(), _snippet()])
         assert result == [pytest.approx(0.5), pytest.approx(0.5)]
 
-    def test_predict_proba_warns_on_inference_failure(
+    def test_predict_proba_surfaces_batch_warning_via_delegation(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         scorer = self._scorer_with_fake_loaded_model(tmp_path, monkeypatch)

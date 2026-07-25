@@ -200,24 +200,11 @@ class CnnScorer:
         self._ensure_model()
         if self._model is None:
             return 0.5
-        try:
-            return self.predict_proba_batch([snippet])[0]
-        except Exception as exc:  # noqa: BLE001
-            # Unlike the "not available" cases above (documented, silent),
-            # this is a real inference-time failure on a loaded model --
-            # e.g. a shape mismatch or a NaN propagating into a torch op.
-            # Silently falling back to 0.5 with no warning is exactly the
-            # loading-path incident this module's docstring already
-            # documents (588 flat-0.5 K2 scores feeding a bogus stacking
-            # weight), just at inference time instead of load time.
-            warnings.warn(
-                f"CnnScorer inference failed on a single snippet "
-                f"({type(exc).__name__}: {exc}); falling back to the "
-                "neutral 0.5 for this prediction only.",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-            return 0.5
+        # No try/except here: predict_proba_batch() already catches every
+        # inference-time failure internally (and warns -- see below), so it
+        # never raises to this caller. A wrapping try/except here would be
+        # permanently dead code, not a second independently-reachable fix.
+        return self.predict_proba_batch([snippet])[0]
 
     def predict_proba_batch(self, snippets: list[list[float]]) -> list[float]:
         """Return P(planet_candidate) for a batch of snippets.
