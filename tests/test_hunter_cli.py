@@ -18,6 +18,7 @@ from exo_toolkit.hunter_cli import (
     _select_live_new_candidates,
     create_new_search,
     import_follow_up,
+    recheck_follow_ups,
     run_new_search,
     show_follow_ups,
 )
@@ -618,6 +619,7 @@ def test_pyproject_registers_exact_required_shell_entry_points() -> None:
     assert scripts["Run-New-Search"].endswith(":run_new_search_entry")
     assert scripts["Show-Follow-Ups"].endswith(":show_follow_ups_entry")
     assert scripts["Import-Follow-Up"].endswith(":import_follow_up_entry")
+    assert scripts["Recheck-Follow-Ups"].endswith(":recheck_follow_ups_entry")
 
 
 def test_import_reviewed_follow_up_verifies_sources_and_reports(
@@ -917,3 +919,124 @@ def test_committed_hunter_history_manifest_preserves_available_project_universe(
         == source["source_sha256"]
         for source in sources
     )
+
+
+# ---------------------------------------------------------------------------
+# Recheck-Follow-Ups
+# ---------------------------------------------------------------------------
+
+
+def _deferred_follow_up_db(tmp_path: Path) -> Path:
+    """Build a durable DB with one real no_data-deferred follow-up row."""
+    db = tmp_path / "hunter.sqlite3"
+    store = HunterStore(db)
+    store.create_search(
+        _candidates(1),
+        requested_target_count=1,
+        mode="new",
+        selector_version="test-v1",
+        config={"seed": 1},
+        now=datetime(2026, 1, 1, tzinfo=UTC),
+    )
+    store.execute_search(
+        lambda _: TargetExecutionResult(
+            status="candidate_found",
+            result={},
+            provenance={},
+            follow_ups=(
+                FollowUpRecommendation(
+                    candidate_id="TIC0-s01",
+                    priority=99.0,
+                    reason="unresolved signal",
+                    evidence={},
+                    recommended_action="obtain more data",
+                ),
+            ),
+        ),
+        search_id=store.open_searches()[0]["search_id"],
+    )
+    store.create_search(
+        store.follow_up_candidates(),
+        requested_target_count=1,
+        mode="follow-up",
+        selector_version="test-v1",
+        config={"seed": 2},
+        now=datetime(2026, 1, 1, tzinfo=UTC),
+    )
+    store.execute_search(
+        lambda _: TargetExecutionResult(status="no_data", result={}, provenance={}),
+        search_id=store.open_searches()[0]["search_id"],
+    )
+    assert store.list_follow_ups(status="deferred")
+    return db
+
+
+class _FakeCoverage:
+    def __init__(self, sectors: list[int]) -> None:
+        self.sectors = sectors
+
+
+def test_recheck_flips_deferred_row_when_sectors_grow(tmp_path: Path) -> None:
+    db = _deferred_follow_up_db(tmp_path)
+    reports: list[object] = []
+
+    exit_code = recheck_follow_ups(
+        ["--db", str(db), "--json"],
+        sector_coverage_fn=lambda *_a, **_k: _FakeCoverage([1, 2]),
+        report_fn=lambda *args: reports.append(args),
+    )
+
+    assert exit_code == 0
+    assert len(reports) == 1
+    store = HunterStore(db)
+    assert store.list_follow_ups(status="open")
+    assert store.list_follow_ups(status="deferred") == []
+
+
+def test_recheck_leaves_row_deferred_when_no_sectors_found(tmp_path: Path) -> None:
+    db = _deferred_follow_up_db(tmp_path)
+
+    exit_code = recheck_follow_ups(
+        ["--db", str(db), "--json"],
+        sector_coverage_fn=lambda *_a, **_k: _FakeCoverage([]),
+        report_fn=lambda *_a: None,
+    )
+
+    assert exit_code == 0
+    store = HunterStore(db)
+    assert store.list_follow_ups(status="deferred")
+    assert store.list_follow_ups(status="open") == []
+
+
+def test_recheck_no_deferred_rows_is_a_clean_noop(tmp_path: Path) -> None:
+    db = tmp_path / "hunter.sqlite3"
+    HunterStore(db)
+    reports: list[object] = []
+
+    exit_code = recheck_follow_ups(
+        ["--db", str(db), "--json"],
+        sector_coverage_fn=lambda *_a, **_k: _FakeCoverage([1]),
+        report_fn=lambda *args: reports.append(args),
+    )
+
+    assert exit_code == 0
+    assert reports == []
+
+
+def test_recheck_reports_error_and_nonzero_exit_on_query_failure(
+    tmp_path: Path,
+) -> None:
+    db = _deferred_follow_up_db(tmp_path)
+
+    def _boom(*_args: object, **_kwargs: object) -> _FakeCoverage:
+        raise RuntimeError("MAST unavailable")
+
+    exit_code = recheck_follow_ups(
+        ["--db", str(db), "--json"],
+        sector_coverage_fn=_boom,
+        report_fn=lambda *_a: None,
+    )
+
+    assert exit_code == 2
+    store = HunterStore(db)
+    assert store.list_follow_ups(status="deferred")

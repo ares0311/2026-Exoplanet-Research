@@ -792,6 +792,27 @@ both bridges now explicitly pass the log file's own parent directory as
 The version 0.3.13 release gate passed 3,119 default tests plus Ruff/mypy as
 10/10 supervised gates in 27.2 seconds under the canonical 6x6 topology.
 
+Version 0.3.14 adds the smart MAST recheck for deferred follow-ups, the last
+gap named in the plan. `follow_up_registry` gains nullable
+`last_known_sectors`/`last_mast_checked_at` columns via the same migration
+pattern already used for `revisit_reason`/`parent_follow_up_id`.
+`HunterStore.record_sector_recheck()` is the only writer: it compares a
+fresh sector list against the row's last recorded baseline (never a blind
+timer, never the original deferral snapshot) and flips `deferred` back to
+`open` only when it finds sectors not already known; a row with no baseline
+yet is treated as empty, matching every follow-up this project has actually
+deferred so far. The baseline/timestamp always advance whether or not it
+grew, with a `follow_up_events` audit row either way. The new
+`Recheck-Follow-Ups` shell entry point iterates every deferred row with
+bounded concurrency, reusing `Skills/sector_coverage.py`'s
+`get_sector_coverage()` (metadata-only, zero downloads) via the existing
+`_load_project_skill()` pattern; a per-target query failure is recorded and
+reported without blocking the rest of the batch. Verified offline against a
+real no_data-deferred follow-up row built through the full create-execute
+lifecycle. See `docs/HUNTER_PRODUCTION_WORKFLOW.md`.
+The version 0.3.14 release gate passed 3,131 default tests plus Ruff/mypy as
+10/10 supervised gates in 29.2 seconds under the canonical 6x6 topology.
+
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.

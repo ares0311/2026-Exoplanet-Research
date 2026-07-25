@@ -115,6 +115,36 @@ function's independent default. Verified offline: real `ScanLog`/
 `batch_scan()` entries round-trip through `import_history_manifest()` into
 `HunterStore.searched_target_ids()`/`target_history()`.
 
+**Version 0.3.14** adds the smart MAST recheck for deferred follow-ups named
+in the plan as the last remaining gap. `follow_up_registry` gains two
+nullable columns, `last_known_sectors` (JSON-encoded sorted sector list) and
+`last_mast_checked_at` (ISO-8601), via the same ALTER-TABLE-if-missing
+migration pattern already used for `revisit_reason`/`parent_follow_up_id`.
+`HunterStore.record_sector_recheck()` is the only place that ever writes
+them: it compares a fresh sector list against the row's last recorded
+baseline (not a blind timer, and not the original deferral snapshot) and
+flips the row from `deferred` back to `open` only when it finds sector
+numbers not already known; a row with no baseline yet is treated as an
+empty one, matching every follow-up this project has actually deferred so
+far (deferred specifically because zero usable sectors existed). The
+baseline/timestamp always advance to the check's result whether or not it
+grew, and a `follow_up_events` row is appended either way (a `deferred`
+audit entry when unchanged, an `open` transition when it flips) — no silent
+no-op. The new `Recheck-Follow-Ups` shell entry point
+(`exo_toolkit.hunter_cli:recheck_follow_ups_entry`) iterates every deferred
+row with bounded concurrency (`--workers`, default 6), reusing
+`Skills/sector_coverage.py`'s `get_sector_coverage()` (a metadata-only
+`lightkurve.search_lightcurve` query, zero downloads) via the same
+`_load_project_skill()` pattern the other Skill-reuse call sites already
+use; a per-target query failure is recorded and reported (non-zero exit)
+without blocking the rest of the batch. Verified offline against a real
+no_data-deferred follow-up row built through the full create-execute
+lifecycle (not a scripted double): a recheck finding new sectors flips it
+open, one finding nothing leaves it deferred and still advances the
+baseline, and a row already holding a non-empty prior baseline only flips
+on sectors beyond that baseline, not the ones already known. No live MAST
+query was run from this session.
+
 An earlier audit found that consumed actionable follow-ups remained open and
 could be scheduled repeatedly. Version 0.3.5 adds durable scheduling/disposition events
 and parent-child recommendation relationships. Version 0.3.6 makes
@@ -202,6 +232,24 @@ target-history row, and follow-up row. This evidence row explicitly carries
 `search_eligible=false`; it remains visible in `Show-Follow-Ups`, but cannot
 seed `Create-New-Search --mode follow-up` until their stated revisit condition
 is satisfied. Source-file hash drift fails before any database mutation.
+
+Recheck deferred follow-ups for new MAST sector coverage (metadata-only, no
+downloads):
+
+```bash
+git switch main
+git pull --ff-only origin main
+.venv/bin/Recheck-Follow-Ups --pipeline QLP --workers 6
+```
+
+`Recheck-Follow-Ups` never flips a deferred row back to revisit-eligible on a
+blind timer — only when `Skills/sector_coverage.py`'s `get_sector_coverage()`
+finds sector numbers not already recorded on that row's baseline. A row with
+no baseline yet is treated as empty, so the first recheck of a row deferred
+for zero usable sectors flips it as soon as any real sector appears. Every
+recheck advances the row's `last_known_sectors`/`last_mast_checked_at`,
+whether or not it flips, and appends a `follow_up_events` audit row either
+way.
 
 All commands support `--json` for scripts and `--no-color` for predictable
 plain output. A candidate file may be supplied to `Create-New-Search` as JSON

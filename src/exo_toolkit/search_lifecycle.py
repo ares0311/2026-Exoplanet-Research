@@ -149,6 +149,8 @@ CREATE TABLE IF NOT EXISTS follow_up_registry (
     search_eligible INTEGER NOT NULL DEFAULT 1 CHECK(search_eligible IN (0, 1)),
     revisit_reason TEXT,
     parent_follow_up_id TEXT,
+    last_known_sectors TEXT,
+    last_mast_checked_at TEXT,
     status TEXT NOT NULL CHECK(status IN ('open', 'scheduled', 'completed', 'deferred')),
     created_at TEXT NOT NULL,
     FOREIGN KEY(search_id) REFERENCES search_manifests(search_id)
@@ -288,6 +290,14 @@ class HunterStore:
             if "parent_follow_up_id" not in columns:
                 connection.execute(
                     "ALTER TABLE follow_up_registry ADD COLUMN parent_follow_up_id TEXT"
+                )
+            if "last_known_sectors" not in columns:
+                connection.execute(
+                    "ALTER TABLE follow_up_registry ADD COLUMN last_known_sectors TEXT"
+                )
+            if "last_mast_checked_at" not in columns:
+                connection.execute(
+                    "ALTER TABLE follow_up_registry ADD COLUMN last_mast_checked_at TEXT"
                 )
             existing_events = {
                 str(row[0])
@@ -1537,6 +1547,94 @@ class HunterStore:
             row["search_eligible"] = bool(row["search_eligible"])
             row["events"] = self.follow_up_events(str(row["follow_up_id"]))
         return result
+
+    def record_sector_recheck(
+        self,
+        follow_up_id: str,
+        *,
+        sectors: Sequence[int],
+        checked_at: datetime,
+    ) -> dict[str, Any]:
+        """Bounded, metadata-only recheck of a deferred follow-up's sector coverage.
+
+        Only flips a deferred row back to revisit-eligible (``open``) when
+        *sectors* contains sector numbers not present in the row's last
+        recorded baseline -- never on a blind timer. A row with no recorded
+        baseline yet (``last_known_sectors IS NULL``) is treated as an empty
+        baseline, so any real sector found already counts as growth; this
+        matches every follow-up this project has actually deferred so far,
+        which are deferred specifically because zero usable sectors existed
+        at deferral time. ``last_known_sectors``/``last_mast_checked_at`` are
+        always advanced to this check's result, whether or not it grew, so
+        the next recheck compares against the most current known baseline
+        rather than the original deferral snapshot.
+        """
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT status, search_id, last_known_sectors "
+                "FROM follow_up_registry WHERE follow_up_id=?",
+                (follow_up_id,),
+            ).fetchone()
+            if row is None:
+                raise RuntimeError(f"Unknown follow-up registry row: {follow_up_id}")
+            if str(row["status"]) != "deferred":
+                raise RuntimeError(
+                    f"Follow-up {follow_up_id} is not deferred: status={row['status']}"
+                )
+            known = (
+                set(json.loads(str(row["last_known_sectors"])))
+                if row["last_known_sectors"] is not None
+                else set()
+            )
+            current = {int(sector) for sector in sectors}
+            new_sectors = sorted(current - known)
+            grew = bool(new_sectors)
+            connection.execute(
+                "UPDATE follow_up_registry "
+                "SET last_known_sectors=?, last_mast_checked_at=? "
+                "WHERE follow_up_id=?",
+                (
+                    _canonical_json(sorted(current)),
+                    checked_at.isoformat(),
+                    follow_up_id,
+                ),
+            )
+            if grew:
+                self._transition_follow_up(
+                    connection,
+                    follow_up_id=follow_up_id,
+                    expected_state="deferred",
+                    new_state="open",
+                    related_search_id=str(row["search_id"]),
+                    detail={
+                        "recheck": True,
+                        "new_sectors": new_sectors,
+                        "known_sectors_before": sorted(known),
+                    },
+                    created_at=checked_at,
+                    search_eligible=True,
+                    revisit_reason=None,
+                )
+            else:
+                self._append_follow_up_event(
+                    connection,
+                    follow_up_id=follow_up_id,
+                    state="deferred",
+                    related_search_id=str(row["search_id"]),
+                    detail={
+                        "recheck": True,
+                        "grew": False,
+                        "checked_sectors": sorted(current),
+                    },
+                    created_at=checked_at,
+                )
+        return {
+            "follow_up_id": follow_up_id,
+            "grew": grew,
+            "new_sectors": new_sectors,
+            "checked_sectors": sorted(current),
+        }
 
     def follow_up_events(self, follow_up_id: str) -> list[dict[str, Any]]:
         with self.connect() as connection:

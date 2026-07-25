@@ -98,9 +98,16 @@ scan via `build_manual_scan_source()`, using the exact schema
 `import_history_manifest()` already verifies for the seven curated
 legacy-log imports; Hunter's own library usage and the shard launcher's
 `--execute-prepared-batch` path stay untouched, proven by dedicated tests.
+Version 0.3.14 then added the smart MAST recheck for deferred follow-ups:
+`follow_up_registry` gains `last_known_sectors`/`last_mast_checked_at`, and
+`HunterStore.record_sector_recheck()` flips a `deferred` row back to `open`
+only when a fresh `Skills/sector_coverage.py` query (metadata-only) finds
+sector coverage beyond the row's last recorded baseline — never on a blind
+timer. The new `Recheck-Follow-Ups` shell entry point runs this over every
+deferred row with bounded concurrency.
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
-Test baseline: 3,119 default tests passing; 2 `integration_live` tests excluded by
+Test baseline: 3,131 default tests passing; 2 `integration_live` tests excluded by
 the configured marker expression (2026-07-24; 6×6 gate: 10/10 gates
 including two verifiable-agent-reliability checks — see
 `docs/RELIABILITY_CONTROLS.md`)
@@ -125,7 +132,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.3.13 is the current development version. Version 0.3.2 added the durable,
+Version note: 0.3.14 is the current development version. Version 0.3.2 added the durable,
 non-AI-dependent Hunter workflow and exact `Create-New-Search`,
 `Run-New-Search`, and `Show-Follow-Ups` entry points. Candidate catalog,
 immutable manifest, run attempts, append-only target history, and follow-up

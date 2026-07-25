@@ -202,6 +202,22 @@ def _parser_import_follow_up() -> argparse.ArgumentParser:
     return parser
 
 
+def _parser_recheck_follow_ups() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="Recheck-Follow-Ups",
+        description=(
+            "Metadata-only MAST recheck of deferred follow-ups; flips a row back "
+            "to revisit-eligible only when its sector coverage has actually grown."
+        ),
+    )
+    parser.add_argument("--db", type=Path, default=DEFAULT_HUNTER_DB)
+    parser.add_argument("--pipeline", default="QLP", choices=("SPOC", "QLP", "TGLC"))
+    parser.add_argument("--workers", type=int, default=6)
+    parser.add_argument("--json", action="store_true", dest="json_output")
+    parser.add_argument("--no-color", action="store_true")
+    return parser
+
+
 def _load_reviewed_follow_up(path: Path) -> dict[str, Any]:
     if not path.is_file():
         raise RuntimeError(f"Reviewed evidence file does not exist: {path}")
@@ -1100,6 +1116,140 @@ def import_follow_up(
         return 2
 
 
+def _write_recheck_report(
+    summary: Mapping[str, Any],
+    db_path: Path,
+    started_at: datetime,
+    completed_at: datetime,
+) -> None:
+    run_report = _load_project_skill("run_report")
+    report = run_report.RunReport(
+        script="hunter_followup_recheck",
+        status="success" if summary["items_failed"] == 0 else "partial",
+        started_at=started_at.isoformat(),
+        completed_at=completed_at.isoformat(),
+        elapsed_seconds=(completed_at - started_at).total_seconds(),
+        items_processed=summary["items_processed"],
+        items_written=summary["items_grown"],
+        items_failed=summary["items_failed"],
+        output_paths=(str(db_path),),
+        notes=(
+            f"checked={summary['items_processed']}; grown={summary['items_grown']}; "
+            f"errors={summary['items_failed']}"
+        ),
+    )
+    _commit_run_report(
+        run_report,
+        report,
+        run_report.report_path_for("hunter_followup_recheck"),
+    )
+
+
+def recheck_follow_ups(
+    argv: Sequence[str] | None = None,
+    *,
+    sector_coverage_fn: Callable[..., Any] | None = None,
+    report_fn: Callable[[Mapping[str, Any], Path, datetime, datetime], None] | None = None,
+) -> int:
+    """Metadata-only MAST recheck of every deferred follow-up.
+
+    Never flips a deferred row back to revisit-eligible on a blind timer --
+    only when a fresh Skills/sector_coverage.py query finds sector numbers
+    not present in the row's last recorded baseline (see
+    HunterStore.record_sector_recheck). Zero-download: sector_coverage.py's
+    lightkurve search queries MAST metadata only.
+    """
+    args = _parser_recheck_follow_ups().parse_args(argv)
+    started_at = datetime.now(UTC)
+    try:
+        if sector_coverage_fn is None:
+            scanner = _load_project_skill("sector_coverage")
+            sector_coverage_fn = scanner.get_sector_coverage
+        store = HunterStore(args.db)
+        deferred = store.list_follow_ups(status="deferred")
+        progress_stream = sys.stderr if args.json_output else sys.stdout
+        results: list[dict[str, Any]] = []
+        errors = 0
+
+        if not deferred:
+            print(
+                "No deferred follow-ups to recheck.", file=progress_stream, flush=True
+            )
+        else:
+            print(
+                f"Recheck-Follow-Ups: {len(deferred)} deferred follow-up(s), "
+                f"pipeline={args.pipeline} workers={args.workers}",
+                file=progress_stream,
+                flush=True,
+            )
+
+            def _check_one(row: dict[str, Any]) -> dict[str, Any]:
+                target_id = str(row["target_id"])
+                coverage = sector_coverage_fn(target_id, pipeline=args.pipeline)
+                checked_at = datetime.now(UTC)
+                return store.record_sector_recheck(
+                    str(row["follow_up_id"]),
+                    sectors=coverage.sectors,
+                    checked_at=checked_at,
+                )
+
+            start_monotonic = time.monotonic()
+            done = 0
+            with ThreadPoolExecutor(max_workers=max(1, args.workers)) as pool:
+                futures = {pool.submit(_check_one, row): row for row in deferred}
+                for future in as_completed(futures):
+                    row = futures[future]
+                    try:
+                        results.append(future.result())
+                    except Exception as exc:  # noqa: BLE001
+                        errors += 1
+                        results.append(
+                            {
+                                "follow_up_id": row["follow_up_id"],
+                                "target_id": row["target_id"],
+                                "error": f"{type(exc).__name__}: {exc}",
+                            }
+                        )
+                    done += 1
+                    elapsed = time.monotonic() - start_monotonic
+                    rate = done / elapsed if elapsed > 0 else 0.0
+                    remaining = (
+                        (len(deferred) - done) / rate if rate > 0 else float("inf")
+                    )
+                    print(
+                        f"  [{done}/{len(deferred)}] elapsed={elapsed:.0f}s "
+                        f"ETA={format_eta(remaining)}",
+                        file=progress_stream,
+                        flush=True,
+                    )
+
+        grown = sum(1 for row in results if row.get("grew"))
+        summary: dict[str, Any] = {
+            "items_processed": len(deferred),
+            "items_grown": grown,
+            "items_failed": errors,
+            "results": results,
+        }
+        completed_at = datetime.now(UTC)
+        if deferred:
+            if report_fn is None:
+                _write_recheck_report(summary, args.db, started_at, completed_at)
+            else:
+                report_fn(summary, args.db, started_at, completed_at)
+        if args.json_output:
+            print(json.dumps(summary, indent=2, sort_keys=True))
+        else:
+            console = _console(no_color=args.no_color)
+            console.print(
+                f"Rechecked {summary['items_processed']} deferred follow-up(s): "
+                f"[green]{grown} now revisit-eligible[/green], {errors} error(s)."
+            )
+        return 0 if errors == 0 else 2
+    except Exception as exc:  # noqa: BLE001
+        print(f"Recheck-Follow-Ups failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 2
+
+
 def create_new_search_entry() -> None:
     raise SystemExit(create_new_search())
 
@@ -1114,3 +1264,7 @@ def show_follow_ups_entry() -> None:
 
 def import_follow_up_entry() -> None:
     raise SystemExit(import_follow_up())
+
+
+def recheck_follow_ups_entry() -> None:
+    raise SystemExit(recheck_follow_ups())
