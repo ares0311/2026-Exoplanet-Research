@@ -768,6 +768,30 @@ this session. See `docs/HUNTER_PRODUCTION_WORKFLOW.md`.
 The version 0.3.12 release gate passed 3,091 default tests plus Ruff/mypy as
 10/10 supervised gates in 27.1 seconds under the canonical 6x6 topology.
 
+Version 0.3.13 closes a real bypass of "no production command bypasses the
+canonical optimizer or durable pipeline": `Skills/star_scanner.py`'s and
+`Skills/batch_scan.py`'s standalone CLI scan modes wrote only to a local
+`ScanLog`/JSON results file, invisible to Hunter's durable
+`target_search_history`. `src/exo_toolkit/hunter_history.py` gains
+`build_manual_scan_source()`, building one history-manifest "source" from a
+completed manual scan using the exact schema `import_history_manifest()`
+already verifies for the seven curated legacy-log imports — no manifest
+file needs to be written to disk, the dict passes straight through. Both
+CLIs now bridge to Hunter by default after a real scan (new
+`--hunter-db`/`--no-hunter-bridge` flags): `star_scanner.py`'s `--target`
+and default background-scan modes (via a new `scanned_this_run` field,
+additive to `run_background_scan()`'s return) and `batch_scan.py`'s CLI (via
+a new optional `new_entries` out-parameter on `batch_scan()`, so `--resume`
+bridges only freshly-scanned targets). Hunter's own library-import usage and
+the shard launcher's `--execute-prepared-batch` path stay untouched, proven
+by dedicated tests. A real integration bug was caught pre-merge: the
+manifest builder and `import_history_manifest()` must resolve the source's
+relative path against the same root or a fail-closed hash mismatch results;
+both bridges now explicitly pass the log file's own parent directory as
+`source_root` to both calls. See `docs/HUNTER_PRODUCTION_WORKFLOW.md`.
+The version 0.3.13 release gate passed 3,119 default tests plus Ruff/mypy as
+10/10 supervised gates in 27.2 seconds under the canonical 6x6 topology.
+
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.

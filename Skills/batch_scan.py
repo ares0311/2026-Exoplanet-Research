@@ -34,6 +34,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from exo_toolkit.hunter_history import build_manual_scan_source
+from exo_toolkit.search_lifecycle import HunterStore
 from Skills.run_report import RunReport, report_path_for, run_and_commit_report
 
 # ---------------------------------------------------------------------------
@@ -93,6 +95,7 @@ def batch_scan(
     model_path: Path | None = None,
     resume: bool = False,
     run_pipeline_fn: Callable[..., list[dict[str, Any]]] | None = None,
+    new_entries: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Run the detection pipeline on a list of TIC IDs and write results.
 
@@ -106,6 +109,11 @@ def batch_scan(
         model_path: XGBoost model path (required for xgboost/ensemble).
         resume: If True, skip TIC IDs already present in *output_path*.
         run_pipeline_fn: Override the pipeline function (for tests).
+        new_entries: Optional mutable list populated in-place with exactly
+            the entries scanned in *this* call (excluding anything skipped
+            via ``resume``), so callers can distinguish freshly-scanned
+            targets from the full accumulated results without changing the
+            return contract.
 
     Returns:
         List of all result dicts written to *output_path*.
@@ -163,10 +171,98 @@ def batch_scan(
             print(f"  {target_id}: ERROR", file=sys.stderr)
 
         all_results.append(entry)
+        if new_entries is not None:
+            new_entries.append(entry)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(json.dumps(all_results, indent=2))
 
     return all_results
+
+
+# ---------------------------------------------------------------------------
+# Hunter durable-history bridge
+# ---------------------------------------------------------------------------
+
+_HISTORY_STATUS_MAP = {
+    "candidate_found": "candidate_found",
+    "scanned_clear": "no_signal",
+    "error": "failed",
+}
+
+
+def _manual_scan_history_entry(entry: dict[str, Any], *, mission: str) -> dict[str, Any]:
+    """Map one batch_scan result entry to a history-manifest entry."""
+    status = _HISTORY_STATUS_MAP.get(str(entry.get("status")), "failed")
+    history_entry: dict[str, Any] = {
+        "target_id": str(entry.get("target_id")),
+        "status": status,
+        "searched_at": datetime.now(UTC).isoformat(),
+        "mission": mission,
+        "ranking_score": 0.0,
+        "metrics": {"n_signals": len(entry.get("signals") or [])},
+        "result": entry,
+    }
+    if status == "failed":
+        history_entry["error_message"] = str(entry.get("error") or "unknown error")
+    return history_entry
+
+
+def _bridge_manual_scan_to_hunter(
+    *,
+    log_path: Path,
+    mission: str,
+    entries: list[dict[str, Any]],
+    started_at: datetime,
+    completed_at: datetime,
+    hunter_db_path: Path,
+) -> dict[str, int] | None:
+    """Durably record a completed batch_scan CLI run in Hunter's history.
+
+    Standalone batch_scan.py CLI runs write only to a local JSON results
+    file by default, invisible to EXO-Hunter's durable
+    target_search_history -- a real bypass of "no production command
+    bypasses the canonical optimizer or durable pipeline." This registers
+    exactly the targets scanned in *this* run using the same fail-closed
+    import_history_manifest() path the seven curated legacy-log imports
+    use. Failure here is reported loudly but does not fail an otherwise-
+    successful scan run, matching this file's existing run-report
+    commit/push-failure precedent.
+    """
+    if not entries:
+        return None
+    try:
+        source_root = log_path.resolve().parent
+        source = build_manual_scan_source(
+            script="batch_scan",
+            log_path=log_path,
+            entries=[
+                _manual_scan_history_entry(entry, mission=mission) for entry in entries
+            ],
+            started_at=started_at,
+            completed_at=completed_at,
+            method_or_data=f"{mission} manual batch scan",
+            source_root=source_root,
+        )
+        store = HunterStore(hunter_db_path)
+        summary = store.import_history_manifest(
+            {"schema_version": 1, "sources": [source]},
+            source_root=source_root,
+        )
+        print(
+            f"Hunter durable history: {summary['sources_created']} source(s), "
+            f"{summary['events_created']} event(s) recorded to {hunter_db_path}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return summary
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"Warning: manual scan was not bridged to Hunter durable history: "
+            f"{type(exc).__name__}: {exc}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -240,6 +336,17 @@ def _cli(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
         action="store_true",
         help="Skip TIC IDs already in the output file.",
     )
+    parser.add_argument(
+        "--hunter-db",
+        type=Path,
+        default=Path("data/hunter_searches.sqlite3"),
+        help="EXO-Hunter durable SQLite database to record this manual scan in",
+    )
+    parser.add_argument(
+        "--no-hunter-bridge",
+        action="store_true",
+        help="Skip recording this manual scan in Hunter's durable target_search_history",
+    )
     args = parser.parse_args(argv)
 
     tic_ids = read_tic_ids(args.targets)
@@ -248,8 +355,10 @@ def _cli(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
         return 1
 
     print(f"Loaded {len(tic_ids)} TIC IDs from {args.targets}", file=sys.stderr)
-    started_at = datetime.now(UTC).isoformat()
+    started_at_dt = datetime.now(UTC)
+    started_at = started_at_dt.isoformat()
     start = time.monotonic()
+    new_entries: list[dict[str, Any]] = []
     results = batch_scan(
         tic_ids,
         output_path=args.output,
@@ -259,9 +368,19 @@ def _cli(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
         scorer=args.scorer,
         model_path=args.model_path,
         resume=args.resume,
+        new_entries=new_entries,
     )
     elapsed = time.monotonic() - start
     print(f"Results written to {args.output}", file=sys.stderr)
+    if not args.no_hunter_bridge:
+        _bridge_manual_scan_to_hunter(
+            log_path=args.output,
+            mission=args.mission,
+            entries=new_entries,
+            started_at=started_at_dt,
+            completed_at=datetime.now(UTC),
+            hunter_db_path=args.hunter_db,
+        )
     _write_run_report(
         started_at=started_at,
         elapsed_seconds=elapsed,

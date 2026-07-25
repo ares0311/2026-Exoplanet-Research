@@ -62,6 +62,8 @@ from exo_toolkit.dataset_manifest import (  # noqa: E402
     sha256_file,
     validate_dataset_manifest,
 )
+from exo_toolkit.hunter_history import build_manual_scan_source  # noqa: E402
+from exo_toolkit.search_lifecycle import HunterStore  # noqa: E402
 from Skills.candidate_database import CandidateDatabase  # noqa: E402
 from Skills.run_report import (  # noqa: E402
     DEFAULT_REPORT_DIR,
@@ -2217,6 +2219,7 @@ def run_background_scan(
         )
         return target, result
 
+    scanned_this_run: list[dict[str, Any]] = []
     executor = ThreadPoolExecutor(max_workers=worker_count)
     futures: list[Future[tuple[dict[str, Any], dict[str, Any]]]] = []
     try:
@@ -2225,6 +2228,7 @@ def run_background_scan(
             target, result = future.result()
             tic_id = target["tic_id"]
             log.record(tic_id, result["status"], result)
+            scanned_this_run.append({"tic_id": tic_id, "result": result})
             n_done += 1
             if result["status"] == "error":
                 n_failed += 1
@@ -2260,7 +2264,102 @@ def run_background_scan(
         "items_failed": n_failed,
         "output_paths": (str(log_path),),
         "search_log": search_log,
+        "scanned_this_run": scanned_this_run,
     }
+
+
+# ---------------------------------------------------------------------------
+# Hunter durable-history bridge
+# ---------------------------------------------------------------------------
+
+_HISTORY_STATUS_MAP = {
+    "candidate_found": "candidate_found",
+    "scanned_clear": "no_signal",
+    "no_data": "no_data",
+    "error": "failed",
+}
+
+
+def _manual_scan_history_entry(
+    tic_id: int, *, mission: str, result: dict[str, Any]
+) -> dict[str, Any]:
+    """Map one scan-log-style result dict to a history-manifest entry."""
+    status = _HISTORY_STATUS_MAP.get(str(result.get("status")), "failed")
+    entry: dict[str, Any] = {
+        "target_id": f"TIC {tic_id}",
+        "status": status,
+        "searched_at": str(
+            result.get("scanned_at") or datetime.now(UTC).isoformat()
+        ),
+        "mission": mission,
+        "ranking_score": float(result.get("priority_score") or 0.0),
+        "metrics": {
+            key: value
+            for key, value in result.items()
+            if key.startswith("best_") or key == "n_signals"
+        },
+        "result": result,
+    }
+    if status == "failed":
+        entry["error_message"] = str(result.get("error_message") or "unknown error")
+    return entry
+
+
+def _bridge_manual_scan_to_hunter(
+    *,
+    script: str,
+    log_path: Path,
+    mission: str,
+    entries: list[dict[str, Any]],
+    started_at: datetime,
+    completed_at: datetime,
+    hunter_db_path: Path,
+    method_or_data: str,
+) -> dict[str, int] | None:
+    """Durably record a completed manual CLI scan in Hunter's history.
+
+    Standalone star_scanner.py CLI runs write only to a local ScanLog by
+    default, invisible to EXO-Hunter's durable target_search_history --
+    a real bypass of "no production command bypasses the canonical
+    optimizer or durable pipeline." This registers exactly the targets
+    scanned in *this* run using the same fail-closed
+    import_history_manifest() path the seven curated legacy-log imports
+    use. Failure here is reported loudly but does not fail an otherwise-
+    successful scan run, matching this file's existing run-report
+    commit/push-failure precedent.
+    """
+    if not entries:
+        return None
+    try:
+        source_root = log_path.resolve().parent
+        source = build_manual_scan_source(
+            script=script,
+            log_path=log_path,
+            entries=entries,
+            started_at=started_at,
+            completed_at=completed_at,
+            method_or_data=method_or_data,
+            source_root=source_root,
+        )
+        store = HunterStore(hunter_db_path)
+        summary = store.import_history_manifest(
+            {"schema_version": 1, "sources": [source]},
+            source_root=source_root,
+        )
+        print(
+            f"Hunter durable history: {summary['sources_created']} source(s), "
+            f"{summary['events_created']} event(s) recorded to {hunter_db_path}",
+            flush=True,
+        )
+        return summary
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"Warning: manual scan was not bridged to Hunter durable history: "
+            f"{type(exc).__name__}: {exc}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -2410,6 +2509,17 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=DEFAULT_REPORT_DIR,
         help="Run-report ledger directory",
     )
+    p.add_argument(
+        "--hunter-db",
+        type=Path,
+        default=Path("data/hunter_searches.sqlite3"),
+        help="EXO-Hunter durable SQLite database to record this manual scan in",
+    )
+    p.add_argument(
+        "--no-hunter-bridge",
+        action="store_true",
+        help="Skip recording this manual scan in Hunter's durable target_search_history",
+    )
     return p.parse_args(argv)
 
 
@@ -2551,6 +2661,21 @@ def main(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
             print(f"Error: {_result['error_message']}", file=sys.stderr)
         else:
             print(f"No candidates found (status: {_result['status']})")
+        if not args.no_hunter_bridge:
+            _bridge_manual_scan_to_hunter(
+                script="star_scanner",
+                log_path=_log_path,
+                mission=args.mission,
+                entries=[
+                    _manual_scan_history_entry(
+                        args.target, mission=args.mission, result=_result
+                    )
+                ],
+                started_at=datetime.fromisoformat(started_at),
+                completed_at=datetime.now(UTC),
+                hunter_db_path=args.hunter_db,
+                method_or_data=f"{args.mission} {args.pipeline} manual single-target scan",
+            )
         if not args.no_git_report:
             is_error = _result["status"] == "error"
             _write_run_report(
@@ -2597,6 +2722,24 @@ def main(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
         exclude_known_variables=args.exclude_known_variables,
         search_log_path=Path(args.search_log_path) if args.search_log_path else None,
     )
+    if not args.prepare_only and not args.no_hunter_bridge:
+        scanned_this_run = summary.get("scanned_this_run") or []
+        if scanned_this_run:
+            _bridge_manual_scan_to_hunter(
+                script="star_scanner",
+                log_path=_log_path,
+                mission=args.mission,
+                entries=[
+                    _manual_scan_history_entry(
+                        int(row["tic_id"]), mission=args.mission, result=row["result"]
+                    )
+                    for row in scanned_this_run
+                ],
+                started_at=datetime.fromisoformat(started_at),
+                completed_at=datetime.now(UTC),
+                hunter_db_path=args.hunter_db,
+                method_or_data=f"{args.mission} {args.pipeline} manual background scan",
+            )
     if not args.no_git_report:
         if args.prepare_only:
             output_paths = (

@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,63 @@ def _repository_root_for(manifest_path: Path) -> Path:
         if (parent / "pyproject.toml").is_file() and (parent / "src").is_dir():
             return parent
     return resolved.parent
+
+
+def build_manual_scan_source(
+    *,
+    script: str,
+    log_path: Path,
+    entries: Sequence[Mapping[str, Any]],
+    started_at: datetime,
+    completed_at: datetime,
+    method_or_data: str,
+    mode: str = "new",
+    source_root: Path | None = None,
+) -> dict[str, Any]:
+    """Build one history-manifest "source" for a completed manual CLI scan.
+
+    Uses exactly the schema ``HunterStore.import_history_manifest`` already
+    verifies for the seven curated legacy-log imports (byte-for-byte source
+    hash, non-empty typed entries), so a standalone ``star_scanner.py`` or
+    ``batch_scan.py`` CLI run is durably recorded in Hunter's
+    ``target_search_history`` through the exact same fail-closed code path
+    instead of being a silent bypass of the durable pipeline. The returned
+    dict is meant to be wrapped as ``{"schema_version": 1, "sources": [...]}"``
+    and passed straight to ``import_history_manifest`` -- no manifest file
+    needs to be written to disk.
+
+    ``search_id`` is derived from the scan log file's own content hash, so
+    re-running this on an unchanged log is naturally idempotent (an unchanged
+    ``entries`` payload reproduces the same computed identity hash inside
+    ``import_history_manifest`` and is skipped as already-imported); a scan
+    log with newly appended entries produces a new, distinct search_id
+    representing a fresh, additional search event.
+    """
+    resolved_log = log_path.resolve()
+    if not resolved_log.is_file():
+        raise ValueError(f"Manual scan log does not exist: {resolved_log}")
+    if not entries:
+        raise ValueError("Manual scan source requires at least one entry")
+    source_sha256 = hashlib.sha256(resolved_log.read_bytes()).hexdigest()
+    root = (source_root or _repository_root_for(resolved_log)).resolve()
+    try:
+        source_path = str(resolved_log.relative_to(root))
+    except ValueError:
+        source_path = str(resolved_log)
+    search_id = f"manual-{script}-{source_sha256[:24]}"
+    return {
+        "search_id": search_id,
+        "mode": mode,
+        "started_at": started_at.isoformat(),
+        "completed_at": completed_at.isoformat(),
+        "searched_by": f"manual_cli:{script}",
+        "source_project": "2026 Exoplanet Research",
+        "method_or_data": method_or_data,
+        "source_path": source_path,
+        "source_sha256": source_sha256,
+        "provenance_uri": f"manual-scan:{script}:{search_id}",
+        "entries": [dict(entry) for entry in entries],
+    }
 
 
 def resolve_history_source_path(
