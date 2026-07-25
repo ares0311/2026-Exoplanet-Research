@@ -948,6 +948,32 @@ three insufficient-data fallback tests are unaffected and still pass.
 The version 0.3.21 release gate passed 3,145 default tests plus Ruff/mypy as
 10/10 supervised gates in 29.1 seconds under the canonical 6x6 topology.
 
+Version 0.3.22 continues the hardening sweep: `ml/cnn_scorer.py`'s
+`predict_proba`/`predict_proba_batch` wrapped the actual inference call
+(not just checkpoint loading) in `except Exception: return 0.5`/
+`[0.5, ...]` with no warning at all -- unlike every other except block in
+this file (checkpoint loading, `Skills` import, calibration application),
+which either already warns or is documented-silent for the "PyTorch not
+installed" case specifically. A transient inference bug -- a shape
+mismatch, a NaN propagating into a torch op, a device error for one
+candidate -- would silently downgrade that candidate's CNN contribution to
+neutral 0.5 while `is_available`/`has_cnn` still report `True`, so
+`StackingScorer` blends a fabricated-neutral value into the production
+posterior with zero trace. This repeats, at inference time, the exact
+incident class this same module's docstring already documents from the
+*loading* path (588 flat-0.5 K2 scores feeding a bogus CNN=0.000 stacking
+weight into an AUC-maximizing grid search). Both except blocks now warn
+with the same `RuntimeWarning` pattern already used elsewhere in this
+file. 2 new regression tests mock a "successfully loaded" fake model
+(bypassing `_ensure_model()`'s own except blocks entirely) so the failure
+is proven to originate specifically inside `predict_proba_batch`'s own try
+block, using this environment's genuine absence of PyTorch as a real (not
+synthetic) exception trigger -- the test is agnostic to the exact
+exception, since the fix's behavior does not depend on which one occurs.
+The version 0.3.22 release gate passed 3,153 default tests plus Ruff/mypy
+as 10/10 supervised gates in 29.2 seconds under the canonical 6x6
+topology.
+
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.

@@ -359,6 +359,59 @@ class TestEnsureRepoRootOnSysPath:
         assert scorer._model is loaded_model
 
 
+class TestInferenceFailureWarnings:
+    """Regression: predict_proba/predict_proba_batch's inference-time except
+    blocks used to silently fall back to 0.5 with no warning -- distinct
+    from _ensure_model()'s load-time except blocks (TestEnsureModelWarnings
+    below), which already warn correctly. These tests mock loading to
+    *succeed* (a fake, non-None model), so the failure below happens
+    specifically inside predict_proba_batch's own try block, not during
+    loading -- exercising the exact code path this fix changes.
+    """
+
+    def _scorer_with_fake_loaded_model(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> CnnScorer:
+        from types import SimpleNamespace
+
+        import exo_toolkit.ml.cnn_scorer as cnn_scorer_module
+
+        checkpoint = tmp_path / "best.pt"
+        checkpoint.write_bytes(b"state-dict")
+        # A plain object() is not a real, callable PyTorch model -- calling
+        # it (or, in this sandbox where PyTorch is not installed, even the
+        # `import torch` inside predict_proba_batch's try block) raises,
+        # giving a real (not synthetic) exception to exercise the fix's
+        # except block regardless of whether PyTorch happens to be present.
+        batcher = SimpleNamespace(
+            _load_torch_model=lambda path: (object(), SimpleNamespace(n_bins=201))
+        )
+        monkeypatch.setattr(
+            cnn_scorer_module,
+            "import_module",
+            lambda name: batcher if name == "Skills.cnn_inference_batcher" else None,
+        )
+        scorer = CnnScorer.from_checkpoint(checkpoint)
+        assert scorer.is_available  # sanity: "loading" succeeded
+        return scorer
+
+    def test_predict_proba_batch_warns_on_inference_failure(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        scorer = self._scorer_with_fake_loaded_model(tmp_path, monkeypatch)
+        with pytest.warns(RuntimeWarning, match="inference failed"):
+            result = scorer.predict_proba_batch([_snippet(), _snippet()])
+        assert result == [pytest.approx(0.5), pytest.approx(0.5)]
+
+    def test_predict_proba_warns_on_inference_failure(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        scorer = self._scorer_with_fake_loaded_model(tmp_path, monkeypatch)
+        with pytest.warns(RuntimeWarning, match="inference failed"):
+            result = scorer.predict_proba(_snippet())
+        assert result == pytest.approx(0.5)
+
+
 class TestEnsureModelWarnings:
     def test_warns_when_skills_package_unimportable(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
