@@ -226,7 +226,17 @@ def _default_product_fn(obsid: str) -> list[dict[str, str]]:
 
     try:
         products = Observations.get_product_list([obsid])
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        # A real MAST failure (timeout, auth, malformed response) must not
+        # be silently indistinguishable from "this obsid genuinely has no
+        # products" -- both currently collapse to the caller seeing an
+        # empty list with no diagnostic at all.
+        print(
+            f"Warning: obsid={obsid}: MAST product listing failed "
+            f"({type(exc).__name__}: {exc})",
+            file=sys.stderr,
+            flush=True,
+        )
         return []
     result = []
     for row in products:
@@ -237,6 +247,29 @@ def _default_product_fn(obsid: str) -> list[dict[str, str]]:
             "type": str(row.get("productType", "")),
         })
     return result
+
+
+def _is_valid_fits(path: Path) -> bool:
+    """Return True if path opens as a complete, readable FITS file.
+
+    astroquery writes downloads directly with no temp+rename, so a run
+    interrupted mid-download (network drop, OOM, Ctrl-C) leaves a
+    truncated-but-present file at the cache path. File existence alone
+    does not imply completeness: without this check, every future run
+    would see the truncated file, skip re-download, and hit the same
+    "Extraction failed" error indefinitely with no way to self-heal.
+    Forces a full read of every HDU's data (not just the header) since a
+    truncated file's header can still parse successfully.
+    """
+    from astropy.io import fits  # type: ignore[import]
+
+    try:
+        with fits.open(path) as hdul:
+            for hdu in hdul:
+                _ = hdu.data
+        return True
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _default_download_fn(data_uri: str, dest: Path) -> Path:
@@ -285,6 +318,16 @@ def fetch_jwst_lc(
     cache_dir.mkdir(parents=True, exist_ok=True)
     warnings: list[str] = []
 
+    def _warn(msg: str) -> None:
+        # warnings is only ever returned on the JwstLcResult success path
+        # (see the return statement below); every early-return-None path
+        # discarded it silently before this fix, so a failure had zero
+        # console visibility beyond a bare pass/fail count. Print
+        # immediately in addition to recording it, so a diagnostic reaches
+        # the operator regardless of how this call ends.
+        warnings.append(msg)
+        print(f"Warning: obsid={obsid}: {msg}", file=sys.stderr, flush=True)
+
     pfn = product_fn or _default_product_fn
     dfn = download_fn or _default_download_fn
 
@@ -306,19 +349,26 @@ def fetch_jwst_lc(
         key=_priority,
     )
     if not candidates:
-        warnings.append(f"No x1dints or calints products found for obsid {obsid}")
+        _warn(f"No x1dints or calints products found for obsid {obsid}")
         return None
 
     best = candidates[0]
     product_type = "x1dints" if "x1dints" in best["filename"].lower() else "calints"
     local_path = cache_dir / best["filename"]
 
+    if local_path.exists() and not _is_valid_fits(local_path):
+        _warn(
+            f"Cached file {local_path} exists but failed FITS validation "
+            "(likely a truncated prior download) -- deleting and re-downloading"
+        )
+        local_path.unlink(missing_ok=True)
+
     # Download if not already cached
     if not local_path.exists():
         try:
             local_path = dfn(best["dataURI"], local_path)
         except Exception as exc:
-            warnings.append(f"Download failed: {exc}")
+            _warn(f"Download failed: {exc}")
             return None
 
     # Extract white-light curve
@@ -328,11 +378,11 @@ def fetch_jwst_lc(
         else:
             time_mjd, flux_raw, err_raw = white_light_from_calints(local_path)
     except Exception as exc:
-        warnings.append(f"Extraction failed: {exc}")
+        _warn(f"Extraction failed: {exc}")
         return None
 
     if len(time_mjd) < 10:
-        warnings.append(f"Too few integrations ({len(time_mjd)}) — skipping")
+        _warn(f"Too few integrations ({len(time_mjd)}) — skipping")
         return None
 
     # Convert MJD → BTJD
@@ -341,7 +391,7 @@ def fetch_jwst_lc(
     # Remove non-finite
     mask = np.isfinite(flux_raw) & np.isfinite(err_raw) & (err_raw > 0)
     if mask.sum() < 10:
-        warnings.append("Too few finite integrations after masking")
+        _warn("Too few finite integrations after masking")
         return None
 
     time_btjd = time_btjd[mask]

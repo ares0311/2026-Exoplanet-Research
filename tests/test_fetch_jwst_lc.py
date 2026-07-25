@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 from fetch_jwst_lc import (
     _MJD_TO_BTJD_OFFSET,
     JwstLcResult,
+    _default_product_fn,
     _normalize,
     fetch_jwst_lc,
 )
@@ -154,6 +155,29 @@ def test_fetch_no_products_returns_none() -> None:
     assert result is None
 
 
+def test_default_product_fn_warns_on_mast_failure(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # Regression: a real MAST failure (timeout, auth, malformed response)
+    # must not be silently indistinguishable from "this obsid genuinely
+    # has no products" -- both used to collapse to an empty list with zero
+    # diagnostic output.
+    from astroquery.mast import Observations
+
+    def _raise(*args: object, **kwargs: object) -> None:
+        raise TimeoutError("MAST request timed out")
+
+    monkeypatch.setattr(Observations, "get_product_list", _raise)
+
+    result = _default_product_fn("obs999")
+
+    assert result == []
+    err = capsys.readouterr().err
+    assert "obs999" in err
+    assert "MAST product listing failed" in err
+    assert "TimeoutError" in err
+
+
 def test_fetch_download_failure_returns_none(tmp_path: Path) -> None:
     result = fetch_jwst_lc(
         "obs88",
@@ -280,13 +304,18 @@ def test_fetch_too_few_integrations_returns_none(
 
 def test_fetch_uses_cache_on_second_call(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     import fetch_jwst_lc as mod
+    from astropy.io import fits
 
     stub = _StubExtract()
     monkeypatch.setattr(mod, "white_light_from_x1dints", stub.x1dints)
 
-    # Pre-create the cached file so download should NOT be called
+    # Pre-create a genuinely valid (minimal) cached FITS file so download
+    # should NOT be called. A merely-touched empty file would now correctly
+    # fail FITS validation and trigger re-download -- see
+    # test_fetch_redownloads_when_cached_file_is_truncated below for that
+    # exact regression case.
     cached = tmp_path / "obs777_x1dints.fits"
-    cached.touch()
+    fits.PrimaryHDU().writeto(cached)
 
     download_calls: list[str] = []
 
@@ -299,6 +328,37 @@ def test_fetch_uses_cache_on_second_call(monkeypatch: pytest.MonkeyPatch, tmp_pa
     result = fetch_jwst_lc("obs777", cache_dir=tmp_path, product_fn=_product_fn_x1dints)
     assert result is not None
     assert download_calls == []  # should use cache
+
+
+def test_fetch_redownloads_when_cached_file_is_truncated(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # Regression: a download interrupted mid-write (network drop, OOM,
+    # Ctrl-C) leaves a truncated-but-present file at the cache path.
+    # astroquery writes directly with no temp+rename, so file existence
+    # alone must not be trusted as completeness -- the invalid file must
+    # be deleted and re-downloaded, not silently reused forever.
+    import fetch_jwst_lc as mod
+
+    stub = _StubExtract()
+    monkeypatch.setattr(mod, "white_light_from_x1dints", stub.x1dints)
+
+    cached = tmp_path / "obs888_x1dints.fits"
+    cached.write_bytes(b"not a real fits file")
+
+    download_calls: list[str] = []
+
+    def _counting_download(uri: str, dest: Path) -> Path:
+        download_calls.append(uri)
+        dest.touch()
+        return dest
+
+    monkeypatch.setattr(mod, "_default_download_fn", _counting_download)
+
+    result = fetch_jwst_lc("obs888", cache_dir=tmp_path, product_fn=_product_fn_x1dints)
+
+    assert download_calls == ["mast:JWST/obs888"]
+    assert result is not None  # stub extraction ignores file content
 
 
 # ---------------------------------------------------------------------------

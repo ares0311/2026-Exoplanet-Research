@@ -1046,6 +1046,39 @@ The version 0.3.26 release gate passed 3,156 default tests plus Ruff/mypy
 as 10/10 supervised gates in 30.1 seconds under the canonical 6x6
 topology.
 
+Version 0.3.27 continues the hardening sweep on `Skills/fetch_jwst_lc.py`,
+closing two related findings. First: `astroquery`'s download call writes
+directly to the cache path with no temp+rename, so a run interrupted
+mid-download (network drop, OOM, Ctrl-C) left a truncated-but-present
+file; `if not local_path.exists()` alone treated that as valid cache
+forever, meaning every future run silently reused the corrupt file and
+hit the identical "Extraction failed" error indefinitely with no
+self-heal path. A new `_is_valid_fits()` helper (forces a full read of
+every HDU's data, not just the header, since a truncated file's header
+can still parse) now gates the cache-hit decision; an invalid cached file
+is deleted and re-downloaded in the same call. Second: `_default_product_fn`'s
+bare `except Exception: return []` made a real MAST failure
+indistinguishable from "this obsid genuinely has no products," with zero
+diagnostic output either way. Investigating this found the problem was
+broader than the original sweep finding stated: the function's entire
+local `warnings` list is only ever attached to a successful `JwstLcResult`
+-- every one of its five early-`return None` paths (no candidates, no
+cache, download failure, extraction failure, too-few-integrations)
+already silently discarded its own warning message before this fix, not
+just the product-listing one named in the sweep. A new `_warn()` closure
+now prints every message immediately in addition to recording it, so a
+diagnostic reaches the console regardless of how the call ends, and
+`_default_product_fn` itself also prints on failure. Several pre-existing
+tests relied on a merely-`.touch()`-ed (empty) file standing in for a
+valid cached download; the one whose whole point was proving cache-hit
+behavior (`test_fetch_uses_cache_on_second_call`) needed a genuinely
+valid minimal FITS file to keep testing what it claims to test, and a new
+dedicated test proves the opposite case (a truncated cached file triggers
+deletion and re-download).
+The version 0.3.27 release gate passed 3,158 default tests plus Ruff/mypy
+as 10/10 supervised gates in 43.2 seconds under the canonical 6x6
+topology.
+
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
