@@ -998,6 +998,28 @@ The version 0.3.24 release gate passed 3,153 default tests plus Ruff/mypy
 as 10/10 supervised gates in 30.2 seconds under the canonical 6x6
 topology.
 
+Version 0.3.25 continues the hardening sweep: `Skills/star_scanner.py`'s
+`run_background_scan()` loaded the TOI exclusion list with an explicit
+try/except that prints a warning and continues on failure, but the
+CTOI and confirmed-transiting-host exclusion lists were loaded via
+`_load_ctoi_tic_ids()`/`_load_confirmed_host_tic_ids()` called with their
+default `strict=False`, which already fail open and swallow any exception
+*internally* -- so no exception ever reached `run_background_scan()` for a
+wrapping try/except to catch, and a CTOI/ExoFOP or NASA Exoplanet Archive
+outage during a live scan silently disabled that entire exclusion category
+with nothing in the console transcript, violating this project's own
+console-output policy. EXO-Hunter could then select and report as "novel"
+a target that is actually a known CTOI or confirmed planet host. Both
+calls now pass `strict=True` (so a real failure actually raises) wrapped
+in the same try/except-and-warn pattern already used for TOI loading,
+giving full three-way symmetry. 2 new regression tests force each loader
+to raise and assert both the warning text and that the scan still
+completes successfully (fail-open behavior preserved, just no longer
+silent).
+The version 0.3.25 release gate passed 3,155 default tests plus Ruff/mypy
+as 10/10 supervised gates in 29.1 seconds under the canonical 6x6
+topology.
+
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.

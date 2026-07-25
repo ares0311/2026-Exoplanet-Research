@@ -2063,15 +2063,40 @@ def run_background_scan(
             toi_ids = set()
 
     print("Loading CTOI exclusion list …", flush=True)
-    ctoi_ids = (
-        _load_ctoi_tic_ids(strict=True) if prepare_only else _load_ctoi_tic_ids()
-    )
+    if prepare_only:
+        ctoi_ids = _load_ctoi_tic_ids(strict=True)
+    else:
+        # strict=True here (not the default strict=False) so a genuine
+        # failure actually raises and is caught below, matching the TOI
+        # branch above. Calling with strict=False would swallow the
+        # exception silently inside _load_ctoi_tic_ids itself before it
+        # ever reached this function -- exactly the asymmetry this fixes:
+        # a CTOI/Exoplanet-Archive outage during a live scan must not
+        # silently disable that exclusion category with nothing in the
+        # console transcript.
+        try:
+            ctoi_ids = _load_ctoi_tic_ids(strict=True)
+        except Exception as exc:  # noqa: BLE001
+            print(
+                f"Warning: could not load CTOI list ({exc}); skipping CTOI exclusion",
+                flush=True,
+            )
+            ctoi_ids = set()
 
     print("Loading confirmed transiting planet hosts …", flush=True)
     if prepare_only:
         confirmed_ids = _load_confirmed_host_tic_ids(strict=True)
     else:
-        confirmed_ids = _load_confirmed_host_tic_ids()
+        # Same reasoning as the CTOI branch above.
+        try:
+            confirmed_ids = _load_confirmed_host_tic_ids(strict=True)
+        except Exception as exc:  # noqa: BLE001
+            print(
+                f"Warning: could not load confirmed transiting planet hosts "
+                f"({exc}); skipping confirmed-host exclusion",
+                flush=True,
+            )
+            confirmed_ids = frozenset()
 
     prior_discovery_ids = _load_prior_discovery_tic_ids(
         log_path.parent,

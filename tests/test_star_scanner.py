@@ -1390,6 +1390,59 @@ class TestRunBackgroundScan:
         assert 1001 in captured[0]
         assert 9999 in captured[0]
 
+    def test_ctoi_load_failure_warns_and_continues(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        # Regression: a CTOI/ExoFOP outage during a live scan used to
+        # silently disable that exclusion category with nothing in the
+        # console transcript -- asymmetric with the TOI branch just above,
+        # which already warns. The scan must still complete.
+        log_path = tmp_path / "log.json"
+        with (
+            patch("Skills.star_scanner._load_toi_tic_ids", return_value=set()),
+            patch(
+                "Skills.star_scanner._load_ctoi_tic_ids",
+                side_effect=RuntimeError("CTOI source unavailable"),
+            ),
+            patch(
+                "Skills.star_scanner._load_confirmed_host_tic_ids",
+                return_value=frozenset(),
+            ),
+            patch("Skills.star_scanner.select_targets", return_value=self._targets()),
+            patch("Skills.star_scanner.run_pipeline", return_value=[]),
+        ):
+            run_background_scan(log_path, n_targets=10)
+
+        out = capsys.readouterr().out
+        assert "Warning: could not load CTOI list" in out
+        assert "CTOI source unavailable" in out
+        log = ScanLog(log_path)
+        assert log.is_scanned(1001)
+        assert log.is_scanned(1002)
+
+    def test_confirmed_host_load_failure_warns_and_continues(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        log_path = tmp_path / "log.json"
+        with (
+            patch("Skills.star_scanner._load_toi_tic_ids", return_value=set()),
+            patch("Skills.star_scanner._load_ctoi_tic_ids", return_value=set()),
+            patch(
+                "Skills.star_scanner._load_confirmed_host_tic_ids",
+                side_effect=RuntimeError("NEA archive unavailable"),
+            ),
+            patch("Skills.star_scanner.select_targets", return_value=self._targets()),
+            patch("Skills.star_scanner.run_pipeline", return_value=[]),
+        ):
+            run_background_scan(log_path, n_targets=10)
+
+        out = capsys.readouterr().out
+        assert "Warning: could not load confirmed transiting planet hosts" in out
+        assert "NEA archive unavailable" in out
+        log = ScanLog(log_path)
+        assert log.is_scanned(1001)
+        assert log.is_scanned(1002)
+
     def test_full_sweep_forwarded_to_select_targets(self, tmp_path: Path) -> None:
         log_path = tmp_path / "log.json"
         captured: dict[str, Any] = {}
