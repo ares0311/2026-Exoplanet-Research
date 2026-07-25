@@ -20,6 +20,13 @@ The CLI entry point writes a structured completion record via
 Rule 7). ``TceFetchResult.flag`` already distinguishes success ("OK")
 from failure ("EMPTY"/"INVALID"/"UNAVAILABLE"), so the Run Report is
 written for both outcomes rather than only on success.
+
+``fetch_tce_table()`` checks the response's first row against
+``_REQUIRED_TCE_COLUMNS`` before parsing any records: a renamed or
+dropped upstream column returns ``flag="INVALID"`` with the missing
+column names, instead of every row silently parsing as
+``tic_id=0``/``period_days=0.0``/``disposition=""`` and still being
+reported as a successful ("OK") fetch.
 """
 from __future__ import annotations
 
@@ -44,6 +51,22 @@ _EXOMAST_TCE_URL = (
 )
 
 _VALID_DISPOSITIONS = {"PC", "FP", "EB", "ND", ""}
+
+# Every field _parse_record() reads via row.get(key) or <default> -- a
+# renamed/missing upstream column looks identical to a legitimate null value
+# at that layer, so schema drift must be caught here, once, against the
+# actual column set the API returned, before any row is parsed.
+_REQUIRED_TCE_COLUMNS = (
+    "ticid",
+    "tce_num",
+    "tce_period",
+    "tce_time0bt",
+    "tce_duration",
+    "tce_depth",
+    "tce_snr",
+    "tce_disposition",
+    "sectors",
+)
 
 
 @dataclass(frozen=True)
@@ -144,6 +167,14 @@ def fetch_tce_table(
 
     if not isinstance(raw, list):
         return _empty_result("INVALID", f"expected list response, got {type(raw).__name__}")
+
+    if raw:
+        missing_columns = sorted(c for c in _REQUIRED_TCE_COLUMNS if c not in raw[0])
+        if missing_columns:
+            return _empty_result(
+                "INVALID",
+                f"response row(s) missing expected column(s): {missing_columns}",
+            )
 
     records: list[TceRecord] = []
     for row in raw:

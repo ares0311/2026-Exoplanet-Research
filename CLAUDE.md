@@ -1079,6 +1079,32 @@ The version 0.3.27 release gate passed 3,158 default tests plus Ruff/mypy
 as 10/10 supervised gates in 43.2 seconds under the canonical 6x6
 topology.
 
+Version 0.3.28 closes the last originally-scoped item on the whole-repo
+hardening sweep: `Skills/tess_tce_fetcher.py`'s `_parse_record()` reads
+every field as `row.get(key) or <default>`, so a renamed or dropped
+upstream column (the exact "invalid MAST-column" incident class this
+project already suffered once, at 0.2.65) is indistinguishable from a
+legitimate null value -- every row would silently parse as
+`tic_id=0`/`period_days=0.0`/`disposition=""` and the fetch would still
+report `flag="OK"`. `fetch_tce_table()` now checks the response's first
+row against a new `_REQUIRED_TCE_COLUMNS` tuple before parsing any
+records, once per fetch rather than per row (a uniform column set across
+rows is a safe assumption for this fixed-`select` TAP-style query); any
+missing column returns `flag="INVALID"` naming the missing column(s)
+instead of silently fabricating zeroed/empty records. This also catches
+a single renamed column (e.g. just `tce_disposition`), not only a
+whole-schema rename, since that column would otherwise masquerade as
+legitimate "not dispositioned" data rather than surfacing as drift. 3 new
+regression tests cover whole-schema-missing, single-column-missing, and
+the unchanged all-columns-present "OK" case. This closes the last item
+from the originally-identified ~10-item Tier-1 backlog; the T2 backlog
+(idempotency-key collisions, further silent schema-drift/fallback sites,
+lost-update races, relative default config paths) remains open as
+follow-up work.
+The version 0.3.28 release gate passed 3,161 default tests plus Ruff/mypy
+as 10/10 supervised gates in 36.2 seconds under the canonical 6x6
+topology.
+
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
