@@ -1020,6 +1020,32 @@ The version 0.3.25 release gate passed 3,155 default tests plus Ruff/mypy
 as 10/10 supervised gates in 29.1 seconds under the canonical 6x6
 topology.
 
+Version 0.3.26 continues the hardening sweep: `Skills/fetch_confirmed_hosts.py`'s
+CLI unconditionally wrote `sorted_ids` to `args.output` even after a
+strict-mode fetch failure set `tic_ids = frozenset()` -- so a transient
+NEA outage during a scheduled re-run destroyed yesterday's valid
+~3,000-ID exclusion list with an empty one, even though the Run Report
+correctly recorded `status="failed"`. The output file is now written only
+on success; a failure leaves any existing file untouched and prints
+`Flag: FETCH_ERROR ... (NOT written -- preserving any existing file)`
+instead. A companion fragility-sweep finding -- that the library's
+default `strict=False` fail-open contract can't distinguish real-zero
+results from network/schema-drift errors -- turned out to already be
+substantially closed as a side effect of 0.3.25 (#312): every real caller
+of `fetch_confirmed_host_tic_ids`/`_load_confirmed_host_tic_ids` in this
+codebase (`star_scanner.py`'s two branches, `hunter_cli.py`'s discovery
+exclusion) now passes `strict=True` explicitly, so the ambiguous default
+is no longer reachable through any current call site; verified by
+grepping all three call sites before concluding no further change was
+needed there. One pre-existing test
+(`test_cli_reports_failure_on_strict_exception`) encoded the old buggy
+overwrite-with-empty behavior as its expected outcome and is corrected; a
+new test proves a pre-existing good output file survives a subsequent
+failed run untouched.
+The version 0.3.26 release gate passed 3,156 default tests plus Ruff/mypy
+as 10/10 supervised gates in 30.1 seconds under the canonical 6x6
+topology.
+
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.

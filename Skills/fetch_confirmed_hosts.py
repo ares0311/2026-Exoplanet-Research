@@ -180,11 +180,20 @@ def _cli(argv: list[str] | None = None, *, git_run_fn: Any = None) -> int:
         error_note = f" error={exc}"
 
     sorted_ids = sorted(tic_ids)
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(sorted_ids, indent=2) + "\n")
-
-    flag = "OK" if status == "success" else "FETCH_ERROR"
-    print(f"Flag: {flag}  n_tic_ids={len(sorted_ids)}  output={args.output}")
+    if status == "success":
+        # Only write on success: a transient NEA outage during a scheduled
+        # re-run must not destroy yesterday's valid exclusion list by
+        # overwriting it with an empty one. The Run Report below still
+        # records status="failed" either way -- this only protects the
+        # actual exclusion-list artifact other tools read from disk.
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(json.dumps(sorted_ids, indent=2) + "\n")
+        print(f"Flag: OK  n_tic_ids={len(sorted_ids)}  output={args.output}")
+    else:
+        print(
+            f"Flag: FETCH_ERROR  n_tic_ids=0  output={args.output} "
+            "(NOT written -- preserving any existing file)"
+        )
 
     elapsed = time.monotonic() - start
     _write_run_report(
