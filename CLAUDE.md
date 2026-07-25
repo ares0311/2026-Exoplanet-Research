@@ -884,6 +884,33 @@ extraction instead of being replaced by a stale field.
 The version 0.3.18 release gate passed 3,144 default tests plus Ruff/mypy as
 10/10 supervised gates in 28.1 seconds under the canonical 6x6 topology.
 
+Version 0.3.19 continues the hardening sweep: `extract_features()` silently
+substituted solar values (`R=1.0 R☉`, `M=1.0 M☉`, `Teff=5778 K`) whenever
+`stellar_radius_rsun`/`stellar_mass_msun`/`stellar_teff_k` were `None`,
+feeding those assumed values into `duration_plausibility_score`,
+`companion_radius_too_large_score`, `duration_implausibility_score`, and
+`limb_darkening_plausibility_score` instead of leaving the diagnostic
+absent — contradicting this module's own stated invariant ("features whose
+required diagnostics are absent are set to None") and diverging from the
+sibling `stellar_density_consistency_score`, which already correctly
+returns `None` under the identical missing-data condition. Since
+`fetch_tic_stellar_params()` already fails open to `None` on any catalog
+miss, and this project explicitly targets fainter stars (Tmag 10-14) where
+TIC catalog completeness is worse, this systematically injected a
+wrong-but-plausible solar-host bias into planet-vs-EB scoring for exactly
+the M-dwarf-heavy population this project targets — a genuine transit
+around a small star could score as duration-implausible against a wrongly
+assumed larger host. All four scores are now gated on the presence of
+their real required stellar parameters (`companion_radius_too_large_score`
+needs only radius; the other three need radius and mass, or Teff),
+matching `stellar_density_consistency_score`'s existing correct pattern.
+Two pre-existing tests encoded the old buggy assumption (asserting these
+scores were "always computed" even with empty diagnostics) and are
+corrected; 6 new regression tests prove each is `None` when its required
+stellar parameter is missing and non-`None` when present.
+The version 0.3.19 release gate passed 3,143 default tests plus Ruff/mypy as
+10/10 supervised gates in 28.1 seconds under the canonical 6x6 topology.
+
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.

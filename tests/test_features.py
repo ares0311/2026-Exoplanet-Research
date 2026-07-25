@@ -527,14 +527,11 @@ class TestExtractFeatures:
         empty_diagnostics: RawDiagnostics,
     ) -> None:
         f = extract_features(base_signal, empty_diagnostics)
-        # Always-computed scores are present
+        # Always-computed scores are present regardless of stellar params
         assert f.snr_score is not None
         assert f.log_snr_score is not None
         assert f.transit_count_score is not None
-        assert f.duration_plausibility_score is not None
         assert f.large_depth_score is not None
-        assert f.companion_radius_too_large_score is not None
-        assert f.duration_implausibility_score is not None
         assert f.single_event_score is not None
 
     def test_missing_diagnostics_yield_none(
@@ -551,6 +548,45 @@ class TestExtractFeatures:
         assert f.stellar_variability_score is None
         assert f.systematics_overlap_score is None
         assert f.known_object_score is None
+
+    def test_missing_stellar_params_yield_none_not_solar_assumption(
+        self,
+        base_signal: CandidateSignal,
+        empty_diagnostics: RawDiagnostics,
+    ) -> None:
+        # Regression: these three used to silently compute against an
+        # assumed solar (1.0 R_Sun / 1.0 M_Sun) host when the real stellar
+        # params were missing, injecting a wrong-but-plausible bias into
+        # planet-vs-EB scoring instead of leaving the diagnostic absent —
+        # worst for the M-dwarf population this project targets. They must
+        # be None when stellar_radius_rsun/stellar_mass_msun are absent,
+        # matching stellar_density_consistency_score's existing pattern.
+        f = extract_features(base_signal, empty_diagnostics)
+        assert f.duration_plausibility_score is None
+        assert f.companion_radius_too_large_score is None
+        assert f.duration_implausibility_score is None
+
+    def test_stellar_params_present_enable_duration_and_companion_scores(
+        self,
+        base_signal: CandidateSignal,
+    ) -> None:
+        diag = RawDiagnostics(stellar_radius_rsun=0.5, stellar_mass_msun=0.5)
+        f = extract_features(base_signal, diag)
+        assert f.duration_plausibility_score is not None
+        assert f.companion_radius_too_large_score is not None
+        assert f.duration_implausibility_score is not None
+
+    def test_only_radius_present_enables_companion_score_only(
+        self,
+        base_signal: CandidateSignal,
+    ) -> None:
+        # companion_radius_too_large_score only needs stellar radius, not
+        # mass; duration_(im)plausibility_score need both.
+        diag = RawDiagnostics(stellar_radius_rsun=0.5)
+        f = extract_features(base_signal, diag)
+        assert f.companion_radius_too_large_score is not None
+        assert f.duration_plausibility_score is None
+        assert f.duration_implausibility_score is None
 
     def test_full_diagnostics_populate_all_fields(
         self, base_signal: CandidateSignal
@@ -1133,13 +1169,26 @@ class TestLimbDarkeningPlausibilityScore:
     def test_extract_features_propagates_ld(self) -> None:
         from exo_toolkit.features import _ld_ingress_egress_fraction  # noqa: PLC0415
         expected = _ld_ingress_egress_fraction(1000.0, 5778.0)
-        diag = RawDiagnostics(ingress_egress_fraction=expected)
+        diag = RawDiagnostics(ingress_egress_fraction=expected, stellar_teff_k=5778.0)
         f = extract_features(_signal(), diag)
         assert f.limb_darkening_plausibility_score is not None
         assert f.limb_darkening_plausibility_score > 0.5
 
     def test_none_ingress_egress_fraction_gives_none_feature(self) -> None:
         f = extract_features(_signal(), RawDiagnostics())
+        assert f.limb_darkening_plausibility_score is None
+
+    def test_missing_stellar_teff_gives_none_feature_not_solar_assumption(
+        self,
+    ) -> None:
+        # Regression: this used to silently assume a solar Teff (5778 K)
+        # when the real value was missing instead of leaving the diagnostic
+        # absent -- ingress_egress_fraction alone is not sufficient once
+        # stellar_teff_k is also required.
+        from exo_toolkit.features import _ld_ingress_egress_fraction  # noqa: PLC0415
+        expected = _ld_ingress_egress_fraction(1000.0, 5778.0)
+        diag = RawDiagnostics(ingress_egress_fraction=expected)
+        f = extract_features(_signal(), diag)
         assert f.limb_darkening_plausibility_score is None
 
     def test_zero_depth_does_not_crash(self) -> None:
