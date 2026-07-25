@@ -28,15 +28,29 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         default=REPO_ROOT / "data_selection" / "hunter_prior_search_history_v1.json",
     )
+    parser.add_argument(
+        "--history-source-root",
+        type=Path,
+        default=None,
+        help=(
+            "Resolve --history-manifest's source_path entries relative to this "
+            "directory instead of the repo-root walk-up heuristic. Required for "
+            "reliable isolated/scripted operation with a manifest that does not "
+            "live under this repo's own tree."
+        ),
+    )
     return parser
 
 
-def _validate(path: Path, history_manifest: Path) -> dict[str, object]:
+def _validate(
+    path: Path, history_manifest: Path, history_source_root: Path | None
+) -> dict[str, object]:
     if path.suffix != ".gz":
         return validate_hunter_database(
             path,
             schema_version=HUNTER_SCHEMA_VERSION,
             history_manifest=history_manifest,
+            history_source_root=history_source_root,
         )
     compressed_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
     with tempfile.NamedTemporaryFile(suffix=".sqlite3") as temporary:
@@ -47,6 +61,7 @@ def _validate(path: Path, history_manifest: Path) -> dict[str, object]:
             Path(temporary.name),
             schema_version=HUNTER_SCHEMA_VERSION,
             history_manifest=history_manifest,
+            history_source_root=history_source_root,
         )
     result["compressed_snapshot_path"] = str(path)
     result["compressed_snapshot_sha256"] = compressed_sha256
@@ -57,7 +72,7 @@ def _validate(path: Path, history_manifest: Path) -> dict[str, object]:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        result = _validate(args.db, args.history_manifest)
+        result = _validate(args.db, args.history_manifest, args.history_source_root)
     except Exception as exc:  # noqa: BLE001
         print(
             json.dumps(

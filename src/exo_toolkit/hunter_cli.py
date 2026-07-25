@@ -146,6 +146,17 @@ def _parser_create() -> argparse.ArgumentParser:
     parser.add_argument("--db", type=Path, default=DEFAULT_HUNTER_DB)
     parser.add_argument("--candidate-file", type=Path)
     parser.add_argument("--history-manifest", type=Path, default=DEFAULT_HISTORY_MANIFEST)
+    parser.add_argument(
+        "--history-source-root",
+        type=Path,
+        default=None,
+        help=(
+            "Resolve --history-manifest's source_path entries relative to this "
+            "directory instead of the repo-root walk-up heuristic. Required for "
+            "reliable isolated/scripted operation with a manifest that does not "
+            "live under this repo's own tree."
+        ),
+    )
     parser.add_argument("--pool-size", type=int)
     parser.add_argument("--workers", type=int, default=6)
     parser.add_argument("--tmag-min", type=float, default=12.0)
@@ -610,7 +621,9 @@ def create_new_search(
             }
             selector_version = OPERATOR_SELECTOR_VERSION
         elif args.mode == "follow-up":
-            import_summary = store.import_history_manifest(args.history_manifest)
+            import_summary = store.import_history_manifest(
+                args.history_manifest, source_root=args.history_source_root
+            )
             candidates = store.follow_up_universe()
             selector_log = {
                 "source": "durable_prior_search_history_and_follow_up_registry",
@@ -654,7 +667,12 @@ def create_new_search(
                 args.history_manifest
                 if args.mode == "follow-up" and not args.candidate_file
                 else None
-            )
+            ),
+            history_source_root=(
+                args.history_source_root
+                if args.mode == "follow-up" and not args.candidate_file
+                else None
+            ),
         )
         if not integrity["ok"]:
             raise RuntimeError(f"Hunter database integrity failed: {integrity}")
