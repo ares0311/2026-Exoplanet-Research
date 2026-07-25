@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import shutil
+import sys
 import subprocess
 from pathlib import Path
 
 import pytest
+import Skills.run_quality_gates as run_quality_gates_module
 from Skills.run_quality_gates import (
     TEST_SHARD_COUNT,
     TOTAL_TEST_WORKERS,
@@ -156,7 +158,9 @@ class TestGitState:
 
 
 class TestMainCapturesGitStateBeforeGatesRun:
-    def test_git_state_is_captured_before_supervise_gates_runs(self) -> None:
+    def test_git_state_is_captured_before_supervise_gates_runs(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Regression: the summary JSON must record the tree state the gates
         # actually verified, not whatever state exists after they finish --
         # a commit landing during the run (plausible in this repo, which has
@@ -164,6 +168,12 @@ class TestMainCapturesGitStateBeforeGatesRun:
         # attributed to the result. Proven here via call order, not just the
         # final summary contents, since a stale git_state_fn could otherwise
         # coincidentally produce the same value regardless of when it's called.
+        #
+        # PYTHON is monkeypatched to sys.executable: main()'s own
+        # `PYTHON.is_file()` preflight check must not depend on this exact
+        # environment having a checked-out .venv/bin/python (CI's runner
+        # sets up Python differently and has no .venv at all).
+        monkeypatch.setattr(run_quality_gates_module, "PYTHON", Path(sys.executable))
         call_order: list[str] = []
         created_log_dirs: list[Path] = []
 
