@@ -9,7 +9,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from Skills.alert_filter import _cli, apply_filters, filter_candidates  # noqa: E402
+from Skills.alert_filter import _cli, _fpp, apply_filters, filter_candidates  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -97,6 +97,27 @@ class TestFilterCandidates:
     def test_pathway_from_best_pathway_key(self) -> None:
         rows = [{"best_fpp": 0.05, "best_pathway": "tfop_ready"}]
         result = filter_candidates(rows, pathway="tfop_ready")
+        assert len(result) == 1
+
+
+class TestFppExtractionPreservesGenuineZero:
+    # Regression: `or`-chaining treated a real 0.0 (perfect FPP) as falsy
+    # and silently fell through to a different, possibly stale field.
+
+    def test_genuine_zero_top_level_fpp_is_not_replaced_by_best_fpp(self) -> None:
+        row = {"false_positive_probability": 0.0, "best_fpp": 0.85}
+        assert _fpp(row) == pytest.approx(0.0)
+
+    def test_genuine_zero_scores_fpp_resolves_when_no_higher_priority_field(self) -> None:
+        # No top-level false_positive_probability or best_fpp present, so
+        # the scores sub-dict is the only source -- must resolve to the
+        # real 0.0, not None.
+        row = {"scores": {"false_positive_probability": 0.0}}
+        assert _fpp(row) == pytest.approx(0.0)
+
+    def test_filter_candidates_keeps_genuine_zero_fpp_row(self) -> None:
+        rows = [{"false_positive_probability": 0.0, "best_fpp": 0.85}]
+        result = filter_candidates(rows, fpp_max=0.01)
         assert len(result) == 1
 
 

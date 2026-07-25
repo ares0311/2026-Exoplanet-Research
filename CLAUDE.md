@@ -866,6 +866,24 @@ stricter logic.
 The version 0.3.16 release gate passed 3,139 default tests plus Ruff/mypy as
 10/10 supervised gates in 28.1 seconds under the canonical 6x6 topology.
 
+Version 0.3.18 continues the hardening sweep: `Skills/alert_filter.py`'s
+`_fpp()` and `Skills/candidate_timeline.py`'s `record()` extracted FPP via
+`row.get("false_positive_probability") or row.get("best_fpp")`-style
+`or`-chains. A genuinely perfect FPP of `0.0` is falsy in Python, so a row
+carrying both a current-schema field at `0.0` and a stale/legacy field
+would have its real zero silently discarded in favor of the wrong value —
+exactly the failure mode `compare_candidates.py`/`export_candidates.py`
+already avoid elsewhere in this same codebase via `is None`/`in` checks,
+making the buggy versions a real inconsistency rather than an unavoidable
+design choice. Both now use `is None` checks throughout, matching that
+existing correct pattern; `candidate_timeline.py`'s `planet_posterior`
+extraction is also normalized to the same style for consistency, though it
+was not independently buggy (its fallback source and default already
+coincided). 5 new regression tests prove a genuine `0.0` now survives
+extraction instead of being replaced by a stale field.
+The version 0.3.18 release gate passed 3,144 default tests plus Ruff/mypy as
+10/10 supervised gates in 28.1 seconds under the canonical 6x6 topology.
+
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
