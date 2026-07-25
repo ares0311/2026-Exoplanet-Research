@@ -186,9 +186,16 @@ def test_live_selector_stamps_versioned_information_gain_contract(
     assert candidate.ranking_score == pytest.approx(67.2)
     assert search_log["stage_two_eligible_count"] == 1
     assert search_log["discovery_expansion_attempts"] == [
-        {"attempt": 0, "tmag_range": [6.0, 13.5], "raw_candidates_returned": 1}
+        {
+            "attempt": 0,
+            "tmag_range": [6.0, 13.5],
+            "max_tiles": 126,
+            "raw_candidates_returned": 1,
+            "eligible_candidates": 1,
+        }
     ]
     assert search_log["final_tmag_range"] == [6.0, 13.5]
+    assert search_log["final_max_tiles"] == 126
 
 
 def test_live_selector_widens_tmag_range_when_sweep_is_thin(
@@ -205,6 +212,7 @@ def test_live_selector_widens_tmag_range_when_sweep_is_thin(
         exclude_tic_ids: set[int],
         full_sweep: bool,
         max_workers: int,
+        max_tiles: int,
         search_log: dict[str, object],
     ) -> list[dict[str, object]]:
         calls.append(tmag_range)
@@ -278,6 +286,111 @@ def test_live_selector_expansion_never_raises_when_still_thin(
     assert len(candidates) == 1
     assert len(search_log["discovery_expansion_attempts"]) == 4  # initial + 3 expansions
     assert search_log["final_tmag_range"] == [9.0, 17.5]
+    # Scanner fake has no TOTAL_SEARCH_TILES, so the tile axis has no room
+    # to widen and stays at the base grid throughout.
+    assert search_log["final_max_tiles"] == 126
+
+
+def test_live_selector_expands_when_raw_count_is_sufficient_but_eligible_is_not(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression test for the real bug: the sufficiency check used to fire on
+    the raw sweep count, before known-variable/product-availability filtering
+    ever ran, so a sweep that cleared the raw threshold but left the
+    eligible pool short of N never triggered further expansion."""
+    scanner = SimpleNamespace(
+        _load_toi_tic_ids=lambda **_: set(),
+        _load_ctoi_tic_ids=lambda **_: set(),
+        _load_confirmed_host_tic_ids=lambda **_: set(),
+        # tic 1 and 2 are known variables on every check; only tic 3 is real.
+        _load_asassn_variable_tic_ids=lambda tic_ids, **_kwargs: {
+            tid for tid in tic_ids if tid in (1, 2)
+        },
+        # Always returns the same 3 raw rows (>= targets=3) regardless of
+        # tmag_range or max_tiles, so the raw count never signals a problem.
+        select_targets=lambda *_args, **_kwargs: [
+            {"tic_id": 1, "priority": 0.9, "tmag": 12.0},
+            {"tic_id": 2, "priority": 0.8, "tmag": 12.5},
+            {"tic_id": 3, "priority": 0.7, "tmag": 13.0},
+        ],
+        inspect_target_products=lambda *_args, **_kwargs: {
+            "products": ["product-1"],
+            "total_bytes": 1_000_000,
+            "priority": 0.5,
+        },
+    )
+    monkeypatch.setattr("exo_toolkit.hunter_cli._load_project_skill", lambda _: scanner)
+
+    candidates, search_log = _select_live_new_candidates(
+        targets=3,
+        pool_size=10,
+        workers=1,
+        tmag_range=(12.0, 14.5),
+        store=HunterStore(tmp_path / "hunter.sqlite3"),
+        progress_fn=None,
+    )
+
+    attempts = search_log["discovery_expansion_attempts"]
+    # Only 1 of 3 raw candidates is actually eligible every attempt, so
+    # expansion must keep retrying (all the way to exhaustion) instead of
+    # stopping after attempt 0 just because raw count already met targets.
+    assert len(attempts) == 4
+    assert [a["raw_candidates_returned"] for a in attempts] == [3, 3, 3, 3]
+    assert [a["eligible_candidates"] for a in attempts] == [1, 1, 1, 1]
+    assert len(candidates) == 3
+    assert search_log["stage_two_eligible_count"] == 1
+
+
+def test_live_selector_widens_tile_grid_alongside_tmag_range(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sky-tile coverage must widen as a second bounded expansion axis,
+    mirroring the Tmag-widening pattern, instead of staying permanently
+    fixed at the base 126-tile grid regardless of how thin the sweep is."""
+    max_tiles_seen: list[int] = []
+
+    def fake_select_targets(
+        _n: int,
+        *,
+        tmag_range: tuple[float, float],
+        exclude_tic_ids: set[int],
+        full_sweep: bool,
+        max_workers: int,
+        max_tiles: int,
+        search_log: dict[str, object],
+    ) -> list[dict[str, object]]:
+        max_tiles_seen.append(max_tiles)
+        return [{"tic_id": 1, "priority": 0.5, "tmag": 13.0}]
+
+    scanner = SimpleNamespace(
+        _load_toi_tic_ids=lambda **_: set(),
+        _load_ctoi_tic_ids=lambda **_: set(),
+        _load_confirmed_host_tic_ids=lambda **_: set(),
+        _load_asassn_variable_tic_ids=lambda *_args, **_kwargs: set(),
+        select_targets=fake_select_targets,
+        inspect_target_products=lambda *_args, **_kwargs: {
+            "products": ["product-1"],
+            "total_bytes": 1_000_000,
+            "priority": 0.5,
+        },
+        TOTAL_SEARCH_TILES=300,
+    )
+    monkeypatch.setattr("exo_toolkit.hunter_cli._load_project_skill", lambda _: scanner)
+
+    candidates, search_log = _select_live_new_candidates(
+        targets=5,
+        pool_size=10,
+        workers=1,
+        tmag_range=(12.0, 14.5),
+        store=HunterStore(tmp_path / "hunter.sqlite3"),
+        progress_fn=None,
+    )
+
+    # 126 -> 186 -> 246 -> capped at scanner's 300 (306 would overshoot).
+    assert max_tiles_seen == [126, 186, 246, 300]
+    attempts = search_log["discovery_expansion_attempts"]
+    assert [a["max_tiles"] for a in attempts] == [126, 186, 246, 300]
+    assert search_log["final_max_tiles"] == 300
 
 
 def test_invalid_target_count_fails_before_live_selection(tmp_path: Path) -> None:

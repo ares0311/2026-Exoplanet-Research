@@ -289,116 +289,18 @@ _TMAG_HARD_MIN = 4.0
 _TMAG_HARD_MAX = 18.0
 _MAX_DISCOVERY_EXPANSIONS = 3
 _DISCOVERY_EXPANSION_STEP = 1.0
+_BASE_MAX_TILES = 126
+_TILE_EXPANSION_STEP = 60
 
 
-def _select_live_new_candidates(
+def _build_new_candidates(
+    raw_targets: list[dict[str, Any]],
     *,
-    targets: int,
-    pool_size: int,
-    workers: int,
-    tmag_range: tuple[float, float],
-    store: HunterStore,
-    progress_fn: Callable[[str], None] | None = print,
-) -> tuple[list[HunterCandidate], dict[str, Any]]:
-    """Two-stage metadata-only TIC selection over a large reproducible pool.
-
-    Never raises for insufficiency: if the fixed-magnitude-window sweep
-    returns fewer raw candidates than requested, this widens the magnitude
-    window and retries (bounded) before returning whatever it has. The final
-    "not enough valid candidates exist" decision belongs to create_search(),
-    which returns the best available N rather than failing outright.
-    """
-    scanner = _load_project_skill("star_scanner")
-    excluded = set(store.searched_target_ids())
-    excluded_tics = {
-        int(value.split()[-1]) for value in excluded if value.upper().startswith("TIC ")
-    }
-    excluded_tics.update(scanner._load_toi_tic_ids(strict=True))
-    excluded_tics.update(scanner._load_ctoi_tic_ids(strict=True))
-    excluded_tics.update(scanner._load_confirmed_host_tic_ids(strict=True))
-
-    search_log: dict[str, Any] = {}
-    expansion_attempts: list[dict[str, Any]] = []
-    current_range = tmag_range
-    raw_targets: list[dict[str, Any]] = []
-    for attempt in range(_MAX_DISCOVERY_EXPANSIONS + 1):
-        tile_log: dict[str, Any] = {}
-        raw_targets = scanner.select_targets(
-            pool_size,
-            tmag_range=current_range,
-            exclude_tic_ids=excluded_tics,
-            full_sweep=True,
-            max_workers=workers,
-            search_log=tile_log,
-        )
-        expansion_attempts.append(
-            {
-                "attempt": attempt,
-                "tmag_range": list(current_range),
-                "raw_candidates_returned": len(raw_targets),
-            }
-        )
-        search_log = tile_log
-        if len(raw_targets) >= targets:
-            break
-        widened = (
-            max(current_range[0] - _DISCOVERY_EXPANSION_STEP, _TMAG_HARD_MIN),
-            min(current_range[1] + _DISCOVERY_EXPANSION_STEP, _TMAG_HARD_MAX),
-        )
-        if widened == current_range or attempt == _MAX_DISCOVERY_EXPANSIONS:
-            break
-        if progress_fn is not None:
-            progress_fn(
-                f"EXO-Hunter discovery sweep returned {len(raw_targets)} raw candidates "
-                f"for {targets} requested; widening Tmag range "
-                f"{current_range[0]:.1f}-{current_range[1]:.1f} -> "
-                f"{widened[0]:.1f}-{widened[1]:.1f} and retrying"
-            )
-        current_range = widened
-    search_log["discovery_expansion_attempts"] = expansion_attempts
-    search_log["final_tmag_range"] = list(current_range)
-
-    stage_two_goal = min(len(raw_targets), max(targets * 3, targets))
-    known_variables = scanner._load_asassn_variable_tic_ids(
-        [row["tic_id"] for row in raw_targets[:stage_two_goal]], strict=True
-    )
-
-    inspected: dict[int, dict[str, Any]] = {}
-    inspect_rows = [
-        row for row in raw_targets[:stage_two_goal] if int(row["tic_id"]) not in known_variables
-    ]
-    inspection_started = time.monotonic()
-    if progress_fn is not None:
-        progress_fn(
-            "EXO-Hunter metadata inspection: "
-            f"targets={len(inspect_rows)} workers={workers} ETA=pending"
-        )
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {
-            pool.submit(
-                scanner.inspect_target_products,
-                row,
-                mission="TESS",
-                pipeline="QLP",
-                exptime="long",
-            ): row
-            for row in inspect_rows
-        }
-        for completed, future in enumerate(as_completed(futures), 1):
-            row = futures[future]
-            try:
-                inspected[int(row["tic_id"])] = future.result()
-            except Exception as exc:  # noqa: BLE001
-                inspected[int(row["tic_id"])] = {"inspection_error": f"{type(exc).__name__}: {exc}"}
-            if progress_fn is not None:
-                elapsed = time.monotonic() - inspection_started
-                rate = completed / elapsed if elapsed > 0 else 0.0
-                remaining = (len(inspect_rows) - completed) / rate if rate > 0 else float("inf")
-                progress_fn(
-                    f"  [{completed}/{len(inspect_rows)}] "
-                    f"elapsed={elapsed:.0f}s ETA={format_eta(remaining)}"
-                )
-
+    inspected: dict[int, dict[str, Any]],
+    known_variables: set[int],
+    stage_two_goal: int,
+) -> list[HunterCandidate]:
+    """Build ranked candidates from a raw sweep plus stage-two inspection."""
     candidates: list[HunterCandidate] = []
     for index, row in enumerate(raw_targets):
         tic_id = int(row["tic_id"])
@@ -470,6 +372,168 @@ def _select_live_new_candidates(
                 },
             )
         )
+    return candidates
+
+
+def _select_live_new_candidates(
+    *,
+    targets: int,
+    pool_size: int,
+    workers: int,
+    tmag_range: tuple[float, float],
+    store: HunterStore,
+    progress_fn: Callable[[str], None] | None = print,
+) -> tuple[list[HunterCandidate], dict[str, Any]]:
+    """Two-stage metadata-only TIC selection over a large reproducible pool.
+
+    Never raises for insufficiency: if a sweep does not turn up enough
+    *eligible* candidates (after known-variable exclusion and QLP
+    product-availability checks -- not just a raw catalog-row count), this
+    widens both the Tmag magnitude window and the sky-tile grid and retries
+    (bounded) before returning whatever it has. The final "not enough valid
+    candidates exist" decision belongs to create_search(), which returns the
+    best available N rather than failing outright.
+
+    Checking the raw sweep count alone is not sufficient: known-variable
+    exclusion and QLP-product-availability filtering only run on the raw
+    sweep's top ``targets * 3`` rows, so a sweep that clears the raw
+    threshold can still fall short once those filters apply, with no further
+    expansion ever triggered. The sufficiency check below therefore runs
+    after stage-two inspection, on the eligible count.
+    """
+    scanner = _load_project_skill("star_scanner")
+    excluded = set(store.searched_target_ids())
+    excluded_tics = {
+        int(value.split()[-1]) for value in excluded if value.upper().startswith("TIC ")
+    }
+    excluded_tics.update(scanner._load_toi_tic_ids(strict=True))
+    excluded_tics.update(scanner._load_ctoi_tic_ids(strict=True))
+    excluded_tics.update(scanner._load_confirmed_host_tic_ids(strict=True))
+    tile_hard_max = getattr(scanner, "TOTAL_SEARCH_TILES", _BASE_MAX_TILES)
+
+    search_log: dict[str, Any] = {}
+    expansion_attempts: list[dict[str, Any]] = []
+    current_range = tmag_range
+    current_max_tiles = _BASE_MAX_TILES
+    raw_targets: list[dict[str, Any]] = []
+    stage_two_goal = 0
+    candidates: list[HunterCandidate] = []
+    inspected: dict[int, dict[str, Any]] = {}
+    known_variables: set[int] = set()
+    checked_for_variable: set[int] = set()
+
+    for attempt in range(_MAX_DISCOVERY_EXPANSIONS + 1):
+        tile_log: dict[str, Any] = {}
+        raw_targets = scanner.select_targets(
+            pool_size,
+            tmag_range=current_range,
+            exclude_tic_ids=excluded_tics,
+            full_sweep=True,
+            max_workers=workers,
+            max_tiles=current_max_tiles,
+            search_log=tile_log,
+        )
+        search_log = tile_log
+
+        stage_two_goal = min(len(raw_targets), max(targets * 3, targets))
+        candidate_rows = raw_targets[:stage_two_goal]
+        newly_seen_ids = [
+            int(row["tic_id"])
+            for row in candidate_rows
+            if int(row["tic_id"]) not in checked_for_variable
+        ]
+        if newly_seen_ids:
+            known_variables.update(
+                scanner._load_asassn_variable_tic_ids(newly_seen_ids, strict=True)
+            )
+            checked_for_variable.update(newly_seen_ids)
+
+        inspect_rows = [
+            row
+            for row in candidate_rows
+            if int(row["tic_id"]) not in known_variables
+            and int(row["tic_id"]) not in inspected
+        ]
+        inspection_started = time.monotonic()
+        if progress_fn is not None:
+            progress_fn(
+                "EXO-Hunter metadata inspection: "
+                f"targets={len(inspect_rows)} workers={workers} ETA=pending"
+            )
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {
+                pool.submit(
+                    scanner.inspect_target_products,
+                    row,
+                    mission="TESS",
+                    pipeline="QLP",
+                    exptime="long",
+                ): row
+                for row in inspect_rows
+            }
+            for completed, future in enumerate(as_completed(futures), 1):
+                row = futures[future]
+                try:
+                    inspected[int(row["tic_id"])] = future.result()
+                except Exception as exc:  # noqa: BLE001
+                    inspected[int(row["tic_id"])] = {
+                        "inspection_error": f"{type(exc).__name__}: {exc}"
+                    }
+                if progress_fn is not None:
+                    elapsed = time.monotonic() - inspection_started
+                    rate = completed / elapsed if elapsed > 0 else 0.0
+                    remaining = (
+                        (len(inspect_rows) - completed) / rate if rate > 0 else float("inf")
+                    )
+                    progress_fn(
+                        f"  [{completed}/{len(inspect_rows)}] "
+                        f"elapsed={elapsed:.0f}s ETA={format_eta(remaining)}"
+                    )
+
+        candidates = _build_new_candidates(
+            raw_targets,
+            inspected=inspected,
+            known_variables=known_variables,
+            stage_two_goal=stage_two_goal,
+        )
+        eligible_count = sum(row.eligible for row in candidates)
+
+        expansion_attempts.append(
+            {
+                "attempt": attempt,
+                "tmag_range": list(current_range),
+                "max_tiles": current_max_tiles,
+                "raw_candidates_returned": len(raw_targets),
+                "eligible_candidates": eligible_count,
+            }
+        )
+        if eligible_count >= targets:
+            break
+
+        widened_range = (
+            max(current_range[0] - _DISCOVERY_EXPANSION_STEP, _TMAG_HARD_MIN),
+            min(current_range[1] + _DISCOVERY_EXPANSION_STEP, _TMAG_HARD_MAX),
+        )
+        widened_max_tiles = min(current_max_tiles + _TILE_EXPANSION_STEP, tile_hard_max)
+        no_room_to_widen = (
+            widened_range == current_range and widened_max_tiles == current_max_tiles
+        )
+        if no_room_to_widen or attempt == _MAX_DISCOVERY_EXPANSIONS:
+            break
+        if progress_fn is not None:
+            progress_fn(
+                f"EXO-Hunter discovery sweep returned {eligible_count} eligible candidates "
+                f"for {targets} requested; widening Tmag range "
+                f"{current_range[0]:.1f}-{current_range[1]:.1f} -> "
+                f"{widened_range[0]:.1f}-{widened_range[1]:.1f} and sky tiles "
+                f"{current_max_tiles} -> {widened_max_tiles} and retrying"
+            )
+        current_range = widened_range
+        current_max_tiles = widened_max_tiles
+
+    search_log["discovery_expansion_attempts"] = expansion_attempts
+    search_log["final_tmag_range"] = list(current_range)
+    search_log["final_max_tiles"] = current_max_tiles
     search_log.update(
         {
             "candidate_universe_requested": pool_size,

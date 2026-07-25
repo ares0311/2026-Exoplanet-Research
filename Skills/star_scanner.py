@@ -89,6 +89,28 @@ _DEFAULT_SEARCH_CENTERS: tuple[tuple[float, float], ...] = tuple(
 # select_targets()'s search_log output for the exact coverage of any given
 # run.
 
+_EXPANSION_SEARCH_CENTERS: tuple[tuple[float, float], ...] = tuple(
+    (float(ra), float(dec))
+    for dec in (-70, -50, -30, -10, 10, 30, 50, 70)
+    for ra in range(10, 360, 20)
+) + tuple(
+    (float(ra), float(dec)) for dec in (-80, 80) for ra in range(0, 360, 20)
+)
+# A second, disjoint ring of tiles for bounded discovery expansion: 8
+# declination bands interleaved half a step (10 deg) off the base grid in
+# both RA and Dec, filling in previously-unsampled sky between base tiles,
+# plus two polar bands (+-80 deg) the base grid never reaches at all. 8*18 +
+# 2*18 = 180 tiles (~142 sq deg additional coverage), used only when
+# select_targets()/_select_live_new_candidates() widen max_tiles past the
+# base grid's 126 -- see TOTAL_SEARCH_TILES.
+
+TOTAL_SEARCH_TILES = len(_DEFAULT_SEARCH_CENTERS) + len(_EXPANSION_SEARCH_CENTERS)
+
+
+def _search_centers(max_tiles: int) -> tuple[tuple[float, float], ...]:
+    """Return up to *max_tiles* tile centers: base grid first, then expansion."""
+    return (_DEFAULT_SEARCH_CENTERS + _EXPANSION_SEARCH_CENTERS)[:max_tiles]
+
 
 class _StartRateLimiter:
     """Space worker starts so live-service requests do not burst at once."""
@@ -685,12 +707,19 @@ def select_targets(
     (a fixed set of cone-search tiles), not an exhaustive survey of the sky
     — see ``search_log`` for the exact coverage achieved.
 
+    ``max_tiles`` beyond the base grid's 126 tiles draws from
+    ``_EXPANSION_SEARCH_CENTERS``, a disjoint second ring (interleaved
+    offset bands plus two polar bands) for bounded discovery-expansion
+    callers, up to ``TOTAL_SEARCH_TILES`` (306) tiles total.
+
     Args:
         n: Maximum number of targets to return.
         tmag_range: ``(min_tmag, max_tmag)`` magnitude range for the query.
         exclude_tic_ids: TIC IDs to omit from the results.
         query_radius_deg: Cone-search radius for each TIC tile.
-        max_tiles: Maximum number of sky tiles to query.
+        max_tiles: Maximum number of sky tiles to query (up to
+            ``TOTAL_SEARCH_TILES``; values beyond the base grid's 126 draw
+            from the expansion ring).
         retry_attempts: Attempts per tile before skipping it.
         retry_delay: Seconds to wait between retry attempts.
         full_sweep: If ``True``, query every tile up to *max_tiles* (in
@@ -728,7 +757,7 @@ def select_targets(
     raw_rows_matching_query = 0
     _search_start = time.monotonic()
 
-    tiles = list(enumerate(_DEFAULT_SEARCH_CENTERS[:max_tiles], 1))
+    tiles = list(enumerate(_search_centers(max_tiles), 1))
 
     def _process_tile_result(result: Any) -> None:
         nonlocal raw_rows_matching_query

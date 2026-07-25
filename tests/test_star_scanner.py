@@ -26,12 +26,16 @@ sys.modules.setdefault("astroquery.mast", _mock_astroquery_mast)
 
 from Skills.candidate_database import CandidateDatabase  # noqa: E402
 from Skills.star_scanner import (  # noqa: E402
+    _DEFAULT_SEARCH_CENTERS,
+    _EXPANSION_SEARCH_CENTERS,
+    TOTAL_SEARCH_TILES,
     PreparedLiveSearchBundle,
     ScanLog,
     _ledger_record_for_outcome,
     _load_asassn_variable_tic_ids,
     _load_prior_discovery_tic_ids,
     _load_toi_tic_ids,
+    _search_centers,
     _write_run_report,
     inspect_target_products,
     load_prepared_live_search_bundle,
@@ -467,6 +471,55 @@ class TestSelectTargets:
         mock_catalogs.query_region.return_value = self._catalog_rows()
         select_targets(n=2, max_tiles=1)
         assert mock_conf.timeout == 30
+
+    @patch("astroquery.mast.Catalogs")
+    def test_max_tiles_within_base_grid_never_uses_expansion_ring(
+        self, mock_catalogs: MagicMock
+    ) -> None:
+        mock_catalogs.query_region.return_value = self._catalog_rows()
+        log: dict[str, Any] = {}
+        select_targets(n=2, max_tiles=126, full_sweep=True, search_log=log)
+        assert log["tiles_configured"] == 126
+
+    @patch("astroquery.mast.Catalogs")
+    def test_max_tiles_beyond_base_grid_draws_from_expansion_ring(
+        self, mock_catalogs: MagicMock
+    ) -> None:
+        mock_catalogs.query_region.return_value = self._catalog_rows()
+        log: dict[str, Any] = {}
+        select_targets(n=2, max_tiles=200, full_sweep=True, search_log=log)
+        assert log["tiles_configured"] == 200
+        assert log["tiles_queried"] == 200
+
+    @patch("astroquery.mast.Catalogs")
+    def test_max_tiles_caps_at_total_available(self, mock_catalogs: MagicMock) -> None:
+        mock_catalogs.query_region.return_value = self._catalog_rows()
+        log: dict[str, Any] = {}
+        select_targets(n=2, max_tiles=10_000, full_sweep=True, search_log=log)
+        assert log["tiles_configured"] == TOTAL_SEARCH_TILES
+
+
+class TestSearchCenters:
+    def test_base_and_expansion_rings_are_disjoint(self) -> None:
+        assert not set(_DEFAULT_SEARCH_CENTERS) & set(_EXPANSION_SEARCH_CENTERS)
+
+    def test_total_search_tiles_matches_combined_ring_lengths(self) -> None:
+        assert len(_DEFAULT_SEARCH_CENTERS) + len(
+            _EXPANSION_SEARCH_CENTERS
+        ) == TOTAL_SEARCH_TILES
+
+    def test_search_centers_within_base_grid_unchanged(self) -> None:
+        assert _search_centers(126) == _DEFAULT_SEARCH_CENTERS
+
+    def test_search_centers_beyond_base_grid_appends_expansion_ring(self) -> None:
+        combined = _search_centers(TOTAL_SEARCH_TILES)
+        assert combined[:126] == _DEFAULT_SEARCH_CENTERS
+        assert combined[126:] == _EXPANSION_SEARCH_CENTERS
+
+    def test_search_centers_caps_at_total_available(self) -> None:
+        assert _search_centers(TOTAL_SEARCH_TILES + 500) == (
+            _DEFAULT_SEARCH_CENTERS + _EXPANSION_SEARCH_CENTERS
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -79,10 +79,21 @@ production database remained byte-identical throughout. Full new-mode
 create-through-execution on genuinely fresh targets is now demonstrated live,
 closing the directive's "New targets" required-validation scenario end to
 end. See `artifacts/manifests/hunter_live_acceptance_v10.json` (discovery/
-expansion) and `hunter_live_acceptance_v11.json` (execution/closure).)
+expansion) and `hunter_live_acceptance_v11.json` (execution/closure).) A
+post-acceptance audit then found `_select_live_new_candidates()` itself still
+had two real gaps: its sufficiency check fired on the raw sweep count before
+known-variable/QLP-availability filtering ran, so a sweep that cleared the
+raw threshold could still leave the eligible pool short of N with no further
+expansion; and only the Tmag window ever widened, while the 126-tile sky
+sweep stayed permanently fixed. Version 0.3.12 moves the sufficiency check to
+after stage-two eligibility and adds a second, disjoint 180-tile expansion
+ring (`TOTAL_SEARCH_TILES = 306`) that `max_tiles` now widens alongside Tmag,
+both bounded and logged per attempt. Verified offline with scanner doubles
+exercising both fixes; no live 126+-tile MAST sweep was run from this
+session. See `docs/HUNTER_PRODUCTION_WORKFLOW.md`.
 Scope decision: T2-2 and T2-3 are permanently out of scope — see DECISION-013
 Branch: `main` (90 production-critical Skills; non-production fluff removed)
-Test baseline: 3,081 default tests passing; 2 `integration_live` tests excluded by
+Test baseline: 3,091 default tests passing; 2 `integration_live` tests excluded by
 the configured marker expression (2026-07-24; 6×6 gate: 10/10 gates
 including two verifiable-agent-reliability checks — see
 `docs/RELIABILITY_CONTROLS.md`)
@@ -107,7 +118,7 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.3.11 is the current development version. Version 0.3.2 added the durable,
+Version note: 0.3.12 is the current development version. Version 0.3.2 added the durable,
 non-AI-dependent Hunter workflow and exact `Create-New-Search`,
 `Run-New-Search`, and `Show-Follow-Ups` entry points. Candidate catalog,
 immutable manifest, run attempts, append-only target history, and follow-up
