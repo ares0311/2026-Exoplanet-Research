@@ -20,6 +20,7 @@ from Skills.fetch_kepler_lc_snippets import (
     _write_run_report,
     build_kepler_snippet,
     build_kepler_snippets,
+    fetch_koi_table,
 )
 
 # ---------------------------------------------------------------------------
@@ -81,6 +82,53 @@ class TestNormalise:
         values = [1.0, 2.0, 3.0, 4.0, 5.0]
         med = _median(values)
         assert abs(_mad(values, med) - 1.0) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# fetch_koi_table
+# ---------------------------------------------------------------------------
+
+
+class TestFetchKoiTable:
+    def test_bare_list_response_returns_rows(self):
+        rows = [{"kepid": 1}, {"kepid": 2}]
+        result = fetch_koi_table(query_fn=lambda url: rows)
+        assert result == rows
+
+    def test_empty_list_response_returns_empty(self):
+        result = fetch_koi_table(query_fn=lambda url: [])
+        assert result == []
+
+    def test_dict_response_raises_instead_of_silently_returning_empty(self):
+        # Regression: an error/wrapper-shaped response (e.g. {"error": "..."})
+        # must not be silently treated as "zero KOIs currently match this
+        # query" via response.get("data", []).
+        with pytest.raises(RuntimeError, match="Unexpected KOI table response"):
+            fetch_koi_table(query_fn=lambda url: {"error": "query timed out"})
+
+    def test_dict_with_data_key_still_raises(self):
+        # Even a plausible-looking {"data": [...]} wrapper is not this TAP
+        # endpoint's real response shape (confirmed by the identical query
+        # in fetch_tess_kepler_overlap_snippets.py, which iterates the raw
+        # response directly) -- it must still fail closed, not be quietly
+        # unwrapped.
+        with pytest.raises(RuntimeError, match="Unexpected KOI table response"):
+            fetch_koi_table(query_fn=lambda url: {"data": [{"kepid": 1}]})
+
+    def test_non_list_non_dict_response_raises(self):
+        with pytest.raises(RuntimeError, match="Unexpected KOI table response"):
+            fetch_koi_table(query_fn=lambda url: "not-a-list")
+
+    def test_query_fn_receives_url(self):
+        received: list[str] = []
+
+        def capture(url: str):
+            received.append(url)
+            return []
+
+        fetch_koi_table(max_rows=42, query_fn=capture)
+        assert len(received) == 1
+        assert "TOP+42" in received[0]
 
 
 # ---------------------------------------------------------------------------

@@ -1105,6 +1105,31 @@ The version 0.3.28 release gate passed 3,161 default tests plus Ruff/mypy
 as 10/10 supervised gates in 36.2 seconds under the canonical 6x6
 topology.
 
+Version 0.3.29 starts the T2 backlog: `Skills/fetch_kepler_lc_snippets.py`'s
+`fetch_koi_table()` parsed the NASA Exoplanet Archive TAP response as
+`data if isinstance(data, list) else data.get("data", [])` -- an error or
+schema-drifted response shape (anything other than a bare JSON list) fell
+through to the empty-list branch and was indistinguishable from
+"zero KOIs currently match this query," so the CLI would report a clean
+`Flag: OK  snippets_written=0` on a real failure. The identical query in
+`fetch_tess_kepler_overlap_snippets.py` iterates the parsed response
+directly with no dict-wrapping fallback at all, confirming this TAP
+endpoint's real successful responses are always a bare list and the
+`.get("data", [])` branch was defending against a shape that never
+legitimately occurs. `fetch_koi_table()` now takes an injectable
+`query_fn` (matching this project's established fetch_fn/query_fn
+convention, e.g. `fetch_kepler_tce.py`) and raises `RuntimeError` naming
+the unexpected type for any non-list response instead of silently
+returning `[]`; the existing `_cli()` try/except around the call already
+converts that into `status="failed"`/exit code 1 with no further changes
+needed. `fetch_koi_table()` also had zero dedicated test coverage before
+this fix (it was only ever monkeypatched wholesale in CLI-level tests) --
+6 new tests cover the bare-list, empty-list, dict-error, dict-with-"data"-
+key, non-list/non-dict, and query_fn-receives-url cases.
+The version 0.3.29 release gate passed 3,167 default tests plus Ruff/mypy
+as 10/10 supervised gates in 29.1 seconds under the canonical 6x6
+topology.
+
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
