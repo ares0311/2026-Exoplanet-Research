@@ -145,6 +145,52 @@ baseline, and a row already holding a non-empty prior baseline only flips
 on sectors beyond that baseline, not the ones already known. No live MAST
 query was run from this session.
 
+**Version 0.3.15** adds an explicit `--history-source-root` override for
+`Create-New-Search --history-manifest`, `HunterStore.validity_summary()`,
+`validate_hunter_database()`, and `Skills/validate_hunter_acceptance.py`'s
+`--history-source-root`. Root cause: `load_verified_history_manifest()`
+(`hunter_history.py`) already accepted a `source_root` parameter, but every
+caller above it left it unset, so a manifest's `source_path` entries always
+resolved through `_repository_root_for()` -- a heuristic that walks up from
+the manifest's location looking for the nearest ancestor containing
+`pyproject.toml`+`src/` and uses that as the root. This is correct for the
+default in-repo manifest (the walk-up finds this repo's own root) and for a
+manifest under a plain OS temp directory (no such ancestor exists, so it
+falls back to the manifest's own directory), but it silently resolves to the
+**wrong** root for a manifest that happens to sit inside some *other*
+checked-out repo's subtree -- exactly the "isolated or scripted operation"
+case `--history-manifest` is documented to support. A prior audit session
+first surfaced this as an apparent regression (a dedicated regression test,
+`tests/test_hunter_cli.py::test_default_follow_up_imports_and_ranks_durable_history`,
+failed deterministically on a clean 0.3.14 tree) but deeper investigation
+found the failure was specific to that interactive sandbox: pytest's
+`tmp_path` fixture normally resolves under a plain OS temp directory (no
+`pyproject.toml` ancestor, heuristic falls back correctly), but in that
+sandbox `tempfile.gettempdir()` could not use the real system temp directory
+and fell back to the process's CWD -- which was this repo's own root -- so
+pytest's tmp dirs landed *inside* this repo and the walk-up escaped test
+isolation to find this repo's `pyproject.toml`+`src/` instead of the
+intended tmp directory. That means the "tests passing" claims recorded for
+versions up to 0.3.14 were very likely accurate in real CI; the underlying
+design fragility they exposed was real, but it was latent, not a shipped
+regression. **Lesson for future agents:** before treating a locally
+reproduced test failure as proof of a shipped regression, check whether the
+failure depends on filesystem ancestry relative to the *sandbox's* temp/cwd
+behavior specifically -- rerun with an explicit, hermetic root rather than
+trusting an implicit heuristic's default, and say so explicitly if the two
+diverge; do not silently launder a sandbox artifact into a false regression
+claim, and do not silently launder a real fragility into "not a bug" either.
+The fix keeps the existing heuristic as the *default* (`--history-source-root`
+omitted, `history_source_root=None` throughout) so the default manifest path
+is unchanged, and adds the explicit override so isolated/scripted callers
+never have to depend on the heuristic at all. `test_default_follow_up_imports_and_ranks_durable_history`
+now passes `--history-source-root` explicitly (hermetic, no longer
+environment-dependent), and a new regression test,
+`test_history_source_root_overrides_repo_root_walk_up_heuristic`, builds a
+decoy nested repo (its own `pyproject.toml`+`src/`) around a manifest and
+proves the walk-up resolves to the wrong root and fails closed without the
+override, then succeeds with it.
+
 An earlier audit found that consumed actionable follow-ups remained open and
 could be scheduled repeatedly. Version 0.3.5 adds durable scheduling/disposition events
 and parent-child recommendation relationships. Version 0.3.6 makes
@@ -195,7 +241,9 @@ git pull --ff-only origin main
 The default source is
 `data_selection/hunter_prior_search_history_v1.json`; it is imported
 automatically and idempotently. `--history-manifest` may point to another
-schema-v1 provenance-complete manifest for isolated or scripted operation.
+schema-v1 provenance-complete manifest for isolated or scripted operation --
+**pass `--history-source-root` alongside it** (see version 0.3.15 below); do
+not rely on the repo-root walk-up heuristic to guess the right directory.
 The candidate-pool count includes every evaluated prior target, including
 ineligible rows, so any shortfall (selected < requested) is an auditable,
 reported fact rather than an inferred one. `Create-New-Search` returns the

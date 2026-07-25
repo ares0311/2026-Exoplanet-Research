@@ -198,6 +198,7 @@ def test_committed_acceptance_snapshot_matches_structured_evidence() -> None:
     evidence = _validate(
         snapshot,
         Path("data_selection/hunter_prior_search_history_v1.json"),
+        None,
     )
     assert evidence["ok"] is True
     assert evidence["issues"] == []

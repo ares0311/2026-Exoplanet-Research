@@ -813,6 +813,34 @@ lifecycle. See `docs/HUNTER_PRODUCTION_WORKFLOW.md`.
 The version 0.3.14 release gate passed 3,131 default tests plus Ruff/mypy as
 10/10 supervised gates in 29.2 seconds under the canonical 6x6 topology.
 
+Version 0.3.15 fixes a real latent gap a business-objective audit found in
+`load_verified_history_manifest()`'s already-existing `source_root`
+parameter: every caller above it (`Create-New-Search --history-manifest`,
+`HunterStore.validity_summary()`, `validate_hunter_database()`,
+`Skills/validate_hunter_acceptance.py`) left it unset, so source-path
+resolution always fell through to `_repository_root_for()`'s repo-root
+walk-up heuristic, which silently resolves to the wrong root for an
+"isolated or scripted operation" manifest (the exact scenario
+`--history-manifest` is documented to support) that happens to sit inside
+some other checked-out repo's subtree. All four call sites now accept an
+explicit `history_source_root`/`--history-source-root` override; the
+default manifest path is unchanged (heuristic remains the default when the
+new parameter is omitted). The audit that found this initially treated a
+locally reproduced test failure as a shipped 0.3.14 regression, then found
+on deeper investigation that the failure was specific to that interactive
+sandbox (pytest's `tmp_path` landed inside this repo's own tree because
+`tempfile.gettempdir()` could not use the real system temp directory there,
+so the walk-up escaped test isolation) rather than a defect present in real
+CI; see `docs/HUNTER_PRODUCTION_WORKFLOW.md`'s 0.3.15 entry for the full
+correction and the lesson recorded for future agents about distinguishing
+sandbox artifacts from shipped regressions. `test_default_follow_up_imports_and_ranks_durable_history`
+now passes `--history-source-root` explicitly (hermetic); a new test,
+`test_history_source_root_overrides_repo_root_walk_up_heuristic`, proves the
+walk-up resolves to the wrong root inside a decoy nested repo and fails
+closed without the override, then succeeds with it.
+The version 0.3.15 release gate passed 3,132 default tests plus Ruff/mypy as
+10/10 supervised gates in 29.1 seconds under the canonical 6x6 topology.
+
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.

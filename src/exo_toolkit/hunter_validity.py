@@ -188,12 +188,13 @@ def _validate_score(
 def _history_sources(
     history_manifest: Path | None,
     *,
+    source_root: Path | None,
     issues: list[str],
 ) -> dict[str, dict[str, Any]]:
     if history_manifest is None:
         return {}
     try:
-        payload = load_verified_history_manifest(history_manifest)
+        payload = load_verified_history_manifest(history_manifest, source_root=source_root)
     except Exception as exc:  # noqa: BLE001
         issues.append(f"history manifest source verification failed: {type(exc).__name__}: {exc}")
         return {}
@@ -205,8 +206,19 @@ def validate_hunter_database(
     *,
     schema_version: int,
     history_manifest: Path | None = None,
+    history_source_root: Path | None = None,
 ) -> dict[str, Any]:
-    """Recompute relational, content, provenance, and immutability evidence."""
+    """Recompute relational, content, provenance, and immutability evidence.
+
+    ``history_source_root``, when given, resolves every ``source_path`` in
+    ``history_manifest`` relative to that exact directory instead of the
+    repo-root-walk-up heuristic in
+    ``hunter_history._repository_root_for()`` (which finds the nearest
+    ancestor containing ``pyproject.toml``+``src/`` and can resolve to the
+    wrong root for an external manifest that happens to sit inside some
+    other repo's subtree). Pass it explicitly for isolated/scripted
+    manifests; leave it ``None`` for the default in-repo manifest.
+    """
     path = Path(db_path)
     issues: list[str] = []
     if not path.is_file():
@@ -256,7 +268,9 @@ def validate_hunter_database(
         if missing_triggers:
             issues.append(f"missing immutable-history triggers: {missing_triggers}")
 
-        sources = _history_sources(history_manifest, issues=issues)
+        sources = _history_sources(
+            history_manifest, source_root=history_source_root, issues=issues
+        )
         manifest_count = 0
         snapshot_count = 0
         manifest_hashes_verified = 0

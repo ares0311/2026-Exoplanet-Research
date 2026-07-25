@@ -1926,8 +1926,19 @@ class HunterStore:
         """Backward-compatible alias for the comprehensive validity verifier."""
         return self.validity_summary()
 
-    def validity_summary(self, *, history_manifest: Path | None = None) -> dict[str, Any]:
-        """Recompute the complete Hunter validity and provenance contract."""
+    def validity_summary(
+        self,
+        *,
+        history_manifest: Path | None = None,
+        history_source_root: Path | None = None,
+    ) -> dict[str, Any]:
+        """Recompute the complete Hunter validity and provenance contract.
+
+        ``history_source_root`` is forwarded to ``validate_hunter_database()``
+        for isolated/scripted manifests whose ``source_path`` entries must be
+        resolved relative to an explicit directory rather than the repo-root
+        walk-up heuristic. Leave it ``None`` for the default in-repo manifest.
+        """
         from exo_toolkit.hunter_validity import validate_hunter_database
 
         resolved_manifest = history_manifest
@@ -1942,4 +1953,5 @@ class HunterStore:
             self.db_path,
             schema_version=HUNTER_SCHEMA_VERSION,
             history_manifest=resolved_manifest,
+            history_source_root=history_source_root,
         )

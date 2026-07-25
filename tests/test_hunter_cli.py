@@ -547,6 +547,8 @@ def test_default_follow_up_imports_and_ranks_durable_history(
             str(db),
             "--history-manifest",
             str(history),
+            "--history-source-root",
+            str(tmp_path),
             "--json",
         ]
     ) == 0
@@ -559,6 +561,102 @@ def test_default_follow_up_imports_and_ranks_durable_history(
     assert search["selector_version"] == FOLLOW_UP_SELECTOR_VERSION
     assert search["config"]["selection_contract"] == selection_contract("follow-up")
     assert search["targets"][0]["target_id"] == "TIC 42"
+
+
+def test_history_source_root_overrides_repo_root_walk_up_heuristic(
+    tmp_path: Path, capsys: object
+) -> None:
+    """A manifest nested inside an unrelated repo must not silently resolve
+    sources against that repo's root: without --history-source-root the
+    walk-up heuristic finds the decoy repo and fails closed; with it, the
+    exact intended directory is used instead."""
+    decoy_repo = tmp_path / "decoy_repo"
+    manifest_dir = decoy_repo / "subdir"
+    manifest_dir.mkdir(parents=True)
+    (decoy_repo / "pyproject.toml").write_text("[project]\nname='decoy'\n", encoding="utf-8")
+    (decoy_repo / "src").mkdir()
+
+    db = tmp_path / "hunter.sqlite3"
+    history = manifest_dir / "history.json"
+    source = manifest_dir / "logs" / "prior.json"
+    source.parent.mkdir(parents=True)
+    source.write_text("prior search evidence", encoding="utf-8")
+    source_sha256 = __import__("hashlib").sha256(source.read_bytes()).hexdigest()
+    history.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "sources": [
+                    {
+                        "search_id": "historical-new-search",
+                        "mode": "new",
+                        "started_at": "2025-01-01T00:00:00+00:00",
+                        "completed_at": "2025-01-01T01:00:00+00:00",
+                        "searched_by": "EXO-Hunter",
+                        "source_project": "legacy project",
+                        "method_or_data": "TESS QLP",
+                        "source_path": "logs/prior.json",
+                        "source_sha256": source_sha256,
+                        "provenance_uri": "artifact:prior-new",
+                        "entries": [
+                            {
+                                "target_id": "TIC 42",
+                                "status": "candidate_found",
+                                "searched_at": "2025-01-01T00:30:00+00:00",
+                                "ranking_score": 0.9,
+                                "metrics": {"best_fpp": 0.1},
+                                "result": {"interpretation": "promising"},
+                                "best_fpp": 0.1,
+                                "best_detection_confidence": 0.8,
+                                "best_pathway": "planet_hunters_discussion",
+                                "error_message": None,
+                            }
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    # Without an explicit source root, the walk-up heuristic finds
+    # decoy_repo (pyproject.toml + src/) instead of manifest_dir and fails
+    # closed rather than silently using the wrong root.
+    without_override = create_new_search(
+        [
+            "--targets",
+            "1",
+            "--mode",
+            "follow-up",
+            "--db",
+            str(db),
+            "--history-manifest",
+            str(history),
+            "--json",
+        ]
+    )
+    assert without_override != 0
+    capsys.readouterr()  # type: ignore[attr-defined]
+
+    # With the explicit override, resolution uses manifest_dir directly.
+    with_override = create_new_search(
+        [
+            "--targets",
+            "1",
+            "--mode",
+            "follow-up",
+            "--db",
+            str(db),
+            "--history-manifest",
+            str(history),
+            "--history-source-root",
+            str(manifest_dir),
+            "--json",
+        ]
+    )
+    assert with_override == 0
+    output = json.loads(capsys.readouterr().out)  # type: ignore[attr-defined]
+    assert output["candidate_pool_count"] == 1
 
 
 def test_follow_up_table_shows_external_prior_search_provenance(
