@@ -114,7 +114,7 @@
     "ruff": "passed",
     "mypy": "passed",
     "full_quality_gates": "10/10 passed on final content; 3187 tests across six shards; logs/quality_gates/20260726T011147Z/quality_gate_summary.json",
-    "github_ci": "pending PR"
+    "github_ci": "PR #319 head 920b90c passed push run 30182573928 and PR run 30182592665"
   },
   "limitations": [
     "The Techno-Hunter sibling has not yet published its advertised normalized export file; the direct flag uses a strict read-only prod_scan_history_v1 adapter and the default remains a complete source-hash-verifiable copied identity export.",

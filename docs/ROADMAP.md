@@ -15,8 +15,8 @@ by itself satisfy a master-guide evidence requirement.
   sufficiency, no operator candidate bypass, atomic pre-write validation,
   explicit decision validity, durable cross-project identity history,
   reconciled contracts, and current end-to-end/quality/CI evidence. No human
-  blocker is open. All implementation, live business-acceptance, and local
-  quality gates pass; PR CI, merge, and merged-main synchronization remain.
+  blocker is open. All implementation, live business-acceptance, local quality,
+  and PR CI gates pass; squash merge and merged-main synchronization remain.
   The historical narrative below remains evidence of prior increments, not
   authority for the current completion claim.
 

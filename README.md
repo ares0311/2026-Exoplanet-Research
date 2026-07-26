@@ -21,7 +21,7 @@ Version 0.4.0 is the current release candidate represented by this branch.
 
 | Area | Status | Current evidence |
 |---|---|---|
-| EXO-Hunter lifecycle | **Locally accepted; release verification pending** | Version 0.4.0 removes the operator-candidate bypass, replaces the 126/306-tile sample with catalog-wide paged discovery and a top-N score-bound proof, adds decision-validity states and durable cross-project identity history, and passes the v12 live acceptance plus all 10 local gates (3,187 tests). PR CI and merged-main synchronization remain before PROD acceptance (see `docs/HUNTER_PRODUCTION_WORKFLOW.md`) |
+| EXO-Hunter lifecycle | **CI accepted; merge verification pending** | Version 0.4.0 removes the operator-candidate bypass, replaces the 126/306-tile sample with catalog-wide paged discovery and a top-N score-bound proof, adds decision-validity states and durable cross-project identity history, and passes the v12 live acceptance, all 10 local gates (3,187 tests), and both PR #319 CI runs. Squash merge and merged-main synchronization remain before PROD acceptance (see `docs/HUNTER_PRODUCTION_WORKFLOW.md`) |
 | Bayesian scorer | **Production ready** | Default non-ML scorer; no model artifact required |
 | XGBoost scorer | **Production ready** | Trained on 7,586 Kepler KOIs; held-out AUC 0.992 |
 | XGBoost + Bayesian ensemble | **Production ready** | Conservative fallback when no CNN is supplied |

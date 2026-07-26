@@ -17,9 +17,10 @@ contract/validity validation, the five-state decision-validity vocabulary,
 schema-v6 immutable cross-project history, and a source-hash-verifiable
 Techno-Hunter copied export with a live sibling-resolved option. The v12 live
 acceptance workflows pass, including the real sibling raw-history adapter, and
-the exact final content passes all 10 local gates with 3,187 tests. Status
-remains **LOCALLY VERIFIED BUT NOT YET RELEASE-VERIFIED** until the committed
-state passes PR CI and merged-main synchronization.
+the exact final content passes all 10 local gates with 3,187 tests. Both
+GitHub Actions runs for PR #319 head `920b90c` pass. Status remains
+**CI-VERIFIED BUT NOT YET MERGED-MAIN VERIFIED** until squash merge and local
+main synchronization.
 
 Every older Hunter PROD/acceptance statement below is retained as historical
 evidence and is superseded for the current product state by this override.
