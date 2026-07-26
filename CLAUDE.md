@@ -1194,6 +1194,32 @@ The version 0.3.31 release gate passed 3,178 default tests plus Ruff/mypy
 as 10/10 supervised gates in 30.1 seconds under the canonical 6x6
 topology.
 
+Version 0.3.32 fixes the T2 backlog's "dormant cwd-fallback" item:
+`src/exo_toolkit/hunter_history.py`'s dict-manifest branch (used when an
+in-memory manifest dict is passed instead of a file path -- the shape
+`build_manual_scan_source()`'s bridge output takes) fell back to a bare
+`Path.cwd()` with no attempt to locate the real repo root whenever
+`source_root` was omitted, unlike the file-manifest branch, which already
+got a smart walk-up heuristic (`_repository_root_for()`) in the 0.3.15
+fix. Dormant against every current caller -- both `star_scanner.py` and
+`batch_scan.py`'s Hunter bridges already pass `source_root` explicitly --
+but the same latent trap already demonstrated as exploitable for the
+file-manifest case (a manifest resolved from inside an unrelated nested
+repo silently uses that repo's root instead of the intended directory).
+`_repository_root_for()` is refactored into a shared
+`_walk_up_for_repo_root(start_dir)` helper (byte-for-byte equivalent
+behavior for the existing file-manifest call site, verified by the full
+existing Hunter test suite passing unchanged) that both
+`resolve_history_source_path()` and `load_verified_history_manifest()`'s
+dict branches now call against `Path.cwd()` instead of trusting it
+blindly. 4 new tests: the walk-up finds a decoy repo's root from a
+subdirectory instead of using bare cwd (for both `resolve_history_source_path()`
+and `load_verified_history_manifest()`), an explicit `source_root` still
+overrides the walk-up, and a plain non-repo cwd still fails closed.
+The version 0.3.32 release gate passed 3,182 default tests plus Ruff/mypy
+as 10/10 supervised gates in 30.1 seconds under the canonical 6x6
+topology.
+
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.
