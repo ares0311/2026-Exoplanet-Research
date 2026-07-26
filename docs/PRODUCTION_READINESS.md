@@ -1,8 +1,8 @@
 # PRODUCTION READINESS
 
-## 2026-07-25 Hunter closure override
+## 2026-07-25 Hunter PROD closure
 
-Version 0.4.0 is the current development version. An adversarial audit
+Version 0.4.0 is the current production version. An adversarial audit
 superseded the earlier Hunter PROD claim: the 126/306-tile discovery grid was
 an unjustifiably narrow sample, `--candidate-file` bypassed canonical
 optimization, validation could reject only after persisting a search, decision
@@ -17,10 +17,10 @@ contract/validity validation, the five-state decision-validity vocabulary,
 schema-v6 immutable cross-project history, and a source-hash-verifiable
 Techno-Hunter copied export with a live sibling-resolved option. The v12 live
 acceptance workflows pass, including the real sibling raw-history adapter, and
-the exact final content passes all 10 local gates with 3,187 tests. Both
-GitHub Actions runs for PR #319 head `920b90c` pass. Status remains
-**CI-VERIFIED BUT NOT YET MERGED-MAIN VERIFIED** until squash merge and local
-main synchronization.
+the exact final content passes all 10 local gates with 3,187 tests. Both final
+GitHub Actions runs for PR #319 pass, the PR squash-merged as `4a575c7`, and a
+clean synchronized merged-main checkout passed all 10 gates again. Status is
+**PROD ACCEPTED**.
 
 Every older Hunter PROD/acceptance statement below is retained as historical
 evidence and is superseded for the current product state by this override.

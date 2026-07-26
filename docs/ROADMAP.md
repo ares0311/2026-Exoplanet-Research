@@ -8,7 +8,7 @@ by itself satisfy a master-guide evidence requirement.
 
 ## Current Master-Guide Alignment — Production Priority Order
 
-- **Hunter production lifecycle (0.4.0 release verification pending):**
+- **Hunter production lifecycle (0.4.0 PROD accepted):**
   The 2026-07-25 adversarial audit supersedes the older PROD label. The active
   closure plan is the seven-gate plan at the top of
   `docs/HUNTER_PRODUCTION_WORKFLOW.md`: broad catalog paging with top-N
@@ -16,8 +16,9 @@ by itself satisfy a master-guide evidence requirement.
   explicit decision validity, durable cross-project identity history,
   reconciled contracts, and current end-to-end/quality/CI evidence. No human
   blocker is open. All implementation, live business-acceptance, local quality,
-  and PR CI gates pass; squash merge and merged-main synchronization remain.
-  The historical narrative below remains evidence of prior increments, not
+  PR CI, squash-merge, and merged-main synchronization gates pass. The current
+  acceptance is `artifacts/manifests/hunter_live_acceptance_v12.json`; the
+  historical narrative below remains evidence of prior increments, not
   authority for the current completion claim.
 
 - **Historical Hunter production lifecycle increments:**
