@@ -301,11 +301,11 @@ git pull --ff-only origin main
 
 New mode automatically imports the committed Techno-Hunter identity export and
 source-verifies it when the sibling checkout is present. Use
-`--cross-project-sibling technosignatures` to require the sibling's live export,
+`--cross-project-sibling technosignatures` to prefer the sibling's normalized
+export and otherwise use its strict read-only `prod_scan_history_v1` adapter,
 or `--cross-project-history-path <file>` for a copied export on a differently
-laid-out machine. The former fails loudly while the sibling has not published
-its advertised file; the latter is explicitly `stale-but-usable` when its
-origin source bytes cannot be re-read.
+laid-out machine. The latter is explicitly `stale-but-usable` when its origin
+source bytes cannot be re-read.
 
 Create a follow-up search from the complete durable prior-search universe:
 
@@ -377,10 +377,11 @@ whether or not it flips, and appends a `follow_up_events` audit row either
 way.
 
 All commands support `--json` for scripts and `--no-color` for predictable
-plain output. A candidate file may be supplied to `Create-New-Search` as JSON
-or CSV. Follow-up rows must carry who searched, when, source project, method or
-data, result, and a provenance URI; missing provenance fails before a search is
-created.
+plain output. Operator-ranked candidate files are not a production input:
+`Create-New-Search` always uses canonical new-mode discovery or durable
+follow-up history. Follow-up rows must carry who searched, when, source
+project, method or data, result, and a provenance URI; missing provenance fails
+before a search is created.
 
 ## Durable entities
 

@@ -401,3 +401,15 @@ def test_v12_acceptance_matches_current_prod_closure_contracts() -> None:
     ]
     assert acceptance["validity_and_atomicity"]["candidate_file_cli_present"] is False
     assert acceptance["cross_project_history"]["source_hashes_verified_live"] == 1
+
+
+def test_hunter_operator_docs_do_not_advertise_retired_bypasses() -> None:
+    readme = Path("README.md").read_text(encoding="utf-8")
+    workflow = Path("docs/HUNTER_PRODUCTION_WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "can also consume a provenance-complete JSON or CSV candidate" not in readme
+    assert "A candidate file may be supplied to `Create-New-Search`" not in workflow
+    assert "does not accept operator-ranked candidate files" in readme
+    assert "strict read-only `prod_scan_history_v1` adapter" in workflow

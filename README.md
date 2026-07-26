@@ -219,8 +219,9 @@ run, history event, and stable follow-up row in one durable contract. Repeating
 the same import is idempotent. Source drift fails before database mutation.
 
 All four Hunter commands support `--json` and `--no-color` for automation.
-`Create-New-Search` can also consume a provenance-complete JSON or CSV candidate
-file. See the full operator contract in
+`Create-New-Search` does not accept operator-ranked candidate files; new and
+follow-up modes always use the canonical discovery/history optimizer. See the
+full operator contract in
 [`docs/HUNTER_PRODUCTION_WORKFLOW.md`](docs/HUNTER_PRODUCTION_WORKFLOW.md).
 
 ## Durable state and provenance
