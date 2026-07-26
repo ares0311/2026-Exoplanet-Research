@@ -45,6 +45,11 @@ format_summary(obs_list) -> str
 The CLI entry point writes a structured completion record via
 ``Skills/run_report.py`` after each run (AGENTS.md Run Report Policy,
 Rule 7), on both success and query-failure outcomes.
+
+``_default_search()`` raises ``RuntimeError`` if the MAST observations
+table is missing an expected column, instead of silently reading a
+missing/renamed column as 0/empty via astropy's ``Row.get(key, default)``
+(which never raises for an absent column).
 """
 from __future__ import annotations
 
@@ -95,6 +100,25 @@ _INSTRUMENTS_TIMESERIES = [
     "NIRSPEC/BOTS",      # NIRSpec Bright Object Time Series
 ]
 
+# astropy Table Row.get(key, default) silently returns the default for a
+# column that doesn't exist at all (no exception) -- a renamed/dropped
+# "t_exptime" column previously made every row read as exptime=0, which
+# min_exptime then silently filtered out, indistinguishable from "zero
+# time-series observations currently exist." Columns are checked once
+# against the table's real schema before any row is read.
+_REQUIRED_JWST_OBS_COLUMNS = (
+    "obsid",
+    "target_name",
+    "s_ra",
+    "s_dec",
+    "instrument_name",
+    "proposal_id",
+    "t_min",
+    "t_max",
+    "t_exptime",
+    "filters",
+)
+
 
 def _default_search(instrument_name: str | None, min_exptime: float) -> list[dict[str, Any]]:
     """Query MAST for JWST time-series observations via astroquery."""
@@ -110,6 +134,12 @@ def _default_search(instrument_name: str | None, min_exptime: float) -> list[dic
     table = Observations.query_criteria(**constraints)
     if table is None or len(table) == 0:
         return []
+
+    missing_columns = sorted(c for c in _REQUIRED_JWST_OBS_COLUMNS if c not in table.colnames)
+    if missing_columns:
+        raise RuntimeError(
+            f"MAST observations response missing expected column(s): {missing_columns}"
+        )
 
     rows = []
     for row in table:

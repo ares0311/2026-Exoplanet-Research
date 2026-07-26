@@ -1130,6 +1130,41 @@ The version 0.3.29 release gate passed 3,167 default tests plus Ruff/mypy
 as 10/10 supervised gates in 29.1 seconds under the canonical 6x6
 topology.
 
+Version 0.3.30 fixes the T2 backlog's "schema-drift swallowing" item across
+two files. `Skills/fetch_jwst_targets.py`'s `_default_search()` read MAST
+observation-table columns via astropy's `Row.get(key, default)`, which
+returns the default for a column that doesn't exist at all -- no
+exception, unlike a plain dict. A renamed/dropped `t_exptime` column
+previously made every row read as `exptime=0`, which the `min_exptime`
+filter (default 1800s) then silently discarded, indistinguishable from
+"zero JWST time-series observations currently exist." It now checks the
+table's real `colnames` against a `_REQUIRED_JWST_OBS_COLUMNS` tuple
+before reading any row and raises `RuntimeError` naming the missing
+column(s); the existing `_cli()` try/except already converts that into a
+correctly-reported failure. `Skills/fetch_tess_k2_overlap_snippets.py`'s
+`fetch_k2_table()` had the same class of bug in CSV form: a per-row
+`KeyError` (the discovered/guessed column name absent from that row) was
+caught by the same `except (KeyError, TypeError, ValueError): continue`
+used for ordinary malformed values, so a fully schema-drifted response
+silently returned `[]`. Self-review of the first version of this fix
+(which counted `KeyError`s per row and raised only if every row hit one)
+found it could not say *which* column was actually missing in its error
+message, unlike the `fetch_jwst_targets.py` fix in the same PR --
+`fetch_k2_table()` now checks the CSV response's header (`reader.fieldnames`)
+against the discovered/guessed columns once, before reading any row, and
+names exactly the missing column(s); ordinary per-row malformed-value
+filtering (a bad float, an unrecognized disposition) is unaffected.
+Neither function had any dedicated test coverage before this fix. 2 new
+tests for `_default_search()` (raises on missing column via a real
+`astropy.table.Table` missing `t_exptime`; unaffected normal-row
+behavior) and 5 new tests for `fetch_k2_table()` (valid rows, empty body
+returns `[]` without raising, renamed column raises, the error names only
+the actually-missing column, malformed-vs-valid rows mixed together still
+skip only the malformed one).
+The version 0.3.30 release gate passed 3,174 default tests plus Ruff/mypy
+as 10/10 supervised gates in 31.3 seconds under the canonical 6x6
+topology.
+
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.

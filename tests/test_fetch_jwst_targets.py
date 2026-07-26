@@ -342,3 +342,55 @@ def test_cli_writes_run_report_on_query_failure(monkeypatch) -> None:
     assert code == 1
     assert captured["report"].status == "failed"
     assert "no network" in captured["report"].notes
+
+
+def test_default_search_raises_on_missing_column(monkeypatch):
+    # Regression: astropy Table Row.get(key, default) silently returns the
+    # default for a column that doesn't exist (no KeyError/AttributeError),
+    # so a renamed/dropped "t_exptime" column previously made every row's
+    # exptime read as 0, which the min_exptime filter then silently dropped
+    # -- indistinguishable from "zero JWST time-series observations exist."
+    from astropy.table import Table
+
+    fake_table = Table({
+        "obsid": ["1"],
+        "target_name": ["WASP-1"],
+        "s_ra": [10.0],
+        "s_dec": [20.0],
+        "instrument_name": ["NIRISS/SOSS"],
+        "proposal_id": ["123"],
+        "t_min": [100.0],
+        "t_max": [101.0],
+        "filters": ["CLEAR"],
+        # t_exptime intentionally omitted.
+    })
+    monkeypatch.setattr(
+        "astroquery.mast.Observations.query_criteria",
+        lambda **kwargs: fake_table,
+    )
+    with pytest.raises(RuntimeError, match="missing expected column"):
+        fetch_jwst_targets._default_search(None, 1800.0)
+
+
+def test_default_search_returns_rows_when_all_columns_present(monkeypatch):
+    from astropy.table import Table
+
+    fake_table = Table({
+        "obsid": ["1", "2"],
+        "target_name": ["WASP-1", "WASP-2"],
+        "s_ra": [10.0, 11.0],
+        "s_dec": [20.0, 21.0],
+        "instrument_name": ["NIRISS/SOSS", "NIRISS/SOSS"],
+        "proposal_id": ["123", "124"],
+        "t_min": [100.0, 200.0],
+        "t_max": [101.0, 201.0],
+        "t_exptime": [7200.0, 100.0],
+        "filters": ["CLEAR", "CLEAR"],
+    })
+    monkeypatch.setattr(
+        "astroquery.mast.Observations.query_criteria",
+        lambda **kwargs: fake_table,
+    )
+    rows = fetch_jwst_targets._default_search(None, 1800.0)
+    assert len(rows) == 1
+    assert rows[0]["obsid"] == "1"
