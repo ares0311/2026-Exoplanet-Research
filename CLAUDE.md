@@ -16,6 +16,17 @@ file assumes you already have.
 
 Current gap status (see `docs/PRODUCTION_READINESS.md` for the full,
 actively-maintained narrative — do not rely on any cached summary of it):
+**Hunter 0.4.0 closure validation is the active priority as of 2026-07-25.**
+An adversarial audit superseded every earlier Hunter PROD statement in this
+file until the seven gates at the top of `docs/HUNTER_PRODUCTION_WORKFLOW.md`
+are current and verified. The implementation replaces fixed sky-tile sampling
+with catalog-wide paged discovery plus a top-N score-bound proof, removes
+`--candidate-file`, adds pre-write decision-validity checks and schema-v6
+cross-project identity history. Its live v12 acceptance, all 10 local quality
+gates, and both PR #319 CI runs pass; it is not release-complete until squash
+merge and main sync finish. The older version narrative below is historical
+context, not current acceptance authority.
+
 **no Tier 1 gaps open as of 2026-07-12** (T1-0/T1-1/T1-2 all complete).
 Version 0.3.2 adds the Hunter product lifecycle above the accepted scientific
 pipeline: `src/exo_toolkit/search_lifecycle.py` is the append-only SQLite
@@ -1191,6 +1202,32 @@ file; `.gitignore` gains a `*.json.lock` pattern. 6 new tests (3 for
 concurrent-write cases, 1 threaded test for `CandidateTimeline`, plus 2
 existing tests adjusted for the new lock-file sidecar's presence).
 The version 0.3.31 release gate passed 3,178 default tests plus Ruff/mypy
+as 10/10 supervised gates in 30.1 seconds under the canonical 6x6
+topology.
+
+Version 0.3.32 fixes the T2 backlog's "dormant cwd-fallback" item:
+`src/exo_toolkit/hunter_history.py`'s dict-manifest branch (used when an
+in-memory manifest dict is passed instead of a file path -- the shape
+`build_manual_scan_source()`'s bridge output takes) fell back to a bare
+`Path.cwd()` with no attempt to locate the real repo root whenever
+`source_root` was omitted, unlike the file-manifest branch, which already
+got a smart walk-up heuristic (`_repository_root_for()`) in the 0.3.15
+fix. Dormant against every current caller -- both `star_scanner.py` and
+`batch_scan.py`'s Hunter bridges already pass `source_root` explicitly --
+but the same latent trap already demonstrated as exploitable for the
+file-manifest case (a manifest resolved from inside an unrelated nested
+repo silently uses that repo's root instead of the intended directory).
+`_repository_root_for()` is refactored into a shared
+`_walk_up_for_repo_root(start_dir)` helper (byte-for-byte equivalent
+behavior for the existing file-manifest call site, verified by the full
+existing Hunter test suite passing unchanged) that both
+`resolve_history_source_path()` and `load_verified_history_manifest()`'s
+dict branches now call against `Path.cwd()` instead of trusting it
+blindly. 4 new tests: the walk-up finds a decoy repo's root from a
+subdirectory instead of using bare cwd (for both `resolve_history_source_path()`
+and `load_verified_history_manifest()`), an explicit `source_root` still
+overrides the walk-up, and a plain non-repo cwd still fails closed.
+The version 0.3.32 release gate passed 3,182 default tests plus Ruff/mypy
 as 10/10 supervised gates in 30.1 seconds under the canonical 6x6
 topology.
 

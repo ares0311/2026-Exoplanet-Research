@@ -801,8 +801,8 @@ def test_integrity_reports_all_required_durable_concepts(tmp_path: Path) -> None
     assert summary["issues"] == []
     assert summary["sqlite_integrity"] == "ok"
     assert summary["foreign_key_violation_count"] == 0
-    assert summary["schema_version"] == 5
-    assert summary["immutable_trigger_count"] == 12
+    assert summary["schema_version"] == 6
+    assert summary["immutable_trigger_count"] == 14
     connection = sqlite3.connect(db_path)
     names = {
         row[0]

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import csv
 import hashlib
 import importlib
 import json
@@ -22,8 +21,15 @@ from rich.table import Table
 
 from exo_toolkit import __version__
 from exo_toolkit.cli import run_pipeline
+from exo_toolkit.hunter_cross_project import (
+    DEFAULT_COPIED_HISTORY,
+    build_sibling_history_manifest,
+    sibling_history_export_path,
+    sibling_project_root,
+)
 from exo_toolkit.hunter_models import (
     ArtifactIdentity,
+    DecisionValidity,
     ExecutionProvenance,
     FollowUpRecommendation,
     HunterCandidate,
@@ -37,7 +43,6 @@ from exo_toolkit.hunter_ranking import (
     FOLLOW_UP_SELECTOR_VERSION,
     NEW_RANKING_WEIGHTS,
     NEW_SELECTOR_VERSION,
-    OPERATOR_SELECTOR_VERSION,
     selection_contract,
 )
 from exo_toolkit.search_lifecycle import (
@@ -144,7 +149,6 @@ def _parser_create() -> argparse.ArgumentParser:
     parser.add_argument("--targets", type=int, required=True)
     parser.add_argument("--mode", choices=("new", "follow-up"), required=True)
     parser.add_argument("--db", type=Path, default=DEFAULT_HUNTER_DB)
-    parser.add_argument("--candidate-file", type=Path)
     parser.add_argument("--history-manifest", type=Path, default=DEFAULT_HISTORY_MANIFEST)
     parser.add_argument(
         "--history-source-root",
@@ -155,6 +159,25 @@ def _parser_create() -> argparse.ArgumentParser:
             "directory instead of the repo-root walk-up heuristic. Required for "
             "reliable isolated/scripted operation with a manifest that does not "
             "live under this repo's own tree."
+        ),
+    )
+    cross_project = parser.add_mutually_exclusive_group()
+    cross_project.add_argument(
+        "--cross-project-sibling",
+        choices=("technosignatures",),
+        help=(
+            "Read sibling Hunter history from paths computed relative to this "
+            "checkout, preferring its normalized export and otherwise using "
+            "the strict supported raw-history adapter."
+        ),
+    )
+    cross_project.add_argument(
+        "--cross-project-history-path",
+        type=Path,
+        help=(
+            "Use an operator-copied sibling history export when the sibling "
+            "checkout is not available; the manifest is retained as "
+            "stale-but-usable because origin source bytes cannot be re-read."
         ),
     )
     parser.add_argument("--pool-size", type=int)
@@ -276,30 +299,6 @@ def _load_reviewed_follow_up(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _load_candidate_file(path: Path) -> list[HunterCandidate]:
-    if not path.is_file():
-        raise RuntimeError(f"Candidate file does not exist: {path}")
-    if path.suffix.lower() == ".csv":
-        with path.open(newline="", encoding="utf-8") as handle:
-            raw_rows: list[dict[str, Any]] = list(csv.DictReader(handle))
-        for row in raw_rows:
-            for field in ("aliases", "source_provenance", "metrics", "prior_searches"):
-                if field in row and row[field]:
-                    row[field] = json.loads(row[field])
-            for field in ("ranking_score", "distance_pc", "estimated_download_gb"):
-                if field in row and row[field] not in (None, ""):
-                    row[field] = float(row[field])
-            if "eligible" in row:
-                row["eligible"] = str(row["eligible"]).lower() in {"1", "true", "yes"}
-    else:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        rows = payload.get("candidates") if isinstance(payload, dict) else payload
-        if not isinstance(rows, list):
-            raise RuntimeError("Candidate JSON must be a list or an object with a candidates list")
-        raw_rows = rows
-    return [HunterCandidate.model_validate(row) for row in raw_rows]
-
-
 def _storage_penalty(estimated_gb: float) -> float:
     if estimated_gb <= 5:
         return 0.0
@@ -312,12 +311,30 @@ def _storage_penalty(estimated_gb: float) -> float:
     return 5.0
 
 
-_TMAG_HARD_MIN = 4.0
-_TMAG_HARD_MAX = 18.0
-_MAX_DISCOVERY_EXPANSIONS = 3
-_DISCOVERY_EXPANSION_STEP = 1.0
-_BASE_MAX_TILES = 126
-_TILE_EXPANSION_STEP = 60
+def _json_safe_metadata(value: Any) -> Any:
+    """Normalize archive-library scalars and masked sentinels for provenance."""
+    if value is None or isinstance(value, (str, int, bool)):
+        return value
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, Mapping):
+        return {str(key): _json_safe_metadata(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe_metadata(item) for item in value]
+    value_type = type(value)
+    if value_type.__module__.startswith("numpy.ma") and value_type.__name__ == "MaskedConstant":
+        return None
+    item_fn = getattr(value, "item", None)
+    if callable(item_fn):
+        try:
+            item = item_fn()
+        except (TypeError, ValueError):
+            item = None
+        if item is not None and item is not value:
+            return _json_safe_metadata(item)
+    if isinstance(value, (datetime, Path)):
+        return str(value)
+    return str(value)
 
 
 def _build_new_candidates(
@@ -326,6 +343,8 @@ def _build_new_candidates(
     inspected: dict[int, dict[str, Any]],
     known_variables: set[int],
     stage_two_goal: int,
+    decision_validity: DecisionValidity,
+    cross_project_identities: frozenset[str],
 ) -> list[HunterCandidate]:
     """Build ranked candidates from a raw sweep plus stage-two inspection."""
     candidates: list[HunterCandidate] = []
@@ -365,18 +384,38 @@ def _build_new_candidates(
             * expected_information_gain
             + NEW_RANKING_WEIGHTS["storage_cost_penalty"] * cost_penalty
         )
+        aliases = [str(tic_id)]
+        raw_hip = row.get("hip_id")
+        hip_text = str(raw_hip).strip()
+        hip_id = int(hip_text) if hip_text.isdigit() else None
+        if hip_id is not None and hip_id > 0:
+            aliases.append(f"HIP {hip_id}")
+        shared_history_match = next(
+            (
+                identity
+                for identity in (f"TIC {tic_id}", *(aliases[1:]))
+                if identity in cross_project_identities
+            ),
+            None,
+        )
+        if shared_history_match is not None:
+            eligible = False
+            eligibility_reason = (
+                f"excluded_cross_project_prior_search:{shared_history_match}"
+            )
         candidates.append(
             HunterCandidate(
                 target_id=f"TIC {tic_id}",
                 canonical_id=f"TIC {tic_id}",
-                aliases=(str(tic_id),),
+                aliases=tuple(aliases),
                 source="MAST TIC and QLP product metadata",
                 source_provenance={
                     "search_category": "new",
                     "selector_version": NEW_SELECTOR_VERSION,
                     "pool_ordinal": index + 1,
-                    "product_metadata": product or {},
+                    "product_metadata": _json_safe_metadata(product or {}),
                 },
+                decision_validity=decision_validity,
                 eligible=eligible,
                 eligibility_reason=eligibility_reason,
                 estimated_download_gb=estimated_gb,
@@ -411,23 +450,7 @@ def _select_live_new_candidates(
     store: HunterStore,
     progress_fn: Callable[[str], None] | None = print,
 ) -> tuple[list[HunterCandidate], dict[str, Any]]:
-    """Two-stage metadata-only TIC selection over a large reproducible pool.
-
-    Never raises for insufficiency: if a sweep does not turn up enough
-    *eligible* candidates (after known-variable exclusion and QLP
-    product-availability checks -- not just a raw catalog-row count), this
-    widens both the Tmag magnitude window and the sky-tile grid and retries
-    (bounded) before returning whatever it has. The final "not enough valid
-    candidates exist" decision belongs to create_search(), which returns the
-    best available N rather than failing outright.
-
-    Checking the raw sweep count alone is not sufficient: known-variable
-    exclusion and QLP-product-availability filtering only run on the raw
-    sweep's top ``targets * 3`` rows, so a sweep that clears the raw
-    threshold can still fall short once those filters apply, with no further
-    expansion ever triggered. The sufficiency check below therefore runs
-    after stage-two inspection, on the eligible count.
-    """
+    """Discover broadly, then expand metadata depth until top-N is supported."""
     scanner = _load_project_skill("star_scanner")
     excluded = set(store.searched_target_ids())
     excluded_tics = {
@@ -436,138 +459,215 @@ def _select_live_new_candidates(
     excluded_tics.update(scanner._load_toi_tic_ids(strict=True))
     excluded_tics.update(scanner._load_ctoi_tic_ids(strict=True))
     excluded_tics.update(scanner._load_confirmed_host_tic_ids(strict=True))
-    tile_hard_max = getattr(scanner, "TOTAL_SEARCH_TILES", _BASE_MAX_TILES)
+    cross_project_identities = store.cross_project_searched_identities()
 
     search_log: dict[str, Any] = {}
     expansion_attempts: list[dict[str, Any]] = []
-    current_range = tmag_range
-    current_max_tiles = _BASE_MAX_TILES
     raw_targets: list[dict[str, Any]] = []
     stage_two_goal = 0
     candidates: list[HunterCandidate] = []
     inspected: dict[int, dict[str, Any]] = {}
     known_variables: set[int] = set()
     checked_for_variable: set[int] = set()
+    shortlist_limit = max(pool_size, targets * 3)
+    sufficiency_reason = ""
+    nth_selected_score: float | None = None
+    remaining_score_upper_bound: float | None = None
 
-    for attempt in range(_MAX_DISCOVERY_EXPANSIONS + 1):
-        tile_log: dict[str, Any] = {}
-        raw_targets = scanner.select_targets(
-            pool_size,
-            tmag_range=current_range,
+    while True:
+        catalog_log: dict[str, Any] = {}
+        raw_targets = scanner.select_targets_catalog(
+            shortlist_limit,
+            tmag_range=tmag_range,
             exclude_tic_ids=excluded_tics,
-            full_sweep=True,
-            max_workers=workers,
-            max_tiles=current_max_tiles,
-            search_log=tile_log,
+            search_log=catalog_log,
         )
-        search_log = tile_log
-
+        search_log = catalog_log
         stage_two_goal = min(len(raw_targets), max(targets * 3, targets))
-        candidate_rows = raw_targets[:stage_two_goal]
-        newly_seen_ids = [
-            int(row["tic_id"])
-            for row in candidate_rows
-            if int(row["tic_id"]) not in checked_for_variable
-        ]
-        if newly_seen_ids:
-            known_variables.update(
-                scanner._load_asassn_variable_tic_ids(newly_seen_ids, strict=True)
+        while True:
+            candidate_rows = raw_targets[:stage_two_goal]
+            newly_seen_ids = [
+                int(row["tic_id"])
+                for row in candidate_rows
+                if int(row["tic_id"]) not in checked_for_variable
+            ]
+            if newly_seen_ids:
+                known_variables.update(
+                    scanner._load_asassn_variable_tic_ids(newly_seen_ids, strict=True)
+                )
+                checked_for_variable.update(newly_seen_ids)
+
+            inspect_rows = [
+                row
+                for row in candidate_rows
+                if int(row["tic_id"]) not in known_variables
+                and int(row["tic_id"]) not in inspected
+            ]
+            inspection_started = time.monotonic()
+            if progress_fn is not None:
+                progress_fn(
+                    "EXO-Hunter metadata inspection: "
+                    f"targets={len(inspect_rows)} workers={workers} ETA=pending"
+                )
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                futures = {
+                    pool.submit(
+                        scanner.inspect_target_products,
+                        row,
+                        mission="TESS",
+                        pipeline="QLP",
+                        exptime="long",
+                    ): row
+                    for row in inspect_rows
+                }
+                for completed, future in enumerate(as_completed(futures), 1):
+                    row = futures[future]
+                    try:
+                        result = future.result()
+                    except Exception as exc:  # noqa: BLE001
+                        raise RuntimeError(
+                            f"QLP metadata refresh failed for TIC {row['tic_id']}: "
+                            f"{type(exc).__name__}: {exc}"
+                        ) from exc
+                    if result.get("inspection_error"):
+                        raise RuntimeError(
+                            f"QLP metadata refresh failed for TIC {row['tic_id']}: "
+                            f"{result['inspection_error']}"
+                        )
+                    inspected[int(row["tic_id"])] = result
+                    if progress_fn is not None:
+                        elapsed = time.monotonic() - inspection_started
+                        rate = completed / elapsed if elapsed > 0 else 0.0
+                        remaining = (
+                            (len(inspect_rows) - completed) / rate
+                            if rate > 0
+                            else float("inf")
+                        )
+                        progress_fn(
+                            f"  [{completed}/{len(inspect_rows)}] "
+                            f"elapsed={elapsed:.0f}s ETA={format_eta(remaining)}"
+                        )
+
+            retrieved_at = datetime.fromisoformat(
+                str(catalog_log.get("retrieved_at", datetime.now(UTC).isoformat()))
             )
-            checked_for_variable.update(newly_seen_ids)
-
-        inspect_rows = [
-            row
-            for row in candidate_rows
-            if int(row["tic_id"]) not in known_variables
-            and int(row["tic_id"]) not in inspected
-        ]
-        inspection_started = time.monotonic()
-        if progress_fn is not None:
-            progress_fn(
-                "EXO-Hunter metadata inspection: "
-                f"targets={len(inspect_rows)} workers={workers} ETA=pending"
+            source_versions = catalog_log.get("source_versions") or ["unknown"]
+            validity = DecisionValidity(
+                state="valid",
+                source="MAST TESS Input Catalog and QLP product metadata",
+                source_version=",".join(str(value) for value in source_versions),
+                as_of=retrieved_at,
+                retrieved_at=retrieved_at,
+                assessed_at=datetime.now(UTC),
+                transformations=(
+                    "TIC structural and magnitude filtering",
+                    "deterministic first-stage priority scoring",
+                    "ASAS-SN known-variable exclusion",
+                    "QLP product availability and storage-size inspection",
+                ),
+                basis=(
+                    "Catalog criteria universe exhausted; metadata refreshed for "
+                    "every row needed by the top-N score bound"
+                ),
             )
-        with ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = {
-                pool.submit(
-                    scanner.inspect_target_products,
-                    row,
-                    mission="TESS",
-                    pipeline="QLP",
-                    exptime="long",
-                ): row
-                for row in inspect_rows
-            }
-            for completed, future in enumerate(as_completed(futures), 1):
-                row = futures[future]
-                try:
-                    inspected[int(row["tic_id"])] = future.result()
-                except Exception as exc:  # noqa: BLE001
-                    inspected[int(row["tic_id"])] = {
-                        "inspection_error": f"{type(exc).__name__}: {exc}"
-                    }
-                if progress_fn is not None:
-                    elapsed = time.monotonic() - inspection_started
-                    rate = completed / elapsed if elapsed > 0 else 0.0
-                    remaining = (
-                        (len(inspect_rows) - completed) / rate if rate > 0 else float("inf")
-                    )
-                    progress_fn(
-                        f"  [{completed}/{len(inspect_rows)}] "
-                        f"elapsed={elapsed:.0f}s ETA={format_eta(remaining)}"
-                    )
-
-        candidates = _build_new_candidates(
-            raw_targets,
-            inspected=inspected,
-            known_variables=known_variables,
-            stage_two_goal=stage_two_goal,
-        )
-        eligible_count = sum(row.eligible for row in candidates)
-
-        expansion_attempts.append(
-            {
-                "attempt": attempt,
-                "tmag_range": list(current_range),
-                "max_tiles": current_max_tiles,
-                "raw_candidates_returned": len(raw_targets),
-                "eligible_candidates": eligible_count,
-            }
-        )
-        if eligible_count >= targets:
+            candidates = _build_new_candidates(
+                raw_targets,
+                inspected=inspected,
+                known_variables=known_variables,
+                stage_two_goal=stage_two_goal,
+                decision_validity=validity,
+                cross_project_identities=cross_project_identities,
+            )
+            ranked_eligible = sorted(
+                (row for row in candidates if row.eligible),
+                key=lambda row: (-row.ranking_score, row.canonical_id),
+            )
+            nth_selected_score = (
+                ranked_eligible[targets - 1].ranking_score
+                if len(ranked_eligible) >= targets
+                else None
+            )
+            remaining_priorities = [
+                float(row["priority"]) for row in raw_targets[stage_two_goal:]
+            ]
+            total_after_exclusion = int(
+                catalog_log.get("candidates_after_exclusion", len(raw_targets))
+            )
+            if total_after_exclusion > len(raw_targets) and raw_targets:
+                remaining_priorities.append(float(raw_targets[-1]["priority"]))
+            remaining_score_upper_bound = (
+                max(80.0 * priority + 20.0 for priority in remaining_priorities)
+                if remaining_priorities
+                else None
+            )
+            supported = (
+                nth_selected_score is not None
+                and (
+                    remaining_score_upper_bound is None
+                    or nth_selected_score >= remaining_score_upper_bound
+                )
+            )
+            fully_inspected_universe = (
+                stage_two_goal == len(raw_targets)
+                and len(raw_targets) == total_after_exclusion
+            )
+            expansion_attempts.append(
+                {
+                    "retained_limit": shortlist_limit,
+                    "retained_candidates": len(raw_targets),
+                    "catalog_candidates_after_exclusion": total_after_exclusion,
+                    "metadata_rows_inspected": stage_two_goal,
+                    "eligible_candidates": len(ranked_eligible),
+                    "nth_selected_score": nth_selected_score,
+                    "remaining_score_upper_bound": remaining_score_upper_bound,
+                    "selection_supported": supported,
+                    "full_filtered_universe_inspected": fully_inspected_universe,
+                }
+            )
+            if supported:
+                sufficiency_reason = "top_n_score_upper_bound"
+                break
+            if fully_inspected_universe:
+                sufficiency_reason = "accessible_filtered_universe_exhausted"
+                break
+            if stage_two_goal < len(raw_targets):
+                stage_two_goal = min(
+                    len(raw_targets),
+                    max(stage_two_goal + 1, stage_two_goal * 2),
+                )
+                continue
             break
 
-        widened_range = (
-            max(current_range[0] - _DISCOVERY_EXPANSION_STEP, _TMAG_HARD_MIN),
-            min(current_range[1] + _DISCOVERY_EXPANSION_STEP, _TMAG_HARD_MAX),
-        )
-        widened_max_tiles = min(current_max_tiles + _TILE_EXPANSION_STEP, tile_hard_max)
-        no_room_to_widen = (
-            widened_range == current_range and widened_max_tiles == current_max_tiles
-        )
-        if no_room_to_widen or attempt == _MAX_DISCOVERY_EXPANSIONS:
+        if sufficiency_reason:
             break
+        total_after_exclusion = int(
+            search_log.get("candidates_after_exclusion", len(raw_targets))
+        )
+        next_limit = min(total_after_exclusion, max(shortlist_limit + 1, shortlist_limit * 2))
+        if next_limit <= shortlist_limit:
+            raise RuntimeError(
+                "Adaptive discovery could not establish top-N sufficiency despite "
+                "exhausting the reported TIC candidate universe"
+            )
         if progress_fn is not None:
             progress_fn(
-                f"EXO-Hunter discovery sweep returned {eligible_count} eligible candidates "
-                f"for {targets} requested; widening Tmag range "
-                f"{current_range[0]:.1f}-{current_range[1]:.1f} -> "
-                f"{widened_range[0]:.1f}-{widened_range[1]:.1f} and sky tiles "
-                f"{current_max_tiles} -> {widened_max_tiles} and retrying"
+                "EXO-Hunter top-N is not yet supported; expanding retained "
+                f"first-stage pool {shortlist_limit} -> {next_limit}"
             )
-        current_range = widened_range
-        current_max_tiles = widened_max_tiles
+        shortlist_limit = next_limit
 
     search_log["discovery_expansion_attempts"] = expansion_attempts
-    search_log["final_tmag_range"] = list(current_range)
-    search_log["final_max_tiles"] = current_max_tiles
     search_log.update(
         {
             "candidate_universe_requested": pool_size,
             "candidate_universe_returned": len(raw_targets),
             "stage_two_metadata_count": stage_two_goal,
             "known_variables_excluded": len(known_variables),
+            "cross_project_identities_considered": len(cross_project_identities),
             "stage_two_eligible_count": sum(row.eligible for row in candidates),
+            "selection_sufficiency_reason": sufficiency_reason,
+            "nth_selected_score": nth_selected_score,
+            "remaining_score_upper_bound": remaining_score_upper_bound,
         }
     )
     return candidates, search_log
@@ -613,14 +713,34 @@ def create_new_search(
             raise ValueError(f"workers must be between 1 and {MAX_LIVE_WORKERS}")
         store = HunterStore(args.db)
         pool_size = max(args.pool_size or 0, DEFAULT_POOL_SIZE, args.targets * 100)
-        if args.candidate_file:
-            candidates = _load_candidate_file(args.candidate_file)
-            selector_log = {
-                "candidate_file": str(args.candidate_file),
-                "candidate_universe_returned": len(candidates),
-            }
-            selector_version = OPERATOR_SELECTOR_VERSION
-        elif args.mode == "follow-up":
+        cross_project_import: dict[str, Any] | None = None
+        if args.mode == "new":
+            if args.cross_project_sibling:
+                sibling_export = sibling_history_export_path(
+                    args.cross_project_sibling
+                )
+                cross_project_import = store.import_cross_project_history(
+                    (
+                        sibling_export
+                        if sibling_export.is_file()
+                        else build_sibling_history_manifest(args.cross_project_sibling)
+                    ),
+                    source_root=sibling_project_root(args.cross_project_sibling),
+                )
+            else:
+                copied_history = args.cross_project_history_path or DEFAULT_COPIED_HISTORY
+                default_sibling_root = sibling_project_root("technosignatures")
+                copied_source_root = (
+                    default_sibling_root
+                    if args.cross_project_history_path is None
+                    and default_sibling_root.is_dir()
+                    else None
+                )
+                cross_project_import = store.import_cross_project_history(
+                    copied_history,
+                    source_root=copied_source_root,
+                )
+        if args.mode == "follow-up":
             import_summary = store.import_history_manifest(
                 args.history_manifest, source_root=args.history_source_root
             )
@@ -643,18 +763,27 @@ def create_new_search(
                 progress_fn=lambda line: print(line, file=sys.stderr, flush=True),
             )
             selector_version = NEW_SELECTOR_VERSION
-        contract = selection_contract(
-            args.mode,
-            operator_supplied=bool(args.candidate_file),
-        )
+        contract = selection_contract(args.mode)
         config = {
             "code_version": __version__,
             "workers": args.workers,
             "tmag_range": [args.tmag_min, args.tmag_max],
             "pool_size_requested": pool_size,
             "selector_log": selector_log,
+            "cross_project_history_import": cross_project_import,
             "selection_contract": contract,
         }
+        prewrite_integrity = store.validity_summary(
+            history_manifest=args.history_manifest if args.mode == "follow-up" else None,
+            history_source_root=(
+                args.history_source_root if args.mode == "follow-up" else None
+            ),
+        )
+        if not prewrite_integrity["ok"]:
+            raise RuntimeError(
+                "Hunter database integrity failed before search creation: "
+                f"{prewrite_integrity}"
+            )
         search = store.create_search(
             candidates,
             requested_target_count=args.targets,
@@ -664,14 +793,10 @@ def create_new_search(
         )
         integrity = store.validity_summary(
             history_manifest=(
-                args.history_manifest
-                if args.mode == "follow-up" and not args.candidate_file
-                else None
+                args.history_manifest if args.mode == "follow-up" else None
             ),
             history_source_root=(
-                args.history_source_root
-                if args.mode == "follow-up" and not args.candidate_file
-                else None
+                args.history_source_root if args.mode == "follow-up" else None
             ),
         )
         if not integrity["ok"]:

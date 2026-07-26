@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from exo_toolkit.hunter_cli import (
@@ -25,10 +26,10 @@ from exo_toolkit.hunter_cli import (
 from exo_toolkit.hunter_ranking import (
     FOLLOW_UP_SELECTOR_VERSION,
     NEW_SELECTOR_VERSION,
-    OPERATOR_SELECTOR_VERSION,
     selection_contract,
 )
 from exo_toolkit.search_lifecycle import (
+    DecisionValidity,
     FollowUpRecommendation,
     HunterCandidate,
     HunterStore,
@@ -37,7 +38,19 @@ from exo_toolkit.search_lifecycle import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _isolate_mutable_sibling_checkout(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """CLI unit tests must not depend on a concurrently changing sibling repo."""
+    monkeypatch.setattr(
+        "exo_toolkit.hunter_cli.sibling_project_root",
+        lambda _project: tmp_path / "sibling-not-checked-out",
+    )
+
+
 def _candidates(count: int) -> list[HunterCandidate]:
+    observed = datetime(2026, 1, 1, tzinfo=UTC)
     return [
         HunterCandidate(
             target_id=f"TIC {index}",
@@ -47,6 +60,15 @@ def _candidates(count: int) -> list[HunterCandidate]:
                 "search_category": "new",
                 "selector_version": NEW_SELECTOR_VERSION,
             },
+            decision_validity=DecisionValidity(
+                state="valid",
+                source="offline test catalog",
+                source_version="fixture-v1",
+                as_of=observed,
+                retrieved_at=observed,
+                assessed_at=observed,
+                basis="deterministic production-selector fixture",
+            ),
             ranking_score=float(count - index),
             selection_reason="offline deterministic rank",
             metrics={"rank": index},
@@ -108,6 +130,10 @@ def test_create_run_show_complete_offline_path(tmp_path: Path, capsys: object) -
     stored = HunterStore(db).get_search(completed["search_id"])
     assert stored["selector_version"] == NEW_SELECTOR_VERSION
     assert stored["config"]["selection_contract"] == selection_contract("new")
+    registered = HunterStore(db).list_follow_ups(status="all")[0]
+    assert registered["prior_search_provenance"][-1]["decision_validity"]["state"] == (
+        "valid"
+    )
 
 
 def test_create_reports_shortfall_and_still_creates_best_available_search(
@@ -160,13 +186,21 @@ def test_live_selector_stamps_versioned_information_gain_contract(
         _load_ctoi_tic_ids=lambda **_: set(),
         _load_confirmed_host_tic_ids=lambda **_: set(),
         _load_asassn_variable_tic_ids=lambda *_args, **_kwargs: set(),
-        select_targets=lambda *_args, **_kwargs: [
-            {"tic_id": 42, "priority": 0.7, "tmag": 10.0}
-        ],
+        select_targets_catalog=lambda *_args, **kwargs: (
+            kwargs["search_log"].update(
+                {
+                    "candidates_after_exclusion": 1,
+                    "retrieved_at": "2026-01-01T00:00:00+00:00",
+                    "source_versions": ["fixture-v1"],
+                }
+            )
+            or [{"tic_id": 42, "hip_id": "--", "priority": 0.7, "tmag": 10.0}]
+        ),
         inspect_target_products=lambda *_args, **_kwargs: {
             "products": ["product-1", "product-2"],
             "total_bytes": 1_000_000_000,
             "priority": 0.8,
+            "masked_archive_field": np.ma.masked,
         },
     )
     monkeypatch.setattr("exo_toolkit.hunter_cli._load_project_skill", lambda _: scanner)
@@ -186,51 +220,44 @@ def test_live_selector_stamps_versioned_information_gain_contract(
     assert candidate.metrics["scientific_suitability"] == pytest.approx(0.8)
     assert candidate.ranking_score == pytest.approx(67.2)
     assert search_log["stage_two_eligible_count"] == 1
-    assert search_log["discovery_expansion_attempts"] == [
-        {
-            "attempt": 0,
-            "tmag_range": [6.0, 13.5],
-            "max_tiles": 126,
-            "raw_candidates_returned": 1,
-            "eligible_candidates": 1,
-        }
-    ]
-    assert search_log["final_tmag_range"] == [6.0, 13.5]
-    assert search_log["final_max_tiles"] == 126
+    assert search_log["selection_sufficiency_reason"] == "top_n_score_upper_bound"
+    assert search_log["discovery_expansion_attempts"][0]["selection_supported"] is True
+    assert candidate.decision_validity is not None
+    assert candidate.decision_validity.state == "valid"
+    assert candidate.aliases == ("42",)
+    assert candidate.source_provenance["product_metadata"]["masked_archive_field"] is None
+    candidate.model_dump_json()
 
 
-def test_live_selector_widens_tmag_range_when_sweep_is_thin(
+def test_live_selector_preserves_scientific_constraints_when_universe_is_thin(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Directive: candidate pools are adaptive, never arbitrarily fixed — expand
-    discovery before settling for fewer than requested."""
+    """A user magnitude constraint is not silently widened to manufacture N."""
     calls: list[tuple[float, float]] = []
 
-    def fake_select_targets(
+    def fake_select_targets_catalog(
         _n: int,
         *,
         tmag_range: tuple[float, float],
         exclude_tic_ids: set[int],
-        full_sweep: bool,
-        max_workers: int,
-        max_tiles: int,
         search_log: dict[str, object],
     ) -> list[dict[str, object]]:
         calls.append(tmag_range)
-        if tmag_range == (12.0, 14.5):
-            return [{"tic_id": 1, "priority": 0.5, "tmag": 13.0}]
-        return [
-            {"tic_id": 1, "priority": 0.5, "tmag": 13.0},
-            {"tic_id": 2, "priority": 0.6, "tmag": 12.0},
-            {"tic_id": 3, "priority": 0.7, "tmag": 14.0},
-        ]
+        search_log.update(
+            {
+                "candidates_after_exclusion": 1,
+                "retrieved_at": "2026-01-01T00:00:00+00:00",
+                "source_versions": ["fixture-v1"],
+            }
+        )
+        return [{"tic_id": 1, "priority": 0.5, "tmag": 13.0}]
 
     scanner = SimpleNamespace(
         _load_toi_tic_ids=lambda **_: set(),
         _load_ctoi_tic_ids=lambda **_: set(),
         _load_confirmed_host_tic_ids=lambda **_: set(),
         _load_asassn_variable_tic_ids=lambda *_args, **_kwargs: set(),
-        select_targets=fake_select_targets,
+        select_targets_catalog=fake_select_targets_catalog,
         inspect_target_products=lambda *_args, **_kwargs: {
             "products": ["product-1"],
             "total_bytes": 1_000_000,
@@ -248,11 +275,11 @@ def test_live_selector_widens_tmag_range_when_sweep_is_thin(
         progress_fn=None,
     )
 
-    assert calls == [(12.0, 14.5), (11.0, 15.5)]
-    assert len(candidates) == 3
-    attempts = search_log["discovery_expansion_attempts"]
-    assert [a["raw_candidates_returned"] for a in attempts] == [1, 3]
-    assert search_log["final_tmag_range"] == [11.0, 15.5]
+    assert calls == [(12.0, 14.5)]
+    assert len(candidates) == 1
+    assert search_log["selection_sufficiency_reason"] == (
+        "accessible_filtered_universe_exhausted"
+    )
 
 
 def test_live_selector_expansion_never_raises_when_still_thin(
@@ -264,9 +291,16 @@ def test_live_selector_expansion_never_raises_when_still_thin(
         _load_ctoi_tic_ids=lambda **_: set(),
         _load_confirmed_host_tic_ids=lambda **_: set(),
         _load_asassn_variable_tic_ids=lambda *_args, **_kwargs: set(),
-        select_targets=lambda *_args, **_kwargs: [
-            {"tic_id": 1, "priority": 0.5, "tmag": 13.0}
-        ],
+        select_targets_catalog=lambda *_args, **kwargs: (
+            kwargs["search_log"].update(
+                {
+                    "candidates_after_exclusion": 1,
+                    "retrieved_at": "2026-01-01T00:00:00+00:00",
+                    "source_versions": ["fixture-v1"],
+                }
+            )
+            or [{"tic_id": 1, "priority": 0.5, "tmag": 13.0}]
+        ),
         inspect_target_products=lambda *_args, **_kwargs: {
             "products": ["product-1"],
             "total_bytes": 1_000_000,
@@ -285,11 +319,10 @@ def test_live_selector_expansion_never_raises_when_still_thin(
     )
 
     assert len(candidates) == 1
-    assert len(search_log["discovery_expansion_attempts"]) == 4  # initial + 3 expansions
-    assert search_log["final_tmag_range"] == [9.0, 17.5]
-    # Scanner fake has no TOTAL_SEARCH_TILES, so the tile axis has no room
-    # to widen and stays at the base grid throughout.
-    assert search_log["final_max_tiles"] == 126
+    assert len(search_log["discovery_expansion_attempts"]) == 1
+    assert search_log["selection_sufficiency_reason"] == (
+        "accessible_filtered_universe_exhausted"
+    )
 
 
 def test_live_selector_expands_when_raw_count_is_sufficient_but_eligible_is_not(
@@ -309,11 +342,20 @@ def test_live_selector_expands_when_raw_count_is_sufficient_but_eligible_is_not(
         },
         # Always returns the same 3 raw rows (>= targets=3) regardless of
         # tmag_range or max_tiles, so the raw count never signals a problem.
-        select_targets=lambda *_args, **_kwargs: [
-            {"tic_id": 1, "priority": 0.9, "tmag": 12.0},
-            {"tic_id": 2, "priority": 0.8, "tmag": 12.5},
-            {"tic_id": 3, "priority": 0.7, "tmag": 13.0},
-        ],
+        select_targets_catalog=lambda *_args, **kwargs: (
+            kwargs["search_log"].update(
+                {
+                    "candidates_after_exclusion": 3,
+                    "retrieved_at": "2026-01-01T00:00:00+00:00",
+                    "source_versions": ["fixture-v1"],
+                }
+            )
+            or [
+                {"tic_id": 1, "priority": 0.9, "tmag": 12.0},
+                {"tic_id": 2, "priority": 0.8, "tmag": 12.5},
+                {"tic_id": 3, "priority": 0.7, "tmag": 13.0},
+            ]
+        ),
         inspect_target_products=lambda *_args, **_kwargs: {
             "products": ["product-1"],
             "total_bytes": 1_000_000,
@@ -332,66 +374,79 @@ def test_live_selector_expands_when_raw_count_is_sufficient_but_eligible_is_not(
     )
 
     attempts = search_log["discovery_expansion_attempts"]
-    # Only 1 of 3 raw candidates is actually eligible every attempt, so
-    # expansion must keep retrying (all the way to exhaustion) instead of
-    # stopping after attempt 0 just because raw count already met targets.
-    assert len(attempts) == 4
-    assert [a["raw_candidates_returned"] for a in attempts] == [3, 3, 3, 3]
-    assert [a["eligible_candidates"] for a in attempts] == [1, 1, 1, 1]
+    assert len(attempts) == 1
+    assert attempts[0]["full_filtered_universe_inspected"] is True
+    assert attempts[0]["eligible_candidates"] == 1
     assert len(candidates) == 3
     assert search_log["stage_two_eligible_count"] == 1
 
 
-def test_live_selector_widens_tile_grid_alongside_tmag_range(
+def test_live_selector_expands_retained_pool_and_selects_outside_candidate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Sky-tile coverage must widen as a second bounded expansion axis,
-    mirroring the Tmag-widening pattern, instead of staying permanently
-    fixed at the base 126-tile grid regardless of how thin the sweep is."""
-    max_tiles_seen: list[int] = []
+    """Superior refreshed metadata outside the initial pool must win top-N."""
+    limits_seen: list[int] = []
+    universe = [
+        {"tic_id": 1, "priority": 0.95, "tmag": 12.0},
+        {"tic_id": 2, "priority": 0.94, "tmag": 12.1},
+        {"tic_id": 3, "priority": 0.93, "tmag": 12.2},
+        {"tic_id": 999, "priority": 0.92, "tmag": 12.3},
+    ]
 
-    def fake_select_targets(
-        _n: int,
+    def fake_select_targets_catalog(
+        n: int,
         *,
         tmag_range: tuple[float, float],
         exclude_tic_ids: set[int],
-        full_sweep: bool,
-        max_workers: int,
-        max_tiles: int,
         search_log: dict[str, object],
     ) -> list[dict[str, object]]:
-        max_tiles_seen.append(max_tiles)
-        return [{"tic_id": 1, "priority": 0.5, "tmag": 13.0}]
+        limits_seen.append(n)
+        search_log.update(
+            {
+                "candidates_after_exclusion": len(universe),
+                "retrieved_at": "2026-01-01T00:00:00+00:00",
+                "source_versions": ["fixture-v1"],
+            }
+        )
+        return universe[:n]
 
     scanner = SimpleNamespace(
         _load_toi_tic_ids=lambda **_: set(),
         _load_ctoi_tic_ids=lambda **_: set(),
         _load_confirmed_host_tic_ids=lambda **_: set(),
         _load_asassn_variable_tic_ids=lambda *_args, **_kwargs: set(),
-        select_targets=fake_select_targets,
-        inspect_target_products=lambda *_args, **_kwargs: {
+        select_targets_catalog=fake_select_targets_catalog,
+        inspect_target_products=lambda row, **_kwargs: {
             "products": ["product-1"],
             "total_bytes": 1_000_000,
-            "priority": 0.5,
+            "priority": 1.0 if row["tic_id"] == 999 else 0.2,
         },
-        TOTAL_SEARCH_TILES=300,
     )
     monkeypatch.setattr("exo_toolkit.hunter_cli._load_project_skill", lambda _: scanner)
 
     candidates, search_log = _select_live_new_candidates(
-        targets=5,
-        pool_size=10,
+        targets=1,
+        pool_size=1,
         workers=1,
         tmag_range=(12.0, 14.5),
         store=HunterStore(tmp_path / "hunter.sqlite3"),
         progress_fn=None,
     )
 
-    # 126 -> 186 -> 246 -> capped at scanner's 300 (306 would overshoot).
-    assert max_tiles_seen == [126, 186, 246, 300]
+    assert limits_seen == [3, 4]
     attempts = search_log["discovery_expansion_attempts"]
-    assert [a["max_tiles"] for a in attempts] == [126, 186, 246, 300]
-    assert search_log["final_max_tiles"] == 300
+    assert attempts[-1]["full_filtered_universe_inspected"] is True
+    assert {candidate.target_id for candidate in candidates} == {
+        "TIC 1",
+        "TIC 2",
+        "TIC 3",
+        "TIC 999",
+    }
+    selected = max(
+        (candidate for candidate in candidates if candidate.eligible),
+        key=lambda candidate: candidate.ranking_score,
+    )
+    assert selected.target_id == "TIC 999"
 
 
 def test_invalid_target_count_fails_before_live_selection(tmp_path: Path) -> None:
@@ -437,7 +492,7 @@ def test_more_than_100_targets_writes_timestamped_csv(tmp_path: Path) -> None:
     assert len(files[0].read_text(encoding="utf-8").splitlines()) == 102
 
 
-def test_candidate_json_file_supports_external_follow_up_provenance(tmp_path: Path) -> None:
+def test_candidate_file_bypass_is_not_a_production_cli_option(tmp_path: Path) -> None:
     db = tmp_path / "hunter.sqlite3"
     candidate_file = tmp_path / "followup.json"
     candidate_file.write_text(
@@ -466,7 +521,7 @@ def test_candidate_json_file_supports_external_follow_up_provenance(tmp_path: Pa
         ),
         encoding="utf-8",
     )
-    assert (
+    with pytest.raises(SystemExit) as exc_info:
         create_new_search(
             [
                 "--targets",
@@ -480,15 +535,8 @@ def test_candidate_json_file_supports_external_follow_up_provenance(tmp_path: Pa
                 "--json",
             ]
         )
-        == 0
-    )
-    search = HunterStore(db).open_searches()[0]
-    restored = HunterStore(db).get_search(search["search_id"])
-    assert restored["selector_version"] == OPERATOR_SELECTOR_VERSION
-    assert restored["config"]["selection_contract"] == selection_contract(
-        "follow-up", operator_supplied=True
-    )
-    assert restored["targets"][0]["candidate"]["prior_searches"][0]["searched_by"] == "Researcher"
+    assert exc_info.value.code == 2
+    assert not db.exists()
 
 
 def test_default_follow_up_imports_and_ranks_durable_history(

@@ -3,8 +3,10 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-NEW_SELECTOR_VERSION = "exo_hunter_tic_v2"
-FOLLOW_UP_SELECTOR_VERSION = "exo_hunter_follow_up_v3"
+# v3/v4 require explicit decision-validity evidence and remove the
+# operator-supplied production selector.
+NEW_SELECTOR_VERSION = "exo_hunter_tic_v3"
+FOLLOW_UP_SELECTOR_VERSION = "exo_hunter_follow_up_v4"
 OPERATOR_SELECTOR_VERSION = "exo_hunter_operator_candidates_v1"
 
 NEW_RANKING_WEIGHTS = {
@@ -36,6 +38,14 @@ def selection_contract(
     if mode == "new":
         return {
             "selector_version": NEW_SELECTOR_VERSION,
+            "discovery": (
+                "catalog-wide filtered TIC paging with adaptive retained-pool and "
+                "metadata-depth expansion"
+            ),
+            "selection_sufficiency": (
+                "Nth selected score >= every uninspected candidate's conservative "
+                "score upper bound, or the accessible filtered universe is exhausted"
+            ),
             "ranking_formula": (
                 "70*tic_priority + 20*availability + "
                 "10*expected_information_gain - storage_cost_penalty"
@@ -46,6 +56,7 @@ def selection_contract(
                 "novel target; strict ASAS-SN exclusion; advanced to metadata stage; "
                 "at least one QLP product"
             ),
+            "decision_validity_states_allowed": ["valid", "stale-but-usable"],
         }
     return {
         "selector_version": FOLLOW_UP_SELECTOR_VERSION,
@@ -61,4 +72,5 @@ def selection_contract(
         "strict_production_bar_confidence_min_exclusive": FOLLOW_UP_CONFIDENCE_MIN,
         "strict_production_bar_pathways": list(FOLLOW_UP_PATHWAYS),
         "latest_search_must_be_new": True,
+        "decision_validity_states_allowed": ["valid", "stale-but-usable"],
     }

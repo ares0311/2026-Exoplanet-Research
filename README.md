@@ -1,7 +1,7 @@
 # EXO-Hunter — 2026 Exoplanet Research
 
 [![CI](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml/badge.svg)](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.3.9-blue.svg)](pyproject.toml)
+[![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)](pyproject.toml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
@@ -17,11 +17,11 @@ XGBoost, CNN, and ensemble scorers are optional.
 
 ## Current production state
 
-Version 0.3.11 is the current release state represented by this repository.
+Version 0.4.0 is the current release candidate represented by this branch.
 
 | Area | Status | Current evidence |
 |---|---|---|
-| EXO-Hunter lifecycle | **PROD accepted** | Best-available-N selection (new and follow-up), adaptive discovery expansion, and live create-through-execution evidence in [`hunter_live_acceptance_v9.json`](artifacts/manifests/hunter_live_acceptance_v9.json) (extends v8/v7; see `docs/HUNTER_PRODUCTION_WORKFLOW.md`) |
+| EXO-Hunter lifecycle | **CI accepted; merge verification pending** | Version 0.4.0 removes the operator-candidate bypass, replaces the 126/306-tile sample with catalog-wide paged discovery and a top-N score-bound proof, adds decision-validity states and durable cross-project identity history, and passes the v12 live acceptance, all 10 local gates (3,187 tests), and both PR #319 CI runs. Squash merge and merged-main synchronization remain before PROD acceptance (see `docs/HUNTER_PRODUCTION_WORKFLOW.md`) |
 | Bayesian scorer | **Production ready** | Default non-ML scorer; no model artifact required |
 | XGBoost scorer | **Production ready** | Trained on 7,586 Kepler KOIs; held-out AUC 0.992 |
 | XGBoost + Bayesian ensemble | **Production ready** | Conservative fallback when no CNN is supplied |
@@ -30,7 +30,8 @@ Version 0.3.11 is the current release state represented by this repository.
 | Dataset and model research | **Active, gated** | Manifested, leakage-safe experiments continue; failed model strategies are retained as evidence and not silently reused |
 | External submission | **Not implemented or authorized** | The system produces recommendations and evidence packages only |
 
-“PROD accepted” refers to the application and its defined operating contract.
+“PROD accepted” may be used only when the current acceptance artifact and
+release gates describe the exact current repository state.
 It does not mean that every search must find a candidate, that a transit signal
 is a confirmed planet, or that the software may submit an alert automatically.
 Scientific null results and ineligible follow-up universes are valid outcomes
@@ -141,10 +142,15 @@ git pull --ff-only origin main
 caffeinate -i .venv/bin/Create-New-Search --targets 100 --mode new
 ```
 
-The live selector requests at least 10,000 TIC candidates when data permits,
-then applies deterministic metadata ranking, prior-search exclusions,
-ASAS-SN variable screening, QLP product availability, and estimated data cost.
-It freezes eligible and ineligible candidate snapshots with selection reasons.
+The live selector scans every page of the accessible magnitude-filtered TIC
+criteria universe while retaining only the strongest first-stage rows in
+memory. It expands that retained pool and the ASAS-SN/QLP metadata-inspection
+depth until the Nth selected score beats the conservative upper bound of every
+uninspected row, or the filtered universe is fully inspected. Local history,
+the default source-verified Techno-Hunter HIP/TIC/KIC export, known TOIs/CTOIs,
+confirmed hosts, variables, product availability, and estimated data cost all
+feed the same canonical decision. Every production input carries an explicit
+validity state and provenance assessment.
 
 Searches of at most 100 targets render a terminal table. Larger searches write
 a timestamped review CSV under `reports/search_manifests/`; SQLite remains
@@ -165,9 +171,12 @@ before ranking. That versioned contract normalizes seven preserved sources,
 logs. Follow-up eligibility considers the latest result, prior work, evidence
 quality, current registry disposition, revisit policy, and data availability.
 
-If fewer targets qualify than requested, the command fails loudly and creates
-no search. It does not replace a scientifically ineligible target with another
-target or manufacture a result by rerunning frozen work.
+If fewer valid targets exist after the durable universe is exhausted, the
+command creates the exact best-available subset and reports the shortfall.
+Absolute quality gates are reported separately from rank and never turn a
+normal top-N request into an arbitrary zero-result failure. It fails without
+creating a search only when zero usable candidates exist or required
+history/validity checks cannot be completed.
 
 ### 3. Execute or resume the exact pending search
 

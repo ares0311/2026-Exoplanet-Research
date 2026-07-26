@@ -9,8 +9,16 @@ from pathlib import Path
 
 import pytest
 
+from exo_toolkit.hunter_cross_project import (
+    build_sibling_history_manifest,
+    load_cross_project_history,
+)
 from exo_toolkit.hunter_history import load_verified_history_manifest
-from exo_toolkit.hunter_models import ArtifactIdentity, ExecutionProvenance
+from exo_toolkit.hunter_models import (
+    ArtifactIdentity,
+    DecisionValidity,
+    ExecutionProvenance,
+)
 from exo_toolkit.hunter_ranking import (
     FOLLOW_UP_SELECTOR_VERSION,
     NEW_SELECTOR_VERSION,
@@ -21,6 +29,7 @@ from exo_toolkit.search_lifecycle import HunterCandidate, HunterStore, TargetExe
 
 
 def _candidate() -> HunterCandidate:
+    observed = datetime(2026, 1, 1, tzinfo=UTC)
     return HunterCandidate(
         target_id="TIC 1",
         canonical_id="TIC 1",
@@ -29,6 +38,15 @@ def _candidate() -> HunterCandidate:
             "search_category": "new",
             "selector_version": NEW_SELECTOR_VERSION,
         },
+        decision_validity=DecisionValidity(
+            state="valid",
+            source="validity fixture",
+            source_version="fixture-v1",
+            as_of=observed,
+            retrieved_at=observed,
+            assessed_at=observed,
+            basis="production selector validity fixture",
+        ),
         ranking_score=1.0,
         selection_reason="deterministic validity fixture",
         metrics={"expected_information_gain": 0.5, "scientific_suitability": 0.5},
@@ -127,6 +145,109 @@ def test_validity_detects_selector_contract_drift(tmp_path: Path) -> None:
     assert any("selection contract does not match" in issue for issue in summary["issues"])
 
 
+def test_production_candidate_validation_is_prewrite_atomic(tmp_path: Path) -> None:
+    store = HunterStore(tmp_path / "hunter.sqlite3")
+    invalid = _candidate().model_copy(update={"decision_validity": None})
+
+    with pytest.raises(ValueError, match="lacks decision_validity"):
+        store.create_search(
+            [invalid],
+            requested_target_count=1,
+            mode="new",
+            selector_version=NEW_SELECTOR_VERSION,
+            config={"selection_contract": selection_contract("new")},
+        )
+
+    with store.connect() as connection:
+        assert connection.execute("SELECT COUNT(*) FROM search_manifests").fetchone()[0] == 0
+        assert connection.execute("SELECT COUNT(*) FROM candidate_catalog").fetchone()[0] == 0
+        assert connection.execute("SELECT COUNT(*) FROM search_state_events").fetchone()[0] == 0
+
+
+def test_cross_project_history_is_durable_and_immutable(tmp_path: Path) -> None:
+    source = tmp_path / "scan.ndjson"
+    source.write_text('{"real":"history"}\n', encoding="utf-8")
+    export = tmp_path / "history.json"
+    export.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "sources": [
+                    {
+                        "search_id": "techno-1",
+                        "source_project": "2026 Technosignatures",
+                        "source_path": source.name,
+                        "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+                        "entries": [
+                            {
+                                "target_id": "HIP74981",
+                                "canonical_id": "HIP 74981",
+                                "searched_at": "2026-01-01T00:00:00+00:00",
+                                "status": "searched",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    store = HunterStore(tmp_path / "hunter.sqlite3")
+    summary = store.import_cross_project_history(export, source_root=tmp_path)
+
+    assert summary["validity_state"] == "valid"
+    assert summary["source_hashes_verified"] == 1
+    assert store.cross_project_searched_identities() == frozenset({"HIP 74981"})
+    with (
+        store.connect() as connection,
+        pytest.raises(sqlite3.IntegrityError, match="append-only"),
+    ):
+        connection.execute("DELETE FROM cross_project_search_history")
+
+
+def test_live_sibling_adapter_normalizes_and_verifies_raw_history(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "results" / "scan_history.ndjson"
+    source.parent.mkdir()
+    source.write_text(
+        "\n".join(
+            (
+                json.dumps(
+                    {
+                        "schema_version": "prod_scan_history_v1",
+                        "target_stem": "GBT_HIP74981_2026-01-01_ABACAD",
+                        "scanned_at_utc": "2026-01-01T00:00:00+00:00",
+                        "pathway": "human_review_queue",
+                    }
+                ),
+                json.dumps(
+                    {
+                        "schema_version": "prod_scan_history_v1",
+                        "target_stem": "non_catalog_calibrator",
+                        "scanned_at_utc": "2026-01-01T01:00:00+00:00",
+                        "pathway": "no_signal",
+                    }
+                ),
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "exo_toolkit.hunter_cross_project.sibling_history_source_path",
+        lambda _project: source,
+    )
+
+    manifest = build_sibling_history_manifest("technosignatures")
+    loaded = load_cross_project_history(manifest, source_root=tmp_path)
+
+    assert loaded["validity_state"] == "valid"
+    assert loaded["source_hashes_verified"] == 1
+    assert len(loaded["entries"]) == 1
+    assert loaded["entries"][0]["identities"] == ["HIP 74981"]
+
+
 def test_validity_detects_model_artifact_drift(tmp_path: Path) -> None:
     model = tmp_path / "model.json"
     model.write_text("model-v1", encoding="utf-8")
@@ -186,7 +307,7 @@ def test_acceptance_validator_returns_nonzero_for_invalid_database(tmp_path: Pat
     assert main(["--db", str(db)]) == 2
 
 
-def test_committed_acceptance_snapshot_matches_structured_evidence() -> None:
+def test_superseded_v5_snapshot_is_not_current_schema_acceptance() -> None:
     from Skills.validate_hunter_acceptance import _validate
 
     acceptance = json.loads(
@@ -200,29 +321,12 @@ def test_committed_acceptance_snapshot_matches_structured_evidence() -> None:
         Path("data_selection/hunter_prior_search_history_v1.json"),
         None,
     )
-    assert evidence["ok"] is True
-    assert evidence["issues"] == []
-    for field in (
-        "compressed_snapshot_sha256",
-        "database_sha256",
-        "schema_version",
-        "sqlite_integrity",
-        "foreign_key_violation_count",
-        "immutable_trigger_count",
-        "manifest_hashes_verified",
-        "snapshot_hashes_verified",
-        "provenance_rows_verified",
-        "counts",
-        "history_status_counts",
-    ):
-        expected_field = field.removeprefix("compressed_snapshot_")
-        if field == "compressed_snapshot_sha256":
-            expected_field = "compressed_sha256"
-        assert evidence[field] == acceptance["production_snapshot"][expected_field]
-    assert all(
-        requirement["verified"] is True
-        for requirement in acceptance["requirements"].values()
+    assert evidence["ok"] is False
+    assert evidence["compressed_snapshot_sha256"] == (
+        acceptance["production_snapshot"]["compressed_sha256"]
     )
+    assert any("schema version mismatch" in issue for issue in evidence["issues"])
+    assert any("cross_project_search_history" in issue for issue in evidence["issues"])
 
 
 def test_v6_acceptance_selector_contracts_remain_historically_frozen() -> None:
@@ -238,7 +342,7 @@ def test_v6_acceptance_selector_contracts_remain_historically_frozen() -> None:
     assert acceptance["selector_contracts"]["follow-up"]["fpp_max_exclusive"] == 0.15
 
 
-def test_current_acceptance_matches_executable_selector_contracts() -> None:
+def test_v7_acceptance_contracts_remain_historically_frozen() -> None:
     acceptance = json.loads(
         Path("artifacts/manifests/hunter_live_acceptance_v7.json").read_text(
             encoding="utf-8"
@@ -254,16 +358,11 @@ def test_current_acceptance_matches_executable_selector_contracts() -> None:
         acceptance["baseline_acceptance"]["compressed_snapshot_sha256"]
         == baseline["production_snapshot"]["compressed_sha256"]
     )
-    assert acceptance["selector_contracts"]["new"] == selection_contract("new")
-    assert acceptance["selector_contracts"]["follow-up"] == selection_contract("follow-up")
-    assert acceptance["selector_contracts"]["operator"] == selection_contract(
-        "new", operator_supplied=True
-    )
     assert acceptance["selector_contracts"]["new"]["selector_version"] == (
-        NEW_SELECTOR_VERSION
+        "exo_hunter_tic_v2"
     )
     assert acceptance["selector_contracts"]["follow-up"]["selector_version"] == (
-        FOLLOW_UP_SELECTOR_VERSION
+        "exo_hunter_follow_up_v3"
     )
     assert acceptance["selector_contracts"]["operator"]["selector_version"] == (
         OPERATOR_SELECTOR_VERSION
@@ -277,3 +376,28 @@ def test_current_acceptance_matches_executable_selector_contracts() -> None:
         "database_integrity_before": True,
         "database_integrity_after": True,
     }
+
+
+def test_v12_acceptance_matches_current_prod_closure_contracts() -> None:
+    acceptance = json.loads(
+        Path("artifacts/manifests/hunter_live_acceptance_v12.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert acceptance["repository_version"] == "0.4.0"
+    assert acceptance["selector_contracts"]["new"] == NEW_SELECTOR_VERSION
+    assert acceptance["selector_contracts"]["follow_up"] == FOLLOW_UP_SELECTOR_VERSION
+    assert acceptance["live_new_workflow"]["targets_failed"] == 0
+    assert acceptance["live_new_workflow"]["database_integrity"] == "ok"
+    assert acceptance["live_follow_up_workflow"]["targets_failed"] == 0
+    assert (
+        acceptance["live_follow_up_workflow"][
+            "weak_quality_did_not_block_best_available_selection"
+        ]
+        is True
+    )
+    assert acceptance["adaptive_outside_initial_sample"][
+        "high_value_target_beyond_initial_page_or_retained_pool_selected"
+    ]
+    assert acceptance["validity_and_atomicity"]["candidate_file_cli_present"] is False
+    assert acceptance["cross_project_history"]["source_hashes_verified_live"] == 1

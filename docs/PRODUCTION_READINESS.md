@@ -1,5 +1,30 @@
 # PRODUCTION READINESS
 
+## 2026-07-25 Hunter closure override
+
+Version 0.4.0 is the current development version. An adversarial audit
+superseded the earlier Hunter PROD claim: the 126/306-tile discovery grid was
+an unjustifiably narrow sample, `--candidate-file` bypassed canonical
+optimization, validation could reject only after persisting a search, decision
+inputs lacked explicit freshness states, and shared Techno-Hunter identity
+history was disconnected. The remediation plan and evidence gates are
+canonical in `docs/HUNTER_PRODUCTION_WORKFLOW.md`.
+
+Locally verified on the current branch: catalog-wide paged TIC criteria discovery,
+adaptive retained-pool and metadata-depth expansion with a conservative top-N
+score bound, removal of the candidate-file production option, pre-transaction
+contract/validity validation, the five-state decision-validity vocabulary,
+schema-v6 immutable cross-project history, and a source-hash-verifiable
+Techno-Hunter copied export with a live sibling-resolved option. The v12 live
+acceptance workflows pass, including the real sibling raw-history adapter, and
+the exact final content passes all 10 local gates with 3,187 tests. Both
+GitHub Actions runs for PR #319 head `920b90c` pass. Status remains
+**CI-VERIFIED BUT NOT YET MERGED-MAIN VERIFIED** until squash merge and local
+main synchronization.
+
+Every older Hunter PROD/acceptance statement below is retained as historical
+evidence and is superseded for the current product state by this override.
+
 Last reviewed: 2026-07-24 (formal production-ensemble acceptance remains PASS: the
 catalog ephemeris for pi Mensae c was recovered within 0.005% with ensemble
 FPP 0.4405, while the TOI-146.01 false-positive control produced no signal.
@@ -132,7 +157,8 @@ its calibrated weights are live in `cli.py`. Do not tune stacking weights
 against training or frozen-eval data — any future recalibration needs its
 own fresh held-out set, same as T1-2's K2 set was for this one.
 
-Version note: 0.3.14 is the current development version. Version 0.3.2 added the durable,
+Historical version note (superseded by the 0.4.0 override above): version
+0.3.14 was the development version when this section was written. Version 0.3.2 added the durable,
 non-AI-dependent Hunter workflow and exact `Create-New-Search`,
 `Run-New-Search`, and `Show-Follow-Ups` entry points. Candidate catalog,
 immutable manifest, run attempts, append-only target history, and follow-up

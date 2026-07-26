@@ -1,4 +1,15 @@
-"""Fail-closed loading and source verification for Hunter history manifests."""
+"""Fail-closed loading and source verification for Hunter history manifests.
+
+Both the file-manifest and in-memory dict-manifest branches share the same
+repo-root walk-up heuristic (``_walk_up_for_repo_root``) when
+``source_root`` is not given explicitly. The dict-manifest branch
+previously fell back to a bare ``Path.cwd()`` with no attempt to locate
+the real repo root -- dormant against every current call site (both
+``star_scanner.py`` and ``batch_scan.py`` already pass ``source_root``
+explicitly) but the same latent trap already demonstrated as exploitable
+for the file-manifest case (a manifest resolved from inside an unrelated
+nested repo silently uses that repo's root).
+"""
 from __future__ import annotations
 
 import hashlib
@@ -9,12 +20,17 @@ from pathlib import Path
 from typing import Any
 
 
+def _walk_up_for_repo_root(start_dir: Path) -> Path:
+    """Walk upward from ``start_dir`` (inclusive) for the repo-root marker
+    (``pyproject.toml`` + ``src/``); fall back to ``start_dir`` itself."""
+    for candidate in (start_dir, *start_dir.parents):
+        if (candidate / "pyproject.toml").is_file() and (candidate / "src").is_dir():
+            return candidate
+    return start_dir
+
+
 def _repository_root_for(manifest_path: Path) -> Path:
-    resolved = manifest_path.resolve()
-    for parent in resolved.parents:
-        if (parent / "pyproject.toml").is_file() and (parent / "src").is_dir():
-            return parent
-    return resolved.parent
+    return _walk_up_for_repo_root(manifest_path.resolve().parent)
 
 
 def build_manual_scan_source(
@@ -84,7 +100,7 @@ def resolve_history_source_path(
     if isinstance(manifest, Path):
         root = source_root.resolve() if source_root else _repository_root_for(manifest)
     else:
-        root = (source_root or Path.cwd()).resolve()
+        root = source_root.resolve() if source_root else _walk_up_for_repo_root(Path.cwd())
     candidate = Path(source_path)
     return candidate.resolve() if candidate.is_absolute() else (root / candidate).resolve()
 
@@ -106,7 +122,9 @@ def load_verified_history_manifest(
         )
     else:
         payload = dict(manifest)
-        resolved_root = (source_root or Path.cwd()).resolve()
+        resolved_root = (
+            source_root.resolve() if source_root else _walk_up_for_repo_root(Path.cwd())
+        )
 
     if payload.get("schema_version") != 1:
         raise ValueError("History manifest must use schema_version=1")

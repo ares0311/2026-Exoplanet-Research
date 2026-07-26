@@ -8,8 +8,41 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 SearchMode = Literal["new", "follow-up"]
 TargetStatus = Literal["candidate_found", "no_signal", "no_data", "failed"]
+ValidityState = Literal[
+    "valid",
+    "stale-but-usable",
+    "refresh-required",
+    "invalid",
+    "unknown",
+]
+USABLE_VALIDITY_STATES = frozenset({"valid", "stale-but-usable"})
 TERMINAL_TARGET_STATUSES = frozenset({"candidate_found", "no_signal", "no_data"})
 EXECUTABLE_SEARCH_STATES = frozenset({"pending", "running", "partial", "failed"})
+
+
+class DecisionValidity(BaseModel):
+    """Applicability assessment for evidence used in a production decision."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    state: ValidityState
+    source: str = Field(min_length=1)
+    source_version: str = Field(min_length=1)
+    as_of: datetime | None = None
+    retrieved_at: datetime
+    assessed_at: datetime
+    transformations: tuple[str, ...] = ()
+    basis: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def timestamps_are_ordered(self) -> DecisionValidity:
+        if self.retrieved_at.tzinfo is None or self.assessed_at.tzinfo is None:
+            raise ValueError("validity timestamps must include a timezone")
+        if self.as_of is not None and self.as_of.tzinfo is None:
+            raise ValueError("validity as_of must include a timezone")
+        if self.assessed_at < self.retrieved_at:
+            raise ValueError("validity assessed_at cannot precede retrieved_at")
+        return self
 
 
 class PriorSearch(BaseModel):
@@ -23,6 +56,7 @@ class PriorSearch(BaseModel):
     method_or_data: str = Field(min_length=1)
     result: str = Field(min_length=1)
     provenance_uri: str = Field(min_length=1)
+    decision_validity: DecisionValidity | None = None
 
 
 class HunterCandidate(BaseModel):
@@ -37,6 +71,7 @@ class HunterCandidate(BaseModel):
     object_classification: str = Field(default="star", min_length=1)
     source: str = Field(min_length=1)
     source_provenance: dict[str, Any]
+    decision_validity: DecisionValidity | None = None
     eligible: bool = True
     eligibility_reason: str = Field(default="eligible", min_length=1)
     distance_pc: float | None = Field(default=None, gt=0, allow_inf_nan=False)

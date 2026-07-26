@@ -79,6 +79,23 @@ REQUIRED_TABLE_COLUMNS: dict[str, frozenset[str]] = {
             "created_at",
         }
     ),
+    "cross_project_search_history": frozenset(
+        {
+            "entry_id",
+            "manifest_sha256",
+            "manifest_path",
+            "source_project",
+            "source_search_id",
+            "source_path",
+            "source_sha256",
+            "identities_json",
+            "searched_at",
+            "source_status",
+            "validity_state",
+            "provenance_json",
+            "imported_at",
+        }
+    ),
     "follow_up_registry": frozenset(
         {
             "follow_up_id",
@@ -122,6 +139,8 @@ IMMUTABLE_TRIGGER_NAMES = frozenset(
         "hunter_immutable_search_state_delete",
         "hunter_immutable_target_history_update",
         "hunter_immutable_target_history_delete",
+        "hunter_immutable_cross_project_history_update",
+        "hunter_immutable_cross_project_history_delete",
         "hunter_immutable_follow_up_events_update",
         "hunter_immutable_follow_up_events_delete",
     }
@@ -376,6 +395,20 @@ def validate_hunter_database(
                             issues.append(
                                 f"{search_id}: candidate selector provenance does not "
                                 f"match {selector_version}"
+                            )
+                        validity = candidate_json.get("decision_validity")
+                        if not isinstance(validity, Mapping):
+                            issues.append(
+                                f"{search_id}: production candidate lacks "
+                                "decision_validity"
+                            )
+                        elif validity.get("state") not in {
+                            "valid",
+                            "stale-but-usable",
+                        }:
+                            issues.append(
+                                f"{search_id}: production candidate has unusable "
+                                f"decision validity state {validity.get('state')!r}"
                             )
             expected_manifest_hash: str | None = None
             if search_id in sources:

@@ -51,44 +51,47 @@ and `docs/HUNTER_PRODUCTION_WORKFLOW.md`.
   consume the same shape, copy this file directly rather than re-deriving the
   design.
 
-## Current operational limitation (read this before assuming access works)
+## Current read-only mechanism
 
-On 2026-07-24, read access to `2026 Technosignatures` and
-`2026 Near Earth Objects` was granted from this repo's
-`.claude/settings.local.json` (cleared `sandbox.filesystem.denyRead` and the
-matching `permissions.deny` `Read(...)`/`Bash(...)` rules for both paths;
-`Edit`/`denyWrite` were deliberately left blocking).
+The 2026-07-25 verification established that sibling reads work when the path
+is computed inside the running process relative to this checkout. The
+write-side repository boundary remains enforced and is intentionally
+unchanged.
 
-That grant is **not sufficient by itself**. This session's own tools (Read,
-Bash) independently enforce a "stay inside the current git root" restriction
-that is separate from that sandbox config and was not lifted by editing it —
-confirmed empirically the same day: both `Read` and `Bash` refused paths
-under `2026 Technosignatures` with "outside current git root" even after the
-settings edit. So an agent working in this repo still cannot actually read
-sibling-repo files yet, despite the permission grant looking complete on
-paper.
+`src/exo_toolkit/hunter_cross_project.py` provides the stable consumer:
 
-Until that harness-level restriction is separately addressed, treat
-cross-repo exchange as **human-mediated**, not automatic:
+- `sibling_history_export_path("technosignatures")` resolves
+  `../2026 Technosignatures/data_selection/hunter_prior_search_history_v1.json`
+  without a hard-coded absolute path.
+- `Create-New-Search --cross-project-sibling technosignatures` prefers that
+  normalized export. When it is absent, a strict read-only adapter normalizes
+  the sibling's real `results/scan_history.ndjson` `prod_scan_history_v1`
+  records in memory and independently verifies the exact source hash.
+- `Create-New-Search --cross-project-history-path <file>` retains the portable
+  operator-copied fallback. When origin source bytes are unavailable, the
+  manifest is explicitly `stale-but-usable`, never silently `valid`.
+- With neither flag, new-mode production imports the committed
+  `data_selection/cross_project_imports/techno_hunter_history_v1.json`. If the
+  sibling checkout is present, its real `results/scan_history.ndjson` is
+  source-hash verified; otherwise the copy remains `stale-but-usable`.
 
-1. If you're an agent in Technosignatures or NEO and want Exoplanet
-   Research's search history: ask the operator to copy
-   `data_selection/hunter_prior_search_history_v1.json` into your repo, then
-   verify and load it with your own copy of `load_verified_history_manifest()`.
-2. If you want Exoplanet Research to know about targets your repo already
-   covered: publish an equivalently-shaped `schema_version: 1` file in your
-   own repo and ask the operator to copy it into this repo's
-   `data_selection/` directory — the existing reconciliation pattern (see
-   `docs/DISCOVERY_RUNBOOK.md`'s superseded-notice section and
-   `data_selection/hunter_prior_search_history_v1.json`'s `sources[]` list,
-   which already reconciles seven legacy discovery logs the same way) applies
-   unchanged to an external source.
+Imported identities are append-only schema-v6 rows. TIC/HIP/KIC aliases affect
+new-target eligibility, but Techno-Hunter's radio outcome vocabulary is
+preserved verbatim and is never translated into an EXO-Hunter scientific
+result. NEO-Hunter is intentionally absent because minor-planet designations
+are a disjoint identity space.
+
+At the time of verification, the real Technosignatures source history existed
+and matched SHA-256
+`c70b35120722754849c589db1d563060b3f4d6a32a246c25d16f2a116266b3fb`;
+its advertised normalized export file did not yet exist. The direct sibling
+flag was therefore verified through the strict raw-history adapter; the
+default source-verified copied export remains the portable no-sibling
+fallback.
 
 ## Non-goals
 
-This is not a proposal for a shared database, a shared `astrometrics_ml_hardening`
-package, or automatic live cross-repo sync. The Hunter directive is explicit
-that the three repos are isolated and that a smaller interoperable solution
-is preferred over coupling repo internals. Revisit only if real, observed
-duplicate-search cost across projects justifies the extra coupling — record
-that justification in `docs/research/agent_decision_log.md` if it happens.
+This is not a shared database, a shared package, cross-repo write path, or
+automatic mutation of a sibling checkout. The interoperability surface is the
+versioned JSON export, plus the narrowly validated Techno-Hunter
+`prod_scan_history_v1` read adapter until the sibling publishes that export.
