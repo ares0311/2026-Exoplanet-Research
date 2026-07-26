@@ -14,12 +14,24 @@ Watchlist(path)
     .entries() -> list[dict]   # [{tic_id, note, added_at}, ...]
     .clear()
     .summary() -> dict         # {n_entries, path}
+
+Every mutating call (``add``/``remove``/``clear``) reloads the file fresh
+under an exclusive ``fcntl`` lock immediately before writing, rather than
+caching state from construction time — an earlier version cached the
+loaded dict for the life of the ``Watchlist`` object, so a second
+``Watchlist`` instance's write to the same file (a second CLI invocation,
+a concurrent shard) could be silently lost to a later write from the
+first, stale instance. Read-only queries also always read the file fresh
+so a ``Watchlist`` object never returns state a concurrent writer has
+since replaced.
 """
 from __future__ import annotations
 
 import datetime
+import fcntl
 import json
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -29,7 +41,6 @@ class Watchlist:
 
     def __init__(self, path: Path | str) -> None:
         self.path = Path(path)
-        self._data: dict[str, Any] = self._load()
 
     # ------------------------------------------------------------------
     # Persistence helpers
@@ -40,11 +51,25 @@ class Watchlist:
             return json.loads(self.path.read_text())
         return {"entries": {}}
 
-    def _save(self) -> None:
-        payload = json.dumps(self._data, indent=2)
+    def _save(self, data: dict[str, Any]) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        payload = json.dumps(data, indent=2)
         tmp = Path(tempfile.mktemp(dir=self.path.parent, suffix=".tmp"))
         tmp.write_text(payload)
         tmp.replace(self.path)
+
+    def _mutate(self, fn: Callable[[dict[str, Any]], Any]) -> Any:
+        """Reload fresh, run ``fn(data)`` in place, save -- all under an
+        exclusive cross-process lock so a concurrent writer's update to the
+        same file is never overwritten by a read that predates it."""
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = self.path.with_suffix(self.path.suffix + ".lock")
+        with lock_path.open("a+") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            data = self._load()
+            result = fn(data)
+            self._save(data)
+            return result
 
     # ------------------------------------------------------------------
     # Public API
@@ -52,47 +77,53 @@ class Watchlist:
 
     def add(self, tic_id: int, note: str = "") -> None:
         """Add a TIC ID to the watchlist (idempotent — updates note if present)."""
-        key = str(tic_id)
-        self._data["entries"][key] = {
-            "tic_id": tic_id,
-            "note": note,
-            "added_at": datetime.datetime.now(datetime.UTC).isoformat(),
-        }
-        self._save()
+
+        def mutate(data: dict[str, Any]) -> None:
+            data["entries"][str(tic_id)] = {
+                "tic_id": tic_id,
+                "note": note,
+                "added_at": datetime.datetime.now(datetime.UTC).isoformat(),
+            }
+
+        self._mutate(mutate)
 
     def remove(self, tic_id: int) -> bool:
         """Remove a TIC ID. Returns True if it was present, False otherwise."""
-        key = str(tic_id)
-        if key in self._data["entries"]:
-            del self._data["entries"][key]
-            self._save()
-            return True
-        return False
+
+        def mutate(data: dict[str, Any]) -> bool:
+            key = str(tic_id)
+            if key in data["entries"]:
+                del data["entries"][key]
+                return True
+            return False
+
+        return bool(self._mutate(mutate))
 
     def contains(self, tic_id: int) -> bool:
         """Return True if the TIC ID is in the watchlist."""
-        return str(tic_id) in self._data["entries"]
+        return str(tic_id) in self._load()["entries"]
 
     def list_ids(self) -> list[int]:
         """Return sorted list of TIC IDs in the watchlist."""
-        return sorted(int(k) for k in self._data["entries"])
+        return sorted(int(k) for k in self._load()["entries"])
 
     def entries(self) -> list[dict[str, Any]]:
         """Return all entries sorted by TIC ID."""
-        return [
-            self._data["entries"][k]
-            for k in sorted(self._data["entries"], key=int)
-        ]
+        entries = self._load()["entries"]
+        return [entries[k] for k in sorted(entries, key=int)]
 
     def clear(self) -> None:
         """Remove all entries from the watchlist."""
-        self._data["entries"] = {}
-        self._save()
+
+        def mutate(data: dict[str, Any]) -> None:
+            data["entries"] = {}
+
+        self._mutate(mutate)
 
     def summary(self) -> dict[str, Any]:
         """Return a summary dict with entry count and file path."""
         return {
-            "n_entries": len(self._data["entries"]),
+            "n_entries": len(self._load()["entries"]),
             "path": str(self.path),
         }
 

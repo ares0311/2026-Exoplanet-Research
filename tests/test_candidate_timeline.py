@@ -28,8 +28,10 @@ class TestCandidateTimeline:
     def test_new_file_created_on_first_record(self, tmp_path: Path) -> None:
         tl = CandidateTimeline(tmp_path)
         tl.record(_row())
-        files = list(tmp_path.iterdir())
-        assert len(files) == 1
+        # record() also creates a per-candidate ".json.lock" file alongside
+        # the data file (see TestCandidateTimelineConcurrency).
+        json_files = list(tmp_path.glob("*.json"))
+        assert len(json_files) == 1
 
     def test_entries_empty_on_new_timeline(self, tmp_path: Path) -> None:
         tl = CandidateTimeline(tmp_path)
@@ -126,3 +128,46 @@ class TestCandidateTimeline:
         tl = CandidateTimeline(nested)
         tl.record(_row())
         assert nested.exists()
+
+
+class TestCandidateTimelineConcurrency:
+    def test_concurrent_record_calls_do_not_lose_either_entry(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Regression: record() used to load, append, and save with no lock
+        # around the read-modify-write, so two concurrent record() calls
+        # for the same candidate could each load the same on-disk state and
+        # each save their own single entry, silently losing one run's
+        # entry to the other's. A short sleep is injected inside the now-
+        # locked region (between load and save) to reliably widen the race
+        # window: the second thread must block on fcntl.flock() until the
+        # first releases, so by the time it loads, it sees the first
+        # thread's already-appended entry.
+        import threading
+        import time
+
+        tl = CandidateTimeline(tmp_path)
+        original_load = tl._load
+
+        def slow_load(candidate_id: str):
+            data = original_load(candidate_id)
+            time.sleep(0.05)
+            return data
+
+        monkeypatch.setattr(tl, "_load", slow_load)
+
+        def worker(fpp: float) -> None:
+            tl.record(_row(scores={"false_positive_probability": fpp}))
+
+        threads = [
+            threading.Thread(target=worker, args=(0.1,)),
+            threading.Thread(target=worker, args=(0.2,)),
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        entries = tl.entries("TIC1_01")
+        assert len(entries) == 2
+        assert {e.fpp for e in entries} == {0.1, 0.2}

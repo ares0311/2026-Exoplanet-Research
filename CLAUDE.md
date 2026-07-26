@@ -1165,6 +1165,35 @@ The version 0.3.30 release gate passed 3,174 default tests plus Ruff/mypy
 as 10/10 supervised gates in 31.3 seconds under the canonical 6x6
 topology.
 
+Version 0.3.31 fixes the T2 backlog's "lost-update races" item.
+`Skills/watchlist.py`'s `Watchlist` cached the loaded JSON dict for the
+life of the object at construction and never reloaded before mutating,
+so a second `Watchlist` instance's write to the same file (a second CLI
+invocation, a concurrent shard) could be silently overwritten by a later
+write from a first, stale instance -- deterministically reproduced (not
+just theorized) in a new regression test with two real `Watchlist`
+objects against the same path. `add()`/`remove()`/`clear()` now reload
+fresh under an exclusive `fcntl.flock()` immediately before every write,
+matching the cross-process locking pattern already established in
+`crossmatch_tess_catalina_labels.py`; read-only queries
+(`contains()`/`list_ids()`/`entries()`/`summary()`) also always read the
+file fresh rather than returning state from construction time.
+`Skills/candidate_timeline.py`'s `record()` already reloaded fresh on
+every call (a narrower bug class -- the race window was only the
+load-append-save inside one call, and only for concurrent `record()`s on
+the *same* candidate, since each candidate has its own file) but had no
+lock around that window; it now uses the same `fcntl.flock()` pattern,
+verified with a threading-based test that injects a sleep inside the
+locked region to reliably force two concurrent `record()` calls to
+interleave. Both fixes add a `.json.lock` sidecar file next to the data
+file; `.gitignore` gains a `*.json.lock` pattern. 6 new tests (3 for
+`Watchlist`'s stale-instance-write/stale-instance-remove/read-sees-
+concurrent-write cases, 1 threaded test for `CandidateTimeline`, plus 2
+existing tests adjusted for the new lock-file sidecar's presence).
+The version 0.3.31 release gate passed 3,178 default tests plus Ruff/mypy
+as 10/10 supervised gates in 30.1 seconds under the canonical 6x6
+topology.
+
 Local artifact/corpus/checkpoint status: `docs/LOCAL_ARTIFACT_LEDGER.md`.
 Full per-Skill Milestone changelog (historical, archived verbatim, not
 needed for day-to-day work): `docs/MILESTONE_HISTORY.md`.

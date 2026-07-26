@@ -12,10 +12,17 @@ CandidateTimeline(path)
     .latest() -> TimelineEntry | None
     .summary() -> dict
     .to_markdown() -> str
+
+``record()`` reloads the candidate's file under an exclusive ``fcntl``
+lock immediately before appending, so two concurrent ``record()`` calls
+for the same candidate never lose one run's entry to the other's
+read-modify-write (each candidate has its own file, so concurrent runs
+for *different* candidates never contend with each other).
 """
 from __future__ import annotations
 
 import datetime
+import fcntl
 import json
 import tempfile
 from dataclasses import asdict, dataclass
@@ -117,9 +124,18 @@ class CandidateTimeline:
             note=note,
         )
 
-        data = self._load(candidate_id)
-        data.append(asdict(entry))
-        self._save(candidate_id, data)
+        # Reload immediately before appending, under an exclusive
+        # cross-process lock, so two concurrent record() calls for the
+        # same candidate_id can never lose one run's entry to the other's
+        # stale read-modify-write.
+        p = self._candidate_path(candidate_id)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = p.with_suffix(p.suffix + ".lock")
+        with lock_path.open("a+") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            data = self._load(candidate_id)
+            data.append(asdict(entry))
+            self._save(candidate_id, data)
 
     def entries(self, candidate_id: str = "unknown") -> list[TimelineEntry]:
         """Return all timeline entries for a candidate.
