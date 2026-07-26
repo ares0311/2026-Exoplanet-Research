@@ -50,6 +50,7 @@ from Skills.star_scanner import (  # noqa: E402
     run_target_scan,
     scan_star,
     select_targets,
+    select_targets_catalog,
 )
 
 from exo_toolkit.dataset_manifest import (  # noqa: E402
@@ -524,6 +525,57 @@ class TestSearchCenters:
         assert _search_centers(TOTAL_SEARCH_TILES + 500) == (
             _DEFAULT_SEARCH_CENTERS + _EXPANSION_SEARCH_CENTERS
         )
+
+
+class TestCatalogCriteriaDiscovery:
+    def test_scans_past_initial_page_and_retains_global_best(self) -> None:
+        pages = {
+            1: [
+                {"ID": 1, "Tmag": 12.0, "Teff": 7000.0, "contratio": 0.9},
+                {"ID": 2, "Tmag": 12.0, "Teff": 7000.0, "contratio": 0.8},
+            ],
+            2: [
+                {
+                    "ID": 999,
+                    "HIP": 74981,
+                    "version": "TICv8.2",
+                    "Tmag": 12.5,
+                    "Teff": 4000.0,
+                    "contratio": 0.0,
+                    "rad": 0.5,
+                },
+                {"ID": 3, "Tmag": 14.4, "Teff": 6500.0, "contratio": 0.7},
+            ],
+            3: [],
+        }
+        calls: list[int] = []
+
+        def query(
+            page: int,
+            pagesize: int,
+            _range: tuple[float, float],
+            *,
+            query_timeout_seconds: float,
+        ) -> list[dict[str, Any]]:
+            assert pagesize == 2
+            assert query_timeout_seconds == 120.0
+            calls.append(page)
+            return pages[page]
+
+        log: dict[str, Any] = {}
+        targets = select_targets_catalog(
+            2,
+            pagesize=2,
+            search_log=log,
+            query_page_fn=query,
+        )
+
+        assert calls == [1, 2, 3]
+        assert targets[0]["tic_id"] == 999
+        assert targets[0]["hip_id"] == 74981
+        assert log["universe_exhausted"] is True
+        assert log["catalog_rows_seen"] == 4
+        assert log["source_versions"] == ["TICv8.2"]
 
 
 # ---------------------------------------------------------------------------

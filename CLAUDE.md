@@ -16,6 +16,17 @@ file assumes you already have.
 
 Current gap status (see `docs/PRODUCTION_READINESS.md` for the full,
 actively-maintained narrative — do not rely on any cached summary of it):
+**Hunter 0.4.0 closure validation is the active priority as of 2026-07-25.**
+An adversarial audit superseded every earlier Hunter PROD statement in this
+file until the seven gates at the top of `docs/HUNTER_PRODUCTION_WORKFLOW.md`
+are current and verified. The implementation replaces fixed sky-tile sampling
+with catalog-wide paged discovery plus a top-N score-bound proof, removes
+`--candidate-file`, adds pre-write decision-validity checks and schema-v6
+cross-project identity history. Its live v12 acceptance and all 10 local
+quality gates pass; it is not release-complete until PR CI, merge, and main
+sync finish. The older version narrative below is historical context, not
+current acceptance authority.
+
 **no Tier 1 gaps open as of 2026-07-12** (T1-0/T1-1/T1-2 all complete).
 Version 0.3.2 adds the Hunter product lifecycle above the accepted scientific
 pipeline: `src/exo_toolkit/search_lifecycle.py` is the append-only SQLite

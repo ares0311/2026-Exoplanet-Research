@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "acceptance_id": "exo-hunter-prod-closure-v12",
+  "generated_at": "2026-07-26T00:58:30Z",
+  "objective": "Adversarial closure of adaptive top-N discovery, canonical selection, pre-write validity, cross-project history, and live new/follow-up execution.",
+  "repository_version": "0.4.0",
+  "prior_acceptance_status": "superseded",
+  "selector_contracts": {
+    "new": "exo_hunter_tic_v3",
+    "follow_up": "exo_hunter_follow_up_v4",
+    "operator_candidate_selector": "legacy database verification only; no production CLI path"
+  },
+  "live_new_workflow": {
+    "database": "/tmp/exo-hunter-v12.26v7Az/hunter.sqlite3",
+    "search_id": "exo-search-20260726T005608Z-b59daa50d6a5",
+    "manifest_sha256": "b59daa50d6a522dbfd31e807981ad4b53dff41c04f6ee083af45438ab6393354",
+    "target_id": "TIC 229095751",
+    "filtered_tic_rows_evaluated": 1086,
+    "catalog_pages_queried": 1,
+    "catalog_universe_exhausted": true,
+    "metadata_rows_inspected": 3,
+    "nth_selected_score": 99.98262537087999,
+    "remaining_score_upper_bound": 91.6783472,
+    "selection_sufficiency_reason": "top_n_score_upper_bound",
+    "targets_requested": 1,
+    "targets_selected": 1,
+    "targets_executed": 1,
+    "targets_succeeded": 1,
+    "targets_failed": 0,
+    "durable_status": "no_signal",
+    "schema_version": 6,
+    "database_integrity": "ok",
+    "foreign_key_violation_count": 0,
+    "candidate_snapshots_verified": 1086,
+    "provenance_rows_verified": 1,
+    "second_execution_result": "nonzero: No pending or resumable search exists"
+  },
+  "live_follow_up_workflow": {
+    "database": "/tmp/exo-hunter-v12.26v7Az/followup.sqlite3",
+    "search_id": "exo-search-20260726T005700Z-1b1d940b62a7",
+    "manifest_sha256": "1b1d940b62a7c203155ae2597c35344d33aad08861388678e893eb8508f4b72c",
+    "target_id": "TIC 149929601",
+    "verified_history_sources": 7,
+    "history_events_imported": 608,
+    "candidate_universe": 200,
+    "eligible_candidates": 190,
+    "targets_requested": 1,
+    "targets_selected": 1,
+    "targets_executed": 1,
+    "targets_succeeded": 1,
+    "targets_failed": 0,
+    "follow_ups_registered": 1,
+    "absolute_quality": {
+      "false_positive_probability": 0.9983325407388594,
+      "detection_confidence": 0.9129751349907814,
+      "meets_strict_production_bar": false
+    },
+    "weak_quality_did_not_block_best_available_selection": true,
+    "schema_version": 6,
+    "database_integrity": "ok",
+    "foreign_key_violation_count": 0,
+    "candidate_snapshots_verified": 808,
+    "provenance_rows_verified": 609
+  },
+  "adaptive_outside_initial_sample": {
+    "production_behavior": "Every MAST criteria page is scanned before the retained heap is ranked.",
+    "regression_tests": [
+      "tests/test_star_scanner.py::TestCatalogCriteriaDiscovery::test_scans_past_initial_page_and_retains_global_best",
+      "tests/test_hunter_cli.py::test_live_selector_expands_retained_pool_and_selects_outside_candidate"
+    ],
+    "high_value_target_beyond_initial_page_or_retained_pool_selected": true
+  },
+  "validity_and_atomicity": {
+    "states": [
+      "valid",
+      "stale-but-usable",
+      "refresh-required",
+      "invalid",
+      "unknown"
+    ],
+    "production_usable_states": [
+      "valid",
+      "stale-but-usable"
+    ],
+    "candidate_file_cli_present": false,
+    "rejected_production_input_left_zero_manifests": true,
+    "rejected_production_input_left_zero_candidate_snapshots": true,
+    "regression_test": "tests/test_hunter_validity.py::test_production_candidate_validation_is_prewrite_atomic"
+  },
+  "cross_project_history": {
+    "source_project": "2026 Technosignatures",
+    "source_path": "results/scan_history.ndjson",
+    "source_sha256": "c70b35120722754849c589db1d563060b3f4d6a32a246c25d16f2a116266b3fb",
+    "source_hashes_verified_live": 1,
+    "normalized_stellar_identities": 590,
+    "validity_state_with_sibling_checkout": "valid",
+    "copied_manifest_fallback_state_without_source_bytes": "stale-but-usable",
+    "sibling_export_path": "../2026 Technosignatures/data_selection/hunter_prior_search_history_v1.json",
+    "sibling_export_present_at_validation_time": false,
+    "direct_sibling_raw_history_adapter": "verified live through Create-New-Search; 590 identities; database integrity ok",
+    "write_boundary_changed": false
+  },
+  "fail_loudly_evidence": {
+    "live_attempt_1": "Masked HIP alias raised MaskError; no search created; fixed with digit-only optional alias parsing.",
+    "live_attempt_2": "Masked QLP metadata raised PydanticSerializationError; no search created; fixed with explicit JSON scalar/null normalization.",
+    "live_attempt_3": "Create succeeded and exact target executed.",
+    "regressions_added": true
+  },
+  "run_reports": [
+    "artifacts/manifests/run_reports/hunter_search.jsonl"
+  ],
+  "quality_validation": {
+    "focused_tests": "43 passed across the final Hunter and direct-adapter checks",
+    "ruff": "passed",
+    "mypy": "passed",
+    "full_quality_gates": "10/10 passed on final content; 3187 tests across six shards; logs/quality_gates/20260726T011147Z/quality_gate_summary.json",
+    "github_ci": "pending PR"
+  },
+  "limitations": [
+    "The Techno-Hunter sibling has not yet published its advertised normalized export file; the direct flag uses a strict read-only prod_scan_history_v1 adapter and the default remains a complete source-hash-verifiable copied identity export.",
+    "TIC criteria paging is exhaustive for the user-specified magnitude interval, not an unfiltered all-TIC download.",
+    "No external scientific submission or discovery claim is authorized."
+  ]
+}

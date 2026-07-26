@@ -1,6 +1,73 @@
 # EXO-Hunter Production Workflow
 
-## Production outcome
+## Adversarial PROD closure plan (2026-07-25)
+
+**Current state: all implementation, live business-acceptance, and local
+quality gates are VERIFIED; PR CI and merged-main synchronization remain
+pending. Prior PROD acceptance claims remain superseded until that release
+gate passes.**
+
+Production outcome: close every path by which Hunter can select from an
+unjustifiably narrow universe, accept unvalidated operator decisions, persist a
+search before rejecting it, or ignore applicable shared search history. No
+human action, credential, GPU, large download, or external publication is
+required for this closure loop.
+
+1. **[AGENT — VERIFIED] Adaptive selection sufficiency.** Replace the fixed 126/306-tile
+   convenience sample and `eligible_count >= N` stopping rule with broad TIC
+   criteria discovery that expands by page and metadata-inspection depth until
+   the selected top-N is supported by an explicit score upper bound or the
+   accessible result universe is exhausted. Regression gate: a higher-value
+   target beyond the initial discovery page must displace an initially selected
+   lower-value target.
+2. **[AGENT — VERIFIED] One production selection path.** Remove the
+   `Create-New-Search --candidate-file` operator-ranking bypass. All new and
+   follow-up searches must enter through Hunter's canonical discovery/history,
+   eligibility, ranking, immutable-manifest, and durable execution path.
+3. **[AGENT — VERIFIED] Atomic pre-write validation.** Validate selector identity,
+   selection contract, candidate provenance, decision validity, and target
+   cardinality before opening the search transaction. Regression gate: rejected
+   input returns non-zero and leaves zero pending/open searches and zero
+   candidate snapshots.
+4. **[AGENT — VERIFIED] Decision-input validity.** Add the explicit states `valid`,
+   `stale-but-usable`, `refresh-required`, `invalid`, and `unknown`, with
+   source/version, retrieval/assessment times, transformations, and assessment
+   basis. Only the first two states may drive a production selection; strict
+   absolute-quality reporting remains separate from rank eligibility.
+5. **[AGENT — VERIFIED] Cross-project history.** Add a read-only sibling-resolved import
+   for Techno-Hunter's signed/hash-addressed history export, computed relative
+   to this checkout, while retaining an explicit copied-manifest fallback.
+   Preserve the write-side repo boundary. Exact shared stellar identities must
+   affect new-target eligibility durably; the disjoint NEO identity space is
+   not imported.
+6. **[AGENT — VERIFIED] Contract and documentation reconciliation.** Bump the product and
+   schema contracts as needed, remove stale fixed-pool/operator-bypass
+   instructions, and make README, readiness, roadmap, architecture, and this
+   runbook describe the same current behavior and evidence.
+7. **[AGENT — LOCAL VERIFIED; RELEASE PENDING] Business acceptance and delivery.** Prove new and follow-up
+   create→exact execution→durable result→future-eligibility workflows, adaptive
+   outside-initial-page discovery, weak-quality best-N behavior, no production
+   bypass, rejected-input atomicity, and restart/resume safety. Then run the
+   complete repository quality gates and finish branch→PR→green CI→squash
+   merge→main synchronization.
+
+Each gate changes to **VERIFIED** only with a current test or acceptance
+artifact tied to the exact code state. Implemented-but-unverified work remains
+explicitly incomplete.
+
+Local evidence for this state is
+`artifacts/manifests/hunter_live_acceptance_v12.json`: a live new-mode search
+scanned all 1,086 rows in the specified MAST criteria universe, proved the
+selected target against the remaining candidates' score upper bound, executed
+that exact target, and persisted an integrity-clean result. A live follow-up
+search imported 608 verified prior events, ranked 190 eligible candidates,
+executed its exact best target, and registered the next recommendation even
+though the result failed the strict absolute-quality bar. The final local
+quality gate passed 10/10 with 3,187 tests across six shards at
+`logs/quality_gates/20260726T011147Z/quality_gate_summary.json`. GitHub CI and
+merged-main verification are intentionally not claimed yet.
+
+## Historical production increments (superseded as current acceptance)
 
 Version 0.3.3 closes the reviewed-prior-result bridge left open by version 0.3.2.
 The shell entry points share one durable SQLite system of record and can run
@@ -230,6 +297,14 @@ git pull --ff-only origin main
 .venv/bin/Create-New-Search --targets 100 --mode new
 ```
 
+New mode automatically imports the committed Techno-Hunter identity export and
+source-verifies it when the sibling checkout is present. Use
+`--cross-project-sibling technosignatures` to require the sibling's live export,
+or `--cross-project-history-path <file>` for a copied export on a differently
+laid-out machine. The former fails loudly while the sibling has not published
+its advertised file; the latter is explicitly `stale-but-usable` when its
+origin source bytes cannot be re-read.
+
 Create a follow-up search from the complete durable prior-search universe:
 
 ```bash
@@ -404,32 +479,36 @@ at verified acceptance or a genuine external blocker.
 
 ## New-target selection
 
-The default metadata-only selector requests at least 10,000 TIC candidates and
-performs two deterministic stages:
+The version 0.4.0 selector scans consecutive non-positional MAST TIC criteria
+pages until the filtered catalog universe is exhausted. A bounded heap retains
+the strongest first-stage rows; this is a memory bound, not a discovery bound,
+because every returned catalog row is evaluated. TOIs, CTOIs, confirmed hosts,
+durable EXO-Hunter history, and usable Techno-Hunter TIC/HIP/KIC identities are
+resolved before final eligibility.
 
-1. A full 126-tile TIC sweep ranks the broad pool by magnitude, stellar type,
-   sector coverage, contamination, and stellar radius. TOIs, CTOIs, confirmed
-   transiting hosts, and successfully searched EXO-Hunter targets are excluded.
-2. The leading three candidates per requested slot receive strict ASAS-SN
-   known-variable screening and QLP product-metadata inspection. Final ranking
-   adds verified data availability and storage cost. Failed metadata checks,
-   known variables, no-product targets, and candidates not advanced from the
-   first stage remain frozen in the candidate catalog with explicit ineligible
-   reasons; they can never enter the manifest silently.
+ASAS-SN and QLP metadata inspection begins with three rows per requested slot.
+It doubles only when needed. Let `p` be an uninspected row's TIC priority; its
+most favorable possible final score is `80*p + 20` (perfect availability and
+zero storage penalty). Selection is sufficient only when the Nth selected
+score meets or exceeds every remaining upper bound, or every accessible
+filtered candidate has been inspected. If the retained heap itself is too
+shallow to prove this, it doubles and the complete paged scan repeats. There
+is no fixed expansion count or fixed final candidate pool.
 
 Ranking is stable by score, canonical ID, and target ID. The manifest freezes
 the archive-derived result so `Run-New-Search` never regenerates or substitutes
-targets. `selector_log` records requested/returned pool size, tile failures,
-coverage, stage-two count, exclusions, and eligible count.
+targets. `selector_log` records page size/count, catalog rows evaluated,
+source versions/retrieval time, retained-pool expansions, metadata depth,
+exclusions, the Nth score, the remaining score bound, and the exact sufficiency
+reason.
 
-Version 0.3.9 gives each selection path a distinct immutable identity:
-`exo_hunter_tic_v2`, `exo_hunter_follow_up_v2`, or
-`exo_hunter_operator_candidates_v1`. Every manifest also freezes the complete
-JSON ranking contract: formula, weights, information-gain definition,
-eligibility thresholds, and accepted pathways. Candidate snapshots created by
-the built-in selectors carry the same selector ID. The validity verifier fails
-if candidate, manifest, or contract identities disagree, so a future ranking
-change must receive a new selector version rather than silently reusing one.
+Current immutable selector identities are `exo_hunter_tic_v3` and
+`exo_hunter_follow_up_v4`. `Create-New-Search --candidate-file` no longer
+exists; external reviewed evidence enters through checksum-verified
+`Import-Follow-Up`, not an operator ranking contract. Every production
+candidate also carries a typed decision-validity assessment. The verifier
+fails before search creation if selector, contract, provenance, or validity
+disagree.
 
 ## Execution and recovery
 

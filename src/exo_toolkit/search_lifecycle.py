@@ -14,6 +14,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any, Literal
 
+from exo_toolkit.hunter_cross_project import load_cross_project_history
 from exo_toolkit.hunter_history import (
     load_verified_history_manifest,
     resolve_history_source_path,
@@ -21,6 +22,8 @@ from exo_toolkit.hunter_history import (
 from exo_toolkit.hunter_models import (
     EXECUTABLE_SEARCH_STATES,
     TERMINAL_TARGET_STATUSES,
+    USABLE_VALIDITY_STATES,
+    DecisionValidity,
     ExecutionProvenance,
     FollowUpRecommendation,
     HunterCandidate,
@@ -34,9 +37,11 @@ from exo_toolkit.hunter_ranking import (
     FOLLOW_UP_FPP_MAX,
     FOLLOW_UP_PATHWAYS,
     FOLLOW_UP_SELECTOR_VERSION,
+    NEW_SELECTOR_VERSION,
+    selection_contract,
 )
 
-HUNTER_SCHEMA_VERSION = 5
+HUNTER_SCHEMA_VERSION = 6
 
 
 class _ClosingConnection(sqlite3.Connection):
@@ -136,6 +141,26 @@ CREATE TABLE IF NOT EXISTS target_search_history (
 CREATE INDEX IF NOT EXISTS idx_target_history_target
     ON target_search_history(target_id, id);
 
+CREATE TABLE IF NOT EXISTS cross_project_search_history (
+    entry_id TEXT PRIMARY KEY,
+    manifest_sha256 TEXT NOT NULL,
+    manifest_path TEXT NOT NULL,
+    source_project TEXT NOT NULL,
+    source_search_id TEXT NOT NULL,
+    source_path TEXT NOT NULL,
+    source_sha256 TEXT NOT NULL,
+    identities_json TEXT NOT NULL,
+    searched_at TEXT NOT NULL,
+    source_status TEXT NOT NULL,
+    validity_state TEXT NOT NULL CHECK(validity_state IN (
+        'valid', 'stale-but-usable', 'refresh-required', 'invalid', 'unknown'
+    )),
+    provenance_json TEXT NOT NULL,
+    imported_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_cross_project_manifest
+    ON cross_project_search_history(manifest_sha256, source_project);
+
 CREATE TABLE IF NOT EXISTS follow_up_registry (
     follow_up_id TEXT PRIMARY KEY,
     search_id TEXT NOT NULL,
@@ -217,6 +242,14 @@ END;
 CREATE TRIGGER IF NOT EXISTS hunter_immutable_target_history_delete
 BEFORE DELETE ON target_search_history BEGIN
     SELECT RAISE(ABORT, 'target_search_history is append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS hunter_immutable_cross_project_history_update
+BEFORE UPDATE ON cross_project_search_history BEGIN
+    SELECT RAISE(ABORT, 'cross_project_search_history is append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS hunter_immutable_cross_project_history_delete
+BEFORE DELETE ON cross_project_search_history BEGIN
+    SELECT RAISE(ABORT, 'cross_project_search_history is append-only');
 END;
 CREATE TRIGGER IF NOT EXISTS hunter_immutable_follow_up_events_update
 BEFORE UPDATE ON follow_up_events BEGIN
@@ -545,6 +578,82 @@ class HunterStore:
             "follow_up_id": str(follow_up["follow_up_id"]),
         }
 
+    def import_cross_project_history(
+        self,
+        path: Path | Mapping[str, Any],
+        *,
+        source_root: Path | None,
+        imported_at: datetime | None = None,
+    ) -> dict[str, Any]:
+        """Durably import verified sibling identities without remapping outcomes."""
+        payload = load_cross_project_history(path, source_root=source_root)
+        created_at = imported_at or _utc_now()
+        created = 0
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            for index, entry in enumerate(payload["entries"], 1):
+                identity = {
+                    "manifest_sha256": payload["manifest_sha256"],
+                    "source_project": entry["source_project"],
+                    "source_search_id": entry["source_search_id"],
+                    "source_path": entry["source_path"],
+                    "source_sha256": entry["source_sha256"],
+                    "identities": entry["identities"],
+                    "searched_at": entry["searched_at"],
+                    "status": entry["status"],
+                    "source_entry": entry["source_entry"],
+                }
+                entry_id = hashlib.sha256(
+                    f"{index}:{_canonical_json(identity)}".encode()
+                ).hexdigest()
+                cursor = connection.execute(
+                    """
+                    INSERT OR IGNORE INTO cross_project_search_history (
+                        entry_id, manifest_sha256, manifest_path, source_project,
+                        source_search_id, source_path, source_sha256,
+                        identities_json, searched_at, source_status,
+                        validity_state, provenance_json, imported_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        entry_id,
+                        payload["manifest_sha256"],
+                        payload["manifest_path"],
+                        entry["source_project"],
+                        entry["source_search_id"],
+                        entry["source_path"],
+                        entry["source_sha256"],
+                        _canonical_json(entry["identities"]),
+                        entry["searched_at"],
+                        entry["status"],
+                        payload["validity_state"],
+                        _canonical_json(identity),
+                        created_at.isoformat(),
+                    ),
+                )
+                created += int(cursor.rowcount > 0)
+        return {
+            "manifest_path": payload["manifest_path"],
+            "manifest_sha256": payload["manifest_sha256"],
+            "validity_state": payload["validity_state"],
+            "source_hashes_verified": payload["source_hashes_verified"],
+            "entries_total": len(payload["entries"]),
+            "entries_created": created,
+        }
+
+    def cross_project_searched_identities(self) -> frozenset[str]:
+        """Return every usable normalized stellar identity from sibling history."""
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT identities_json FROM cross_project_search_history "
+                "WHERE validity_state IN ('valid', 'stale-but-usable')"
+            ).fetchall()
+        return frozenset(
+            identity
+            for row in rows
+            for identity in json.loads(str(row["identities_json"]))
+        )
+
     def import_history_manifest(
         self,
         manifest: Path | Mapping[str, Any],
@@ -832,6 +941,36 @@ class HunterStore:
         ]
         if len({row.target_id for row in validated}) != len(validated):
             raise ValueError("candidate universe contains duplicate target_id values")
+        production_selector = {
+            "new": NEW_SELECTOR_VERSION,
+            "follow-up": FOLLOW_UP_SELECTOR_VERSION,
+        }[mode]
+        if selector_version in {NEW_SELECTOR_VERSION, FOLLOW_UP_SELECTOR_VERSION}:
+            if selector_version != production_selector:
+                raise ValueError(
+                    f"selector {selector_version!r} is invalid for mode={mode!r}"
+                )
+            expected_contract = selection_contract(mode)
+            if dict(config).get("selection_contract") != expected_contract:
+                raise ValueError(
+                    f"selection_contract does not match selector {selector_version}"
+                )
+            for row in validated:
+                if row.source_provenance.get("selector_version") != selector_version:
+                    raise ValueError(
+                        f"{row.target_id}: candidate selector provenance does not match "
+                        f"{selector_version}"
+                    )
+                validity = row.decision_validity
+                if validity is None:
+                    raise ValueError(
+                        f"{row.target_id}: production candidate lacks decision_validity"
+                    )
+                if validity.state not in USABLE_VALIDITY_STATES:
+                    raise ValueError(
+                        f"{row.target_id}: decision validity state "
+                        f"{validity.state!r} cannot drive production selection"
+                    )
 
         if mode == "new":
             searched = self.searched_target_ids()
@@ -1476,6 +1615,26 @@ class HunterStore:
                             "method_or_data": "durable EXO-Hunter lifecycle execution",
                             "result": follow_up.reason,
                             "provenance_uri": f"hunter-search:{search_id}",
+                            "decision_validity": {
+                                "state": "valid",
+                                "source": "Immutable EXO-Hunter execution result",
+                                "source_version": str(
+                                    candidate.source_provenance.get(
+                                        "selector_version", "unknown"
+                                    )
+                                ),
+                                "as_of": created_at.isoformat(),
+                                "retrieved_at": created_at.isoformat(),
+                                "assessed_at": created_at.isoformat(),
+                                "transformations": [
+                                    "typed acquisition-through-scoring execution",
+                                    "evidence-based follow-up registration",
+                                ],
+                                "basis": (
+                                    "Result was produced and registered in the same "
+                                    "durable transaction"
+                                ),
+                            },
                         }
                     ]
                 ),
@@ -1696,7 +1855,7 @@ class HunterStore:
         with self.connect() as connection:
             history_rows = connection.execute(
                 """
-                SELECT h.*, m.mode, c.candidate_json
+                SELECT h.*, m.mode, m.selector_version, c.candidate_json
                 FROM target_search_history AS h
                 JOIN search_manifests AS m ON m.search_id=h.search_id
                 LEFT JOIN candidate_catalog AS c
@@ -1713,6 +1872,7 @@ class HunterStore:
             registry_by_target.setdefault(str(row["target_id"]), []).append(row)
 
         candidates: list[HunterCandidate] = []
+        assessed_at = _utc_now()
         for target_id in sorted(set(grouped) | set(registry_by_target)):
             histories = grouped.get(target_id, [])
             registry_rows = registry_by_target.get(target_id, [])
@@ -1731,9 +1891,10 @@ class HunterStore:
                             seen_prior.add(key)
                 provenance = json.loads(str(row["provenance_json"]))
                 summary, _, _, _ = self._history_result_summary(row)
+                searched_at = datetime.fromisoformat(str(row["created_at"]))
                 prior = PriorSearch(
                     searched_by=str(provenance.get("searched_by", "EXO-Hunter")),
-                    searched_at=datetime.fromisoformat(str(row["created_at"])),
+                    searched_at=searched_at,
                     source_project=str(
                         provenance.get("source_project", "2026 Exoplanet Research")
                     ),
@@ -1749,6 +1910,22 @@ class HunterStore:
                             "provenance_uri",
                             f"hunter-search:{row['search_id']}/{row['attempt_id']}",
                         )
+                    ),
+                    decision_validity=DecisionValidity(
+                        state="stale-but-usable",
+                        source="Immutable EXO-Hunter target_search_history",
+                        source_version=str(row["selector_version"]),
+                        as_of=searched_at,
+                        retrieved_at=searched_at,
+                        assessed_at=assessed_at,
+                        transformations=(
+                            "typed result and execution-provenance validation",
+                            "latest applicable result resolution",
+                        ),
+                        basis=(
+                            "The prior-search fact remains valid; scientific scores "
+                            "are historical and are reported separately from availability"
+                        ),
                     ),
                 )
                 key = (prior.provenance_uri, prior.searched_at.isoformat())
@@ -1863,6 +2040,23 @@ class HunterStore:
                     ),
                     source="Durable EXO-Hunter prior-search universe",
                     source_provenance=source_provenance,
+                    decision_validity=DecisionValidity(
+                        state="stale-but-usable",
+                        source="Immutable EXO-Hunter history and follow-up registry",
+                        source_version=FOLLOW_UP_SELECTOR_VERSION,
+                        as_of=max(prior.searched_at for prior in prior_searches),
+                        retrieved_at=max(prior.searched_at for prior in prior_searches),
+                        assessed_at=assessed_at,
+                        transformations=(
+                            "identity grouping",
+                            "latest-result applicability resolution",
+                            "deterministic follow-up ranking",
+                        ),
+                        basis=(
+                            "Prior-search identity and disposition are durable; "
+                            "historical scientific scores remain usable but may age"
+                        ),
+                    ),
                     eligible=eligible,
                     eligibility_reason=eligibility_reason,
                     distance_pc=(template.distance_pc if template else None),
