@@ -2,10 +2,9 @@
 
 ## Adversarial PROD closure plan (2026-07-25)
 
-**Current state: all implementation, live business-acceptance, local quality,
-and PR CI gates are VERIFIED; squash merge and merged-main synchronization
-remain pending. Prior PROD acceptance claims remain superseded until that
-release gate passes.**
+**Current state: PROD ACCEPTED. All implementation, live business-acceptance,
+local quality, PR CI, squash-merge, and merged-main synchronization gates are
+VERIFIED for version 0.4.0.**
 
 Production outcome: close every path by which Hunter can select from an
 unjustifiably narrow universe, accept unvalidated operator decisions, persist a
@@ -44,7 +43,7 @@ required for this closure loop.
    schema contracts as needed, remove stale fixed-pool/operator-bypass
    instructions, and make README, readiness, roadmap, architecture, and this
    runbook describe the same current behavior and evidence.
-7. **[AGENT — CI VERIFIED; MERGE PENDING] Business acceptance and delivery.** Prove new and follow-up
+7. **[AGENT — VERIFIED] Business acceptance and delivery.** Prove new and follow-up
    create→exact execution→durable result→future-eligibility workflows, adaptive
    outside-initial-page discovery, weak-quality best-N behavior, no production
    bypass, rejected-input atomicity, and restart/resume safety. Then run the
@@ -63,11 +62,12 @@ that exact target, and persisted an integrity-clean result. A live follow-up
 search imported 608 verified prior events, ranked 190 eligible candidates,
 executed its exact best target, and registered the next recommendation even
 though the result failed the strict absolute-quality bar. The final local
-quality gate passed 10/10 with 3,187 tests across six shards at
-`logs/quality_gates/20260726T011147Z/quality_gate_summary.json`. GitHub push
-run `30182573928` and PR run `30182592665` both passed for PR #319 head
-`920b90c`. Squash merge and merged-main verification are intentionally not
-claimed yet.
+quality gate passed 10/10 with 3,187 tests across six shards on clean merged
+main at `logs/quality_gates/20260726T012353Z/quality_gate_summary.json`.
+PR #319 final-head push run `30182708666` and PR run `30182710043` both
+passed; the PR squash-merged as
+`4a575c7a3df9b83925e9af7bbe71234027566c03`; local `main` was synchronized
+exactly to `origin/main`.
 
 ## Historical production increments (superseded as current acceptance)
 
