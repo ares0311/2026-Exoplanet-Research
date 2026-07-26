@@ -95,3 +95,57 @@ class TestWatchlistQuery:
 
     def test_new_watchlist_starts_empty(self, wl: Watchlist) -> None:
         assert wl.list_ids() == []
+
+
+class TestWatchlistConcurrency:
+    def test_stale_instance_does_not_clobber_concurrent_external_write(
+        self, tmp_path: Path
+    ) -> None:
+        # Regression: an earlier version cached the loaded dict for the life
+        # of the Watchlist object, so a *second* Watchlist instance's write
+        # to the same file (a second CLI invocation, a concurrent shard)
+        # could be silently lost to a later write from the first, stale
+        # instance -- even though neither instance was ever destructed.
+        path = tmp_path / "wl.json"
+        w1 = Watchlist(path)
+        w1.add(111)
+
+        w2 = Watchlist(path)
+        w2.add(222)
+
+        # w1's next write must see w2's concurrent write, not overwrite it.
+        w1.add(333)
+
+        assert set(Watchlist(path).list_ids()) == {111, 222, 333}
+
+    def test_stale_instance_remove_does_not_resurrect_concurrent_delete(
+        self, tmp_path: Path
+    ) -> None:
+        path = tmp_path / "wl.json"
+        w1 = Watchlist(path)
+        w1.add(111)
+        w1.add(222)
+
+        w2 = Watchlist(path)
+        w2.remove(222)
+
+        # w1's next mutation must not re-save its stale copy (which still
+        # has 222) over w2's deletion.
+        w1.add(444)
+
+        assert set(Watchlist(path).list_ids()) == {111, 444}
+
+    def test_read_only_queries_see_concurrent_external_write(
+        self, tmp_path: Path
+    ) -> None:
+        path = tmp_path / "wl.json"
+        w1 = Watchlist(path)
+        w1.add(111)
+
+        w2 = Watchlist(path)
+        w2.add(222)
+
+        # w1 never explicitly reloaded, but its read-only queries must not
+        # report stale state from construction time.
+        assert w1.contains(222)
+        assert set(w1.list_ids()) == {111, 222}

@@ -98,6 +98,10 @@ rad.json
 *.flf
 TestResults.xml
 
+# Cross-process fcntl lock sidecar files (watchlist.py, candidate_timeline.py,
+# crossmatch_tess_catalina_labels.py) -- operational artifacts, never data.
+*.json.lock
+
 # Runtime automation state. Keep only committed documentation/ignore sentinels.
 logs/*
 !logs/
