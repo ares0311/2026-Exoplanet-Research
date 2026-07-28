@@ -441,10 +441,24 @@ class TestSelectTargets:
 
     @patch("astroquery.mast.Catalogs")
     def test_radius_extracted_from_catalog_row(self, mock_catalogs: MagicMock) -> None:
-        rows = [{"ID": 700, "Tmag": 12.0, "Teff": 4500.0, "contratio": 0.0, "rad": 0.45}]
+        rows = [
+            {
+                "ID": 700,
+                "Tmag": 12.0,
+                "Teff": 4500.0,
+                "contratio": 0.0,
+                "rad": 0.45,
+                "d": 12.5,
+                "e_d": 0.4,
+                "distFlag": "bj2018",
+            }
+        ]
         mock_catalogs.query_region.return_value = rows
         results = select_targets(n=5)
         assert results[0]["radius_rsun"] == pytest.approx(0.45)
+        assert results[0]["distance_pc"] == pytest.approx(12.5)
+        assert results[0]["distance_error_pc"] == pytest.approx(0.4)
+        assert results[0]["distance_source_flag"] == "bj2018"
 
     @patch("astroquery.mast.Catalogs")
     def test_missing_radius_is_none(self, mock_catalogs: MagicMock) -> None:
@@ -543,6 +557,9 @@ class TestCatalogCriteriaDiscovery:
                     "Teff": 4000.0,
                     "contratio": 0.0,
                     "rad": 0.5,
+                    "d": 22.0,
+                    "e_d": 1.0,
+                    "distFlag": "bj2018",
                 },
                 {"ID": 3, "Tmag": 14.4, "Teff": 6500.0, "contratio": 0.7},
             ],
@@ -573,6 +590,9 @@ class TestCatalogCriteriaDiscovery:
         assert calls == [1, 2, 3]
         assert targets[0]["tic_id"] == 999
         assert targets[0]["hip_id"] == 74981
+        assert targets[0]["distance_pc"] == pytest.approx(22.0)
+        assert targets[0]["distance_error_pc"] == pytest.approx(1.0)
+        assert targets[0]["distance_source_flag"] == "bj2018"
         assert log["universe_exhausted"] is True
         assert log["catalog_rows_seen"] == 4
         assert log["source_versions"] == ["TICv8.2"]

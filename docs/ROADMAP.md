@@ -8,6 +8,13 @@ by itself satisfy a master-guide evidence requirement.
 
 ## Current Master-Guide Alignment — Production Priority Order
 
+- **Explainable operator reporting (0.5.2 under release verification):**
+  The candidate grid and timestamped CSV now expose the full decision context
+  required to review a selection: stable identities, classification, distance,
+  storage, explicit search status, prior-search count/provenance, rank,
+  selection reason, and exoplanet metrics. This is a presentation/export delta
+  over the unchanged accepted 0.5.1 lifecycle.
+
 - **Exact shared Hunter command contract (0.5.1 PROD accepted):**
   Add the named `EXO-Hunter` launch command and canonical
   `/Create-New-Search --targets N --mode ...` and `/Run-New-Search` slash

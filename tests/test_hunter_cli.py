@@ -7,14 +7,17 @@ import subprocess
 import sys
 import tomllib
 from datetime import UTC, datetime
+from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
+from rich.console import Console
 
 from exo_toolkit.hunter_cli import (
     _commit_run_report,
+    _manifest_table,
     _pipeline_runner,
     _select_live_new_candidates,
     create_new_search,
@@ -161,6 +164,97 @@ def test_create_reports_shortfall_and_still_creates_best_available_search(
     assert open_searches[0]["selected_target_count"] == 1
 
 
+def test_candidate_grid_exposes_required_selection_context(tmp_path: Path) -> None:
+    observed = datetime(2025, 1, 1, tzinfo=UTC)
+    candidate = _candidates(1)[0].model_copy(
+        update={
+            "source_provenance": {"search_category": "follow-up"},
+            "distance_pc": 10.0,
+            "estimated_download_gb": 0.25,
+            "metrics": {
+                "tmag": 11.2,
+                "teff_k": 5772,
+                "radius_rsun": 1.01,
+                "qlp_product_count": 4,
+                "expected_information_gain": 0.72,
+                "latest_fpp": 0.08,
+                "latest_detection_confidence": 0.81,
+                "latest_pathway": "planet_hunters_discussion",
+                "meets_strict_follow_up_bar": True,
+            },
+            "prior_searches": (
+                PriorSearch(
+                    searched_by="External Researcher",
+                    searched_at=observed,
+                    source_project="External Survey",
+                    method_or_data="TESS photometry",
+                    result="unresolved signal",
+                    provenance_uri="doi:example",
+                ),
+            ),
+        }
+    )
+    store = HunterStore(tmp_path / "hunter.sqlite3")
+    search = store.create_search(
+        [candidate],
+        requested_target_count=1,
+        mode="follow-up",
+        selector_version="test-v1",
+        config={},
+        now=datetime(2026, 1, 1, tzinfo=UTC),
+    )
+    output = StringIO()
+    Console(file=output, width=400, no_color=True).print(_manifest_table(search))
+    rendered = output.getvalue()
+
+    assert "Survey ID" in rendered
+    assert "Canonical ID" in rendered
+    assert "Distance ly" in rendered
+    assert "32.62" in rendered
+    assert "follow-up" in rendered
+    assert "External Survey / External Researcher / 2025-01-01" in rendered
+    assert "method=TESS photometry" in rendered
+    assert "result=unresolved signal" in rendered
+    assert "provenance=doi:example" in rendered
+    assert "Tmag=11.2" in rendered
+    assert "latest FPP=0.08" in rendered
+    assert "strict bar=yes" in rendered
+
+
+def test_large_search_writes_visibly_timestamped_manifest(
+    tmp_path: Path, capsys: object
+) -> None:
+    db = tmp_path / "hunter.sqlite3"
+    manifest_dir = tmp_path / "manifests"
+
+    def selector(**_: object) -> tuple[list[HunterCandidate], dict[str, object]]:
+        return _candidates(101), {"candidate_universe_returned": 101}
+
+    assert (
+        create_new_search(
+            [
+                "--targets",
+                "101",
+                "--mode",
+                "new",
+                "--db",
+                str(db),
+                "--manifest-dir",
+                str(manifest_dir),
+                "--json",
+            ],
+            live_selector=selector,
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)  # type: ignore[attr-defined]
+    manifest_path = Path(payload["manifest_csv"])
+    timestamp = manifest_path.name.split("_", 1)[0]
+
+    assert datetime.strptime(timestamp, "%Y%m%dT%H%M%SZ")
+    assert manifest_path.is_file()
+
+
 def test_create_fails_when_zero_candidates_are_available(tmp_path: Path) -> None:
     db = tmp_path / "hunter.sqlite3"
 
@@ -194,7 +288,17 @@ def test_live_selector_stamps_versioned_information_gain_contract(
                     "source_versions": ["fixture-v1"],
                 }
             )
-            or [{"tic_id": 42, "hip_id": "--", "priority": 0.7, "tmag": 10.0}]
+            or [
+                {
+                    "tic_id": 42,
+                    "hip_id": "--",
+                    "priority": 0.7,
+                    "tmag": 10.0,
+                    "distance_pc": 12.5,
+                    "distance_error_pc": 0.4,
+                    "distance_source_flag": "bj2018",
+                }
+            ]
         ),
         inspect_target_products=lambda *_args, **_kwargs: {
             "products": ["product-1", "product-2"],
@@ -218,6 +322,10 @@ def test_live_selector_stamps_versioned_information_gain_contract(
     assert candidate.source_provenance["selector_version"] == NEW_SELECTOR_VERSION
     assert candidate.metrics["expected_information_gain"] == pytest.approx(0.32)
     assert candidate.metrics["scientific_suitability"] == pytest.approx(0.8)
+    assert candidate.distance_pc == pytest.approx(12.5)
+    assert candidate.metrics["distance_error_pc"] == pytest.approx(0.4)
+    assert candidate.metrics["distance_source_flag"] == "bj2018"
+    assert candidate.source_provenance["distance_field"]["field"] == "d"
     assert candidate.ranking_score == pytest.approx(67.2)
     assert search_log["stage_two_eligible_count"] == 1
     assert search_log["selection_sufficiency_reason"] == "top_n_score_upper_bound"
@@ -487,8 +595,9 @@ def test_more_than_100_targets_writes_timestamped_csv(tmp_path: Path) -> None:
         live_selector=selector,
     )
     assert code == 0
-    files = list(manifests.glob("exo-search-*.csv"))
+    files = list(manifests.glob("*_exo-search-*.csv"))
     assert len(files) == 1
+    assert datetime.strptime(files[0].name.split("_", 1)[0], "%Y%m%dT%H%M%SZ")
     assert len(files[0].read_text(encoding="utf-8").splitlines()) == 102
 
 
