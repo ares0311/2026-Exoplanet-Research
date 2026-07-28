@@ -1,0 +1,165 @@
+{
+  "schema_version": 1,
+  "acceptance_id": "exo-hunter-persistent-terminal-v13",
+  "generated_at": "2026-07-28T03:45:00Z",
+  "objective": "Close the required persistent ExoHunter slash terminal without duplicating the canonical adaptive selection, execution, or durable lifecycle.",
+  "repository_version": "0.5.0",
+  "implementation_commit": "a854dd4736db97907a7cf748bab93b877064fd55",
+  "release_status": "implementation, live business workflows, and clean local quality gates verified; PR CI, squash merge, and merged-main verification pending",
+  "workspace_boundary": {
+    "active_repo_root": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research",
+    "active_repo_name": "2026-Exoplanet-Research",
+    "active_branch": "claude/exohunter-interactive-prod-closure",
+    "reference_repo_roots": [
+      "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Technosignatures",
+      "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Near Earth Objects"
+    ],
+    "reference_repo_writes": 0,
+    "runtime_cross_repo_paths_used": 0,
+    "cross_project_contract": "operator-copied hash-bearing Techno-Hunter identity export; assessed stale-but-usable because origin bytes were intentionally not read"
+  },
+  "persistent_terminal": {
+    "entry_point": "ExoHunter",
+    "stays_active_until": "/Exit",
+    "slash_discovery_verified_in_real_pty": true,
+    "required_commands_exposed": [
+      "/New-Search <N>",
+      "/Follow-Up-Search <N>",
+      "/Run-Search",
+      "/Show-Follow-Ups",
+      "/Help",
+      "/Exit"
+    ],
+    "additional_canonical_commands_exposed": [
+      "/Import-Follow-Up",
+      "/Recheck-Follow-Ups"
+    ],
+    "canonical_delegates": [
+      "create_new_search",
+      "run_new_search",
+      "show_follow_ups",
+      "import_follow_up",
+      "recheck_follow_ups"
+    ],
+    "duplicate_selector_or_persistence_path_added": false,
+    "history": "readline-backed persistent history with a 1000-command bound",
+    "autocomplete": "case-insensitive slash-command completion on Tab",
+    "animation": "exoplanet orbit/transit frames run for the exact lifetime of canonical discovery, execution, import, recheck, and follow-up commands",
+    "animation_fallbacks": [
+      "--no-animation",
+      "redirected input or stderr",
+      "CI",
+      "TERM=dumb",
+      "REDUCE_MOTION",
+      "EXOHUNTER_REDUCE_MOTION"
+    ],
+    "scriptable_interfaces": [
+      "repeatable --command",
+      "--script <path>",
+      "--script -"
+    ],
+    "machine_readable_stdout_preserved": true
+  },
+  "live_new_workflow": {
+    "database": "/tmp/exohunter-v13-live-new.sqlite3",
+    "search_id": "exo-search-20260728T034208Z-326bbdeb7afe",
+    "manifest_sha256": "326bbdeb7afe89a4e6d00a86cb48ba4001ef35204641a3a9a7f3a631ca9ece26",
+    "selector_version": "exo_hunter_tic_v3",
+    "scientific_constraint": {
+      "tmag_min": 12.0,
+      "tmag_max": 12.01
+    },
+    "catalog_rows_evaluated": 49860,
+    "catalog_pages_queried": 5,
+    "catalog_universe_exhausted": true,
+    "retained_candidates": 10000,
+    "metadata_rows_inspected": 3,
+    "nth_selected_score": 99.998975394934,
+    "remaining_score_upper_bound": 91.99887717836,
+    "selection_sufficiency_reason": "top_n_score_upper_bound",
+    "targets_requested": 1,
+    "targets_selected": 1,
+    "target_id": "TIC 232981147",
+    "targets_executed": 1,
+    "targets_succeeded": 1,
+    "targets_failed": 0,
+    "durable_status": "candidate_found",
+    "raw_product_uri_count": 11,
+    "cadences_processed": 41366,
+    "absolute_quality": {
+      "false_positive_probability": 0.6093237459152997,
+      "detection_confidence": 0.8272494280590084,
+      "meets_strict_production_bar": false
+    },
+    "follow_ups_registered": 1,
+    "second_execution_result": "nonzero: No pending or resumable search exists",
+    "schema_version": 6,
+    "database_sha256": "a77c17cc6d496f00af1ac66152024d1e2cf4032ea39b17a4fb267d246e9fc458",
+    "database_integrity": "ok",
+    "foreign_key_violation_count": 0,
+    "candidate_snapshots_verified": 10000,
+    "provenance_rows_verified": 1
+  },
+  "live_follow_up_workflow": {
+    "database": "/tmp/exohunter-v13-live-followup.sqlite3",
+    "search_id": "exo-search-20260728T033926Z-11c3eb9b87b7",
+    "manifest_sha256": "11c3eb9b87b7a3d0faa8cf1da69f1f165d19e74048274863127b40add273910d",
+    "selector_version": "exo_hunter_follow_up_v4",
+    "verified_history_sources": 7,
+    "history_events_imported": 608,
+    "unique_history_targets": 200,
+    "candidate_universe": 200,
+    "eligible_candidates": 190,
+    "targets_requested": 1,
+    "targets_selected": 1,
+    "target_id": "TIC 149929601",
+    "targets_executed": 1,
+    "targets_succeeded": 1,
+    "targets_failed": 0,
+    "durable_status": "candidate_found",
+    "raw_product_uri_count": 22,
+    "cadences_processed": 239570,
+    "absolute_quality": {
+      "false_positive_probability": 0.9983325407388594,
+      "detection_confidence": 0.9129751349907814,
+      "meets_strict_production_bar": false
+    },
+    "weak_quality_did_not_block_best_available_selection": true,
+    "follow_ups_registered": 1,
+    "schema_version": 6,
+    "database_sha256": "f456ec0f0683a355577d670d10d1aa8e0edf0d2b2ce355dc8fd61df09dafaf8e",
+    "database_integrity": "ok",
+    "foreign_key_violation_count": 0,
+    "candidate_snapshots_verified": 808,
+    "provenance_rows_verified": 609
+  },
+  "fail_loudly_and_atomicity": {
+    "initial_live_new_attempt": "MAST closed both catalog page requests without a response; ExoHunter returned nonzero.",
+    "strategy_change": "The next live request used an explicit narrow scientific Tmag constraint and later succeeded across five pages.",
+    "failed_attempt_manifest_count": 0,
+    "failed_attempt_candidate_snapshot_count": 0,
+    "failed_attempt_database_integrity": "ok"
+  },
+  "run_reports": {
+    "path": "artifacts/manifests/run_reports/hunter_search.jsonl",
+    "new_entry_recorded": true,
+    "follow_up_entry_recorded": true,
+    "automatic_push_result": "failed loudly because the new feature branch had no upstream; both exact ledger rows are included in the PR"
+  },
+  "quality_validation": {
+    "focused_hunter_tests": "102 passed",
+    "full_quality_gates": "10/10 passed on clean implementation commit a854dd4; 3211 tests across six shards; logs/quality_gates/20260728T033544Z/quality_gate_summary.json",
+    "ruff": "passed",
+    "mypy": "passed",
+    "incomplete_implementation_scan": "passed",
+    "directive_integrity": "passed",
+    "git_dirty": false
+  },
+  "limitations": [
+    "The copied cross-project identity contract was intentionally assessed stale-but-usable so this validation did not read or depend on a sibling checkout at runtime.",
+    "The first MAST catalog request failed remotely; the failure remained atomic and a changed constrained request later succeeded.",
+    "Both live candidate signals fail the strict absolute-quality bar and are follow-up targets, not confirmed planets or discovery claims.",
+    "No external scientific submission, public alert, or authority-facing action is implemented or authorized.",
+    "PR CI, squash merge, and merged-main verification remain required before version 0.5.0 may be called PROD accepted."
+  ]
+}

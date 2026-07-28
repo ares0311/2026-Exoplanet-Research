@@ -1,5 +1,32 @@
 # PRODUCTION READINESS
 
+## 2026-07-27 persistent ExoHunter terminal closure
+
+Version 0.5.0 is the current release candidate. The current PROD contract
+requires a persistent `ExoHunter` terminal that remains active until `/Exit`,
+discovers slash commands, provides history/completion, reflects real work with
+an exoplanet-specific animation, and degrades cleanly for automation and
+accessibility. Version 0.4.0 had only disconnected one-shot operator commands,
+so its PROD label is superseded for the expanded contract.
+
+The implementation delegates every slash action to the canonical adaptive
+discovery, exact-manifest execution, follow-up, import, and recheck functions.
+It adds no selector, scorer, runner, or SQLite path. A real PTY proved `/`
+discovery and `/Exit`; isolated live workflows then proved new mode across
+49,860 TIC rows/five pages and follow-up mode across the durable 200-target
+history universe. Both exact targets executed successfully and registered
+follow-ups despite failing the strict absolute-quality bar. Both schema-v6
+databases pass integrity, foreign-key, manifest, candidate-snapshot, and
+provenance checks. The first MAST attempt failed remotely, returned nonzero,
+and left zero manifests/snapshots before the changed constrained retry passed.
+
+Clean implementation commit `a854dd4` passes all 10 local gates with 3,211
+tests. Evidence is
+`artifacts/manifests/hunter_live_acceptance_v13.json`. Status is
+**LIVE AND LOCALLY VERIFIED; PR CI, SQUASH MERGE, AND MERGED-MAIN VERIFICATION
+PENDING**. Do not call version 0.5.0 PROD accepted until those release gates
+pass.
+
 ## 2026-07-25 Hunter PROD closure
 
 Version 0.4.0 is the current production version. An adversarial audit

@@ -1,7 +1,7 @@
 # EXO-Hunter — 2026 Exoplanet Research
 
 [![CI](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml/badge.svg)](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)](pyproject.toml)
+[![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)](pyproject.toml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
@@ -17,11 +17,11 @@ XGBoost, CNN, and ensemble scorers are optional.
 
 ## Current production state
 
-Version 0.4.0 is the current production release represented by this repository.
+Version 0.5.0 is the current release candidate represented by this branch.
 
 | Area | Status | Current evidence |
 |---|---|---|
-| EXO-Hunter lifecycle | **PROD accepted** | Version 0.4.0 removes the operator-candidate bypass, replaces the 126/306-tile sample with catalog-wide paged discovery and a top-N score-bound proof, adds decision-validity states and durable cross-project identity history, and passes the v12 live acceptance, all 10 local gates (3,187 tests), both final PR #319 CI runs, squash merge, and clean merged-main verification (see `docs/HUNTER_PRODUCTION_WORKFLOW.md`) |
+| EXO-Hunter lifecycle | **Live and locally verified; release verification pending** | Version 0.5.0 adds the required persistent `ExoHunter` slash terminal directly over the version 0.4.0 adaptive/durable pipeline. Real new and follow-up create-through-execution workflows, slash discovery, exact-target execution, follow-up updates, and 10/10 clean local gates pass in [`hunter_live_acceptance_v13.json`](artifacts/manifests/hunter_live_acceptance_v13.json). PR CI, squash merge, and merged-main verification remain before PROD acceptance. |
 | Bayesian scorer | **Production ready** | Default non-ML scorer; no model artifact required |
 | XGBoost scorer | **Production ready** | Trained on 7,586 Kepler KOIs; held-out AUC 0.992 |
 | XGBoost + Bayesian ensemble | **Production ready** | Conservative fallback when no CNN is supplied |
@@ -97,6 +97,7 @@ Verify the installed entry points:
 git switch main
 git pull --ff-only origin main
 .venv/bin/exo --version
+.venv/bin/ExoHunter --help
 .venv/bin/Create-New-Search --help
 .venv/bin/Run-New-Search --help
 .venv/bin/Show-Follow-Ups --help
@@ -133,6 +134,36 @@ enabled because prior transfer experiments did not establish general validity.
 The Hunter commands use `data/hunter_searches.sqlite3` by default. This ignored
 runtime database is the local durable system of record; CSV files are review
 exports only.
+
+Launch the persistent terminal:
+
+```bash
+git switch main
+git pull --ff-only origin main
+.venv/bin/ExoHunter
+```
+
+Enter `/` or `/Help` to display every command. The normal workflow is:
+
+```text
+/New-Search 100
+/Run-Search
+/Show-Follow-Ups
+/Follow-Up-Search 10
+/Run-Search
+/Exit
+```
+
+The session remains active until `/Exit`. Tab completes slash commands and
+readline history persists across sessions. Orbit/transit animation runs only
+while canonical Hunter work is active; it disables under redirected I/O, CI,
+reduced-motion settings, `TERM=dumb`, or `--no-animation`. Automation can use
+repeatable `--command`, `--script <path>`, or `--script -`; machine-readable
+`--json` stdout is not prefixed with a banner.
+
+The one-shot commands below remain stable automation entry points. `ExoHunter`
+delegates to these same functions; it does not implement another selector,
+runner, table renderer, or database path.
 
 ### 1. Create a new-target search
 
@@ -218,7 +249,7 @@ Import validates source hashes and writes a completed historical manifest,
 run, history event, and stable follow-up row in one durable contract. Repeating
 the same import is idempotent. Source drift fails before database mutation.
 
-All four Hunter commands support `--json` and `--no-color` for automation.
+All canonical Hunter commands support `--json` and `--no-color` for automation.
 `Create-New-Search` does not accept operator-ranked candidate files; new and
 follow-up modes always use the canonical discovery/history optimizer. See the
 full operator contract in

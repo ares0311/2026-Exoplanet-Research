@@ -1,5 +1,41 @@
 # EXO-Hunter Production Workflow
 
+## Persistent terminal release gate (2026-07-27)
+
+**Current state: implementation, real new/follow-up business workflows, and
+clean local quality gates are VERIFIED for version 0.5.0; PR CI, squash merge,
+and merged-main verification remain.**
+
+The expanded PROD contract requires one persistent `ExoHunter` application.
+Version 0.5.0 supplies it as a terminal-only adapter over the canonical
+functions in `hunter_cli.py`:
+
+```text
+ExoHunter
+→ /New-Search N or /Follow-Up-Search N
+→ canonical create_new_search()
+→ /Run-Search
+→ canonical run_new_search()
+→ /Show-Follow-Ups
+→ canonical show_follow_ups()
+→ /Exit
+```
+
+Entering `/` displays every command and Tab completes slash names. The shell
+keeps readline history, stays active after useful parse/runtime errors, and
+exits only on `/Exit` or closed input. Its orbit/transit frames run for the
+actual lifetime of canonical operations; redirected I/O, CI, reduced-motion
+settings, `TERM=dumb`, and `--no-animation` use plain status lines.
+`--command`, `--script`, and `--script -` preserve automation, and canonical
+`--json` stdout remains banner-free.
+
+Live v13 evidence created and executed exact new target TIC 232981147 after
+exhaustively evaluating 49,860 constrained TIC rows across five pages, and
+created/executed exact follow-up TIC 149929601 from 608 imported events across
+200 targets. Both runs completed with zero target failures, clean schema-v6
+validity, and one registered follow-up. See
+`artifacts/manifests/hunter_live_acceptance_v13.json`.
+
 ## Adversarial PROD closure plan (2026-07-25)
 
 **Current state: PROD ACCEPTED. All implementation, live business-acceptance,
@@ -291,6 +327,30 @@ optional and do not control target eligibility or ranking.
 
 ## Commands
 
+Launch the persistent application:
+
+```bash
+git switch main
+git pull --ff-only origin main
+.venv/bin/ExoHunter
+```
+
+Then enter:
+
+```text
+/
+/New-Search 100
+/Run-Search
+/Show-Follow-Ups
+/Follow-Up-Search 10
+/Run-Search
+/Exit
+```
+
+Options after each slash action are forwarded to the corresponding canonical
+one-shot parser. The commands below remain the stable automation surface and
+the implementation source of truth used by the persistent shell.
+
 Create a new-target search:
 
 ```bash
@@ -439,9 +499,10 @@ accepted:
    and reproducible. New-target and follow-up selection record a named expected-
    information-gain/suitability component in addition to novelty, availability,
    scientific priority, and storage/compute cost.
-8. **Independent reproducibility:** the three installed Hunter entry points run
-   without AI or another repository, exact pending searches survive process
-   restart, and partial/failed work remains loud and resumable.
+8. **Independent reproducibility:** the persistent `ExoHunter` entry point and
+   five canonical one-shot Hunter entry points run without AI or another
+   repository, exact pending searches survive process restart, and
+   partial/failed work remains loud and resumable.
 
 The canonical verifier is `HunterStore.validity_summary()`. CLI creation and
 execution fail closed when it reports any issue. Acceptance artifacts may

@@ -403,6 +403,64 @@ def test_v12_acceptance_matches_current_prod_closure_contracts() -> None:
     assert acceptance["cross_project_history"]["source_hashes_verified_live"] == 1
 
 
+def test_v13_acceptance_matches_persistent_terminal_and_live_contracts() -> None:
+    acceptance = json.loads(
+        Path("artifacts/manifests/hunter_live_acceptance_v13.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    terminal = acceptance["persistent_terminal"]
+    new = acceptance["live_new_workflow"]
+    follow_up = acceptance["live_follow_up_workflow"]
+    boundary = acceptance["workspace_boundary"]
+    atomicity = acceptance["fail_loudly_and_atomicity"]
+
+    assert acceptance["repository_version"] == "0.5.0"
+    assert terminal["entry_point"] == "ExoHunter"
+    assert terminal["slash_discovery_verified_in_real_pty"] is True
+    assert terminal["required_commands_exposed"] == [
+        "/New-Search <N>",
+        "/Follow-Up-Search <N>",
+        "/Run-Search",
+        "/Show-Follow-Ups",
+        "/Help",
+        "/Exit",
+    ]
+    assert terminal["canonical_delegates"] == [
+        "create_new_search",
+        "run_new_search",
+        "show_follow_ups",
+        "import_follow_up",
+        "recheck_follow_ups",
+    ]
+    assert terminal["duplicate_selector_or_persistence_path_added"] is False
+    assert terminal["machine_readable_stdout_preserved"] is True
+
+    assert new["catalog_rows_evaluated"] == 49_860
+    assert new["catalog_pages_queried"] == 5
+    assert new["catalog_universe_exhausted"] is True
+    assert new["nth_selected_score"] > new["remaining_score_upper_bound"]
+    assert new["targets_selected"] == new["targets_executed"] == 1
+    assert new["targets_failed"] == 0
+    assert new["database_integrity"] == "ok"
+    assert new["foreign_key_violation_count"] == 0
+    assert new["candidate_snapshots_verified"] == 10_000
+
+    assert follow_up["history_events_imported"] == 608
+    assert follow_up["unique_history_targets"] == 200
+    assert follow_up["eligible_candidates"] == 190
+    assert follow_up["targets_selected"] == follow_up["targets_executed"] == 1
+    assert follow_up["targets_failed"] == 0
+    assert follow_up["weak_quality_did_not_block_best_available_selection"] is True
+    assert follow_up["database_integrity"] == "ok"
+    assert follow_up["foreign_key_violation_count"] == 0
+
+    assert boundary["reference_repo_writes"] == 0
+    assert boundary["runtime_cross_repo_paths_used"] == 0
+    assert atomicity["failed_attempt_manifest_count"] == 0
+    assert atomicity["failed_attempt_candidate_snapshot_count"] == 0
+
+
 def test_hunter_operator_docs_do_not_advertise_retired_bypasses() -> None:
     readme = Path("README.md").read_text(encoding="utf-8")
     workflow = Path("docs/HUNTER_PRODUCTION_WORKFLOW.md").read_text(
@@ -413,3 +471,6 @@ def test_hunter_operator_docs_do_not_advertise_retired_bypasses() -> None:
     assert "A candidate file may be supplied to `Create-New-Search`" not in workflow
     assert "does not accept operator-ranked candidate files" in readme
     assert "strict read-only `prod_scan_history_v1` adapter" in workflow
+    assert ".venv/bin/ExoHunter" in readme
+    assert "/New-Search 100" in readme
+    assert "persistent `ExoHunter`" in workflow

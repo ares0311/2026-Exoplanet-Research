@@ -1,7 +1,13 @@
 # PROJECT STATUS
 
-## Status: EXO-Hunter PROD Accepted — no open Tier 1/Tier 2 gaps
-## Last Updated: 2026-07-19 (version 0.3.2)
+## Status: EXO-Hunter 0.5.0 Release Verification Pending
+## Last Updated: 2026-07-27 (version 0.5.0)
+
+The current contract adds the persistent `ExoHunter` slash terminal that the
+0.4.0 acceptance did not contain. Implementation, real new/follow-up
+create-through-execution workflows, and clean local quality gates pass;
+PR CI, squash merge, and merged-main verification remain. Current evidence:
+`artifacts/manifests/hunter_live_acceptance_v13.json`.
 
 This file had drifted badly stale before this update: it described Phase 4
 individual-transit diagnostics and T1-2 stacking calibration as the active

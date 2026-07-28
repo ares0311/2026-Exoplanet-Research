@@ -8,6 +8,15 @@ by itself satisfy a master-guide evidence requirement.
 
 ## Current Master-Guide Alignment — Production Priority Order
 
+- **Persistent Hunter terminal (0.5.0 release verification pending):**
+  The current business contract requires the shell-launched `ExoHunter`
+  application, persistent slash discovery/history/completion, direct canonical
+  new/follow-up execution, domain-specific real-work animation, and safe
+  non-interactive operation. Implementation and real new/follow-up business
+  workflows pass on commit `a854dd4`; clean local quality is 10/10 with 3,211
+  tests. PR CI, squash merge, and merged-main verification remain. Current
+  evidence is `artifacts/manifests/hunter_live_acceptance_v13.json`.
+
 - **Hunter production lifecycle (0.4.0 PROD accepted):**
   The 2026-07-25 adversarial audit supersedes the older PROD label. The active
   closure plan is the seven-gate plan at the top of
@@ -664,6 +673,27 @@ thresholds, or classifications. Version 0.2.96 implements it.
 - [x] Provide an explicit `--no-animation`/reduced-motion path and graceful interruption/error rendering — `--no-animation` forces plain `[<elapsed>s] <Stage> ...` lines; animation also auto-disables whenever `sys.stdout.isatty()` is false. `KeyboardInterrupt` during a scan stops the spinner cleanly, prints `Interrupted during stage: <Stage>` to stderr, and exits `130` with no partial JSON written.
 - [x] Add terminal-width, TTY/non-TTY, failure-path, and interruption regression tests — 15 new tests across `TestRunPipelineOnStage`, `TestScanCommand`, and `TestStageAnimator` in `tests/test_cli.py`, including a narrow (`width=20`) non-interactive-console render check. (A 16th test asserting on rendered `--help` text was added then removed after a CI-only failure showed Typer's Rich-based help renderer wraps long option names at widths this sandbox doesn't reproduce and doesn't honor `COLUMNS` the way Click's plain formatter does; the flag's registration is already proven end-to-end by the `--no-animation` invocation test.)
 - [x] Document the interactive and automation-safe CLI modes — see `docs/DISCOVERY_RUNBOOK.md`'s "`exo scan` interactive vs. automation-safe display modes" section.
+
+---
+
+## Milestone 21 — Persistent EXO-Hunter Slash Terminal (RELEASE PENDING)
+
+- [x] Register `ExoHunter` as the persistent shell entry point.
+- [x] Expose `/New-Search`, `/Follow-Up-Search`, `/Run-Search`,
+  `/Show-Follow-Ups`, `/Help`, and `/Exit`, plus the existing import/recheck
+  operations.
+- [x] Delegate to the canonical one-shot functions instead of duplicating
+  selection, scoring, execution, tables, or persistence.
+- [x] Add persistent history, Tab completion, useful errors, and explicit
+  `/` discovery.
+- [x] Tie orbit/transit frames to real canonical work and disable motion for
+  redirected I/O, CI, reduced-motion settings, `TERM=dumb`, and
+  `--no-animation`.
+- [x] Preserve scriptable, machine-readable operation through repeatable
+  `--command`, `--script`, and unchanged canonical `--json` stdout.
+- [x] Prove real new and follow-up create-through-execution workflows and clean
+  schema-v6 integrity in `hunter_live_acceptance_v13.json`.
+- [ ] Pass PR CI, squash-merge, synchronize `main`, and rerun merged-main gates.
 
 ---
 
