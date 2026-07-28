@@ -2,7 +2,7 @@
 
 ## 2026-07-27 persistent ExoHunter terminal closure
 
-Version 0.5.0 is the current release candidate. The current PROD contract
+Version 0.5.0 is the current production release. The current PROD contract
 requires a persistent `ExoHunter` terminal that remains active until `/Exit`,
 discovers slash commands, provides history/completion, reflects real work with
 an exoplanet-specific animation, and degrades cleanly for automation and
@@ -21,11 +21,11 @@ provenance checks. The first MAST attempt failed remotely, returned nonzero,
 and left zero manifests/snapshots before the changed constrained retry passed.
 
 Clean implementation commit `a854dd4` passes all 10 local gates with 3,211
-tests. Evidence is
+tests. PR #322 passed branch, pull-request, ready-event, and merged-main CI,
+squash-merged as `6b8c78e`, and the clean synchronized merge commit passed all
+10 local gates with 3,212 tests. Evidence is
 `artifacts/manifests/hunter_live_acceptance_v13.json`. Status is
-**LIVE AND LOCALLY VERIFIED; PR CI, SQUASH MERGE, AND MERGED-MAIN VERIFICATION
-PENDING**. Do not call version 0.5.0 PROD accepted until those release gates
-pass.
+**PROD ACCEPTED**.
 
 ## 2026-07-25 Hunter PROD closure
 

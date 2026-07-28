@@ -2,9 +2,10 @@
 
 ## Persistent terminal release gate (2026-07-27)
 
-**Current state: implementation, real new/follow-up business workflows, and
-clean local quality gates are VERIFIED for version 0.5.0; PR CI, squash merge,
-and merged-main verification remain.**
+**Current state: PROD ACCEPTED. Implementation, real new/follow-up business
+workflows, local quality, PR #322 CI, squash merge `6b8c78e`, merged-main CI,
+synchronization, and clean merged-main local quality are VERIFIED for version
+0.5.0.**
 
 The expanded PROD contract requires one persistent `ExoHunter` application.
 Version 0.5.0 supplies it as a terminal-only adapter over the canonical
@@ -35,6 +36,11 @@ created/executed exact follow-up TIC 149929601 from 608 imported events across
 200 targets. Both runs completed with zero target failures, clean schema-v6
 validity, and one registered follow-up. See
 `artifacts/manifests/hunter_live_acceptance_v13.json`.
+
+The exact release evidence is: four successful GitHub Actions runs (branch
+push, pull request, ready event, and merged `main`), closed PR #322, clean
+synchronized merge commit `6b8c78e`, installed `ExoHunter 0.5.0` slash-command
+verification, and 10/10 merged-main local gates with 3,212 tests.
 
 ## Adversarial PROD closure plan (2026-07-25)
 

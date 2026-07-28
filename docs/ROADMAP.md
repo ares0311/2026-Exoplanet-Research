@@ -8,14 +8,15 @@ by itself satisfy a master-guide evidence requirement.
 
 ## Current Master-Guide Alignment — Production Priority Order
 
-- **Persistent Hunter terminal (0.5.0 release verification pending):**
+- **Persistent Hunter terminal (0.5.0 PROD accepted):**
   The current business contract requires the shell-launched `ExoHunter`
   application, persistent slash discovery/history/completion, direct canonical
   new/follow-up execution, domain-specific real-work animation, and safe
   non-interactive operation. Implementation and real new/follow-up business
-  workflows pass on commit `a854dd4`; clean local quality is 10/10 with 3,211
-  tests. PR CI, squash merge, and merged-main verification remain. Current
-  evidence is `artifacts/manifests/hunter_live_acceptance_v13.json`.
+  workflows pass on commit `a854dd4`; PR #322 passed all CI runs and
+  squash-merged as `6b8c78e`; clean synchronized merged-main quality is 10/10
+  with 3,212 tests. Current evidence is
+  `artifacts/manifests/hunter_live_acceptance_v13.json`.
 
 - **Hunter production lifecycle (0.4.0 PROD accepted):**
   The 2026-07-25 adversarial audit supersedes the older PROD label. The active
@@ -676,7 +677,7 @@ thresholds, or classifications. Version 0.2.96 implements it.
 
 ---
 
-## Milestone 21 — Persistent EXO-Hunter Slash Terminal (RELEASE PENDING)
+## Milestone 21 — Persistent EXO-Hunter Slash Terminal (COMPLETE)
 
 - [x] Register `ExoHunter` as the persistent shell entry point.
 - [x] Expose `/New-Search`, `/Follow-Up-Search`, `/Run-Search`,
@@ -693,7 +694,7 @@ thresholds, or classifications. Version 0.2.96 implements it.
   `--command`, `--script`, and unchanged canonical `--json` stdout.
 - [x] Prove real new and follow-up create-through-execution workflows and clean
   schema-v6 integrity in `hunter_live_acceptance_v13.json`.
-- [ ] Pass PR CI, squash-merge, synchronize `main`, and rerun merged-main gates.
+- [x] Pass PR CI, squash-merge, synchronize `main`, and rerun merged-main gates.
 
 ---
 

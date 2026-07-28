@@ -16,15 +16,17 @@ file assumes you already have.
 
 Current gap status (see `docs/PRODUCTION_READINESS.md` for the full,
 actively-maintained narrative — do not rely on any cached summary of it):
-**Hunter 0.5.0 release verification is the active priority as of 2026-07-27.**
+**Hunter 0.5.0 is PROD accepted as of 2026-07-27.**
 The 2026-07-27 PROD-closure directive exposed that version 0.4.0 had five
 one-shot entry points but no required persistent `ExoHunter` slash terminal.
 Version 0.5.0 adds that thin terminal directly over the canonical functions,
 with history/completion, real-work orbit animation, accessibility/automation
 fallbacks, and repeatable command/script modes. Real new and follow-up
-create-through-execution workflows plus clean 10/10 local gates pass in
-`artifacts/manifests/hunter_live_acceptance_v13.json`; PR CI, squash merge,
-and merged-main verification remain before PROD acceptance.
+create-through-execution workflows pass in
+`artifacts/manifests/hunter_live_acceptance_v13.json`. PR #322 passed all
+branch, pull-request, ready-event, and merged-main CI runs, squash-merged as
+`6b8c78e`, and the clean synchronized merge commit passed 10/10 local gates
+with 3,212 tests.
 
 **Hunter 0.4.0 was PROD accepted under the prior contract as of 2026-07-25.**
 An adversarial audit superseded every earlier Hunter PROD statement in this

@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "acceptance_id": "exo-hunter-persistent-terminal-v13",
-  "generated_at": "2026-07-28T03:45:00Z",
+  "generated_at": "2026-07-28T03:59:00Z",
   "objective": "Close the required persistent ExoHunter slash terminal without duplicating the canonical adaptive selection, execution, or durable lifecycle.",
   "repository_version": "0.5.0",
   "implementation_commit": "a854dd4736db97907a7cf748bab93b877064fd55",
-  "release_status": "implementation, live business workflows, and clean local quality gates verified; PR CI, squash merge, and merged-main verification pending",
+  "release_status": "PROD accepted: implementation, live business workflows, local quality, PR CI, squash merge, merged-main CI, synchronization, and merged-main local verification passed",
   "workspace_boundary": {
     "active_repo_root": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research",
     "active_repo_name": "2026-Exoplanet-Research",
@@ -17,6 +17,43 @@
     "reference_repo_writes": 0,
     "runtime_cross_repo_paths_used": 0,
     "cross_project_contract": "operator-copied hash-bearing Techno-Hunter identity export; assessed stale-but-usable because origin bytes were intentionally not read"
+  },
+  "release_delivery": {
+    "pull_request": "https://github.com/ares0311/2026-Exoplanet-Research/pull/322",
+    "pull_request_number": 322,
+    "pull_request_state": "MERGED",
+    "pull_request_head": "1a31586da94d1133f40c014ebb8994c66401786a",
+    "merge_commit": "6b8c78e66d73d07d8ca78ded568275b507336c6b",
+    "merged_at": "2026-07-28T03:54:51Z",
+    "ci_runs": [
+      {
+        "id": 30327044648,
+        "event": "push",
+        "head": "1a31586da94d1133f40c014ebb8994c66401786a",
+        "conclusion": "success"
+      },
+      {
+        "id": 30327091479,
+        "event": "pull_request",
+        "head": "1a31586da94d1133f40c014ebb8994c66401786a",
+        "conclusion": "success"
+      },
+      {
+        "id": 30327240304,
+        "event": "pull_request_ready",
+        "head": "1a31586da94d1133f40c014ebb8994c66401786a",
+        "conclusion": "success"
+      },
+      {
+        "id": 30327243855,
+        "event": "push_main",
+        "head": "6b8c78e66d73d07d8ca78ded568275b507336c6b",
+        "conclusion": "success"
+      }
+    ],
+    "merged_main_synced": true,
+    "installed_version": "ExoHunter 0.5.0",
+    "required_slash_commands_verified_after_merge": true
   },
   "persistent_terminal": {
     "entry_point": "ExoHunter",
@@ -155,11 +192,19 @@
     "directive_integrity": "passed",
     "git_dirty": false
   },
+  "merged_main_quality_validation": {
+    "full_quality_gates": "10/10 passed on clean merge commit 6b8c78e; 3212 tests across six shards; logs/quality_gates/20260728T035824Z/quality_gate_summary.json",
+    "git_head_sha": "6b8c78e66d73d07d8ca78ded568275b507336c6b",
+    "git_dirty": false,
+    "ruff": "passed",
+    "mypy": "passed",
+    "incomplete_implementation_scan": "passed",
+    "directive_integrity": "passed"
+  },
   "limitations": [
     "The copied cross-project identity contract was intentionally assessed stale-but-usable so this validation did not read or depend on a sibling checkout at runtime.",
     "The first MAST catalog request failed remotely; the failure remained atomic and a changed constrained request later succeeded.",
     "Both live candidate signals fail the strict absolute-quality bar and are follow-up targets, not confirmed planets or discovery claims.",
-    "No external scientific submission, public alert, or authority-facing action is implemented or authorized.",
-    "PR CI, squash merge, and merged-main verification remain required before version 0.5.0 may be called PROD accepted."
+    "No external scientific submission, public alert, or authority-facing action is implemented or authorized."
   ]
 }

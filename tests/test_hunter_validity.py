@@ -414,8 +414,11 @@ def test_v13_acceptance_matches_persistent_terminal_and_live_contracts() -> None
     follow_up = acceptance["live_follow_up_workflow"]
     boundary = acceptance["workspace_boundary"]
     atomicity = acceptance["fail_loudly_and_atomicity"]
+    delivery = acceptance["release_delivery"]
+    merged_quality = acceptance["merged_main_quality_validation"]
 
     assert acceptance["repository_version"] == "0.5.0"
+    assert acceptance["release_status"].startswith("PROD accepted:")
     assert terminal["entry_point"] == "ExoHunter"
     assert terminal["slash_discovery_verified_in_real_pty"] is True
     assert terminal["required_commands_exposed"] == [
@@ -459,6 +462,12 @@ def test_v13_acceptance_matches_persistent_terminal_and_live_contracts() -> None
     assert boundary["runtime_cross_repo_paths_used"] == 0
     assert atomicity["failed_attempt_manifest_count"] == 0
     assert atomicity["failed_attempt_candidate_snapshot_count"] == 0
+    assert delivery["pull_request_number"] == 322
+    assert delivery["pull_request_state"] == "MERGED"
+    assert delivery["merge_commit"] == merged_quality["git_head_sha"]
+    assert delivery["merged_main_synced"] is True
+    assert all(run["conclusion"] == "success" for run in delivery["ci_runs"])
+    assert merged_quality["git_dirty"] is False
 
 
 def test_hunter_operator_docs_do_not_advertise_retired_bypasses() -> None:
