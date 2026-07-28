@@ -21,6 +21,7 @@ from exo_toolkit.hunter_history import (
 )
 from exo_toolkit.hunter_models import (
     EXECUTABLE_SEARCH_STATES,
+    PARSECS_TO_LIGHT_YEARS,
     TERMINAL_TARGET_STATUSES,
     USABLE_VALIDITY_STATES,
     DecisionValidity,
@@ -2076,9 +2077,16 @@ class HunterStore:
         """Return only currently executable rows from the full history universe."""
         return [candidate for candidate in self.follow_up_universe() if candidate.eligible]
 
-    def export_manifest_csv(self, search_id: str, path: Path) -> Path:
+    def export_manifest_csv(
+        self,
+        search_id: str,
+        path: Path,
+        *,
+        exported_at: datetime | None = None,
+    ) -> Path:
         search = self.get_search(search_id)
         path.parent.mkdir(parents=True, exist_ok=True)
+        export_timestamp = (exported_at or _utc_now()).astimezone(UTC).isoformat()
         fieldnames = (
             "ordinal",
             "target_id",
@@ -2086,17 +2094,41 @@ class HunterStore:
             "mission",
             "object_classification",
             "distance_pc",
+            "distance_light_years",
             "estimated_download_gb",
+            "search_status",
+            "prior_search_count",
             "ranking_score",
             "selection_reason",
             "source",
             "prior_search_provenance",
+            "metrics_json",
+            "tmag",
+            "teff_k",
+            "radius_rsun",
+            "qlp_product_count",
+            "expected_information_gain",
+            "latest_fpp",
+            "latest_detection_confidence",
+            "latest_pathway",
+            "meets_strict_follow_up_bar",
+            "search_created_at",
+            "exported_at_utc",
         )
         with path.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=fieldnames)
             writer.writeheader()
             for target in search["targets"]:
                 candidate = HunterCandidate.model_validate(target["candidate"])
+                search_status = str(
+                    candidate.source_provenance.get(
+                        "search_category",
+                        "follow-up" if candidate.prior_searches else "new",
+                    )
+                )
+                strict_follow_up_bar = candidate.metrics.get(
+                    "meets_strict_follow_up_bar"
+                )
                 writer.writerow(
                     {
                         "ordinal": target["ordinal"],
@@ -2105,13 +2137,40 @@ class HunterStore:
                         "mission": candidate.mission,
                         "object_classification": candidate.object_classification,
                         "distance_pc": candidate.distance_pc,
+                        "distance_light_years": (
+                            candidate.distance_pc * PARSECS_TO_LIGHT_YEARS
+                            if candidate.distance_pc is not None
+                            else None
+                        ),
                         "estimated_download_gb": candidate.estimated_download_gb,
+                        "search_status": search_status,
+                        "prior_search_count": len(candidate.prior_searches),
                         "ranking_score": candidate.ranking_score,
                         "selection_reason": candidate.selection_reason,
                         "source": candidate.source,
                         "prior_search_provenance": _canonical_json(
                             [row.model_dump(mode="json") for row in candidate.prior_searches]
                         ),
+                        "metrics_json": _canonical_json(candidate.metrics),
+                        "tmag": candidate.metrics.get("tmag"),
+                        "teff_k": candidate.metrics.get("teff_k"),
+                        "radius_rsun": candidate.metrics.get("radius_rsun"),
+                        "qlp_product_count": candidate.metrics.get("qlp_product_count"),
+                        "expected_information_gain": candidate.metrics.get(
+                            "expected_information_gain"
+                        ),
+                        "latest_fpp": candidate.metrics.get("latest_fpp"),
+                        "latest_detection_confidence": candidate.metrics.get(
+                            "latest_detection_confidence"
+                        ),
+                        "latest_pathway": candidate.metrics.get("latest_pathway"),
+                        "meets_strict_follow_up_bar": (
+                            str(bool(strict_follow_up_bar)).lower()
+                            if strict_follow_up_bar is not None
+                            else None
+                        ),
+                        "search_created_at": search["created_at"],
+                        "exported_at_utc": export_timestamp,
                     }
                 )
         return path

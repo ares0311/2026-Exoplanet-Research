@@ -1,5 +1,17 @@
 # EXO-Hunter Production Workflow
 
+## Explainable operator-reporting gate (2026-07-27)
+
+**Current state: version 0.5.2 is under release verification; version 0.5.1
+remains PROD accepted.** The interactive candidate grid and large-search CSV
+now expose the same review-critical context frozen in the durable candidate
+snapshot: survey/canonical identifiers, object class, distance, estimated
+storage, explicit new/follow-up status, prior-search count/provenance,
+deterministic score/reason, and exoplanet metrics. CSV filenames and rows are
+explicitly UTC-timestamped. SQLite remains authoritative; the CSV remains an
+operator-facing review artifact. No selection, scoring, execution,
+persistence, or scientific rule changed.
+
 ## Exact shared command-contract gate (2026-07-27)
 
 **Current state: PROD ACCEPTED for version 0.5.1.** The required persistent `EXO-Hunter`

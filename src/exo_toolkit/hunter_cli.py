@@ -28,6 +28,7 @@ from exo_toolkit.hunter_cross_project import (
     sibling_project_root,
 )
 from exo_toolkit.hunter_models import (
+    PARSECS_TO_LIGHT_YEARS,
     ArtifactIdentity,
     DecisionValidity,
     ExecutionProvenance,
@@ -60,6 +61,7 @@ DEFAULT_HISTORY_MANIFEST = (
 DEFAULT_POOL_SIZE = 10_000
 VALID_SCORERS = {"bayesian", "xgboost", "ensemble", "cnn", "full-ensemble"}
 MAX_LIVE_WORKERS = 12
+TIC_SCHEMA_URL = "https://mast.stsci.edu/api/v0/_t_i_cfields.html"
 
 
 def _artifact_identity(path: Path, role: str) -> ArtifactIdentity:
@@ -139,6 +141,68 @@ def _load_project_skill(module_name: str) -> ModuleType:
 
 def _console(*, no_color: bool = False) -> Console:
     return Console(no_color=no_color, force_terminal=False if no_color else None)
+
+
+def _candidate_search_status(candidate: HunterCandidate) -> str:
+    category = candidate.source_provenance.get("search_category")
+    if category in {"new", "follow-up"}:
+        return str(category)
+    return "follow-up" if candidate.prior_searches else "new"
+
+
+def _format_metric_value(value: float | int | str | None) -> str:
+    if value is None:
+        return "—"
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    if isinstance(value, float):
+        return f"{value:.4g}"
+    return str(value)
+
+
+def _candidate_metric_summary(candidate: HunterCandidate) -> str:
+    metric_labels = (
+        ("tmag", "Tmag"),
+        ("teff_k", "Teff K"),
+        ("radius_rsun", "R* Rsun"),
+        ("qlp_product_count", "QLP products"),
+        ("expected_information_gain", "info gain"),
+        ("latest_fpp", "latest FPP"),
+        ("latest_detection_confidence", "latest confidence"),
+        ("latest_pathway", "latest pathway"),
+        ("meets_strict_follow_up_bar", "strict bar"),
+    )
+    rendered: list[str] = []
+    for key, label in metric_labels:
+        if key not in candidate.metrics:
+            continue
+        value = candidate.metrics[key]
+        if key == "meets_strict_follow_up_bar" and value is not None:
+            rendered_value = "yes" if bool(value) else "no"
+        else:
+            rendered_value = _format_metric_value(value)
+        rendered.append(f"{label}={rendered_value}")
+    return "; ".join(rendered) if rendered else "—"
+
+
+def _prior_search_summary(candidate: HunterCandidate) -> str:
+    count = len(candidate.prior_searches)
+    if not count:
+        return "0"
+    latest = max(candidate.prior_searches, key=lambda row: row.searched_at)
+    return (
+        f"{count}; latest={latest.source_project} / {latest.searched_by} / "
+        f"{latest.searched_at.date().isoformat()} / method={latest.method_or_data} / "
+        f"result={latest.result} / provenance={latest.provenance_uri}"
+    )
+
+
+def _timestamped_manifest_path(
+    manifest_dir: Path, search: Mapping[str, Any]
+) -> Path:
+    created_at = datetime.fromisoformat(str(search["created_at"]))
+    timestamp = created_at.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
+    return manifest_dir / f"{timestamp}_{search['search_id']}.csv"
 
 
 def _parser_create() -> argparse.ArgumentParser:
@@ -337,6 +401,14 @@ def _json_safe_metadata(value: Any) -> Any:
     return str(value)
 
 
+def _positive_float_or_none(value: Any) -> float | None:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    return numeric if math.isfinite(numeric) and numeric > 0 else None
+
+
 def _build_new_candidates(
     raw_targets: list[dict[str, Any]],
     *,
@@ -374,6 +446,7 @@ def _build_new_candidates(
         base_priority = float(product.get("priority", row["priority"])) if product else float(
             row["priority"]
         )
+        distance_pc = _positive_float_or_none(row.get("distance_pc"))
         availability_score = min(product_count / 5.0, 1.0) if product_count else 0.0
         expected_information_gain = base_priority * availability_score
         cost_penalty = _storage_penalty(estimated_gb) if estimated_gb is not None else 5.0
@@ -414,10 +487,17 @@ def _build_new_candidates(
                     "selector_version": NEW_SELECTOR_VERSION,
                     "pool_ordinal": index + 1,
                     "product_metadata": _json_safe_metadata(product or {}),
+                    "distance_field": {
+                        "catalog": "TIC",
+                        "field": "d",
+                        "units": "pc",
+                        "schema_url": TIC_SCHEMA_URL,
+                    },
                 },
                 decision_validity=decision_validity,
                 eligible=eligible,
                 eligibility_reason=eligibility_reason,
+                distance_pc=distance_pc,
                 estimated_download_gb=estimated_gb,
                 ranking_score=ranking_score,
                 selection_reason=(
@@ -429,6 +509,12 @@ def _build_new_candidates(
                     "tmag": row.get("tmag"),
                     "teff_k": row.get("teff"),
                     "radius_rsun": row.get("radius_rsun"),
+                    "distance_error_pc": _positive_float_or_none(
+                        row.get("distance_error_pc")
+                    ),
+                    "distance_source_flag": _json_safe_metadata(
+                        row.get("distance_source_flag")
+                    ),
                     "contamination_ratio": row.get("contratio"),
                     "qlp_product_count": product_count,
                     "availability_score": availability_score,
@@ -676,23 +762,37 @@ def _select_live_new_candidates(
 def _manifest_table(search: Mapping[str, Any]) -> Table:
     table = Table(title=f"Pending {search['mode']} search — {search['search_id']}")
     table.add_column("#", justify="right", style="dim")
-    table.add_column("Target", style="cyan")
+    table.add_column("Survey ID", style="cyan")
+    table.add_column("Canonical ID")
     table.add_column("Class")
+    table.add_column("Distance ly", justify="right")
     table.add_column("Est. GB", justify="right")
+    table.add_column("Status")
+    table.add_column("Prior searches", overflow="fold")
     table.add_column("Score", justify="right", style="green")
+    table.add_column("Exoplanet metrics", overflow="fold")
     table.add_column("Reason")
     for row in search["targets"]:
         candidate = HunterCandidate.model_validate(row["candidate"])
         table.add_row(
             str(row["ordinal"]),
+            candidate.target_id,
             candidate.canonical_id,
             candidate.object_classification,
+            (
+                "—"
+                if candidate.distance_pc is None
+                else f"{candidate.distance_pc * PARSECS_TO_LIGHT_YEARS:.2f}"
+            ),
             (
                 "—"
                 if candidate.estimated_download_gb is None
                 else f"{candidate.estimated_download_gb:.4f}"
             ),
+            _candidate_search_status(candidate),
+            _prior_search_summary(candidate),
             f"{candidate.ranking_score:.3f}",
+            _candidate_metric_summary(candidate),
             candidate.selection_reason,
         )
     return table
@@ -804,7 +904,7 @@ def create_new_search(
 
         manifest_path: Path | None = None
         if len(search["targets"]) > 100:
-            manifest_path = args.manifest_dir / f"{search['search_id']}.csv"
+            manifest_path = _timestamped_manifest_path(args.manifest_dir, search)
             store.export_manifest_csv(search["search_id"], manifest_path)
         shortfall = search["requested_target_count"] - search["selected_target_count"]
         payload = {

@@ -1,6 +1,7 @@
 """Tests for the durable EXO-Hunter search lifecycle."""
 from __future__ import annotations
 
+import csv
 import hashlib
 import sqlite3
 from datetime import UTC, datetime, timedelta
@@ -785,11 +786,54 @@ def test_reviewed_import_preserves_history_and_is_idempotent(tmp_path: Path) -> 
 
 def test_manifest_csv_is_operator_review_artifact_not_system_of_record(tmp_path: Path) -> None:
     store = HunterStore(tmp_path / "hunter.sqlite3")
-    search = _create(store, [_candidate(1), _candidate(2)], count=2)
-    output = store.export_manifest_csv(search["search_id"], tmp_path / "manifest.csv")
-    text = output.read_text(encoding="utf-8")
-    assert "target_id" in text
-    assert "TIC 2" in text
+    observed = datetime(2025, 1, 1, tzinfo=UTC)
+    candidate = _candidate(1).model_copy(
+        update={
+            "distance_pc": 10.0,
+            "metrics": {
+                "tmag": 12.3,
+                "teff_k": 5200,
+                "radius_rsun": 0.9,
+                "qlp_product_count": 3,
+                "expected_information_gain": 0.5,
+                "latest_fpp": 0.1,
+                "latest_detection_confidence": 0.8,
+                "latest_pathway": "planet_hunters_discussion",
+                "meets_strict_follow_up_bar": True,
+            },
+            "prior_searches": (
+                PriorSearch(
+                    searched_by="External Researcher",
+                    searched_at=observed,
+                    source_project="External Survey",
+                    method_or_data="TESS photometry",
+                    result="unresolved signal",
+                    provenance_uri="doi:example",
+                ),
+            ),
+        }
+    )
+    search = _create(store, [candidate, _candidate(2)], count=2)
+    exported_at = datetime(2026, 1, 2, tzinfo=UTC)
+    output = store.export_manifest_csv(
+        search["search_id"],
+        tmp_path / "manifest.csv",
+        exported_at=exported_at,
+    )
+    with output.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    row = next(item for item in rows if item["target_id"] == "TIC 1")
+
+    assert float(row["distance_light_years"]) == pytest.approx(32.61563777)
+    assert row["search_status"] == "new"
+    assert row["prior_search_count"] == "1"
+    assert "External Survey" in row["prior_search_provenance"]
+    assert '"tmag":12.3' in row["metrics_json"]
+    assert row["expected_information_gain"] == "0.5"
+    assert row["latest_pathway"] == "planet_hunters_discussion"
+    assert row["meets_strict_follow_up_bar"] == "true"
+    assert row["search_created_at"]
+    assert row["exported_at_utc"] == exported_at.isoformat()
     assert store.get_search(search["search_id"])["targets"]
 
 

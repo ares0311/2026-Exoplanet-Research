@@ -1,5 +1,25 @@
 # PRODUCTION READINESS
 
+## 2026-07-27 explainable operator-reporting contract
+
+Version 0.5.2 closes a presentation/export gap found by re-auditing the exact
+candidate-table requirements after 0.5.1 acceptance. The `N <= 100` terminal
+grid now exposes primary survey and canonical identifiers, classification,
+distance in light-years, estimated storage, explicit new/follow-up status,
+prior-search count and latest provenance, deterministic ranking score,
+exoplanet metrics, and selection reason. The `N > 100` CSV carries those
+fields plus full prior-search provenance, full metric JSON, search creation
+time, and export time; its filename begins with an unambiguous UTC timestamp.
+Live new-target snapshots now preserve the MAST TIC `d` distance field in
+parsecs, its uncertainty/source flag where present, and the authoritative
+schema URL; the terminal converts the preserved value to light-years only for
+display.
+
+This is an operator explainability/reporting delta only. It changes no
+selector, scorer, runner, schema, database, scientific threshold, or
+interpretation path. Version 0.5.1 remains the accepted scientific and command
+baseline while 0.5.2 completes release verification.
+
 ## 2026-07-27 exact cross-Hunter command contract
 
 Version 0.5.1 is the current production release. The three-Hunter PROD

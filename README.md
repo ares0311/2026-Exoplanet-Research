@@ -1,7 +1,7 @@
 # EXO-Hunter — 2026 Exoplanet Research
 
 [![CI](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml/badge.svg)](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.5.1-blue.svg)](pyproject.toml)
+[![Version](https://img.shields.io/badge/version-0.5.2-blue.svg)](pyproject.toml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
@@ -17,11 +17,11 @@ XGBoost, CNN, and ensemble scorers are optional.
 
 ## Current production state
 
-Version 0.5.1 is the current production release represented by this repository.
+Version 0.5.2 is the current release represented by this repository.
 
 | Area | Status | Current evidence |
 |---|---|---|
-| EXO-Hunter lifecycle | **PROD accepted** | Version 0.5.1 adds the exact `EXO-Hunter` launch alias and canonical `/Create-New-Search --targets N --mode ...` and `/Run-New-Search` slash commands over the unchanged adaptive/durable pipeline. Clean 10/10 gates (3,214 tests), all PR #324 CI events, squash merge `12ec767`, merged-main CI, installed probes, and exact Git-tree identity pass in [`hunter_live_acceptance_v14.json`](artifacts/manifests/hunter_live_acceptance_v14.json); v13 preserves the live scientific workflows. |
+| EXO-Hunter lifecycle | **PROD accepted at 0.5.1; 0.5.2 reporting delta under release verification** | Version 0.5.2 exposes the full required selection context in the terminal grid and timestamped CSV review manifest without changing the accepted selector, scorer, runner, schema, or scientific interpretation paths. The accepted 0.5.1 command and scientific evidence remains in [`hunter_live_acceptance_v14.json`](artifacts/manifests/hunter_live_acceptance_v14.json), with v13 preserving the live workflows. |
 | Bayesian scorer | **Production ready** | Default non-ML scorer; no model artifact required |
 | XGBoost scorer | **Production ready** | Trained on 7,586 Kepler KOIs; held-out AUC 0.992 |
 | XGBoost + Bayesian ensemble | **Production ready** | Conservative fallback when no CNN is supplied |
@@ -184,9 +184,17 @@ confirmed hosts, variables, product availability, and estimated data cost all
 feed the same canonical decision. Every production input carries an explicit
 validity state and provenance assessment.
 
-Searches of at most 100 targets render a terminal table. Larger searches write
-a timestamped review CSV under `reports/search_manifests/`; SQLite remains
-authoritative in both cases.
+For 100 or fewer targets, the terminal grid shows survey and canonical
+identifiers, object class, distance, estimated storage, explicit new/follow-up
+status, prior-search summary, ranking score, domain metrics, and selection
+reason. Larger searches write a visibly timestamped CSV under
+`reports/search_manifests/` with the same fields, full prior-search provenance,
+full metric JSON, search creation time, and export time. The CSV remains an
+operator review artifact; SQLite remains the authoritative immutable manifest
+and history record. Distance is preserved directly from the MAST TIC `d`
+field in parsecs and displayed in light-years; the source field and units are
+defined by the [MAST TIC schema](https://mast.stsci.edu/api/v0/_t_i_cfields.html)
+and stamped into candidate provenance.
 
 ### 2. Create a follow-up search
 

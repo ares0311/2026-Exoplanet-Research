@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+PARSECS_TO_LIGHT_YEARS = 3.261563777
 SearchMode = Literal["new", "follow-up"]
 TargetStatus = Literal["candidate_found", "no_signal", "no_data", "failed"]
 ValidityState = Literal[
