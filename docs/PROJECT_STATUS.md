@@ -1,13 +1,14 @@
 # PROJECT STATUS
 
-## Status: EXO-Hunter 0.5.0 PROD Accepted
-## Last Updated: 2026-07-27 (version 0.5.0)
+## Status: EXO-Hunter 0.5.1 Command-Contract Release Verification Pending
+## Last Updated: 2026-07-27 (version 0.5.1)
 
-The current contract adds the persistent `ExoHunter` slash terminal that the
-0.4.0 acceptance did not contain. Implementation, real new/follow-up
-create-through-execution workflows, all PR #322 CI runs, squash merge
-`6b8c78e`, merged-main CI, synchronization, installed slash discovery, and
-clean 10/10 merged-main local gates with 3,212 tests pass. Current evidence:
+Version 0.5.1 aligns the persistent terminal with the exact shared operator
+contract: `EXO-Hunter`, `/Create-New-Search --targets N --mode ...`, and
+`/Run-New-Search`. These are thin aliases over the already accepted 0.5.0
+functions. Focused shell/validity tests pass; full exact-tree gates, PR CI,
+merge, installed-entrypoint verification, and merged-main acceptance remain.
+The unchanged live scientific workflow evidence is preserved in
 `artifacts/manifests/hunter_live_acceptance_v13.json`.
 
 This file had drifted badly stale before this update: it described Phase 4

@@ -50,9 +50,10 @@ def _shell(
     )
 
 
-def test_pyproject_registers_required_persistent_entry_point() -> None:
+def test_pyproject_registers_required_persistent_entry_points() -> None:
     project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
     scripts = project["project"]["scripts"]
+    assert scripts["EXO-Hunter"] == "exo_toolkit.hunter_shell:exohunter_entry"
     assert scripts["ExoHunter"] == "exo_toolkit.hunter_shell:exohunter_entry"
 
 
@@ -70,8 +71,10 @@ def test_slash_and_help_expose_required_workflow(tmp_path: Path) -> None:
     assert shell.dispatch("/").exit_code == 0
     help_output = output.getvalue()
     for command in (
+        "/Create-New-Search",
         "/New-Search",
         "/Follow-Up-Search",
+        "/Run-New-Search",
         "/Run-Search",
         "/Show-Follow-Ups",
         "/Help",
@@ -79,6 +82,35 @@ def test_slash_and_help_expose_required_workflow(tmp_path: Path) -> None:
     ):
         assert command in help_output
     assert calls == []
+
+
+def test_canonical_create_command_delegates_exact_options(tmp_path: Path) -> None:
+    calls: list[tuple[str, tuple[str, ...]]] = []
+    shell = _shell(tmp_path, calls)
+
+    assert (
+        shell.dispatch(
+            "/Create-New-Search --targets 3 --mode follow-up --workers 4"
+        ).exit_code
+        == 0
+    )
+
+    assert calls == [
+        (
+            "create",
+            (
+                "--targets",
+                "3",
+                "--mode",
+                "follow-up",
+                "--workers",
+                "4",
+                "--db",
+                str(tmp_path / "hunter.sqlite3"),
+                "--no-color",
+            ),
+        )
+    ]
 
 
 def test_new_and_follow_up_delegate_to_one_canonical_creator(tmp_path: Path) -> None:
@@ -103,6 +135,7 @@ def test_new_and_follow_up_delegate_to_one_canonical_creator(tmp_path: Path) -> 
 @pytest.mark.parametrize(
     ("command", "handler"),
     (
+        ("/Run-New-Search --workers 6 --scorer bayesian", "run"),
         ("/Run-Search --workers 6 --scorer bayesian", "run"),
         ("/Show-Follow-Ups --status all", "show"),
         ("/Import-Follow-Up --evidence-file evidence.json", "import"),
