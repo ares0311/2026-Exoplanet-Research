@@ -29,8 +29,10 @@ from exo_toolkit.hunter_cli import (
 CommandFn = Callable[[Sequence[str] | None], int]
 
 _SLASH_COMMANDS = (
+    "/Create-New-Search",
     "/New-Search",
     "/Follow-Up-Search",
+    "/Run-New-Search",
     "/Run-Search",
     "/Show-Follow-Ups",
     "/Import-Follow-Up",
@@ -58,7 +60,7 @@ class CommandResult:
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="ExoHunter",
+        prog="EXO-Hunter",
         description=(
             "Persistent EXO-Hunter terminal. Enter / for commands; "
             "the session remains active until /Exit."
@@ -220,11 +222,16 @@ class HunterShell:
         table = Table(title="EXO-Hunter commands", show_lines=False)
         table.add_column("Command", style="cyan", no_wrap=True)
         table.add_column("Canonical action")
+        table.add_row(
+            "/Create-New-Search --targets <N> --mode <new|follow-up> [options]",
+            "Canonical search-creation command",
+        )
         table.add_row("/New-Search <N> [options]", "Create exact best-available new-target search")
         table.add_row(
             "/Follow-Up-Search <N> [options]",
             "Create exact best-available follow-up search",
         )
+        table.add_row("/Run-New-Search [options]", "Canonical exact-manifest execution command")
         table.add_row("/Run-Search [options]", "Run or resume the exact pending manifest")
         table.add_row("/Show-Follow-Ups [options]", "Show evidence, priority, and next action")
         table.add_row(
@@ -310,7 +317,16 @@ class HunterShell:
             return self._create(tokens, mode="new")
         if command == "/follow-up-search":
             return self._create(tokens, mode="follow-up")
-        if command == "/run-search":
+        if command == "/create-new-search":
+            args = self._with_shared_options(tokens[1:])
+            return CommandResult(
+                self._invoke(
+                    "building the deterministic exact-target search",
+                    self._create_fn,
+                    args,
+                )
+            )
+        if command in {"/run-new-search", "/run-search"}:
             args = self._with_shared_options(tokens[1:])
             return CommandResult(
                 self._invoke("tracking exact targets through transit analysis", self._run_fn, args)
@@ -391,7 +407,7 @@ class HunterShell:
         try:
             while True:
                 try:
-                    line = input_fn("ExoHunter> ")
+                    line = input_fn("EXO-Hunter> ")
                     result = self.dispatch(line)
                 except KeyboardInterrupt:
                     print(
@@ -449,13 +465,13 @@ def exohunter(argv: Sequence[str] | None = None) -> int:
         try:
             commands.extend(_script_commands(args.script, input_stream=sys.stdin))
         except RuntimeError as exc:
-            print(f"ExoHunter failed: {exc}", file=sys.stderr)
+            print(f"EXO-Hunter failed: {exc}", file=sys.stderr)
             return 2
     if commands:
         return shell.run_commands(commands)
     if not sys.stdin.isatty():
         print(
-            "ExoHunter requires an interactive terminal, --command, or --script "
+            "EXO-Hunter requires an interactive terminal, --command, or --script "
             "when stdin is redirected.",
             file=sys.stderr,
         )

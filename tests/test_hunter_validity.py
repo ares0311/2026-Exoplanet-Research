@@ -480,6 +480,7 @@ def test_hunter_operator_docs_do_not_advertise_retired_bypasses() -> None:
     assert "A candidate file may be supplied to `Create-New-Search`" not in workflow
     assert "does not accept operator-ranked candidate files" in readme
     assert "strict read-only `prod_scan_history_v1` adapter" in workflow
-    assert ".venv/bin/ExoHunter" in readme
-    assert "/New-Search 100" in readme
-    assert "persistent `ExoHunter`" in workflow
+    assert ".venv/bin/EXO-Hunter" in readme
+    assert "/Create-New-Search --targets 100 --mode new" in readme
+    assert "/Run-New-Search" in readme
+    assert "persistent `EXO-Hunter`" in workflow

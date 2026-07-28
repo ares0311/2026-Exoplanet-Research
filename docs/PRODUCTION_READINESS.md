@@ -1,9 +1,24 @@
 # PRODUCTION READINESS
 
+## 2026-07-27 exact cross-Hunter command contract
+
+Version 0.5.1 is the current release candidate. The three-Hunter PROD
+directive names `EXO-Hunter` as the shell command and preserves
+`/Create-New-Search --targets <N> --mode <new|follow-up>` plus
+`/Run-New-Search` as the canonical persistent-terminal workflow. Version 0.5.0
+installed only `ExoHunter` and rejected both canonical slash names.
+
+Version 0.5.1 adds compatibility aliases that delegate to the same
+`hunter_shell.py` adapter and canonical `hunter_cli.py` functions. It adds no
+selector, scorer, runner, schema, database, or scientific interpretation path.
+Focused shell/validity tests pass. Full exact-tree gates, PR CI, squash merge,
+installed `EXO-Hunter` verification, and merged-main acceptance remain.
+Status is **IMPLEMENTED BUT NOT YET RELEASE-VERIFIED**.
+
 ## 2026-07-27 persistent ExoHunter terminal closure
 
-Version 0.5.0 is the current production release. The current PROD contract
-requires a persistent `ExoHunter` terminal that remains active until `/Exit`,
+Version 0.5.0 is the accepted baseline release for the prior command contract.
+That contract requires a persistent `ExoHunter` terminal that remains active until `/Exit`,
 discovers slash commands, provides history/completion, reflects real work with
 an exoplanet-specific animation, and degrades cleanly for automation and
 accessibility. Version 0.4.0 had only disconnected one-shot operator commands,

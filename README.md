@@ -1,7 +1,7 @@
 # EXO-Hunter — 2026 Exoplanet Research
 
 [![CI](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml/badge.svg)](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)](pyproject.toml)
+[![Version](https://img.shields.io/badge/version-0.5.1-blue.svg)](pyproject.toml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
@@ -17,11 +17,11 @@ XGBoost, CNN, and ensemble scorers are optional.
 
 ## Current production state
 
-Version 0.5.0 is the current production release represented by this repository.
+Version 0.5.1 is the current release candidate represented by this branch.
 
 | Area | Status | Current evidence |
 |---|---|---|
-| EXO-Hunter lifecycle | **PROD accepted** | Version 0.5.0 adds the required persistent `ExoHunter` slash terminal directly over the canonical adaptive/durable pipeline. Real new and follow-up create-through-execution workflows, slash discovery, exact-target execution, follow-up updates, all PR #322 CI runs, squash merge `6b8c78e`, merged-main CI, and clean synchronized 10/10 local gates (3,212 tests) pass in [`hunter_live_acceptance_v13.json`](artifacts/manifests/hunter_live_acceptance_v13.json). |
+| EXO-Hunter lifecycle | **0.5.1 implemented; release verification pending** | Version 0.5.1 adds the exact `EXO-Hunter` launch alias and canonical `/Create-New-Search --targets N --mode ...` and `/Run-New-Search` slash commands over the unchanged 0.5.0 adaptive/durable pipeline. Focused shell/validity checks pass; full exact-tree gates, PR CI, merge, installed-entrypoint verification, and merged-main acceptance remain. Version 0.5.0's live scientific evidence remains preserved in [`hunter_live_acceptance_v13.json`](artifacts/manifests/hunter_live_acceptance_v13.json). |
 | Bayesian scorer | **Production ready** | Default non-ML scorer; no model artifact required |
 | XGBoost scorer | **Production ready** | Trained on 7,586 Kepler KOIs; held-out AUC 0.992 |
 | XGBoost + Bayesian ensemble | **Production ready** | Conservative fallback when no CNN is supplied |
@@ -97,7 +97,7 @@ Verify the installed entry points:
 git switch main
 git pull --ff-only origin main
 .venv/bin/exo --version
-.venv/bin/ExoHunter --help
+.venv/bin/EXO-Hunter --help
 .venv/bin/Create-New-Search --help
 .venv/bin/Run-New-Search --help
 .venv/bin/Show-Follow-Ups --help
@@ -140,17 +140,17 @@ Launch the persistent terminal:
 ```bash
 git switch main
 git pull --ff-only origin main
-.venv/bin/ExoHunter
+.venv/bin/EXO-Hunter
 ```
 
 Enter `/` or `/Help` to display every command. The normal workflow is:
 
 ```text
-/New-Search 100
-/Run-Search
+/Create-New-Search --targets 100 --mode new
+/Run-New-Search
 /Show-Follow-Ups
-/Follow-Up-Search 10
-/Run-Search
+/Create-New-Search --targets 10 --mode follow-up
+/Run-New-Search
 /Exit
 ```
 
@@ -159,9 +159,10 @@ readline history persists across sessions. Orbit/transit animation runs only
 while canonical Hunter work is active; it disables under redirected I/O, CI,
 reduced-motion settings, `TERM=dumb`, or `--no-animation`. Automation can use
 repeatable `--command`, `--script <path>`, or `--script -`; machine-readable
-`--json` stdout is not prefixed with a banner.
+`--json` stdout is not prefixed with a banner. `ExoHunter`, `/New-Search <N>`,
+`/Follow-Up-Search <N>`, and `/Run-Search` remain convenience aliases.
 
-The one-shot commands below remain stable automation entry points. `ExoHunter`
+The one-shot commands below remain stable automation entry points. `EXO-Hunter`
 delegates to these same functions; it does not implement another selector,
 runner, table renderer, or database path.
 

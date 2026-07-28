@@ -8,6 +8,13 @@ by itself satisfy a master-guide evidence requirement.
 
 ## Current Master-Guide Alignment — Production Priority Order
 
+- **Exact shared Hunter command contract (0.5.1 release verification pending):**
+  Add the named `EXO-Hunter` launch command and canonical
+  `/Create-New-Search --targets N --mode ...` and `/Run-New-Search` slash
+  commands as aliases over the accepted 0.5.0 terminal and lifecycle. Focused
+  tests pass; full gates, PR CI, merge, installed-entrypoint verification, and
+  merged-main acceptance remain.
+
 - **Persistent Hunter terminal (0.5.0 PROD accepted):**
   The current business contract requires the shell-launched `ExoHunter`
   application, persistent slash discovery/history/completion, direct canonical
@@ -695,6 +702,18 @@ thresholds, or classifications. Version 0.2.96 implements it.
 - [x] Prove real new and follow-up create-through-execution workflows and clean
   schema-v6 integrity in `hunter_live_acceptance_v13.json`.
 - [x] Pass PR CI, squash-merge, synchronize `main`, and rerun merged-main gates.
+
+---
+
+## Milestone 22 — Exact Shared Hunter Command Contract (RELEASE PENDING)
+
+- [x] Register `EXO-Hunter` while retaining `ExoHunter` as a compatibility alias.
+- [x] Accept canonical `/Create-New-Search --targets N --mode ...` and
+  `/Run-New-Search` commands without duplicating business logic.
+- [x] Retain `/New-Search`, `/Follow-Up-Search`, and `/Run-Search` conveniences.
+- [x] Add focused packaging, help-discovery, and exact-delegation tests.
+- [ ] Pass full gates, PR CI, squash merge, installed-command probes, and
+  merged-main acceptance.
 
 ---
 

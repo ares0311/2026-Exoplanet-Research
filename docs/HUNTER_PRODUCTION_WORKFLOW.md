@@ -1,5 +1,15 @@
 # EXO-Hunter Production Workflow
 
+## Exact shared command-contract gate (2026-07-27)
+
+**Current state: IMPLEMENTED BUT RELEASE VERIFICATION PENDING for version
+0.5.1.** The required persistent `EXO-Hunter` launch command and canonical
+`/Create-New-Search --targets N --mode <new|follow-up>` and
+`/Run-New-Search` slash commands now delegate directly to the accepted
+terminal and one-shot functions. The shorter 0.5.0 names remain aliases.
+Focused tests pass; full exact-tree gates, PR CI, merge, installed-command
+probes, and merged-main acceptance remain.
+
 ## Persistent terminal release gate (2026-07-27)
 
 **Current state: PROD ACCEPTED. Implementation, real new/follow-up business
@@ -7,9 +17,10 @@ workflows, local quality, PR #322 CI, squash merge `6b8c78e`, merged-main CI,
 synchronization, and clean merged-main local quality are VERIFIED for version
 0.5.0.**
 
-The expanded PROD contract requires one persistent `ExoHunter` application.
-Version 0.5.0 supplies it as a terminal-only adapter over the canonical
-functions in `hunter_cli.py`:
+The 0.5.0 PROD contract required one persistent `ExoHunter` application.
+Version 0.5.0 supplied it as a terminal-only adapter over the canonical
+functions in `hunter_cli.py`; the exact shared names added by 0.5.1 are
+documented above.
 
 ```text
 ExoHunter
