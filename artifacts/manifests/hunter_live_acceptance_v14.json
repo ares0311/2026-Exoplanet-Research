@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "acceptance_id": "exo-hunter-exact-command-contract-v14",
+  "generated_at": "2026-07-28T04:48:13Z",
+  "objective": "Close the exact shared EXO-Hunter launch and slash-command contract without changing the accepted adaptive scientific workflow.",
+  "repository_version": "0.5.1",
+  "release_status": "PROD accepted: exact launch and canonical slash aliases, clean exact-tree quality, PR delivery, merged-main CI, synchronization, and installed merged-main probes passed",
+  "implementation": {
+    "commit": "6b94bb60f5330b1cc3a07ecd7cd3aa0df26818a1",
+    "merge_commit": "12ec7678e4405572992fd09946337f40648c9042",
+    "implementation_tree": "010e64a61c5384f0c743be1a1039250a6c7ce9f0",
+    "merged_main_tree": "010e64a61c5384f0c743be1a1039250a6c7ce9f0",
+    "trees_identical": true,
+    "selector_changed": false,
+    "scorer_changed": false,
+    "runner_changed": false,
+    "persistence_changed": false,
+    "scientific_interpretation_changed": false
+  },
+  "operator_contract": {
+    "primary_launch_command": "EXO-Hunter",
+    "compatibility_launch_command": "ExoHunter",
+    "canonical_create_command": "/Create-New-Search --targets <N> --mode <new|follow-up>",
+    "canonical_run_command": "/Run-New-Search",
+    "canonical_follow_up_command": "/Show-Follow-Ups",
+    "convenience_commands_retained": [
+      "/New-Search <N>",
+      "/Follow-Up-Search <N>",
+      "/Run-Search"
+    ],
+    "canonical_delegates": [
+      "create_new_search",
+      "run_new_search",
+      "show_follow_ups"
+    ],
+    "duplicate_selector_or_persistence_path_added": false,
+    "installed_version_probe": "EXO-Hunter 0.5.1",
+    "installed_legacy_alias_probe": "EXO-Hunter 0.5.1",
+    "canonical_help_discovery_verified_after_merge": true,
+    "canonical_parser_delegation_verified_after_merge": true
+  },
+  "release_delivery": {
+    "pull_request": "https://github.com/ares0311/2026-Exoplanet-Research/pull/324",
+    "pull_request_number": 324,
+    "pull_request_state": "MERGED",
+    "pull_request_head": "6b94bb60f5330b1cc3a07ecd7cd3aa0df26818a1",
+    "merge_commit": "12ec7678e4405572992fd09946337f40648c9042",
+    "merged_at": "2026-07-28T04:44:53Z",
+    "ci_runs": [
+      {
+        "id": 30329182860,
+        "event": "push",
+        "head": "6b94bb60f5330b1cc3a07ecd7cd3aa0df26818a1",
+        "conclusion": "success"
+      },
+      {
+        "id": 30329245981,
+        "event": "pull_request_draft",
+        "head": "6b94bb60f5330b1cc3a07ecd7cd3aa0df26818a1",
+        "conclusion": "success"
+      },
+      {
+        "id": 30329429562,
+        "event": "pull_request_ready",
+        "head": "6b94bb60f5330b1cc3a07ecd7cd3aa0df26818a1",
+        "conclusion": "success"
+      },
+      {
+        "id": 30329604270,
+        "event": "push_main",
+        "head": "12ec7678e4405572992fd09946337f40648c9042",
+        "conclusion": "success"
+      }
+    ],
+    "merged_main_synced": true
+  },
+  "quality_validation": {
+    "focused_hunter_tests": "70 passed",
+    "full_quality_gates": "10/10 passed on clean implementation commit 6b94bb6; 3214 tests across six shards; logs/quality_gates/20260728T043434Z/quality_gate_summary.json",
+    "git_head_sha": "6b94bb60f5330b1cc3a07ecd7cd3aa0df26818a1",
+    "git_dirty": false,
+    "ruff": "passed",
+    "mypy": "passed",
+    "incomplete_implementation_scan": "passed",
+    "directive_integrity": "passed",
+    "merged_main_tree_matches_clean_validated_tree": true,
+    "merged_main_ci": "passed"
+  },
+  "scientific_acceptance_inheritance": {
+    "baseline": "artifacts/manifests/hunter_live_acceptance_v13.json",
+    "live_new_workflow_preserved": true,
+    "live_follow_up_workflow_preserved": true,
+    "schema_version_preserved": 6,
+    "reason_live_workflows_not_repeated": "The release adds command aliases only; the implementation and merged-main Git trees are identical and no selection, execution, scoring, persistence, or interpretation bytes changed outside the terminal adapter, packaging metadata, tests, and documentation."
+  },
+  "workspace_boundary": {
+    "active_repo_name": "2026-Exoplanet-Research",
+    "sibling_repositories_inspected_read_only": [
+      "2026 Technosignatures",
+      "2026 Near Earth Objects"
+    ],
+    "sibling_repository_writes": 0
+  },
+  "limitations": [
+    "The live v13 candidates remain follow-up targets, not confirmed planets or discovery claims.",
+    "No external scientific submission, public alert, or authority-facing action is implemented or authorized.",
+    "This acceptance covers the EXO-Hunter repository only; sibling Hunter release state must be verified in each sibling's own active workspace."
+  ]
+}

@@ -17,11 +17,11 @@ XGBoost, CNN, and ensemble scorers are optional.
 
 ## Current production state
 
-Version 0.5.1 is the current release candidate represented by this branch.
+Version 0.5.1 is the current production release represented by this repository.
 
 | Area | Status | Current evidence |
 |---|---|---|
-| EXO-Hunter lifecycle | **0.5.1 implemented; release verification pending** | Version 0.5.1 adds the exact `EXO-Hunter` launch alias and canonical `/Create-New-Search --targets N --mode ...` and `/Run-New-Search` slash commands over the unchanged 0.5.0 adaptive/durable pipeline. Focused shell/validity checks pass; full exact-tree gates, PR CI, merge, installed-entrypoint verification, and merged-main acceptance remain. Version 0.5.0's live scientific evidence remains preserved in [`hunter_live_acceptance_v13.json`](artifacts/manifests/hunter_live_acceptance_v13.json). |
+| EXO-Hunter lifecycle | **PROD accepted** | Version 0.5.1 adds the exact `EXO-Hunter` launch alias and canonical `/Create-New-Search --targets N --mode ...` and `/Run-New-Search` slash commands over the unchanged adaptive/durable pipeline. Clean 10/10 gates (3,214 tests), all PR #324 CI events, squash merge `12ec767`, merged-main CI, installed probes, and exact Git-tree identity pass in [`hunter_live_acceptance_v14.json`](artifacts/manifests/hunter_live_acceptance_v14.json); v13 preserves the live scientific workflows. |
 | Bayesian scorer | **Production ready** | Default non-ML scorer; no model artifact required |
 | XGBoost scorer | **Production ready** | Trained on 7,586 Kepler KOIs; held-out AUC 0.992 |
 | XGBoost + Bayesian ensemble | **Production ready** | Conservative fallback when no CNN is supplied |

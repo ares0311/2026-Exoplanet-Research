@@ -2,13 +2,15 @@
 
 ## Exact shared command-contract gate (2026-07-27)
 
-**Current state: IMPLEMENTED BUT RELEASE VERIFICATION PENDING for version
-0.5.1.** The required persistent `EXO-Hunter` launch command and canonical
+**Current state: PROD ACCEPTED for version 0.5.1.** The required persistent `EXO-Hunter`
+launch command and canonical
 `/Create-New-Search --targets N --mode <new|follow-up>` and
 `/Run-New-Search` slash commands now delegate directly to the accepted
 terminal and one-shot functions. The shorter 0.5.0 names remain aliases.
-Focused tests pass; full exact-tree gates, PR CI, merge, installed-command
-probes, and merged-main acceptance remain.
+Clean 10/10 exact-tree gates with 3,214 tests, all PR #324 CI events, squash
+merge `12ec767`, merged-main CI, synchronization, installed-command probes,
+and exact implementation/merge Git-tree identity pass. Evidence is
+`artifacts/manifests/hunter_live_acceptance_v14.json`.
 
 ## Persistent terminal release gate (2026-07-27)
 

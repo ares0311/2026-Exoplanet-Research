@@ -16,13 +16,15 @@ file assumes you already have.
 
 Current gap status (see `docs/PRODUCTION_READINESS.md` for the full,
 actively-maintained narrative — do not rely on any cached summary of it):
-**Hunter 0.5.1 command-contract release verification is the active priority.**
+**Hunter 0.5.1 is PROD accepted as of 2026-07-27.**
 The cross-Hunter PROD directive requires the exact shell name `EXO-Hunter`
 and canonical slash forms `/Create-New-Search --targets N --mode ...` and
 `/Run-New-Search`. Version 0.5.1 adds those as compatibility aliases over the
-unchanged canonical functions; focused tests pass, while full exact-tree gates,
-PR CI, merge, installed-entrypoint verification, and merged-main acceptance
-remain.
+unchanged canonical functions. Clean 10/10 exact-tree gates with 3,214 tests,
+all PR #324 CI events, squash merge `12ec767`, merged-main CI, synchronization,
+and installed merged-main probes pass. Current command-contract evidence is
+`artifacts/manifests/hunter_live_acceptance_v14.json`; v13 preserves the live
+new/follow-up scientific workflows.
 
 **Hunter 0.5.0 was PROD accepted as of 2026-07-27.**
 The 2026-07-27 PROD-closure directive exposed that version 0.4.0 had five

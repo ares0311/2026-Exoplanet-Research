@@ -470,6 +470,49 @@ def test_v13_acceptance_matches_persistent_terminal_and_live_contracts() -> None
     assert merged_quality["git_dirty"] is False
 
 
+def test_v14_acceptance_matches_exact_shared_command_contract() -> None:
+    acceptance = json.loads(
+        Path("artifacts/manifests/hunter_live_acceptance_v14.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    implementation = acceptance["implementation"]
+    operator = acceptance["operator_contract"]
+    delivery = acceptance["release_delivery"]
+    quality = acceptance["quality_validation"]
+    inheritance = acceptance["scientific_acceptance_inheritance"]
+
+    assert acceptance["repository_version"] == "0.5.1"
+    assert acceptance["release_status"].startswith("PROD accepted:")
+    assert implementation["trees_identical"] is True
+    assert implementation["implementation_tree"] == implementation["merged_main_tree"]
+    assert not any(
+        implementation[field]
+        for field in (
+            "selector_changed",
+            "scorer_changed",
+            "runner_changed",
+            "persistence_changed",
+            "scientific_interpretation_changed",
+        )
+    )
+    assert operator["primary_launch_command"] == "EXO-Hunter"
+    assert operator["compatibility_launch_command"] == "ExoHunter"
+    assert operator["canonical_create_command"].startswith("/Create-New-Search")
+    assert operator["canonical_run_command"] == "/Run-New-Search"
+    assert operator["duplicate_selector_or_persistence_path_added"] is False
+    assert operator["canonical_help_discovery_verified_after_merge"] is True
+    assert delivery["pull_request_number"] == 324
+    assert delivery["pull_request_state"] == "MERGED"
+    assert delivery["merge_commit"] == implementation["merge_commit"]
+    assert all(run["conclusion"] == "success" for run in delivery["ci_runs"])
+    assert quality["git_dirty"] is False
+    assert quality["merged_main_tree_matches_clean_validated_tree"] is True
+    assert inheritance["baseline"].endswith("hunter_live_acceptance_v13.json")
+    assert inheritance["live_new_workflow_preserved"] is True
+    assert inheritance["live_follow_up_workflow_preserved"] is True
+
+
 def test_hunter_operator_docs_do_not_advertise_retired_bypasses() -> None:
     readme = Path("README.md").read_text(encoding="utf-8")
     workflow = Path("docs/HUNTER_PRODUCTION_WORKFLOW.md").read_text(
