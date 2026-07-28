@@ -2,7 +2,7 @@
 
 ## 2026-07-27 exact cross-Hunter command contract
 
-Version 0.5.1 is the current release candidate. The three-Hunter PROD
+Version 0.5.1 is the current production release. The three-Hunter PROD
 directive names `EXO-Hunter` as the shell command and preserves
 `/Create-New-Search --targets <N> --mode <new|follow-up>` plus
 `/Run-New-Search` as the canonical persistent-terminal workflow. Version 0.5.0
@@ -11,9 +11,11 @@ installed only `ExoHunter` and rejected both canonical slash names.
 Version 0.5.1 adds compatibility aliases that delegate to the same
 `hunter_shell.py` adapter and canonical `hunter_cli.py` functions. It adds no
 selector, scorer, runner, schema, database, or scientific interpretation path.
-Focused shell/validity tests pass. Full exact-tree gates, PR CI, squash merge,
-installed `EXO-Hunter` verification, and merged-main acceptance remain.
-Status is **IMPLEMENTED BUT NOT YET RELEASE-VERIFIED**.
+Clean 10/10 gates with 3,214 tests, all PR #324 CI events, squash merge
+`12ec767`, merged-main CI, synchronization, installed `EXO-Hunter` and legacy
+alias probes, and exact implementation/merge Git-tree identity pass. Evidence
+is `artifacts/manifests/hunter_live_acceptance_v14.json`; the unchanged live
+scientific workflow remains evidenced by v13. Status is **PROD ACCEPTED**.
 
 ## 2026-07-27 persistent ExoHunter terminal closure
 

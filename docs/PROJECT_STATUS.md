@@ -1,15 +1,17 @@
 # PROJECT STATUS
 
-## Status: EXO-Hunter 0.5.1 Command-Contract Release Verification Pending
+## Status: EXO-Hunter 0.5.1 PROD Accepted
 ## Last Updated: 2026-07-27 (version 0.5.1)
 
 Version 0.5.1 aligns the persistent terminal with the exact shared operator
 contract: `EXO-Hunter`, `/Create-New-Search --targets N --mode ...`, and
 `/Run-New-Search`. These are thin aliases over the already accepted 0.5.0
-functions. Focused shell/validity tests pass; full exact-tree gates, PR CI,
-merge, installed-entrypoint verification, and merged-main acceptance remain.
-The unchanged live scientific workflow evidence is preserved in
-`artifacts/manifests/hunter_live_acceptance_v13.json`.
+functions. Clean 10/10 exact-tree gates with 3,214 tests, all PR #324 CI
+events, squash merge `12ec767`, merged-main CI, synchronization, installed
+command probes, and exact implementation/merge tree identity pass. Current
+command-contract evidence is
+`artifacts/manifests/hunter_live_acceptance_v14.json`; the unchanged live
+scientific workflow evidence is preserved in v13.
 
 This file had drifted badly stale before this update: it described Phase 4
 individual-transit diagnostics and T1-2 stacking calibration as the active

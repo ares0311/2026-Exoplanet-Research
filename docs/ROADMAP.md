@@ -8,12 +8,13 @@ by itself satisfy a master-guide evidence requirement.
 
 ## Current Master-Guide Alignment — Production Priority Order
 
-- **Exact shared Hunter command contract (0.5.1 release verification pending):**
+- **Exact shared Hunter command contract (0.5.1 PROD accepted):**
   Add the named `EXO-Hunter` launch command and canonical
   `/Create-New-Search --targets N --mode ...` and `/Run-New-Search` slash
-  commands as aliases over the accepted 0.5.0 terminal and lifecycle. Focused
-  tests pass; full gates, PR CI, merge, installed-entrypoint verification, and
-  merged-main acceptance remain.
+  commands as aliases over the accepted 0.5.0 terminal and lifecycle. Clean
+  10/10 gates with 3,214 tests, all PR #324 CI events, squash merge `12ec767`,
+  merged-main CI, installed probes, and exact Git-tree identity pass. Evidence
+  is `artifacts/manifests/hunter_live_acceptance_v14.json`.
 
 - **Persistent Hunter terminal (0.5.0 PROD accepted):**
   The current business contract requires the shell-launched `ExoHunter`
@@ -705,14 +706,14 @@ thresholds, or classifications. Version 0.2.96 implements it.
 
 ---
 
-## Milestone 22 — Exact Shared Hunter Command Contract (RELEASE PENDING)
+## Milestone 22 — Exact Shared Hunter Command Contract (COMPLETE)
 
 - [x] Register `EXO-Hunter` while retaining `ExoHunter` as a compatibility alias.
 - [x] Accept canonical `/Create-New-Search --targets N --mode ...` and
   `/Run-New-Search` commands without duplicating business logic.
 - [x] Retain `/New-Search`, `/Follow-Up-Search`, and `/Run-Search` conveniences.
 - [x] Add focused packaging, help-discovery, and exact-delegation tests.
-- [ ] Pass full gates, PR CI, squash merge, installed-command probes, and
+- [x] Pass full gates, PR CI, squash merge, installed-command probes, and
   merged-main acceptance.
 
 ---
