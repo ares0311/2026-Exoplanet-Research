@@ -17,11 +17,11 @@ XGBoost, CNN, and ensemble scorers are optional.
 
 ## Current production state
 
-Version 0.5.0 is the current release candidate represented by this branch.
+Version 0.5.0 is the current production release represented by this repository.
 
 | Area | Status | Current evidence |
 |---|---|---|
-| EXO-Hunter lifecycle | **Live and locally verified; release verification pending** | Version 0.5.0 adds the required persistent `ExoHunter` slash terminal directly over the version 0.4.0 adaptive/durable pipeline. Real new and follow-up create-through-execution workflows, slash discovery, exact-target execution, follow-up updates, and 10/10 clean local gates pass in [`hunter_live_acceptance_v13.json`](artifacts/manifests/hunter_live_acceptance_v13.json). PR CI, squash merge, and merged-main verification remain before PROD acceptance. |
+| EXO-Hunter lifecycle | **PROD accepted** | Version 0.5.0 adds the required persistent `ExoHunter` slash terminal directly over the canonical adaptive/durable pipeline. Real new and follow-up create-through-execution workflows, slash discovery, exact-target execution, follow-up updates, all PR #322 CI runs, squash merge `6b8c78e`, merged-main CI, and clean synchronized 10/10 local gates (3,212 tests) pass in [`hunter_live_acceptance_v13.json`](artifacts/manifests/hunter_live_acceptance_v13.json). |
 | Bayesian scorer | **Production ready** | Default non-ML scorer; no model artifact required |
 | XGBoost scorer | **Production ready** | Trained on 7,586 Kepler KOIs; held-out AUC 0.992 |
 | XGBoost + Bayesian ensemble | **Production ready** | Conservative fallback when no CNN is supplied |
