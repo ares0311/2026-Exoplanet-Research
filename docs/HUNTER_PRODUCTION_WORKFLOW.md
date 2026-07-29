@@ -2,8 +2,8 @@
 
 ## Explainable operator-reporting gate (2026-07-27)
 
-**Current state: version 0.5.2 is under release verification; version 0.5.1
-remains PROD accepted.** The interactive candidate grid and large-search CSV
+**Current state: version 0.5.2 is PROD ACCEPTED.** The interactive candidate
+grid and large-search CSV
 now expose the same review-critical context frozen in the durable candidate
 snapshot: survey/canonical identifiers, object class, distance, estimated
 storage, explicit new/follow-up status, prior-search count/provenance,
@@ -11,6 +11,10 @@ deterministic score/reason, and exoplanet metrics. CSV filenames and rows are
 explicitly UTC-timestamped. SQLite remains authoritative; the CSV remains an
 operator-facing review artifact. No selection, scoring, execution,
 persistence, or scientific rule changed.
+Clean implementation and merged-main gates each passed 10/10 with 3,217 tests;
+PR #326 passed every CI event, squash-merged as `a062245`, and synchronized
+merged-main verification passed. Evidence is
+`artifacts/manifests/hunter_live_acceptance_v15.json`.
 
 ## Exact shared command-contract gate (2026-07-27)
 

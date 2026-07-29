@@ -21,7 +21,7 @@ Version 0.5.2 is the current release represented by this repository.
 
 | Area | Status | Current evidence |
 |---|---|---|
-| EXO-Hunter lifecycle | **PROD accepted at 0.5.1; 0.5.2 reporting delta under release verification** | Version 0.5.2 exposes the full required selection context in the terminal grid and timestamped CSV review manifest without changing the accepted selector, scorer, runner, schema, or scientific interpretation paths. The accepted 0.5.1 command and scientific evidence remains in [`hunter_live_acceptance_v14.json`](artifacts/manifests/hunter_live_acceptance_v14.json), with v13 preserving the live workflows. |
+| EXO-Hunter lifecycle | **PROD accepted at 0.5.2** | Version 0.5.2 exposes the full required selection context in the terminal grid and timestamped CSV review manifest without changing the accepted selector, scorer, runner, schema, or scientific interpretation paths. Clean implementation and merged-main gates each passed 10/10 with 3,217 tests; PR #326 and all four CI events passed. Delivery evidence is [`hunter_live_acceptance_v15.json`](artifacts/manifests/hunter_live_acceptance_v15.json), with v14 preserving the exact command contract and v13 the live scientific workflows. |
 | Bayesian scorer | **Production ready** | Default non-ML scorer; no model artifact required |
 | XGBoost scorer | **Production ready** | Trained on 7,586 Kepler KOIs; held-out AUC 0.992 |
 | XGBoost + Bayesian ensemble | **Production ready** | Conservative fallback when no CNN is supplied |
