@@ -1,5 +1,58 @@
 # EXO-Hunter Production Workflow
 
+## Adversarial requalification gate (2026-07-29)
+
+**Current state: NOT PROD. Version 0.5.2 is the historical baseline; version
+0.5.3 must close the following plan before the PROD label may be restored.**
+
+Production outcome: make the active repository the sole runtime filesystem
+authority and produce one reproducible, inspectable proof that the installed
+shell drives the complete canonical business lifecycle correctly on a clean
+datastore.
+
+1. **[AGENT — PLANNED] Enforce the repository boundary.** Delete
+   `--cross-project-sibling` and implicit sibling-root discovery. Cross-project
+   search history may influence selection only after it has been exported,
+   copied into this repository, checksum-verified, and imported through the
+   versioned history contract. Reject outside-repository paths before any
+   durable write.
+2. **[AGENT — PLANNED] Exercise the production entry point.** Launch the
+   installed `EXO-Hunter` command in separate processes for create, run,
+   resume, follow-up creation/execution, and post-restart inspection. Use the
+   same shell router, canonical discovery/selection code, SQLite store,
+   execution lifecycle, and scientific pipeline used by operators.
+3. **[AGENT — PLANNED] Bound mocks at external I/O.** Supply deterministic TIC,
+   product-metadata, and light-curve responses at the network adapters. Do not
+   replace discovery paging, validity/provenance checks, identity/history
+   resolution, adaptive expansion, ranking, manifest persistence, execution,
+   scorers/composite interpretation, or follow-up updates.
+4. **[AGENT — PLANNED] Prove required adversarial cases.** The controlled
+   universe must show a selected best target outside the initial retained
+   partition, best-available `N` despite weak absolute quality, exclusion of
+   invalid and refresh-required inputs, alias collapse, prior-search exclusion
+   from new mode, evidence-sensitive follow-up rank, exact manifested/executed
+   equality, and retry of only unfinished work after a forced partial failure.
+5. **[AGENT — PLANNED] Repair terminal follow-up integrity.** The first
+   installed-shell run revealed that successful follow-up completion made the
+   originating recommendation non-executable without recording a disposition
+   reason, contradicting the database validator. Record and regression-test
+   the terminal reason so the canonical run can validate its own final state.
+6. **[AGENT — PLANNED] Emit durable acceptance evidence.** Persist the request,
+   discovery coverage, validity report, provenance graph, ranking evidence,
+   exact target/run state, follow-up state, command assertions, code version,
+   database hash, and a compressed immutable database snapshot. Validation
+   must recompute hashes and inspect the snapshot rather than trusting
+   self-reported values.
+7. **[AGENT — PLANNED] Deliver and reverify.** Run focused tests and inspect
+   state, then the full clean-tree quality gate; commit on `claude/**`, push,
+   pass PR CI, squash-merge, synchronize `main`, and repeat the required
+   merged-state verification. Only then update these items to VERIFIED and
+   restore PROD status.
+
+External dependencies: none. The controlled acceptance is offline and replaces
+external network responses only; no credentials, large downloads, sibling
+repository access, human scientific decision, or publication is required.
+
 ## Explainable operator-reporting gate (2026-07-27)
 
 **Current state: version 0.5.2 is PROD ACCEPTED.** The interactive candidate
@@ -104,12 +157,10 @@ required for this closure loop.
    source/version, retrieval/assessment times, transformations, and assessment
    basis. Only the first two states may drive a production selection; strict
    absolute-quality reporting remains separate from rank eligibility.
-5. **[AGENT — VERIFIED] Cross-project history.** Add a read-only sibling-resolved import
-   for Techno-Hunter's signed/hash-addressed history export, computed relative
-   to this checkout, while retaining an explicit copied-manifest fallback.
-   Preserve the write-side repo boundary. Exact shared stellar identities must
-   affect new-target eligibility durably; the disjoint NEO identity space is
-   not imported.
+5. **[AGENT — SUPERSEDED] Cross-project history.** The earlier read-only
+   sibling-resolved import proved identity interoperability but is prohibited
+   by the stricter active-repository runtime boundary. Version 0.5.3 removes
+   it; only a copied repo-local manifest may now influence selection.
 6. **[AGENT — VERIFIED] Contract and documentation reconciliation.** Bump the product and
    schema contracts as needed, remove stale fixed-pool/operator-bypass
    instructions, and make README, readiness, roadmap, architecture, and this
@@ -394,13 +445,14 @@ git pull --ff-only origin main
 .venv/bin/Create-New-Search --targets 100 --mode new
 ```
 
-New mode automatically imports the committed Techno-Hunter identity export and
-source-verifies it when the sibling checkout is present. Use
-`--cross-project-sibling technosignatures` to prefer the sibling's normalized
-export and otherwise use its strict read-only `prod_scan_history_v1` adapter,
-or `--cross-project-history-path <file>` for a copied export on a differently
-laid-out machine. The latter is explicitly `stale-but-usable` when its origin
-source bytes cannot be re-read.
+New mode automatically imports the committed Techno-Hunter identity export.
+`--cross-project-history-path <file>` may select another copied export only
+when the resolved file is inside this active repository; outside-repository
+paths are rejected before the SQLite datastore is created. Origin source bytes
+are not read at runtime, so a copied export is explicitly
+`stale-but-usable`—never silently `valid`—while its manifest bytes, declared
+source hashes, schema, provenance, and stellar identities are validated during
+import.
 
 Create a follow-up search from the complete durable prior-search universe:
 

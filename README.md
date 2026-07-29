@@ -1,7 +1,7 @@
 # EXO-Hunter — 2026 Exoplanet Research
 
 [![CI](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml/badge.svg)](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.5.2-blue.svg)](pyproject.toml)
+[![Version](https://img.shields.io/badge/version-0.5.3-blue.svg)](pyproject.toml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
@@ -17,11 +17,11 @@ XGBoost, CNN, and ensemble scorers are optional.
 
 ## Current production state
 
-Version 0.5.2 is the current release represented by this repository.
+Version 0.5.3 is the current release candidate represented by this repository.
 
 | Area | Status | Current evidence |
 |---|---|---|
-| EXO-Hunter lifecycle | **PROD accepted at 0.5.2** | Version 0.5.2 exposes the full required selection context in the terminal grid and timestamped CSV review manifest without changing the accepted selector, scorer, runner, schema, or scientific interpretation paths. Clean implementation and merged-main gates each passed 10/10 with 3,217 tests; PR #326 and all four CI events passed. Delivery evidence is [`hunter_live_acceptance_v15.json`](artifacts/manifests/hunter_live_acceptance_v15.json), with v14 preserving the exact command contract and v13 the live scientific workflows. |
+| EXO-Hunter lifecycle | **0.5.3 requalification in progress — not PROD** | The 2026-07-29 adversarial gate supersedes the 0.5.2 PROD label. Version 0.5.3 removes sibling-repository runtime reads, constrains cross-project history to a verified repo-local copy, repairs completed-follow-up validity, and adds deterministic clean-state acceptance through the installed `EXO-Hunter` shell. Current completion evidence and release gates are tracked in [`docs/HUNTER_PRODUCTION_WORKFLOW.md`](docs/HUNTER_PRODUCTION_WORKFLOW.md); PROD requires local acceptance, a hash-verifiable datastore snapshot, full quality gates, PR CI, squash merge, and synchronized-main revalidation. |
 | Bayesian scorer | **Production ready** | Default non-ML scorer; no model artifact required |
 | XGBoost scorer | **Production ready** | Trained on 7,586 Kepler KOIs; held-out AUC 0.992 |
 | XGBoost + Bayesian ensemble | **Production ready** | Conservative fallback when no CNN is supplied |

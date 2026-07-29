@@ -499,7 +499,7 @@ def test_failed_follow_up_stays_scheduled_until_successful_resume(tmp_path: Path
                     candidate_id="TIC1-s01",
                     priority=99.0,
                     reason="unresolved signal",
-                    evidence={},
+                    evidence={"false_positive_probability": 0.1},
                     recommended_action="repeat photometry",
                 ),
             ),
@@ -523,12 +523,15 @@ def test_failed_follow_up_stays_scheduled_until_successful_resume(tmp_path: Path
         search_id=follow_search["search_id"],
     ).status == "completed"
     row = store.list_follow_ups(status="completed")[0]
+    assert row["search_eligible"] is False
+    assert "originating recommendation is closed" in row["revisit_reason"]
     assert [event["state"] for event in row["events"]] == [
         "open",
         "scheduled",
         "attempt_failed",
         "completed",
     ]
+    assert store.validity_summary()["ok"] is True
 
 
 def test_no_data_follow_up_is_deferred_not_rescheduled(tmp_path: Path) -> None:

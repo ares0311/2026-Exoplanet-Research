@@ -1,5 +1,45 @@
 # PRODUCTION READINESS
 
+## 2026-07-29 adversarial PROD requalification
+
+Version 0.5.2 is **NOT CURRENTLY PROD ACCEPTED** under the stricter
+Hunter PROD-closure contract. The earlier acceptance remains useful historical
+evidence, but it did not prove two now-mandatory properties:
+
+1. production must not read a sibling repository at runtime; the
+   `--cross-project-sibling` path and implicit sibling-root resolution violate
+   the active-repository boundary even though they are read-only; and
+2. one deterministic clean-state acceptance run must traverse the installed
+   `EXO-Hunter` shell and canonical new/follow-up lifecycle, prove adaptive
+   discovery, validity, alias/history exclusion, exact-manifest execution,
+   partial-failure resume, real scorers, restart durability, and emit an
+   independently hash-verifiable evidence bundle.
+
+The production-closing plan is:
+
+1. **[AGENT] Repo-local history boundary.** Remove sibling discovery and accept
+   only copied, checksum-verified cross-project history inputs whose resolved
+   paths are inside this repository.
+2. **[AGENT] Deterministic installed-CLI acceptance.** Add a controlled-universe
+   harness that replaces external network responses only, while retaining the
+   production shell routing, discovery, validation, ranking, SQLite lifecycle,
+   scientific pipeline/scorers, and restart behavior.
+3. **[AGENT] Lifecycle integrity repair.** Ensure a terminally completed
+   follow-up records the reason it is no longer executable; the first
+   deterministic run exposed that the prior transition contradicted the
+   database validity contract.
+4. **[AGENT] Durable evidence.** Emit request, coverage, validity, provenance,
+   ranking, exact selected/executed targets, run/follow-up state, assertions,
+   and a compressed datastore snapshot with verified hashes.
+5. **[AGENT] Release verification.** Run focused regressions, inspect the
+   resulting state, run the complete local quality gate on a clean commit,
+   deliver through PR/CI/squash merge, synchronize `main`, and repeat the
+   merged-state checks required by repository policy.
+
+No human credential, large data acquisition, external publication, or sibling
+repository write is required. Until every item above is verified against the
+same repository state, later `PROD ACCEPTED` statements below are superseded.
+
 ## 2026-07-27 explainable operator-reporting contract
 
 Version 0.5.2 closes a presentation/export gap found by re-auditing the exact

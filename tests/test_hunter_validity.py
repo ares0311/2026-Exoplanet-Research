@@ -10,8 +10,8 @@ from pathlib import Path
 import pytest
 
 from exo_toolkit.hunter_cross_project import (
-    build_sibling_history_manifest,
     load_cross_project_history,
+    require_repo_local_history_path,
 )
 from exo_toolkit.hunter_history import load_verified_history_manifest
 from exo_toolkit.hunter_models import (
@@ -205,47 +205,21 @@ def test_cross_project_history_is_durable_and_immutable(tmp_path: Path) -> None:
         connection.execute("DELETE FROM cross_project_search_history")
 
 
-def test_live_sibling_adapter_normalizes_and_verifies_raw_history(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    source = tmp_path / "results" / "scan_history.ndjson"
-    source.parent.mkdir()
-    source.write_text(
-        "\n".join(
-            (
-                json.dumps(
-                    {
-                        "schema_version": "prod_scan_history_v1",
-                        "target_stem": "GBT_HIP74981_2026-01-01_ABACAD",
-                        "scanned_at_utc": "2026-01-01T00:00:00+00:00",
-                        "pathway": "human_review_queue",
-                    }
-                ),
-                json.dumps(
-                    {
-                        "schema_version": "prod_scan_history_v1",
-                        "target_stem": "non_catalog_calibrator",
-                        "scanned_at_utc": "2026-01-01T01:00:00+00:00",
-                        "pathway": "no_signal",
-                    }
-                ),
-            )
-        )
-        + "\n",
-        encoding="utf-8",
+def test_default_cross_project_history_is_repo_local() -> None:
+    copied = Path(
+        "data_selection/cross_project_imports/techno_hunter_history_v1.json"
     )
-    monkeypatch.setattr(
-        "exo_toolkit.hunter_cross_project.sibling_history_source_path",
-        lambda _project: source,
-    )
+    resolved = require_repo_local_history_path(copied)
+    loaded = load_cross_project_history(resolved, source_root=None)
 
-    manifest = build_sibling_history_manifest("technosignatures")
-    loaded = load_cross_project_history(manifest, source_root=tmp_path)
-
-    assert loaded["validity_state"] == "valid"
-    assert loaded["source_hashes_verified"] == 1
-    assert len(loaded["entries"]) == 1
-    assert loaded["entries"][0]["identities"] == ["HIP 74981"]
+    assert resolved.is_file()
+    assert loaded["validity_state"] == "stale-but-usable"
+    assert loaded["source_hashes_verified"] == 0
+    assert "HIP 74981" in {
+        identity
+        for entry in loaded["entries"]
+        for identity in entry["identities"]
+    }
 
 
 def test_validity_detects_model_artifact_drift(tmp_path: Path) -> None:
@@ -579,7 +553,11 @@ def test_hunter_operator_docs_do_not_advertise_retired_bypasses() -> None:
     assert "can also consume a provenance-complete JSON or CSV candidate" not in readme
     assert "A candidate file may be supplied to `Create-New-Search`" not in workflow
     assert "does not accept operator-ranked candidate files" in readme
-    assert "strict read-only `prod_scan_history_v1` adapter" in workflow
+    assert "`--cross-project-sibling technosignatures` to prefer" not in workflow
+    normalized_workflow = " ".join(workflow.split())
+    assert "outside-repository paths are rejected before the SQLite datastore" in (
+        normalized_workflow
+    )
     assert ".venv/bin/EXO-Hunter" in readme
     assert "/Create-New-Search --targets 100 --mode new" in readme
     assert "/Run-New-Search" in readme

@@ -51,29 +51,22 @@ and `docs/HUNTER_PRODUCTION_WORKFLOW.md`.
   consume the same shape, copy this file directly rather than re-deriving the
   design.
 
-## Current read-only mechanism
+## Current repo-local mechanism
 
-The 2026-07-25 verification established that sibling reads work when the path
-is computed inside the running process relative to this checkout. The
-write-side repository boundary remains enforced and is intentionally
-unchanged.
+The stricter 2026-07-29 production boundary prohibits runtime filesystem reads
+from sibling repositories, including read-only relative-path discovery.
+`src/exo_toolkit/hunter_cross_project.py` therefore consumes only copied
+history manifests inside this active repository:
 
-`src/exo_toolkit/hunter_cross_project.py` provides the stable consumer:
-
-- `sibling_history_export_path("technosignatures")` resolves
-  `../2026 Technosignatures/data_selection/hunter_prior_search_history_v1.json`
-  without a hard-coded absolute path.
-- `Create-New-Search --cross-project-sibling technosignatures` prefers that
-  normalized export. When it is absent, a strict read-only adapter normalizes
-  the sibling's real `results/scan_history.ndjson` `prod_scan_history_v1`
-  records in memory and independently verifies the exact source hash.
-- `Create-New-Search --cross-project-history-path <file>` retains the portable
-  operator-copied fallback. When origin source bytes are unavailable, the
-  manifest is explicitly `stale-but-usable`, never silently `valid`.
-- With neither flag, new-mode production imports the committed
-  `data_selection/cross_project_imports/techno_hunter_history_v1.json`. If the
-  sibling checkout is present, its real `results/scan_history.ndjson` is
-  source-hash verified; otherwise the copy remains `stale-but-usable`.
+- With no flag, new mode imports
+  `data_selection/cross_project_imports/techno_hunter_history_v1.json`.
+- `Create-New-Search --cross-project-history-path <file>` accepts another
+  copied manifest only if its resolved path remains inside this repository.
+- Outside-repository paths are rejected before datastore initialization.
+- Because origin bytes are deliberately not re-read at runtime, a valid copied
+  manifest is `stale-but-usable`, not `valid`. The importer still validates
+  schema, declared source hashes, provenance fields, identities, and the
+  manifest's own SHA-256 before any identity affects selection.
 
 Imported identities are append-only schema-v6 rows. TIC/HIP/KIC aliases affect
 new-target eligibility, but Techno-Hunter's radio outcome vocabulary is
@@ -81,17 +74,14 @@ preserved verbatim and is never translated into an EXO-Hunter scientific
 result. NEO-Hunter is intentionally absent because minor-planet designations
 are a disjoint identity space.
 
-At the time of verification, the real Technosignatures source history existed
-and matched SHA-256
-`c70b35120722754849c589db1d563060b3f4d6a32a246c25d16f2a116266b3fb`;
-its advertised normalized export file did not yet exist. The direct sibling
-flag was therefore verified through the strict raw-history adapter; the
-default source-verified copied export remains the portable no-sibling
-fallback.
+The committed copy declares source SHA-256
+`c70b35120722754849c589db1d563060b3f4d6a32a246c25d16f2a116266b3fb`.
+Refreshing that copy is an explicit cross-project handoff performed outside
+the runtime workflow; EXO-Hunter never follows the provenance URI into another
+checkout.
 
 ## Non-goals
 
 This is not a shared database, a shared package, cross-repo write path, or
-automatic mutation of a sibling checkout. The interoperability surface is the
-versioned JSON export, plus the narrowly validated Techno-Hunter
-`prod_scan_history_v1` read adapter until the sibling publishes that export.
+automatic mutation of a sibling checkout. The sole interoperability surface is
+the versioned JSON export copied into the consuming repository.
