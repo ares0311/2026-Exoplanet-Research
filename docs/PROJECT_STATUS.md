@@ -1,12 +1,16 @@
 # PROJECT STATUS
 
-## Status: EXO-Hunter 0.5.1 PROD Accepted; 0.5.2 Release Verification
+## Status: EXO-Hunter 0.5.2 PROD Accepted
 ## Last Updated: 2026-07-27 (version 0.5.2)
 
 Version 0.5.2 closes the operator-reporting gap found after the 0.5.1
 acceptance audit. Candidate grids and timestamped CSV manifests now expose the
 full required selection context already frozen in durable candidate snapshots,
 without changing scientific or persistence behavior.
+Clean implementation and merged-main gates each passed 10/10 with 3,217 tests;
+PR #326 and all four CI events passed, squash merge `a062245` is synchronized,
+and structured evidence is
+`artifacts/manifests/hunter_live_acceptance_v15.json`.
 
 Version 0.5.1 aligns the persistent terminal with the exact shared operator
 contract: `EXO-Hunter`, `/Create-New-Search --targets N --mode ...`, and

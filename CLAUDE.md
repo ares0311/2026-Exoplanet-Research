@@ -16,8 +16,7 @@ file assumes you already have.
 
 Current gap status (see `docs/PRODUCTION_READINESS.md` for the full,
 actively-maintained narrative — do not rely on any cached summary of it):
-**Hunter 0.5.1 is PROD accepted; 0.5.2 is under release verification as of
-2026-07-27.**
+**Hunter 0.5.2 is PROD accepted as of 2026-07-27.**
 
 Version 0.5.2 closes the operator-reporting gap in the candidate grid and CSV
 review manifest: both now expose stable survey/canonical identifiers, object
@@ -25,6 +24,9 @@ class, distance, storage, explicit search status, prior-search
 count/provenance, deterministic rank and reason, and exoplanet metrics. CSV
 filenames and rows carry explicit timestamps. This changes no selector,
 scorer, runner, schema, database, or scientific interpretation behavior.
+Clean implementation and merged-main gates each passed 10/10 with 3,217 tests;
+PR #326 and all four CI events passed. Acceptance is
+`artifacts/manifests/hunter_live_acceptance_v15.json`.
 The cross-Hunter PROD directive requires the exact shell name `EXO-Hunter`
 and canonical slash forms `/Create-New-Search --targets N --mode ...` and
 `/Run-New-Search`. Version 0.5.1 adds those as compatibility aliases over the

@@ -513,6 +513,63 @@ def test_v14_acceptance_matches_exact_shared_command_contract() -> None:
     assert inheritance["live_follow_up_workflow_preserved"] is True
 
 
+def test_v15_acceptance_matches_explainable_operator_reporting_contract() -> None:
+    acceptance = json.loads(
+        Path("artifacts/manifests/hunter_live_acceptance_v15.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    implementation = acceptance["implementation"]
+    reporting = acceptance["operator_reporting_contract"]
+    delivery = acceptance["release_delivery"]
+    quality = acceptance["quality_validation"]
+    inheritance = acceptance["scientific_acceptance_inheritance"]
+    boundary = acceptance["workspace_boundary"]
+
+    assert acceptance["repository_version"] == "0.5.2"
+    assert acceptance["release_status"].startswith("PROD accepted:")
+    assert implementation["trees_identical"] is True
+    assert implementation["implementation_tree"] == implementation["merged_main_tree"]
+    assert implementation["candidate_snapshot_contract_enriched"] is True
+    assert not any(
+        implementation[field]
+        for field in (
+            "selector_changed",
+            "scorer_changed",
+            "ranking_weights_or_thresholds_changed",
+            "runner_changed",
+            "persistence_schema_changed",
+            "persistence_mechanism_changed",
+            "scientific_interpretation_changed",
+        )
+    )
+    assert reporting["small_manifest_behavior"].startswith("N <= 100")
+    assert reporting["large_manifest_behavior"].startswith("N > 100")
+    assert reporting["sqlite_remains_authoritative"] is True
+    assert reporting["csv_is_operator_review_artifact"] is True
+    assert reporting["distance_source"]["field"] == "d"
+    assert reporting["distance_source"]["units"] == "pc"
+    assert reporting["distance_source"]["schema_url"].startswith(
+        "https://mast.stsci.edu/"
+    )
+    assert delivery["pull_request_number"] == 326
+    assert delivery["pull_request_state"] == "MERGED"
+    assert delivery["merge_commit"] == implementation["merge_commit"]
+    assert all(run["conclusion"] == "success" for run in delivery["ci_runs"])
+    assert quality["clean_implementation_git_dirty"] is False
+    assert quality["merged_main_git_dirty"] is False
+    assert quality["merged_main_tree_matches_clean_validated_tree"] is True
+    assert inheritance["command_baseline"].endswith(
+        "hunter_live_acceptance_v14.json"
+    )
+    assert inheritance["live_workflow_baseline"].endswith(
+        "hunter_live_acceptance_v13.json"
+    )
+    assert boundary["sibling_repository_writes"] == 0
+    assert boundary["operator_owned_readme_spec_modified"] is False
+    assert boundary["operator_owned_readme_spec_used_as_implementation_authority"] is False
+
+
 def test_hunter_operator_docs_do_not_advertise_retired_bypasses() -> None:
     readme = Path("README.md").read_text(encoding="utf-8")
     workflow = Path("docs/HUNTER_PRODUCTION_WORKFLOW.md").read_text(

@@ -17,8 +17,12 @@ display.
 
 This is an operator explainability/reporting delta only. It changes no
 selector, scorer, runner, schema, database, scientific threshold, or
-interpretation path. Version 0.5.1 remains the accepted scientific and command
-baseline while 0.5.2 completes release verification.
+interpretation path. Clean implementation and synchronized merged-main gates
+each passed 10/10 with 3,217 tests. PR #326 passed push, draft, ready, and
+merged-main CI, squash-merged as `a062245`, and the implementation/merge trees
+are identical. Version 0.5.2 is **PROD ACCEPTED**; evidence is
+`artifacts/manifests/hunter_live_acceptance_v15.json`, inheriting the unchanged
+command and live scientific baselines from v14 and v13.
 
 ## 2026-07-27 exact cross-Hunter command contract
 

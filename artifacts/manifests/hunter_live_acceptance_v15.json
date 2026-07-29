@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "acceptance_id": "exo-hunter-explainable-operator-reports-v15",
+  "generated_at": "2026-07-28T05:34:11Z",
+  "objective": "Close the EXO-Hunter candidate-grid and CSV explainability gap without changing accepted selection, scoring, execution, persistence, or scientific interpretation behavior.",
+  "repository_version": "0.5.2",
+  "release_status": "PROD accepted: explainable terminal grid, timestamped complete CSV review manifests, authoritative TIC distance provenance, clean exact-tree quality, PR delivery, merged-main CI, and synchronized merged-main verification passed",
+  "implementation": {
+    "commit": "14fdfd421692ab7a6cc288f2c960270827a18ab0",
+    "merge_commit": "a062245061b55245a65d0be6fb1d5319cba0f99d",
+    "implementation_tree": "06902b37d18f65b454cc0b50e621329f0dbaad1f",
+    "merged_main_tree": "06902b37d18f65b454cc0b50e621329f0dbaad1f",
+    "trees_identical": true,
+    "selector_changed": false,
+    "scorer_changed": false,
+    "ranking_weights_or_thresholds_changed": false,
+    "runner_changed": false,
+    "persistence_schema_changed": false,
+    "persistence_mechanism_changed": false,
+    "candidate_snapshot_contract_enriched": true,
+    "scientific_interpretation_changed": false
+  },
+  "operator_reporting_contract": {
+    "small_manifest_behavior": "N <= 100 renders a terminal grid",
+    "large_manifest_behavior": "N > 100 writes a visibly UTC-timestamped CSV under the Search Manifest Directory",
+    "terminal_grid_fields": [
+      "primary survey identifier",
+      "canonical identifier",
+      "object classification",
+      "distance in light-years",
+      "estimated storage in GB",
+      "new or follow-up status",
+      "prior-search count and latest complete provenance",
+      "deterministic ranking score",
+      "exoplanet metrics",
+      "selection reason"
+    ],
+    "csv_additional_fields": [
+      "distance in parsecs",
+      "full prior-search provenance JSON",
+      "full domain-metric JSON",
+      "search creation timestamp",
+      "CSV export timestamp"
+    ],
+    "sqlite_remains_authoritative": true,
+    "csv_is_operator_review_artifact": true,
+    "distance_source": {
+      "catalog": "TIC",
+      "field": "d",
+      "units": "pc",
+      "schema_url": "https://mast.stsci.edu/api/v0/_t_i_cfields.html",
+      "uncertainty_field_preserved": "e_d",
+      "source_flag_preserved": "distFlag",
+      "display_conversion_only": "pc * 3.261563777 = light-years"
+    }
+  },
+  "release_delivery": {
+    "pull_request": "https://github.com/ares0311/2026-Exoplanet-Research/pull/326",
+    "pull_request_number": 326,
+    "pull_request_state": "MERGED",
+    "pull_request_head": "14fdfd421692ab7a6cc288f2c960270827a18ab0",
+    "merge_commit": "a062245061b55245a65d0be6fb1d5319cba0f99d",
+    "merged_at": "2026-07-28T05:29:36Z",
+    "ci_runs": [
+      {
+        "id": 30331365816,
+        "event": "push",
+        "head": "14fdfd421692ab7a6cc288f2c960270827a18ab0",
+        "conclusion": "success"
+      },
+      {
+        "id": 30331633752,
+        "event": "pull_request_draft",
+        "head": "14fdfd421692ab7a6cc288f2c960270827a18ab0",
+        "conclusion": "success"
+      },
+      {
+        "id": 30331780257,
+        "event": "pull_request_ready",
+        "head": "14fdfd421692ab7a6cc288f2c960270827a18ab0",
+        "conclusion": "success"
+      },
+      {
+        "id": 30331786562,
+        "event": "push_main",
+        "head": "a062245061b55245a65d0be6fb1d5319cba0f99d",
+        "conclusion": "success"
+      }
+    ],
+    "merged_main_synced": true
+  },
+  "quality_validation": {
+    "focused_hunter_scanner_lifecycle_tests": "175 passed",
+    "clean_implementation_quality": "10/10 passed on clean implementation commit 14fdfd4; 3217 tests across six shards; logs/quality_gates/20260728T052011Z/quality_gate_summary.json",
+    "clean_implementation_git_head_sha": "14fdfd421692ab7a6cc288f2c960270827a18ab0",
+    "clean_implementation_git_dirty": false,
+    "merged_main_quality": "10/10 passed on synchronized merge commit a062245; 3217 tests across six shards; logs/quality_gates/20260728T053305Z/quality_gate_summary.json",
+    "merged_main_git_head_sha": "a062245061b55245a65d0be6fb1d5319cba0f99d",
+    "merged_main_git_dirty": false,
+    "ruff": "passed",
+    "mypy": "passed",
+    "incomplete_implementation_scan": "passed",
+    "directive_integrity": "passed",
+    "merged_main_tree_matches_clean_validated_tree": true,
+    "merged_main_ci": "passed"
+  },
+  "scientific_acceptance_inheritance": {
+    "command_baseline": "artifacts/manifests/hunter_live_acceptance_v14.json",
+    "live_workflow_baseline": "artifacts/manifests/hunter_live_acceptance_v13.json",
+    "live_new_workflow_preserved": true,
+    "live_follow_up_workflow_preserved": true,
+    "schema_version_preserved": 6,
+    "reason_live_workflows_not_repeated": "The release changes catalog field preservation and operator rendering/export only. Exact implementation and merged-main Git trees are identical, all ranking and execution contracts are unchanged, and v13 already demonstrates real new and follow-up create-through-execution workflows."
+  },
+  "workspace_boundary": {
+    "active_repo_name": "2026-Exoplanet-Research",
+    "sibling_repositories_inspected_read_only": [
+      "2026 Technosignatures",
+      "2026 Near Earth Objects"
+    ],
+    "sibling_repository_writes": 0,
+    "operator_owned_readme_spec_modified": false,
+    "operator_owned_readme_spec_used_as_implementation_authority": false
+  },
+  "limitations": [
+    "Distance is reported only when the authoritative TIC d field is present and finite; missing catalog distance remains explicit rather than inferred.",
+    "The live v13 candidates remain follow-up targets, not confirmed planets or discovery claims.",
+    "No external scientific submission, public alert, or authority-facing action is implemented or authorized.",
+    "This acceptance covers the EXO-Hunter repository; sibling repositories are read-only architectural references for this agent."
+  ]
+}
