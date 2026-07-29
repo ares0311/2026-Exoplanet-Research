@@ -8,7 +8,7 @@ by itself satisfy a master-guide evidence requirement.
 
 ## Current Master-Guide Alignment — Production Priority Order
 
-- **Adversarial Hunter requalification (0.5.3; delivery gate in progress):**
+- **Adversarial Hunter requalification (0.5.3 PROD accepted):**
   Version 0.5.2 is not PROD under the stricter closure contract. Remove all
   production sibling-repository filesystem reads, constrain cross-project
   history to verified copies inside this repository, and add one deterministic
@@ -20,10 +20,10 @@ by itself satisfy a master-guide evidence requirement.
   restart state, then emit a hash-verifiable evidence bundle and datastore
   snapshot. The implementation and v16 clean-state acceptance now pass at
   `79f606e` with 17/17 assertions and an independently verifiable schema-v6
-  snapshot. Clean-tree local quality also passed 10/10 gates and 3,225 tests
-  on evidence commit `45d4d18`; a final-tree repeat, PR CI, squash merge,
-  synchronization, and merged-state verification remain required before
-  restoring PROD status.
+  snapshot. Clean-tree implementation and synchronized merged-main quality
+  pass 10/10 gates with 3,225 tests; PR #328, every branch/PR CI event, squash
+  merge `6ad5c81`, merged-main CI, and a bounded MAST/QLP live-source smoke
+  pass. Version 0.5.3 is PROD accepted.
 
 - **Explainable operator reporting (0.5.2 PROD accepted):**
   The candidate grid and timestamped CSV now expose the full decision context

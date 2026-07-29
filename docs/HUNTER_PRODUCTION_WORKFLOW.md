@@ -2,8 +2,8 @@
 
 ## Adversarial requalification gate (2026-07-29)
 
-**Current state: NOT PROD. Version 0.5.2 is the historical baseline; version
-0.5.3 must close the following plan before the PROD label may be restored.**
+**Current state: version 0.5.3 is PROD ACCEPTED. The stricter adversarial
+requalification plan and every delivery gate below are verified.**
 
 Production outcome: make the active repository the sole runtime filesystem
 authority and produce one reproducible, inspectable proof that the installed
@@ -43,7 +43,7 @@ datastore.
    database hash, and a compressed immutable database snapshot. Validation
    must recompute hashes and inspect the snapshot rather than trusting
    self-reported values.
-7. **[AGENT — LOCAL VERIFIED; CI/MERGE PENDING] Deliver and reverify.** Run focused tests and inspect
+7. **[AGENT — VERIFIED] Deliver and reverify.** Run focused tests and inspect
    state, then the full clean-tree quality gate; commit on `claude/**`, push,
    pass PR CI, squash-merge, synchronize `main`, and repeat the required
    merged-state verification. Only then update these items to VERIFIED and
@@ -64,16 +64,33 @@ durable scored evidence. Schema-v6 integrity, provenance, immutable hashes, and
 restart validation pass. Evidence is
 `artifacts/manifests/hunter_live_acceptance_v16.json`; its independently
 verifiable compressed datastore is
-`artifacts/evidence/hunter_production_snapshot_v16.sqlite3.gz`. Full quality
-gates, PR CI, merge, synchronized-main validation, and the final PROD label
-remain pending under item 7.
+`artifacts/evidence/hunter_production_snapshot_v16.sqlite3.gz`.
 
 The complete clean-tree quality command
 `UV_CACHE_DIR=.uv-cache caffeinate -i .venv/bin/python
 Skills/run_quality_gates.py` passed 10/10 gates and 3,225 tests in 44.2 seconds
-on evidence commit `45d4d18`. This documentation update follows that run, so
-the gate will be repeated on the final pre-push commit; CI, merge, and
-synchronized-main verification remain pending.
+on evidence commit `45d4d18`, then passed again on final branch commit
+`f9ca83f` and synchronized merge commit `6ad5c81` (46.2 seconds on merged
+main). PR #328 passed push run `30428911876`, pull-request runs `30428912253`
+and `30428923264`, and merged-main run `30429112223`; it squash-merged as
+`6ad5c81`.
+
+The bounded authoritative-source smoke launched installed `EXO-Hunter 0.5.3`
+on clean merged main with a fresh datastore and a narrow
+`14.499 <= Tmag <= 14.5` request. Production MAST discovery exhausted 39,053
+TIC rows across four pages, retained 10,000, inspected live QLP metadata,
+selected exact target TIC 262037877 with five real products, and established
+the top-N score bound. Its decision source is MAST TIC/QLP, TIC version
+`20190415`, state `valid`; the repo-local cross-project copy remained explicitly
+`stale-but-usable`. The schema-v6 datastore has 10,000 verified snapshots, one
+verified exact manifest, 14 immutable triggers, zero foreign-key violations,
+and zero validity issues. This metadata-only smoke downloaded no raw
+light-curve payloads.
+
+The deterministic v16 harness proves business correctness and restart safety;
+the bounded live smoke proves current authoritative connectivity, schema,
+required fields, QLP availability, validity, persistence, and provenance.
+Version 0.5.3 is therefore **PROD ACCEPTED**.
 
 ## Explainable operator-reporting gate (2026-07-27)
 

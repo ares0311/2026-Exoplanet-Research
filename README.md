@@ -17,11 +17,11 @@ XGBoost, CNN, and ensemble scorers are optional.
 
 ## Current production state
 
-Version 0.5.3 is the current release candidate represented by this repository.
+Version 0.5.3 is the current production release represented by this repository.
 
 | Area | Status | Current evidence |
 |---|---|---|
-| EXO-Hunter lifecycle | **0.5.3 requalification in progress — not PROD** | The 2026-07-29 adversarial gate supersedes the 0.5.2 PROD label. Version 0.5.3 removes sibling-repository runtime reads, constrains cross-project history to a verified repo-local copy, repairs completed-follow-up validity, and adds deterministic clean-state acceptance through the installed `EXO-Hunter` shell. Implementation commit `79f606e` passes all 17 controlled assertions and emits [`hunter_live_acceptance_v16.json`](artifacts/manifests/hunter_live_acceptance_v16.json) plus a hash-verifiable schema-v6 snapshot. Full quality gates, PR CI, squash merge, and synchronized-main revalidation remain required. |
+| EXO-Hunter lifecycle | **PROD accepted at 0.5.3** | The 2026-07-29 adversarial requalification is complete. Version 0.5.3 removes sibling-repository runtime reads, constrains cross-project history to a verified repo-local copy, repairs completed-follow-up validity, and adds deterministic clean-state acceptance through the installed `EXO-Hunter` shell. The v16 harness passes 17/17 controlled assertions and a bounded live-source smoke passes on merged `main`. Local implementation and merged-main gates pass 10/10 with 3,225 tests; PR #328, all branch/PR CI events, squash merge `6ad5c81`, synchronization, and merged-main CI pass. Evidence is [`hunter_live_acceptance_v16.json`](artifacts/manifests/hunter_live_acceptance_v16.json) plus its hash-verifiable schema-v6 snapshot. |
 | Bayesian scorer | **Production ready** | Default non-ML scorer; no model artifact required |
 | XGBoost scorer | **Production ready** | Trained on 7,586 Kepler KOIs; held-out AUC 0.992 |
 | XGBoost + Bayesian ensemble | **Production ready** | Conservative fallback when no CNN is supplied |
