@@ -446,6 +446,19 @@ def run_acceptance(
             },
         },
         "commands": command_results,
+        "controlled_inputs": {
+            "history_manifest": json.loads(
+                history_manifest.read_text(encoding="utf-8")
+            ),
+            "history_sources": {
+                source["source_path"]: (
+                    history_source_root / source["source_path"]
+                ).read_text(encoding="utf-8")
+                for source in json.loads(
+                    history_manifest.read_text(encoding="utf-8")
+                )["sources"]
+            },
+        },
         "discovery_coverage": new_search["config"]["selector_log"],
         "validity_report": validity_evidence,
         "provenance_graph": [

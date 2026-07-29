@@ -40,8 +40,8 @@ def test_committed_v16_evidence_snapshot_is_independently_verifiable(
     snapshot_path = Path(
         "artifacts/evidence/hunter_production_snapshot_v16.sqlite3.gz"
     )
-    if not evidence_path.is_file() or not snapshot_path.is_file():
-        return
+    assert evidence_path.is_file()
+    assert snapshot_path.is_file()
 
     evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
     assert all(evidence["assertion_results"].values())
@@ -54,12 +54,27 @@ def test_committed_v16_evidence_snapshot_is_independently_verifiable(
     assert hashlib.sha256(database_bytes).hexdigest() == (
         evidence["snapshot"]["database_sha256"]
     )
+    history_source_root = tmp_path / "history_source"
+    history_source_root.mkdir()
+    for relative_path, content in evidence["controlled_inputs"][
+        "history_sources"
+    ].items():
+        source_path = history_source_root / relative_path
+        source_path.parent.mkdir(parents=True, exist_ok=True)
+        source_path.write_text(content, encoding="utf-8")
+    history_manifest = tmp_path / "history_manifest.json"
+    history_manifest.write_text(
+        json.dumps(
+            evidence["controlled_inputs"]["history_manifest"],
+            indent=2,
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
     validation = validate_hunter_database(
         database_path,
         schema_version=HUNTER_SCHEMA_VERSION,
-        history_manifest=Path(evidence["validity_report"]["history_manifest"]),
-        history_source_root=Path(
-            evidence["validity_report"]["history_source_root"]
-        ),
+        history_manifest=history_manifest,
+        history_source_root=history_source_root,
     )
     assert validation["ok"] is True
