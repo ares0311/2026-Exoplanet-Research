@@ -1,16 +1,14 @@
 # PROJECT STATUS
 
-## Status: EXO-Hunter 0.5.3 Requalification In Progress — Not PROD
-## Last Updated: 2026-07-29 (version 0.5.3 release candidate)
+## Status: EXO-Hunter 0.5.3 PROD Accepted
+## Last Updated: 2026-07-29 (version 0.5.3)
 
 The stricter 2026-07-29 adversarial contract supersedes the 0.5.2 PROD label.
 Version 0.5.3 removes runtime sibling-repository reads, accepts cross-project
 identity history only from a copied manifest inside this repository, repairs a
 completed-follow-up disposition defect exposed by the new end-to-end harness,
 and adds deterministic clean-state acceptance through the installed
-`EXO-Hunter` command. PROD remains gated on committed acceptance evidence and
-snapshot hashes, complete local quality gates, PR CI, squash merge,
-synchronization, and merged-main revalidation. See
+`EXO-Hunter` command. Every release gate is now closed; see
 `docs/HUNTER_PRODUCTION_WORKFLOW.md`.
 
 Implementation commit `79f606e` now passes the deterministic acceptance:
@@ -19,8 +17,15 @@ outside-partition selection, invalid/alias/history exclusions, exact execution,
 loud partial failure, one-target resume, real scorer persistence, follow-up
 completion, and restart validation. The self-contained v16 evidence and
 compressed datastore snapshot are committed for independent validation. This
-is local acceptance evidence only; the release remains not PROD until its
-delivery gates close.
+is independently verifiable production acceptance evidence.
+
+PR #328 passed push, pull-request, ready-event, and merged-main CI, then
+squash-merged as `6ad5c81`. Clean synchronized merged main passes the
+installed-shell acceptance again at 17/17 and the canonical quality runner at
+10/10 gates with 3,225 tests. The bounded authoritative-source smoke scanned
+39,053 MAST TIC records across four pages, selected TIC 262037877 with five
+real QLP products, and produced a validity-clean exact pending manifest without
+downloading raw light curves.
 
 The 0.5.2 acceptance below is retained as historical evidence under the prior
 contract.

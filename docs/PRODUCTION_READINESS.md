@@ -2,9 +2,9 @@
 
 ## 2026-07-29 adversarial PROD requalification
 
-Version 0.5.2 is **NOT CURRENTLY PROD ACCEPTED** under the stricter
-Hunter PROD-closure contract. The earlier acceptance remains useful historical
-evidence, but it did not prove two now-mandatory properties:
+Version 0.5.3 is **PROD ACCEPTED** under the stricter Hunter PROD-closure
+contract. The earlier 0.5.2 acceptance remains useful historical evidence, but
+it did not prove two properties now closed by this release:
 
 1. production must not read a sibling repository at runtime; the
    `--cross-project-sibling` path and implicit sibling-root resolution violate
@@ -31,14 +31,13 @@ The production-closing plan is:
 4. **[AGENT — VERIFIED LOCALLY] Durable evidence.** Emit request, coverage, validity, provenance,
    ranking, exact selected/executed targets, run/follow-up state, assertions,
    and a compressed datastore snapshot with verified hashes.
-5. **[AGENT — LOCAL VERIFIED; CI/MERGE PENDING] Release verification.** Run focused regressions, inspect the
+5. **[AGENT — VERIFIED] Release verification.** Run focused regressions, inspect the
    resulting state, run the complete local quality gate on a clean commit,
    deliver through PR/CI/squash merge, synchronize `main`, and repeat the
    merged-state checks required by repository policy.
 
 No human credential, large data acquisition, external publication, or sibling
-repository write is required. Until every item above is verified against the
-same repository state, later `PROD ACCEPTED` statements below are superseded.
+repository write was required.
 
 Current local evidence: implementation commit `79f606e` completed six
 installed-shell processes and passed 17/17 controlled business assertions.
@@ -47,11 +46,19 @@ targets, four run attempts, five history rows, zero foreign-key violations,
 14 immutable triggers, and no validity issues. The compressed snapshot SHA-256
 is recorded and independently recomputed by
 `tests/test_hunter_production_acceptance.py`. Evidence is v16 in
-`artifacts/manifests/` and `artifacts/evidence/`. This is
-**IMPLEMENTED AND LOCALLY ACCEPTANCE-VERIFIED, NOT YET PROD**. The canonical
-clean-tree quality run passed 10/10 gates and 3,225 tests in 44.2 seconds on
-`45d4d18`; it must be repeated after this evidence-note commit. CI, merge, and
-synchronized-main gates remain open.
+`artifacts/manifests/` and `artifacts/evidence/`.
+The canonical clean-tree quality run passes 10/10 gates and 3,225 tests on the
+final branch and synchronized merge commit `6ad5c81`. PR #328 passed push,
+pull-request, ready-event, and merged-main CI and is squash-merged. The
+installed-shell acceptance passes again at 17/17 on merged main.
+
+A bounded live-source smoke on merged main exhausted 39,053 authoritative MAST
+TIC rows across four pages, selected exact target TIC 262037877 with five real
+QLP products, persisted one validity-clean pending manifest from a 10,000-row
+candidate catalog, and downloaded no raw light curves. Source version
+`20190415`, decision state `valid`, top-N score-bound sufficiency, manifest
+hash, immutable triggers, and the repo-local `stale-but-usable` cross-project
+copy are all explicit. Version 0.5.3 is **PROD ACCEPTED**.
 
 ## 2026-07-27 explainable operator-reporting contract
 
