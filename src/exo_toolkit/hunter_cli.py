@@ -23,9 +23,7 @@ from exo_toolkit import __version__
 from exo_toolkit.cli import run_pipeline
 from exo_toolkit.hunter_cross_project import (
     DEFAULT_COPIED_HISTORY,
-    build_sibling_history_manifest,
-    sibling_history_export_path,
-    sibling_project_root,
+    require_repo_local_history_path,
 )
 from exo_toolkit.hunter_models import (
     PARSECS_TO_LIGHT_YEARS,
@@ -225,23 +223,13 @@ def _parser_create() -> argparse.ArgumentParser:
             "live under this repo's own tree."
         ),
     )
-    cross_project = parser.add_mutually_exclusive_group()
-    cross_project.add_argument(
-        "--cross-project-sibling",
-        choices=("technosignatures",),
-        help=(
-            "Read sibling Hunter history from paths computed relative to this "
-            "checkout, preferring its normalized export and otherwise using "
-            "the strict supported raw-history adapter."
-        ),
-    )
-    cross_project.add_argument(
+    parser.add_argument(
         "--cross-project-history-path",
         type=Path,
         help=(
-            "Use an operator-copied sibling history export when the sibling "
-            "checkout is not available; the manifest is retained as "
-            "stale-but-usable because origin source bytes cannot be re-read."
+            "Use an operator-copied sibling history export inside this active "
+            "repository. Outside-repository paths are rejected before any "
+            "durable state is created."
         ),
     )
     parser.add_argument("--pool-size", type=int)
@@ -811,35 +799,18 @@ def create_new_search(
             raise ValueError("targets must be at least 1")
         if not 1 <= args.workers <= MAX_LIVE_WORKERS:
             raise ValueError(f"workers must be between 1 and {MAX_LIVE_WORKERS}")
-        store = HunterStore(args.db)
         pool_size = max(args.pool_size or 0, DEFAULT_POOL_SIZE, args.targets * 100)
         cross_project_import: dict[str, Any] | None = None
         if args.mode == "new":
-            if args.cross_project_sibling:
-                sibling_export = sibling_history_export_path(
-                    args.cross_project_sibling
-                )
-                cross_project_import = store.import_cross_project_history(
-                    (
-                        sibling_export
-                        if sibling_export.is_file()
-                        else build_sibling_history_manifest(args.cross_project_sibling)
-                    ),
-                    source_root=sibling_project_root(args.cross_project_sibling),
-                )
-            else:
-                copied_history = args.cross_project_history_path or DEFAULT_COPIED_HISTORY
-                default_sibling_root = sibling_project_root("technosignatures")
-                copied_source_root = (
-                    default_sibling_root
-                    if args.cross_project_history_path is None
-                    and default_sibling_root.is_dir()
-                    else None
-                )
-                cross_project_import = store.import_cross_project_history(
-                    copied_history,
-                    source_root=copied_source_root,
-                )
+            copied_history = require_repo_local_history_path(
+                args.cross_project_history_path or DEFAULT_COPIED_HISTORY
+            )
+        store = HunterStore(args.db)
+        if args.mode == "new":
+            cross_project_import = store.import_cross_project_history(
+                copied_history,
+                source_root=None,
+            )
         if args.mode == "follow-up":
             import_summary = store.import_history_manifest(
                 args.history_manifest, source_root=args.history_source_root

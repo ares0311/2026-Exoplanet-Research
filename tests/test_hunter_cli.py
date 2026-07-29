@@ -41,17 +41,6 @@ from exo_toolkit.search_lifecycle import (
 )
 
 
-@pytest.fixture(autouse=True)
-def _isolate_mutable_sibling_checkout(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """CLI unit tests must not depend on a concurrently changing sibling repo."""
-    monkeypatch.setattr(
-        "exo_toolkit.hunter_cli.sibling_project_root",
-        lambda _project: tmp_path / "sibling-not-checked-out",
-    )
-
-
 def _candidates(count: int) -> list[HunterCandidate]:
     observed = datetime(2026, 1, 1, tzinfo=UTC)
     return [
@@ -162,6 +151,50 @@ def test_create_reports_shortfall_and_still_creates_best_available_search(
     open_searches = HunterStore(db).open_searches()
     assert len(open_searches) == 1
     assert open_searches[0]["selected_target_count"] == 1
+
+
+def test_removed_cross_project_sibling_option_is_rejected() -> None:
+    with pytest.raises(SystemExit) as caught:
+        create_new_search(
+            [
+                "--targets",
+                "1",
+                "--mode",
+                "new",
+                "--cross-project-sibling",
+                "technosignatures",
+            ]
+        )
+    assert caught.value.code == 2
+
+
+def test_outside_repo_cross_project_history_is_rejected_before_db_creation(
+    tmp_path: Path, capsys: object
+) -> None:
+    history = tmp_path / "outside-history.json"
+    history.write_text('{"schema_version":1,"sources":[]}', encoding="utf-8")
+    db = tmp_path / "hunter.sqlite3"
+
+    code = create_new_search(
+        [
+            "--targets",
+            "1",
+            "--mode",
+            "new",
+            "--db",
+            str(db),
+            "--cross-project-history-path",
+            str(history),
+            "--json",
+        ],
+        live_selector=lambda **_: (_candidates(1), {}),
+    )
+
+    assert code == 2
+    assert not db.exists()
+    assert "must be copied inside the active repository" in (
+        capsys.readouterr().err  # type: ignore[attr-defined]
+    )
 
 
 def test_candidate_grid_exposes_required_selection_context(tmp_path: Path) -> None:

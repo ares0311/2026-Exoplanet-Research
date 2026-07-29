@@ -3,109 +3,33 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 CROSS_PROJECT_SCHEMA_VERSION = 1
-SUPPORTED_SIBLINGS = {"technosignatures": "2026 Technosignatures"}
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_COPIED_HISTORY = (
-    Path(__file__).resolve().parents[2]
+    REPOSITORY_ROOT
     / "data_selection"
     / "cross_project_imports"
     / "techno_hunter_history_v1.json"
 )
 
 
-def sibling_history_export_path(project: str) -> Path:
-    """Resolve a sibling's export relative to this checkout, never absolutely."""
-    directory = SUPPORTED_SIBLINGS.get(project.lower())
-    if directory is None:
+def require_repo_local_history_path(path: Path) -> Path:
+    """Resolve a copied history manifest and reject every cross-repo path."""
+    resolved = path.resolve()
+    try:
+        resolved.relative_to(REPOSITORY_ROOT)
+    except ValueError as exc:
         raise ValueError(
-            f"unknown sibling {project!r}; allowed: {', '.join(sorted(SUPPORTED_SIBLINGS))}"
-        )
-    return (
-        Path(__file__).resolve().parents[3]
-        / directory
-        / "data_selection"
-        / "hunter_prior_search_history_v1.json"
-    )
-
-
-def sibling_project_root(project: str) -> Path:
-    """Return the computed sibling root for independent source-hash checks."""
-    return sibling_history_export_path(project).parents[1]
-
-
-def sibling_history_source_path(project: str) -> Path:
-    """Return the sibling's verified raw history when no normalized export exists."""
-    if project.lower() != "technosignatures":
-        raise ValueError(f"no raw-history adapter exists for sibling {project!r}")
-    return sibling_project_root(project) / "results" / "scan_history.ndjson"
-
-
-def build_sibling_history_manifest(project: str) -> dict[str, Any]:
-    """Normalize a supported sibling's real read-only history into schema v1."""
-    source = sibling_history_source_path(project)
-    if not source.is_file():
-        raise ValueError(f"sibling history source does not exist: {source}")
-    source_bytes = source.read_bytes()
-    entries: list[dict[str, Any]] = []
-    for line_number, raw_line in enumerate(source_bytes.splitlines(), 1):
-        if not raw_line.strip():
-            continue
-        try:
-            row = json.loads(raw_line)
-        except json.JSONDecodeError as exc:
-            raise ValueError(
-                f"invalid sibling history JSON at {source}:{line_number}: {exc}"
-            ) from exc
-        if not isinstance(row, Mapping) or row.get("schema_version") != (
-            "prod_scan_history_v1"
-        ):
-            raise ValueError(
-                f"unsupported sibling history schema at {source}:{line_number}"
-            )
-        target_stem = str(row.get("target_stem", ""))
-        match = re.search(
-            r"(?i)(?:^|[_-])HIP[_ -]?(\d+)(?:[_\-.]|$)",
-            target_stem,
-        )
-        if match is None:
-            continue
-        searched_at = str(row.get("scanned_at_utc", "")).strip()
-        if not searched_at:
-            raise ValueError(
-                f"sibling history row lacks scanned_at_utc at {source}:{line_number}"
-            )
-        identity = f"HIP {int(match.group(1))}"
-        entries.append(
-            {
-                "target_id": identity,
-                "canonical_id": identity,
-                "aliases": [identity],
-                "searched_at": searched_at,
-                "status": str(row.get("pathway") or "searched"),
-                "source_record": dict(row),
-            }
-        )
-    if not entries:
-        raise ValueError(f"sibling history contains no interoperable identities: {source}")
-    source_sha256 = hashlib.sha256(source_bytes).hexdigest()
-    return {
-        "schema_version": CROSS_PROJECT_SCHEMA_VERSION,
-        "manifest_id": f"technosignatures-live-{source_sha256[:16]}",
-        "sources": [
-            {
-                "search_id": f"techno-prod-scan-history-{source_sha256[:16]}",
-                "source_project": SUPPORTED_SIBLINGS[project.lower()],
-                "source_path": "results/scan_history.ndjson",
-                "source_sha256": source_sha256,
-                "entries": entries,
-            }
-        ],
-    }
+            "cross-project history must be copied inside the active repository: "
+            f"{resolved}"
+        ) from exc
+    if not resolved.is_file():
+        raise ValueError(f"cross-project history export does not exist: {resolved}")
+    return resolved
 
 
 def normalize_stellar_identity(value: object) -> str | None:

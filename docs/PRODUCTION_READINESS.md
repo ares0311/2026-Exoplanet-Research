@@ -1,5 +1,58 @@
 # PRODUCTION READINESS
 
+## 2026-07-29 adversarial PROD requalification
+
+Version 0.5.2 is **NOT CURRENTLY PROD ACCEPTED** under the stricter
+Hunter PROD-closure contract. The earlier acceptance remains useful historical
+evidence, but it did not prove two now-mandatory properties:
+
+1. production must not read a sibling repository at runtime; the
+   `--cross-project-sibling` path and implicit sibling-root resolution violate
+   the active-repository boundary even though they are read-only; and
+2. one deterministic clean-state acceptance run must traverse the installed
+   `EXO-Hunter` shell and canonical new/follow-up lifecycle, prove adaptive
+   discovery, validity, alias/history exclusion, exact-manifest execution,
+   partial-failure resume, real scorers, restart durability, and emit an
+   independently hash-verifiable evidence bundle.
+
+The production-closing plan is:
+
+1. **[AGENT — VERIFIED LOCALLY] Repo-local history boundary.** Remove sibling discovery and accept
+   only copied, checksum-verified cross-project history inputs whose resolved
+   paths are inside this repository.
+2. **[AGENT — VERIFIED LOCALLY] Deterministic installed-CLI acceptance.** Add a controlled-universe
+   harness that replaces external network responses only, while retaining the
+   production shell routing, discovery, validation, ranking, SQLite lifecycle,
+   scientific pipeline/scorers, and restart behavior.
+3. **[AGENT — VERIFIED LOCALLY] Lifecycle integrity repair.** Ensure a terminally completed
+   follow-up records the reason it is no longer executable; the first
+   deterministic run exposed that the prior transition contradicted the
+   database validity contract.
+4. **[AGENT — VERIFIED LOCALLY] Durable evidence.** Emit request, coverage, validity, provenance,
+   ranking, exact selected/executed targets, run/follow-up state, assertions,
+   and a compressed datastore snapshot with verified hashes.
+5. **[AGENT — LOCAL VERIFIED; CI/MERGE PENDING] Release verification.** Run focused regressions, inspect the
+   resulting state, run the complete local quality gate on a clean commit,
+   deliver through PR/CI/squash merge, synchronize `main`, and repeat the
+   merged-state checks required by repository policy.
+
+No human credential, large data acquisition, external publication, or sibling
+repository write is required. Until every item above is verified against the
+same repository state, later `PROD ACCEPTED` statements below are superseded.
+
+Current local evidence: implementation commit `79f606e` completed six
+installed-shell processes and passed 17/17 controlled business assertions.
+The schema-v6 snapshot has 205 candidate snapshots, four exact manifest
+targets, four run attempts, five history rows, zero foreign-key violations,
+14 immutable triggers, and no validity issues. The compressed snapshot SHA-256
+is recorded and independently recomputed by
+`tests/test_hunter_production_acceptance.py`. Evidence is v16 in
+`artifacts/manifests/` and `artifacts/evidence/`. This is
+**IMPLEMENTED AND LOCALLY ACCEPTANCE-VERIFIED, NOT YET PROD**. The canonical
+clean-tree quality run passed 10/10 gates and 3,225 tests in 44.2 seconds on
+`45d4d18`; it must be repeated after this evidence-note commit. CI, merge, and
+synchronized-main gates remain open.
+
 ## 2026-07-27 explainable operator-reporting contract
 
 Version 0.5.2 closes a presentation/export gap found by re-auditing the exact

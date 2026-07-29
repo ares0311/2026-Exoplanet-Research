@@ -8,6 +8,23 @@ by itself satisfy a master-guide evidence requirement.
 
 ## Current Master-Guide Alignment — Production Priority Order
 
+- **Adversarial Hunter requalification (0.5.3; delivery gate in progress):**
+  Version 0.5.2 is not PROD under the stricter closure contract. Remove all
+  production sibling-repository filesystem reads, constrain cross-project
+  history to verified copies inside this repository, and add one deterministic
+  fresh-datastore acceptance through the installed `EXO-Hunter` shell and
+  canonical new/follow-up pipeline. The harness must replace only external
+  network boundaries, exercise the real scorers and durable lifecycle, prove
+  adaptive outside-partition discovery, invalid/stale/history/alias handling,
+  best-available weak candidates, exact execution, partial-failure resume, and
+  restart state, then emit a hash-verifiable evidence bundle and datastore
+  snapshot. The implementation and v16 clean-state acceptance now pass at
+  `79f606e` with 17/17 assertions and an independently verifiable schema-v6
+  snapshot. Clean-tree local quality also passed 10/10 gates and 3,225 tests
+  on evidence commit `45d4d18`; a final-tree repeat, PR CI, squash merge,
+  synchronization, and merged-state verification remain required before
+  restoring PROD status.
+
 - **Explainable operator reporting (0.5.2 PROD accepted):**
   The candidate grid and timestamped CSV now expose the full decision context
   required to review a selection: stable identities, classification, distance,
@@ -15,7 +32,8 @@ by itself satisfy a master-guide evidence requirement.
   selection reason, and exoplanet metrics. This is a presentation/export delta
   over the unchanged accepted 0.5.1 lifecycle. Clean implementation and
   merged-main gates, PR #326 CI, squash merge `a062245`, synchronization, and
-  v15 structured acceptance all pass.
+  v15 structured acceptance all passed under the prior contract; that status
+  is historical and superseded by the 0.5.3 requalification item above.
 
 - **Exact shared Hunter command contract (0.5.1 PROD accepted):**
   Add the named `EXO-Hunter` launch command and canonical

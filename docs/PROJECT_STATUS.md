@@ -1,7 +1,29 @@
 # PROJECT STATUS
 
-## Status: EXO-Hunter 0.5.2 PROD Accepted
-## Last Updated: 2026-07-27 (version 0.5.2)
+## Status: EXO-Hunter 0.5.3 Requalification In Progress — Not PROD
+## Last Updated: 2026-07-29 (version 0.5.3 release candidate)
+
+The stricter 2026-07-29 adversarial contract supersedes the 0.5.2 PROD label.
+Version 0.5.3 removes runtime sibling-repository reads, accepts cross-project
+identity history only from a copied manifest inside this repository, repairs a
+completed-follow-up disposition defect exposed by the new end-to-end harness,
+and adds deterministic clean-state acceptance through the installed
+`EXO-Hunter` command. PROD remains gated on committed acceptance evidence and
+snapshot hashes, complete local quality gates, PR CI, squash merge,
+synchronization, and merged-main revalidation. See
+`docs/HUNTER_PRODUCTION_WORKFLOW.md`.
+
+Implementation commit `79f606e` now passes the deterministic acceptance:
+six installed-shell processes and 17/17 assertions, including adaptive
+outside-partition selection, invalid/alias/history exclusions, exact execution,
+loud partial failure, one-target resume, real scorer persistence, follow-up
+completion, and restart validation. The self-contained v16 evidence and
+compressed datastore snapshot are committed for independent validation. This
+is local acceptance evidence only; the release remains not PROD until its
+delivery gates close.
+
+The 0.5.2 acceptance below is retained as historical evidence under the prior
+contract.
 
 Version 0.5.2 closes the operator-reporting gap found after the 0.5.1
 acceptance audit. Candidate grids and timestamped CSV manifests now expose the

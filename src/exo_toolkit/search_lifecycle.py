@@ -1460,7 +1460,11 @@ class HunterStore:
                                     f"Follow-up search {search_id} returned no data; "
                                     "new archive products are required before another search."
                                     if outcome.status == "no_data"
-                                    else None
+                                    else (
+                                        f"Follow-up search {search_id} completed with "
+                                        f"terminal outcome {outcome.status}; the originating "
+                                        "recommendation is closed."
+                                    )
                                 ),
                             )
                     if outcome.status in TERMINAL_TARGET_STATUSES:
