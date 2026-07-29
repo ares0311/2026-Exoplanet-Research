@@ -195,9 +195,20 @@ def run_acceptance(
     work_dir.mkdir(parents=True, exist_ok=True)
     db = work_dir / "hunter.sqlite3"
     state_path = work_dir / "fixture_state.json"
-    command = REPO_ROOT / ".venv" / "bin" / "EXO-Hunter"
-    if not command.is_file():
-        raise RuntimeError(f"installed EXO-Hunter command is missing: {command}")
+    checkout_command = REPO_ROOT / ".venv" / "bin" / "EXO-Hunter"
+    path_command = shutil.which("EXO-Hunter")
+    command = (
+        checkout_command
+        if checkout_command.is_file()
+        else Path(path_command)
+        if path_command is not None
+        else None
+    )
+    if command is None or not command.is_file():
+        raise RuntimeError(
+            "installed EXO-Hunter command is missing from both the checkout "
+            "environment and PATH"
+        )
     bootstrap = REPO_ROOT / "tests" / "hunter_acceptance_bootstrap"
     env = dict(os.environ)
     env["PYTHONPATH"] = os.pathsep.join(
