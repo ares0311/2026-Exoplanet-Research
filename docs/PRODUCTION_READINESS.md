@@ -17,21 +17,21 @@ evidence, but it did not prove two now-mandatory properties:
 
 The production-closing plan is:
 
-1. **[AGENT] Repo-local history boundary.** Remove sibling discovery and accept
+1. **[AGENT — VERIFIED LOCALLY] Repo-local history boundary.** Remove sibling discovery and accept
    only copied, checksum-verified cross-project history inputs whose resolved
    paths are inside this repository.
-2. **[AGENT] Deterministic installed-CLI acceptance.** Add a controlled-universe
+2. **[AGENT — VERIFIED LOCALLY] Deterministic installed-CLI acceptance.** Add a controlled-universe
    harness that replaces external network responses only, while retaining the
    production shell routing, discovery, validation, ranking, SQLite lifecycle,
    scientific pipeline/scorers, and restart behavior.
-3. **[AGENT] Lifecycle integrity repair.** Ensure a terminally completed
+3. **[AGENT — VERIFIED LOCALLY] Lifecycle integrity repair.** Ensure a terminally completed
    follow-up records the reason it is no longer executable; the first
    deterministic run exposed that the prior transition contradicted the
    database validity contract.
-4. **[AGENT] Durable evidence.** Emit request, coverage, validity, provenance,
+4. **[AGENT — VERIFIED LOCALLY] Durable evidence.** Emit request, coverage, validity, provenance,
    ranking, exact selected/executed targets, run/follow-up state, assertions,
    and a compressed datastore snapshot with verified hashes.
-5. **[AGENT] Release verification.** Run focused regressions, inspect the
+5. **[AGENT — IN PROGRESS] Release verification.** Run focused regressions, inspect the
    resulting state, run the complete local quality gate on a clean commit,
    deliver through PR/CI/squash merge, synchronize `main`, and repeat the
    merged-state checks required by repository policy.
@@ -39,6 +39,17 @@ The production-closing plan is:
 No human credential, large data acquisition, external publication, or sibling
 repository write is required. Until every item above is verified against the
 same repository state, later `PROD ACCEPTED` statements below are superseded.
+
+Current local evidence: implementation commit `79f606e` completed six
+installed-shell processes and passed 17/17 controlled business assertions.
+The schema-v6 snapshot has 205 candidate snapshots, four exact manifest
+targets, four run attempts, five history rows, zero foreign-key violations,
+14 immutable triggers, and no validity issues. The compressed snapshot SHA-256
+is recorded and independently recomputed by
+`tests/test_hunter_production_acceptance.py`. Evidence is v16 in
+`artifacts/manifests/` and `artifacts/evidence/`. This is
+**IMPLEMENTED AND LOCALLY ACCEPTANCE-VERIFIED, NOT YET PROD** because full
+quality, CI, merge, and synchronized-main gates remain open.
 
 ## 2026-07-27 explainable operator-reporting contract
 

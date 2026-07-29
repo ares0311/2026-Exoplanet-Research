@@ -13,6 +13,15 @@ snapshot hashes, complete local quality gates, PR CI, squash merge,
 synchronization, and merged-main revalidation. See
 `docs/HUNTER_PRODUCTION_WORKFLOW.md`.
 
+Implementation commit `79f606e` now passes the deterministic acceptance:
+six installed-shell processes and 17/17 assertions, including adaptive
+outside-partition selection, invalid/alias/history exclusions, exact execution,
+loud partial failure, one-target resume, real scorer persistence, follow-up
+completion, and restart validation. The self-contained v16 evidence and
+compressed datastore snapshot are committed for independent validation. This
+is local acceptance evidence only; the release remains not PROD until its
+delivery gates close.
+
 The 0.5.2 acceptance below is retained as historical evidence under the prior
 contract.
 
