@@ -83,6 +83,14 @@ if state_path_text:
                 "version": "acceptance-tic-v1",
             }
         )
+        rows.append(
+            {
+                "ID": 700_002,
+                "objType": "GALAXY",
+                "Tmag": 12.5,
+                "version": "acceptance-tic-v1",
+            }
+        )
         return rows
 
     def fixture_product_search(

@@ -366,6 +366,14 @@ def run_acceptance(
             and row["eligibility_reason"] == "excluded_known_asassn_variable"
             for row in catalog_rows
         ),
+        "invalid_source_record_never_ranked": (
+            new_search["config"]["selector_log"]["catalog_rows_seen"] == 202
+            and new_search["config"]["selector_log"][
+                "raw_candidates_before_exclusion"
+            ]
+            == 201
+            and all(row["target_id"] != "TIC 700002" for row in catalog_rows)
+        ),
         "alias_prior_search_excluded": any(
             row["target_id"] == "TIC 800002"
             and str(row["eligibility_reason"]).startswith(

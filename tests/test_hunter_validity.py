@@ -164,6 +164,33 @@ def test_production_candidate_validation_is_prewrite_atomic(tmp_path: Path) -> N
         assert connection.execute("SELECT COUNT(*) FROM search_state_events").fetchone()[0] == 0
 
 
+@pytest.mark.parametrize("state", ("refresh-required", "invalid", "unknown"))
+def test_unusable_decision_validity_is_rejected_prewrite(
+    tmp_path: Path, state: str
+) -> None:
+    store = HunterStore(tmp_path / f"{state}.sqlite3")
+    unusable = _candidate().model_copy(
+        update={
+            "decision_validity": _candidate().decision_validity.model_copy(
+                update={"state": state}
+            )
+        }
+    )
+
+    with pytest.raises(ValueError, match="cannot drive production selection"):
+        store.create_search(
+            [unusable],
+            requested_target_count=1,
+            mode="new",
+            selector_version=NEW_SELECTOR_VERSION,
+            config={"selection_contract": selection_contract("new")},
+        )
+
+    with store.connect() as connection:
+        assert connection.execute("SELECT COUNT(*) FROM search_manifests").fetchone()[0] == 0
+        assert connection.execute("SELECT COUNT(*) FROM candidate_catalog").fetchone()[0] == 0
+
+
 def test_cross_project_history_is_durable_and_immutable(tmp_path: Path) -> None:
     source = tmp_path / "scan.ndjson"
     source.write_text('{"real":"history"}\n', encoding="utf-8")
