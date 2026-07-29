@@ -20,8 +20,10 @@ by itself satisfy a master-guide evidence requirement.
   restart state, then emit a hash-verifiable evidence bundle and datastore
   snapshot. The implementation and v16 clean-state acceptance now pass at
   `79f606e` with 17/17 assertions and an independently verifiable schema-v6
-  snapshot. Full local gates, PR CI, squash merge, synchronization, and
-  merged-state verification remain required before restoring PROD status.
+  snapshot. Clean-tree local quality also passed 10/10 gates and 3,225 tests
+  on evidence commit `45d4d18`; a final-tree repeat, PR CI, squash merge,
+  synchronization, and merged-state verification remain required before
+  restoring PROD status.
 
 - **Explainable operator reporting (0.5.2 PROD accepted):**
   The candidate grid and timestamped CSV now expose the full decision context

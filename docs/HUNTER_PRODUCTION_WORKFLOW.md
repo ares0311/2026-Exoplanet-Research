@@ -43,7 +43,7 @@ datastore.
    database hash, and a compressed immutable database snapshot. Validation
    must recompute hashes and inspect the snapshot rather than trusting
    self-reported values.
-7. **[AGENT — IN PROGRESS] Deliver and reverify.** Run focused tests and inspect
+7. **[AGENT — LOCAL VERIFIED; CI/MERGE PENDING] Deliver and reverify.** Run focused tests and inspect
    state, then the full clean-tree quality gate; commit on `claude/**`, push,
    pass PR CI, squash-merge, synchronize `main`, and repeat the required
    merged-state verification. Only then update these items to VERIFIED and
@@ -67,6 +67,13 @@ verifiable compressed datastore is
 `artifacts/evidence/hunter_production_snapshot_v16.sqlite3.gz`. Full quality
 gates, PR CI, merge, synchronized-main validation, and the final PROD label
 remain pending under item 7.
+
+The complete clean-tree quality command
+`UV_CACHE_DIR=.uv-cache caffeinate -i .venv/bin/python
+Skills/run_quality_gates.py` passed 10/10 gates and 3,225 tests in 44.2 seconds
+on evidence commit `45d4d18`. This documentation update follows that run, so
+the gate will be repeated on the final pre-push commit; CI, merge, and
+synchronized-main verification remain pending.
 
 ## Explainable operator-reporting gate (2026-07-27)
 

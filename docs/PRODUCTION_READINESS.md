@@ -31,7 +31,7 @@ The production-closing plan is:
 4. **[AGENT — VERIFIED LOCALLY] Durable evidence.** Emit request, coverage, validity, provenance,
    ranking, exact selected/executed targets, run/follow-up state, assertions,
    and a compressed datastore snapshot with verified hashes.
-5. **[AGENT — IN PROGRESS] Release verification.** Run focused regressions, inspect the
+5. **[AGENT — LOCAL VERIFIED; CI/MERGE PENDING] Release verification.** Run focused regressions, inspect the
    resulting state, run the complete local quality gate on a clean commit,
    deliver through PR/CI/squash merge, synchronize `main`, and repeat the
    merged-state checks required by repository policy.
@@ -48,8 +48,10 @@ targets, four run attempts, five history rows, zero foreign-key violations,
 is recorded and independently recomputed by
 `tests/test_hunter_production_acceptance.py`. Evidence is v16 in
 `artifacts/manifests/` and `artifacts/evidence/`. This is
-**IMPLEMENTED AND LOCALLY ACCEPTANCE-VERIFIED, NOT YET PROD** because full
-quality, CI, merge, and synchronized-main gates remain open.
+**IMPLEMENTED AND LOCALLY ACCEPTANCE-VERIFIED, NOT YET PROD**. The canonical
+clean-tree quality run passed 10/10 gates and 3,225 tests in 44.2 seconds on
+`45d4d18`; it must be repeated after this evidence-note commit. CI, merge, and
+synchronized-main gates remain open.
 
 ## 2026-07-27 explainable operator-reporting contract
 
