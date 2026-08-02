@@ -47,6 +47,12 @@ REQUIRED_TABLE_COLUMNS: dict[str, frozenset[str]] = {
             "canonical_id",
             "ranking_score",
             "selection_reason",
+            # cross_project_history_validity/_source are deliberately NOT
+            # required here: they are nullable columns added later, and a
+            # frozen historical snapshot database predating them is still a
+            # valid archive. HunterStore.initialize() migrates live databases;
+            # requiring them here would retroactively invalidate committed
+            # acceptance evidence.
         }
     ),
     "search_state_events": frozenset(

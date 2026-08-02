@@ -90,6 +90,11 @@ CREATE TABLE IF NOT EXISTS search_manifest_targets (
     canonical_id TEXT NOT NULL,
     ranking_score REAL NOT NULL,
     selection_reason TEXT NOT NULL,
+    -- IDENT-04: the cross-project history evidence this inclusion rests on,
+    -- so a frozen target can be audited later. Nullable because follow-up
+    -- searches and pre-existing rows do not carry a federation decision.
+    cross_project_history_validity TEXT,
+    cross_project_history_source TEXT,
     PRIMARY KEY(search_id, ordinal),
     UNIQUE(search_id, target_id),
     FOREIGN KEY(search_id) REFERENCES search_manifests(search_id),
@@ -287,6 +292,31 @@ def _stable_id(prefix: str, payload: Any, now: datetime) -> str:
     return f"{prefix}-{now.strftime('%Y%m%dT%H%M%SZ')}-{digest}"
 
 
+def _evidence_score(evidence: Mapping[str, Any] | Any, name: str) -> float | None:
+    """Read one finite scorer value from a stored follow-up evidence payload.
+
+    Mirrors ``hunter_cli._required_score``'s tolerance of both the production row
+    shape (scores nested under ``scores``) and the legacy top-level shape, but
+    returns ``None`` instead of raising: a registry row whose stored evidence
+    predates the current scorer schema must publish an absent metric rather than
+    a fabricated substitute (RANK-01).
+    """
+    if not isinstance(evidence, Mapping):
+        return None
+    value = evidence.get(name)
+    if value is None:
+        scores = evidence.get("scores")
+        if isinstance(scores, Mapping):
+            value = scores.get(name)
+    if value is None:
+        return None
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    return numeric if math.isfinite(numeric) else None
+
+
 class HunterStore:
     """SQLite system of record for exact, resumable Hunter searches."""
 
@@ -332,6 +362,20 @@ class HunterStore:
             if "last_mast_checked_at" not in columns:
                 connection.execute(
                     "ALTER TABLE follow_up_registry ADD COLUMN last_mast_checked_at TEXT"
+                )
+            manifest_target_columns = {
+                str(row[1])
+                for row in connection.execute("PRAGMA table_info(search_manifest_targets)")
+            }
+            if "cross_project_history_validity" not in manifest_target_columns:
+                connection.execute(
+                    "ALTER TABLE search_manifest_targets "
+                    "ADD COLUMN cross_project_history_validity TEXT"
+                )
+            if "cross_project_history_source" not in manifest_target_columns:
+                connection.execute(
+                    "ALTER TABLE search_manifest_targets "
+                    "ADD COLUMN cross_project_history_source TEXT"
                 )
             existing_events = {
                 str(row[0])
@@ -1061,13 +1105,19 @@ class HunterStore:
                         created_at.isoformat(),
                     ),
                 )
+            # IDENT-04: freeze the federation evidence alongside each target.
+            # Recorded by the New gate in hunter_cli._require_decision_grade_history;
+            # None for follow-up searches, which make no novelty claim.
+            history_validity = config.get("cross_project_history_validity")
+            history_source = config.get("cross_project_history_source")
             for ordinal, candidate in enumerate(selected, 1):
                 connection.execute(
                     """
                     INSERT INTO search_manifest_targets (
                         search_id, ordinal, snapshot_id, target_id, canonical_id,
-                        ranking_score, selection_reason
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ranking_score, selection_reason,
+                        cross_project_history_validity, cross_project_history_source
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         search_id,
@@ -1077,6 +1127,8 @@ class HunterStore:
                         candidate.canonical_id,
                         candidate.ranking_score,
                         candidate.selection_reason,
+                        None if history_validity is None else str(history_validity),
+                        None if history_source is None else str(history_source),
                     ),
                 )
             self._append_state(
@@ -1226,6 +1278,27 @@ class HunterStore:
                 """
             ).fetchall()
         return [dict(row) for row in rows if row["state"] in EXECUTABLE_SEARCH_STATES]
+
+    def all_searches(self) -> list[dict[str, Any]]:
+        """Return every durable search with its current state, newest first.
+
+        Read-only. ``open_searches()`` deliberately filters to executable
+        states; target inspection must also reach completed and abandoned
+        searches, so this returns the unfiltered set.
+        """
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT m.*, e.state
+                FROM search_manifests AS m
+                JOIN search_state_events AS e ON e.id = (
+                    SELECT MAX(e2.id) FROM search_state_events AS e2
+                    WHERE e2.search_id = m.search_id
+                )
+                ORDER BY m.created_at DESC, m.search_id DESC
+                """
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def searched_target_ids(self) -> frozenset[str]:
         with self.connect() as connection:
@@ -1970,10 +2043,25 @@ class HunterStore:
                     "search_id": registry["search_id"],
                     "history_event_count": len(histories),
                 }
+                # RANK-01: publish the exact contract formula
+                # ``(1-fpp)*detection_confidence`` from the stored evidence, the
+                # same quantity the history-derived branch below publishes under
+                # this name. The former ``ranking_score / 110.0`` was a
+                # normalization of the *priority* scale (whose maximum is
+                # 100*(1-0) + 10*1 = 110), not the published expected-information
+                # -gain equation, so the identical field carried two different
+                # quantities depending on which branch produced the row. Absent
+                # evidence publishes None rather than a divergent proxy.
+                registry_fpp = _evidence_score(registry["evidence"], "false_positive_probability")
+                registry_confidence = _evidence_score(registry["evidence"], "detection_confidence")
                 metrics: dict[str, float | int | str | None] = {
                     "follow_up_priority": ranking_score,
-                    "expected_information_gain": ranking_score / 110.0,
-                    "scientific_suitability": ranking_score / 110.0,
+                    "expected_information_gain": (
+                        (1.0 - registry_fpp) * registry_confidence
+                        if registry_fpp is not None and registry_confidence is not None
+                        else None
+                    ),
+                    "scientific_suitability": registry_confidence,
                     "prior_search_count": len(prior_searches),
                     "registry_status": str(registry["status"]),
                     "meets_strict_follow_up_bar": registry["evidence"].get(

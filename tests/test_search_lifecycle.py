@@ -407,6 +407,94 @@ def test_follow_up_mode_requires_reliable_prior_search_provenance(tmp_path: Path
     assert restored.prior_searches[0].source_project == "external survey"
 
 
+def _execute_with_follow_up(
+    store: HunterStore, *, priority: float, evidence: dict[str, Any]
+) -> None:
+    """Run one new-mode search that registers a single follow-up recommendation."""
+    search = _create(store, [_candidate(1)], count=1)
+    store.execute_search(
+        lambda _: TargetExecutionResult(
+            status="candidate_found",
+            result={},
+            provenance={},
+            follow_ups=(
+                FollowUpRecommendation(
+                    candidate_id="TIC1-s01",
+                    priority=priority,
+                    reason="registry-derived follow-up",
+                    evidence=evidence,
+                    recommended_action="repeat photometry",
+                ),
+            ),
+        ),
+        search_id=search["search_id"],
+    )
+
+
+class TestRegistryExpectedInformationGainMatchesContract:
+    """RANK-01 / EXO-FIELD-04.
+
+    ``selection_contract("follow-up")`` publishes exactly one definition of
+    ``expected_information_gain``: ``(1-fpp)*detection_confidence``. The
+    registry-derived branch previously persisted ``follow_up_priority / 110``
+    instead, so the same published field name carried two different quantities
+    depending on which branch produced the row.
+    """
+
+    def test_registry_branch_publishes_the_contract_formula(self, tmp_path: Path) -> None:
+        store = HunterStore(tmp_path / "hunter.sqlite3")
+        fpp, confidence = 0.10, 0.50
+        priority = 100.0 * (1.0 - fpp) + 10.0 * confidence  # == 95.0
+        _execute_with_follow_up(
+            store,
+            priority=priority,
+            evidence={
+                "false_positive_probability": fpp,
+                "detection_confidence": confidence,
+            },
+        )
+
+        metrics = store.follow_up_candidates()[0].metrics
+
+        assert metrics["follow_up_priority"] == pytest.approx(priority)
+        assert metrics["expected_information_gain"] == pytest.approx((1.0 - fpp) * confidence)
+        assert metrics["scientific_suitability"] == pytest.approx(confidence)
+        # The superseded proxy differed by ~1.9x on this row, so an accidental
+        # revert cannot coincidentally satisfy the assertion above.
+        assert metrics["expected_information_gain"] != pytest.approx(priority / 110.0)
+
+    def test_registry_branch_reads_the_nested_production_scores_shape(
+        self, tmp_path: Path
+    ) -> None:
+        store = HunterStore(tmp_path / "hunter.sqlite3")
+        fpp, confidence = 0.04, 0.80
+        _execute_with_follow_up(
+            store,
+            priority=100.0 * (1.0 - fpp) + 10.0 * confidence,
+            evidence={
+                "scores": {
+                    "false_positive_probability": fpp,
+                    "detection_confidence": confidence,
+                }
+            },
+        )
+
+        metrics = store.follow_up_candidates()[0].metrics
+
+        assert metrics["expected_information_gain"] == pytest.approx((1.0 - fpp) * confidence)
+        assert metrics["scientific_suitability"] == pytest.approx(confidence)
+
+    def test_absent_evidence_publishes_none_not_a_substitute(self, tmp_path: Path) -> None:
+        store = HunterStore(tmp_path / "hunter.sqlite3")
+        _execute_with_follow_up(store, priority=99.0, evidence={"legacy_only": True})
+
+        metrics = store.follow_up_candidates()[0].metrics
+
+        assert metrics["follow_up_priority"] == pytest.approx(99.0)
+        assert metrics["expected_information_gain"] is None
+        assert metrics["scientific_suitability"] is None
+
+
 def test_follow_up_registry_can_seed_later_follow_up_search(tmp_path: Path) -> None:
     store = HunterStore(tmp_path / "hunter.sqlite3")
     search = _create(store, [_candidate(1)], count=1)

@@ -51,7 +51,51 @@ and `docs/HUNTER_PRODUCTION_WORKFLOW.md`.
   consume the same shape, copy this file directly rather than re-deriving the
   design.
 
-## Current repo-local mechanism
+## Superseded for reads: cross-project novelty requires all three projects
+
+Date: 2026-08-01.
+
+The 2026-07-29 boundary recorded below prohibited *all* runtime filesystem
+reads from sibling repositories, including read-only relative-path discovery.
+That prohibition made a correct novelty claim impossible: consulting only this
+repo's own export establishes "not searched by EXO-Hunter", which the selector
+then reported as novelty across every Astrometrics project. Techno-Hunter
+recorded the same defect class against itself, and the cross-repo directive
+(IDENT-03) requires New-mode eligibility to rest on decision-grade history
+from **all three** projects.
+
+The boundary is therefore superseded **for reads only**:
+
+- `src/exo_toolkit/hunter_cross_project_history.py` reads each sibling's
+  published export read-only at a path computed relative to this repo's own
+  location (`sibling_history_export_path()`). No symlink, no inward copy
+  performed by code, no runtime import from a sibling, no hardcoded absolute
+  path (WS-03). A sibling that is not checked out degrades to `unknown`
+  rather than raising.
+- Writing into a sibling remains prohibited without exception (WS-01). This
+  repo publishes only its own export.
+- `hunter_cross_project.py` and its copied-manifest import path are
+  **unchanged** and still in use for the durable append-only
+  `cross_project_search_history` table. The federation read path is additive.
+
+Validity is stamped per source *and* per entry at load time; there is no
+top-level validity field, because an export is only as trustworthy as its
+weakest source. Only `valid` and `stale-but-usable` are decision-grade. An
+absent, malformed, unversioned, or schema-incompatible export is never
+decision-grade, and a New search refuses rather than assuming novelty.
+
+Publish this repo's own export with:
+
+```bash
+Export-Cross-Project-History          # or --output <path>, --json
+```
+
+NEO-Hunter is included in the gate despite the disjoint minor-planet identity
+space noted below. Its entries cannot exclude a stellar target, so this is a
+liveness/consistency requirement, not an identity bridge: it proves NEO-Hunter
+has actually published rather than silently having no history to offer.
+
+## Prior repo-local mechanism (2026-07-29, superseded for reads)
 
 The stricter 2026-07-29 production boundary prohibits runtime filesystem reads
 from sibling repositories, including read-only relative-path discovery.

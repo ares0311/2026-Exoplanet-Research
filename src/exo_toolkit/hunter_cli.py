@@ -25,6 +25,11 @@ from exo_toolkit.hunter_cross_project import (
     DEFAULT_COPIED_HISTORY,
     require_repo_local_history_path,
 )
+from exo_toolkit.hunter_cross_project_history import (
+    CROSS_PROJECT_DECISION_STATES,
+    cross_project_history_federation_validity,
+    write_cross_project_history_export,
+)
 from exo_toolkit.hunter_models import (
     PARSECS_TO_LIGHT_YEARS,
     ArtifactIdentity,
@@ -43,6 +48,12 @@ from exo_toolkit.hunter_ranking import (
     NEW_RANKING_WEIGHTS,
     NEW_SELECTOR_VERSION,
     selection_contract,
+)
+from exo_toolkit.hunter_ux import (
+    ValidationError as UxValidationError,
+)
+from exo_toolkit.hunter_ux import (
+    validate_target_reference,
 )
 from exo_toolkit.search_lifecycle import (
     HunterStore,
@@ -271,6 +282,29 @@ def _parser_follow_ups() -> argparse.ArgumentParser:
         choices=("open", "scheduled", "completed", "deferred", "all"),
         default="open",
     )
+    parser.add_argument("--json", action="store_true", dest="json_output")
+    parser.add_argument("--no-color", action="store_true")
+    return parser
+
+
+def _parser_inspect_target() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="Inspect-Target",
+        description=(
+            "Show full identity, score components, provenance, and prior-search "
+            "evidence for one target in a frozen manifest."
+        ),
+    )
+    parser.add_argument(
+        "--rank-or-id",
+        required=True,
+        help="Manifest rank number, or a target/canonical identifier.",
+    )
+    parser.add_argument(
+        "--search-id",
+        help="Search to inspect; defaults to the most recent search containing the target.",
+    )
+    parser.add_argument("--db", type=Path, default=DEFAULT_HUNTER_DB)
     parser.add_argument("--json", action="store_true", dest="json_output")
     parser.add_argument("--no-color", action="store_true")
     return parser
@@ -786,6 +820,85 @@ def _manifest_table(search: Mapping[str, Any]) -> Table:
     return table
 
 
+def _require_decision_grade_history(
+    history_path: Path | None = None,
+) -> tuple[str, str]:
+    """Fail closed unless cross-project history can justify a novelty decision.
+
+    Consulting only this project's own export established "not searched by
+    EXO-Hunter" and then reported it as novelty. Novelty is a claim about
+    every Astrometrics Hunter project, so the gate requires decision-grade
+    history from all three (own + Techno-Hunter + NEO-Hunter). A sibling that
+    is absent, unpublished, or malformed resolves to ``unknown`` and closes
+    the gate -- absence of a label is not evidence (IDENT-03).
+    """
+    state, detail, per_project = cross_project_history_federation_validity(history_path)
+    if state not in CROSS_PROJECT_DECISION_STATES:
+        blocking = sorted(
+            project
+            for project, (project_state, _) in per_project.items()
+            if project_state not in CROSS_PROJECT_DECISION_STATES
+        )
+        raise RuntimeError(
+            "New eligibility requires decision-grade cross-project history from "
+            f"all {len(per_project)} Astrometrics Hunter projects; weakest "
+            f"validity is {state!r} from {', '.join(blocking)}. {detail}. "
+            "Publish or refresh the blocking project's export "
+            "(data_selection/hunter_prior_search_history_v1.json), or run a "
+            "follow-up search instead. New selection fails closed rather than "
+            "assuming novelty (IDENT-03)."
+        )
+    return state, detail
+
+
+def _parser_export_history() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="Export-Cross-Project-History",
+        description=(
+            "Publish this repository's own cross-project Hunter search-history "
+            "export for sibling Astrometrics projects to consume read-only."
+        ),
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help=(
+            "Write here instead of the contract path "
+            "data_selection/hunter_prior_search_history_v1.json."
+        ),
+    )
+    parser.add_argument("--json", action="store_true", dest="json_output")
+    parser.add_argument("--no-color", action="store_true")
+    return parser
+
+
+def export_cross_project_history_command(argv: Sequence[str] | None = None) -> int:
+    """Deliverable A: write this repo's own export, and only its own."""
+    args = _parser_export_history().parse_args(argv)
+    console = Console(no_color=args.no_color, stderr=False)
+    try:
+        summary = write_cross_project_history_export(args.output)
+    except (OSError, ValueError) as exc:
+        if args.json_output:
+            print(json.dumps({"ok": False, "error": str(exc)}, indent=2))
+        else:
+            console.print(f"[red]Export failed:[/red] {exc}")
+        return 1
+    if args.json_output:
+        print(json.dumps(summary, indent=2, sort_keys=True))
+    else:
+        console.print(
+            f"[green]Published[/green] {summary['output_path']}\n"
+            f"  schema_version={summary['schema_version']} "
+            f"sources={summary['source_count']} "
+            f"entries={summary['entry_count']} "
+            f"unique_targets={summary['unique_target_count']}"
+        )
+        console.print(f"[dim]{summary['disclaimer']}[/dim]")
+    return 0
+
+
 def create_new_search(
     argv: Sequence[str] | None = None,
     *,
@@ -801,7 +914,12 @@ def create_new_search(
             raise ValueError(f"workers must be between 1 and {MAX_LIVE_WORKERS}")
         pool_size = max(args.pool_size or 0, DEFAULT_POOL_SIZE, args.targets * 100)
         cross_project_import: dict[str, Any] | None = None
+        history_state: str | None = None
+        history_detail: str | None = None
         if args.mode == "new":
+            # IDENT-03: refuse before touching the datastore, so a blocked New
+            # search freezes nothing at all.
+            history_state, history_detail = _require_decision_grade_history()
             copied_history = require_repo_local_history_path(
                 args.cross_project_history_path or DEFAULT_COPIED_HISTORY
             )
@@ -842,6 +960,9 @@ def create_new_search(
             "pool_size_requested": pool_size,
             "selector_log": selector_log,
             "cross_project_history_import": cross_project_import,
+            # IDENT-04: the federation evidence this selection rests on.
+            "cross_project_history_validity": history_state,
+            "cross_project_history_source": history_detail,
             "selection_contract": contract,
         }
         prewrite_integrity = store.validity_summary(
@@ -1277,6 +1398,191 @@ def show_follow_ups(argv: Sequence[str] | None = None) -> int:
         return 2
 
 
+def _match_manifest_target(
+    search: Mapping[str, Any], reference: str
+) -> dict[str, Any] | None:
+    """Resolve one manifest row by ordinal rank or by identifier.
+
+    A purely numeric reference is a rank (the manifest ordinal shown in the
+    results table); anything else is matched case-insensitively against the
+    target identifier, the canonical identifier, and any alias.
+    """
+    if reference.isdigit():
+        wanted = int(reference)
+        for row in search.get("targets", ()):
+            if int(row.get("ordinal", -1)) == wanted:
+                return dict(row)
+        return None
+    folded = reference.casefold()
+    for row in search.get("targets", ()):
+        candidate = row.get("candidate", {})
+        identities = [
+            str(row.get("target_id", "")),
+            str(candidate.get("target_id", "")),
+            str(candidate.get("canonical_id", "")),
+            *(str(alias) for alias in candidate.get("aliases", ()) or ()),
+        ]
+        if any(value.casefold() == folded for value in identities if value):
+            return dict(row)
+    return None
+
+
+def _inspection_report(
+    search: Mapping[str, Any], target_row: Mapping[str, Any], history: Sequence[Mapping[str, Any]]
+) -> dict[str, Any]:
+    """Assemble the UX-TABLE-02 detail payload from durable records only."""
+    candidate = dict(target_row.get("candidate", {}))
+    prior_searches = candidate.get("prior_searches") or ()
+    return {
+        "search_id": search.get("search_id"),
+        "search_state": search.get("state"),
+        # mode is a top-level search_manifests column, not a config_json key.
+        "search_mode": search.get("mode") or (search.get("config") or {}).get("mode"),
+        "rank": target_row.get("ordinal"),
+        "target_id": target_row.get("target_id") or candidate.get("target_id"),
+        "canonical_id": candidate.get("canonical_id"),
+        "aliases": list(candidate.get("aliases") or ()),
+        "mission": candidate.get("mission"),
+        "object_classification": candidate.get("object_classification"),
+        "source": candidate.get("source"),
+        "source_provenance": candidate.get("source_provenance") or {},
+        "decision_validity": candidate.get("decision_validity") or {},
+        "ranking_score": candidate.get("ranking_score"),
+        "selection_reason": candidate.get("selection_reason"),
+        "metrics": candidate.get("metrics") or {},
+        "estimated_download_gb": candidate.get("estimated_download_gb"),
+        "prior_searches": [dict(entry) for entry in prior_searches],
+        "search_status": _candidate_search_status(
+            HunterCandidate.model_validate(candidate)
+        )
+        if candidate
+        else None,
+        "durable_history": [dict(entry) for entry in history],
+        "limitations": [
+            "Scores and metrics are the values frozen at selection time; they are "
+            "not recomputed on inspection.",
+            "Absent metrics are reported as null rather than substituted, so a "
+            "missing diagnostic is never presented as a measured value.",
+        ],
+    }
+
+
+def inspect_target(argv: Sequence[str] | None = None) -> int:
+    """Show the full detail view for one frozen manifest target (CLI-02)."""
+    args = _parser_inspect_target().parse_args(argv)
+    try:
+        reference = validate_target_reference(args.rank_or_id)
+    except UxValidationError as exc:
+        print(f"Inspect-Target: {exc}", file=sys.stderr)
+        return 2
+    try:
+        store = HunterStore(args.db)
+        store.initialize()
+        if args.search_id:
+            searches = [store.get_search(args.search_id)]
+        else:
+            searches = [store.get_search(row["search_id"]) for row in store.all_searches()]
+        if not searches:
+            print(
+                "Inspect-Target: no durable search exists yet. "
+                "Create one with /New-Search or /Follow-Up-Search.",
+                file=sys.stderr,
+            )
+            return 2
+        match: tuple[dict[str, Any], dict[str, Any]] | None = None
+        for search in searches:
+            row = _match_manifest_target(search, reference)
+            if row is not None:
+                match = (search, row)
+                break
+        if match is None:
+            scope = (
+                f"search {args.search_id}"
+                if args.search_id
+                else f"{len(searches)} durable search(es)"
+            )
+            print(
+                f"Inspect-Target: no target matching {args.rank_or_id!r} in {scope}. "
+                "Use a manifest rank number or a target identifier.",
+                file=sys.stderr,
+            )
+            return 2
+        search, target_row = match
+        target_id = str(target_row.get("target_id") or "")
+        history = store.target_history(target_id) if target_id else []
+        report = _inspection_report(search, target_row, history)
+    except Exception as exc:  # noqa: BLE001
+        print(f"Inspect-Target failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 2
+
+    if args.json_output:
+        print(json.dumps(report, indent=2, sort_keys=True, default=str))
+        return 0
+
+    console = _console(no_color=args.no_color)
+    console.print(
+        f"[bold cyan]{report['canonical_id'] or report['target_id']}[/bold cyan]  "
+        f"[dim]rank {report['rank']} in {report['search_id']} "
+        f"({report['search_mode']}, {report['search_state']})[/dim]"
+    )
+    identity = Table(show_header=False, box=None, pad_edge=False)
+    identity.add_column("Field", style="cyan", no_wrap=True)
+    identity.add_column("Value")
+    identity.add_row("Target", str(report["target_id"]))
+    identity.add_row("Aliases", ", ".join(report["aliases"]) or "none recorded")
+    identity.add_row("Mission", str(report["mission"]))
+    identity.add_row("Class", str(report["object_classification"]))
+    identity.add_row("Search status", str(report["search_status"]))
+    identity.add_row("Ranking score", _format_metric_value(report["ranking_score"]))
+    identity.add_row("Estimated download", f"{report['estimated_download_gb']} GB")
+    identity.add_row("Source", str(report["source"]))
+    console.print(identity)
+
+    if report["metrics"]:
+        metrics = Table(title="Score components", show_lines=False)
+        metrics.add_column("Metric", style="cyan", no_wrap=True)
+        metrics.add_column("Value")
+        for key in sorted(report["metrics"]):
+            metrics.add_row(key, _format_metric_value(report["metrics"][key]))
+        console.print(metrics)
+
+    console.print(f"\n[bold]Selection reason[/bold]\n{report['selection_reason']}")
+
+    validity = report["decision_validity"]
+    if validity:
+        console.print(
+            f"\n[bold]Decision validity[/bold]\nstate={validity.get('state')} "
+            f"source={validity.get('source')} as_of={validity.get('as_of')}"
+        )
+
+    if report["prior_searches"]:
+        console.print("\n[bold]Prior-search evidence[/bold]")
+        for index, entry in enumerate(report["prior_searches"], 1):
+            console.print(
+                f"  {index}. {entry.get('source_project')} — {entry.get('searched_by')} — "
+                f"{entry.get('searched_at')}; result={entry.get('result')}; "
+                f"provenance={entry.get('provenance_uri')}"
+            )
+    else:
+        console.print("\n[bold]Prior-search evidence[/bold]\n  none recorded")
+
+    if report["durable_history"]:
+        console.print("\n[bold]Durable history[/bold]")
+        for entry in report["durable_history"]:
+            line = (
+                f"  {entry.get('created_at')} status={entry.get('status')} "
+                f"search={entry.get('search_id')}"
+            )
+            if entry.get("error_message"):
+                line += f" error={entry['error_message']}"
+            console.print(line)
+
+    console.print("\n[bold]Limitations[/bold]")
+    for note in report["limitations"]:
+        console.print(f"  - {note}")
+    return 0
+
+
 def import_follow_up(
     argv: Sequence[str] | None = None,
     *,
@@ -1480,5 +1786,13 @@ def import_follow_up_entry() -> None:
     raise SystemExit(import_follow_up())
 
 
+def inspect_target_entry() -> None:
+    raise SystemExit(inspect_target())
+
+
 def recheck_follow_ups_entry() -> None:
     raise SystemExit(recheck_follow_ups())
+
+
+def export_cross_project_history_entry() -> None:
+    raise SystemExit(export_cross_project_history_command())

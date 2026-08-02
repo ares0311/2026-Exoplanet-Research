@@ -69,7 +69,10 @@ Create-New-Search = "exo_toolkit.hunter_cli:create_new_search_entry"
 Run-New-Search = "exo_toolkit.hunter_cli:run_new_search_entry"
 Show-Follow-Ups = "exo_toolkit.hunter_cli:show_follow_ups_entry"
 Import-Follow-Up = "exo_toolkit.hunter_cli:import_follow_up_entry"
+Inspect-Target = "exo_toolkit.hunter_cli:inspect_target_entry"
+prod-check = "exo_toolkit.prod_check:main_entry"
 Recheck-Follow-Ups = "exo_toolkit.hunter_cli:recheck_follow_ups_entry"
+Export-Cross-Project-History = "exo_toolkit.hunter_cli:export_cross_project_history_entry"
 
 [tool.setuptools.packages.find]
 where = ["src"]
