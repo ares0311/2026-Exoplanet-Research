@@ -1,0 +1,5 @@
+Targets: twenty
+Invalid - enter a positive whole number.
+
+Targets: 0
+Invalid - targets must be greater than zero.

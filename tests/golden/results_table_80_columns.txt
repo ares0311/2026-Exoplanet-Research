@@ -1,0 +1,4 @@
+Rank  Target           Score    Status         Class
+----- ---------------- -------- -------------- ----------
+1     TIC 237884073    100.0    follow-up      star
+2     TIC 38846515     92.5     novel          star

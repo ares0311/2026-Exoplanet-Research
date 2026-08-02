@@ -1,0 +1,14 @@
+Resolved action preview
+-----------------------
+Mode:                            new
+Requested targets:               5
+Scientific constraints:          none
+Primary sources:                 TIC via MAST
+Source freshness:                not resolved
+Cross-project history freshness: not resolved
+Estimated discovery universe:    not resolved
+Estimated storage:               not resolved
+Estimated compute:               not resolved
+Output behavior:                 durable manifest + terminal table
+
+Confirm, edit, or cancel.

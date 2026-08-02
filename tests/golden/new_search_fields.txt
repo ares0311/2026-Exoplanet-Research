@@ -1,0 +1,8 @@
+/New-Search
+
+*targets          [20]
+  How many targets to select and freeze.
+ max-download-gb  [optional]
+  Upper bound on total acquisition size, in gigabytes.
+
+Tab/Shift-Tab move - Enter executes when valid - Escape cancels.

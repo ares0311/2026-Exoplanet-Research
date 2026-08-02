@@ -1,0 +1,45 @@
+EXO-Hunter commands
+-------------------
+  /New-Search
+    Select and freeze the best available never-before-searched targets.
+    Required: targets
+    Optional: max-download-gb
+  /Follow-Up-Search
+    Select and freeze the highest-value previously-searched targets.
+    Required: targets
+    Optional: max-download-gb
+  /Run-Search
+    Execute or resume the exact frozen manifest without regenerating it.
+    Required: none
+    Optional: none
+    Also: /Run-New-Search
+  /Show-Follow-Ups
+    Show follow-up evidence, priority, and the recommended next action.
+    Required: none
+    Optional: status
+  /Inspect-Target
+    Show full identity, score components, provenance, and prior-search evidence.
+    Required: rank-or-id
+    Optional: none
+  /Create-New-Search
+    Lower-level creation command taking explicit --targets and --mode.
+    Required: none
+    Optional: none
+  /Import-Follow-Up
+    Import one checksum-verified reviewed prior result.
+    Required: evidence-file
+    Optional: none
+  /Recheck-Follow-Ups
+    Recheck deferred follow-ups for newly available MAST sectors.
+    Required: none
+    Optional: none
+  /Help
+    Show the full command surface with parameters.
+    Required: none
+    Optional: none
+  /Exit
+    Close the persistent terminal.
+    Required: none
+    Optional: none
+
+Type to filter - Up/Down to navigate - Enter to select - Escape to close.

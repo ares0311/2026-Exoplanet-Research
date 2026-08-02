@@ -1,0 +1,484 @@
+{
+  "artifact": "configs/HUNTER_PROD_STATE.json",
+  "schema_version": "1.2.0",
+  "contract_version": "HUNTER-PROD-2026-07-30.3",
+  "cli_ux_version": "HUNTER-CLI-UX-2026-07-30.3",
+  "active_repository": "2026 Exoplanet Research (ares0311/2026-Exoplanet-Research)",
+  "repository_profile": "EXOHunter",
+  "bootstrap_complete": true,
+  "prod_status": "REVOKED_UNTIL_VERIFIED",
+  "current_priority": "P0",
+  "active_requirement_id": "PROD-01",
+  "artifact_normalization_note": {
+    "defect": "HUNTER_PROD_CONTRACT.md, CLI_UX_SPEC.md, and HUNTER_PROD_STATE.json were delivered as RTF (Rich Text Format) payloads carrying .md/.json extensions. This file could not be parsed as JSON, so the mandated state-ledger protocol could not run.",
+    "reproduction": "python3 -c \"import json;json.load(open('configs/HUNTER_PROD_STATE.json'))\" -> JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 2",
+    "repair": "Converted losslessly to the declared formats with textutil. Content is byte-faithful to the user-supplied originals; no contract text was invented, added, or removed.",
+    "originals_preserved_at": "logs/prod_closure_scratch/*.rtf.bak",
+    "authorized_by": "User selection 'Normalize in place', 2026-07-31.",
+    "internal_path_correction": "The delivered payload's own 'artifact' value read 'ARTIFACT 3 - docs/HUNTER_PROD_STATE.json'. No such file exists under docs/; the real and intended location is configs/HUNTER_PROD_STATE.json, which is also the path the launch prompt mandates. Corrected, user-confirmed 2026-07-31."
+  },
+  "preserved_user_changes": [
+    {
+      "path": "docs/README_SPEC.md",
+      "declared_state": "staged-and-uncommitted",
+      "observed_state": "committed-and-clean",
+      "observed_evidence": "Tracked at commit 4a65442; 'git diff -- docs/README_SPEC.md' and 'git diff --cached -- docs/README_SPEC.md' are both empty.",
+      "premise_status": "CONTRADICTED_BY_REPOSITORY",
+      "policy": "Preserve. Do not unstage, replace, discard, or silently rewrite.",
+      "action_taken": "Left byte-untouched. Contract WS-02 and this ledger's original preserved_user_changes entry both assert a staged-and-uncommitted state that this repository does not exhibit."
+    }
+  ],
+  "operator_environment": {
+    "documented_install_command": "uv sync --all-extras --all-groups",
+    "canonical_executable": "EXO-Hunter",
+    "entry_point": "exo_toolkit.hunter_shell:exohunter_entry",
+    "python_version": "3.14 (venv interpreter; not directly invocable from this sandbox)",
+    "package_manager_version": "uv (not resolvable from this sandbox)",
+    "virtual_environment": ".venv",
+    "resolved_executable": ".venv/bin/EXO-Hunter",
+    "installation_mode": "pre-existing editable/synced .venv",
+    "last_verified_commit": "61ba0c2289d0aa1faf774513c82ddcc93372e88a",
+    "last_verified_at_utc": "2026-07-31T00:00:00Z",
+    "sandbox_limitations": [
+      ".venv/bin/python resolves to /Library/Frameworks/Python.framework/... which is outside the git root and is denied by the session sandbox. Console scripts (EXO-Hunter, pytest, ruff, mypy) execute normally.",
+      "The Bash policy hook rejects any argument beginning with '/' as an out-of-repo path, so slash commands must be driven through --script files written inside the repository.",
+      "File writes outside the git root are denied, so no fresh out-of-tree virtual environment, wheel install, or unrelated-directory execution can be staged from this session."
+    ]
+  },
+  "applicable_blockers": [
+    {
+      "id": "EXO-FIELD-01",
+      "priority": "P1",
+      "requirements": ["IDENT-01", "IDENT-03", "IDENT-04"],
+      "summary": "Stale copied Techno history allowed known searched targets to remain eligible as New.",
+      "known_examples": ["HIP 60759", "HIP 61099", "HIP 3419"],
+      "status": "UNVERIFIED",
+      "note": "README claims 0.5.3 removed sibling-repository runtime reads and constrained cross-project history to a verified repo-local copy. Not independently re-verified this session."
+    },
+    {
+      "id": "EXO-FIELD-02",
+      "priority": "P1",
+      "requirements": ["IDENT-01", "IDENT-04"],
+      "summary": "Approximately 590 HIP identities were flattened into one aliases field.",
+      "status": "UNVERIFIED"
+    },
+    {
+      "id": "EXO-FIELD-03",
+      "priority": "P2",
+      "requirements": ["E2E-01", "E2E-04", "CLAIM-04"],
+      "summary": "A claimed 39053-row live-source smoke was supported only by prose while the acceptance harness was fixture-controlled.",
+      "status": "BLOCKING"
+    },
+    {
+      "id": "EXO-FIELD-04",
+      "priority": "P1",
+      "requirements": ["RANK-01"],
+      "summary": "The published follow-up expected-information-gain formula disagreed with registry-derived persistence.",
+      "documented_formula": "(1 - fpp) * confidence",
+      "observed_alternative": "follow_up_priority / 110",
+      "status": "CLOSED",
+      "closed_by": "RANK-01 evidence entry below."
+    },
+    {
+      "id": "EXO-FIELD-05",
+      "priority": "P0",
+      "requirements": ["LAUNCH-04", "DUR-04", "CLAIM-01"],
+      "summary": "Live TIC operation produced repeated RemoteDisconnected failures and raw exception-style output. Root cause and test escape are unknown.",
+      "status": "BLOCKING",
+      "reproduced_2026_08_01": {
+        "command": "bash scripts/run_acceptance.sh -> Create-New-Search --mode new",
+        "observed": "RuntimeError: TIC criteria discovery failed before universe exhaustion: criteria page 1 attempt 1/2 and 2/2 both ConnectionError ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+        "eliminated_causes": [
+          "Query size: astroquery Catalogs.query_criteria(catalog='Tic') failed identically at pagesize 10, 100, 1000, and 10000.",
+          "Sandbox network policy: the probe ran from an unsandboxed runner (os.openpty() succeeded in the same process) and still failed.",
+          "General MAST reachability: https://mast.stsci.edu/api/v0/ returns HTTP 200 and the NASA Exoplanet Archive TAP returns HTTP 200 with 40035 rows."
+        ],
+        "remaining_unknown": "Whether the fault is in the MAST Portal catalogs endpoint itself, in this astroquery version's use of it, or in the product's paged-discovery wrapper. Not isolated, therefore UNKNOWN and blocking.",
+        "secondary_finding": "DUR-04 requires a concise, actionable operator-facing failure. The current output is a raw chained exception string, which is the presentation half of this blocker and is independent of the connection cause.",
+        "raw_evidence_path": "logs/prod_closure_evidence/phase5/01_create_new.txt, logs/prod_closure_evidence/phase2/pty_gate.txt (probe)"
+      }
+    },
+    {
+      "id": "EXO-FIELD-06",
+      "priority": "P3",
+      "requirements": ["CLI-01", "CLI-02", "CLI-03"],
+      "summary": "The CLI lacks the required command palette, guided parameter entry, validity sentinels, engaging animation, and clean result tables.",
+      "status": "CLOSED",
+      "closed_by": ["CLI-01", "CLI-02", "CLI-03", "EVAL-01"],
+      "resolved_sub_gaps": [
+        "/Inspect-Target implemented, registered in _SLASH_COMMANDS and pyproject, exercised against real durable data.",
+        "Typing '/' now opens a searchable described palette; '/text' filters it; discovery no longer requires /Help.",
+        "Guided parameter entry and live validity sentinels implemented in hunter_ux with shared validators.",
+        "Width-aware results table and /Inspect-Target detail view implemented.",
+        "tests/golden/ created with six EXO-scoped semantic baselines."
+      ],
+      "residual": "Five of the eleven golden filenames named in CLI/UX spec §13 are not created here: two are sibling-repository startup baselines, and operator_error/non_tty_output/startup_exo require terminal-level capture not staged this session."
+    }
+  ],
+  "requirements": {
+    "WS-01": {"priority": "P0", "status": "VERIFIED", "evidence_ref": "WS-01"},
+    "WS-02": {"priority": "P0", "status": "VERIFIED", "evidence_ref": "WS-02"},
+    "WS-03": {"priority": "P0", "status": "UNVERIFIED"},
+    "WS-04": {"priority": "P0", "status": "UNVERIFIED"},
+    "LAUNCH-01": {
+      "priority": "P0",
+      "status": "VERIFIED",
+      "evidence_ref": "PHASE1-INSTALL-SURFACES",
+      "note": "The documented sync 'uv sync --all-extras --all-groups' completes with exit 0 and the canonical executable runs as an operating-system subprocess."
+    },
+    "LAUNCH-02": {
+      "priority": "P0",
+      "status": "BLOCKING",
+      "evidence_ref": "PHASE1-INSTALL-SURFACES",
+      "blocked_reason": "Surfaces 1-6 executed and passed, including the built wheel and a fresh installation, which an earlier ledger entry wrongly recorded as impossible here: both work inside the git root. Only surface 7 (execution from an unrelated directory) is genuinely blocked, and it needs a working directory outside the git root rather than a write."
+    },
+    "LAUNCH-03": {
+      "priority": "P0",
+      "status": "VERIFIED",
+      "evidence_ref": "PHASE1-INSTALL-SURFACES",
+      "note": "Commit, working-tree state, Python and uv versions, virtual-environment paths, resolved executables, installation mode, working directory, exact commands, exit statuses, and captured output are all recorded."
+    },
+    "LAUNCH-04": {"priority": "P0", "status": "BLOCKING", "blocked_reason": "Command palette and /Inspect-Target do not exist."},
+    "PIPE-01": {"priority": "P1", "status": "UNVERIFIED"},
+    "PIPE-02": {"priority": "P1", "status": "UNVERIFIED"},
+    "PIPE-03": {"priority": "P1", "status": "UNVERIFIED"},
+    "IDENT-01": {"priority": "P1", "status": "UNVERIFIED"},
+    "IDENT-02": {"priority": "P1", "status": "UNVERIFIED"},
+    "IDENT-03": {"priority": "P1", "status": "UNVERIFIED"},
+    "IDENT-04": {"priority": "P1", "status": "UNVERIFIED"},
+    "DISC-01": {"priority": "P1", "status": "UNVERIFIED"},
+    "DISC-02": {"priority": "P1", "status": "UNVERIFIED"},
+    "DISC-03": {"priority": "P1", "status": "UNVERIFIED"},
+    "RANK-01": {"priority": "P1", "status": "VERIFIED", "evidence_ref": "RANK-01"},
+    "DUR-01": {"priority": "P1", "status": "UNVERIFIED"},
+    "DUR-02": {"priority": "P1", "status": "UNVERIFIED"},
+    "DUR-03": {"priority": "P1", "status": "UNVERIFIED"},
+    "DUR-04": {"priority": "P1", "status": "UNVERIFIED"},
+    "E2E-01": {"priority": "P2", "status": "UNVERIFIED"},
+    "E2E-02": {"priority": "P2", "status": "UNVERIFIED"},
+    "E2E-03": {"priority": "P2", "status": "UNVERIFIED"},
+    "E2E-04": {"priority": "P2", "status": "UNVERIFIED"},
+    "CLI-01": {
+      "priority": "P3",
+      "status": "BLOCKING",
+      "revoked_from": "VERIFIED",
+      "revoked_by": "PHASE0-STATUS-AUTHORITY",
+      "blocked_reason": "UX-CMD-01 is not satisfied: the shipped interactive loop has no character-at-a-time input mechanism, so '/' cannot open the palette until Enter is pressed. The prior VERIFIED rested on an in-process render_palette() call, which the directive names as a forbidden substitute for interactive keystrokes."
+    },
+    "CLI-02": {"priority": "P3", "status": "VERIFIED", "evidence_ref": "CLI-02"},
+    "CLI-03": {"priority": "P3", "status": "VERIFIED", "evidence_ref": "CLI-03"},
+    "UX-CMD-01": {
+      "priority": "P3",
+      "status": "BLOCKING",
+      "blocked_reason": "Structurally FAIL (interactive_input_capability). Behavioural proof NOT EXECUTED: /dev/ptmx is denied in this session, so no real PTY can be allocated."
+    },
+    "UX-IN-01": {
+      "priority": "P3",
+      "status": "BLOCKING",
+      "blocked_reason": "GuidedEntry, render_action_preview, and render_results_table are never referenced by the shipped shell (PIPE-02: reachable only from tests and the gate)."
+    },
+    "CLAIM-01": {"priority": "P4", "status": "UNVERIFIED"},
+    "CLAIM-02": {"priority": "P4", "status": "VERIFIED", "evidence_ref": "PROD-01"},
+    "CLAIM-03": {"priority": "P4", "status": "VERIFIED", "evidence_ref": "PROD-01"},
+    "CLAIM-04": {"priority": "P4", "status": "UNVERIFIED"},
+    "PROD-01": {
+      "priority": "P4",
+      "status": "IMPLEMENTED_NOT_VERIFIED",
+      "revoked_from": "VERIFIED",
+      "revoked_by": "PHASE0-STATUS-AUTHORITY",
+      "evidence_ref": "PHASE0-STATUS-AUTHORITY",
+      "note": "The gate exists, is versioned, and exits nonzero, but its pre-repair form reported PASS for UX-CMD-01 on renderer evidence. Repaired this session; it now surfaces two real FAILs. It remains unverified against the environmental surfaces it still cannot execute."
+    },
+    "EVAL-01": {
+      "priority": "P4",
+      "status": "BLOCKING",
+      "revoked_from": "VERIFIED",
+      "revoked_by": "PHASE0-STATUS-AUTHORITY",
+      "blocked_reason": "The golden baselines assert renderer output only. CLI/UX spec section 13 also requires startup_exo.txt, operator_error.txt, and non_tty_output.txt, and EVAL-01's '/ command discovery' regression case needs keystroke evidence a golden file cannot supply."
+    },
+    "README-01": {"priority": "P4", "status": "VERIFIED", "evidence_ref": "README-01"},
+    "README-02": {"priority": "P4", "status": "IMPLEMENTED_NOT_VERIFIED", "note": "Content derives from verified code and gate output, but the live-data capability rows remain Nonconforming pending E2E evidence."},
+    "README-03": {"priority": "P4", "status": "VERIFIED", "evidence_ref": "README-01"}
+  },
+  "allowed_statuses": [
+    "UNVERIFIED",
+    "BLOCKING",
+    "IN_PROGRESS",
+    "IMPLEMENTED_NOT_VERIFIED",
+    "VERIFIED",
+    "NOT_APPLICABLE"
+  ],
+  "evidence_contract": {
+    "required_fields": [
+      "requirement_id",
+      "exact_command",
+      "environment",
+      "observable_assertion",
+      "raw_evidence_path",
+      "tested_commit",
+      "tested_at_utc"
+    ],
+    "verified_rule": "A requirement may be VERIFIED only when every required evidence field is populated and the result is reproducible.",
+    "revocation_rule": "Any reproducible documented-user-workflow failure reopens every contradicted requirement."
+  },
+  "evidence": {
+    "PHASE0-STATUS-AUTHORITY": {
+      "requirement_id": "PROD-01",
+      "phase": "PHASE 0",
+      "exact_command": ".venv/bin/prod-check",
+      "environment": "macOS darwin 25.6.0; repo .venv synced with 'UV_CACHE_DIR=$PWD/.cache/uv uv sync --all-extras --all-groups' (exit 0); uv 0.11.3; Python 3.14; installed console script",
+      "observable_assertion": "Baseline gate reported 13/19 PASS, 0 FAIL, 6 NOT EXECUTED, exit 1. After the status-authority repair the same command reports 13/22 PASS, 2 FAIL, 7 NOT EXECUTED, exit 1. The two new FAILs (interactive_input_capability, guided_entry_wiring) were previously masked inside a PASS.",
+      "root_cause": "_check_command_palette claimed requirement UX-CMD-01 ('/' immediately opens the palette) while proving only that render_palette() emits text in-process. The shipped interactive loop is builtins.input(), which is line-buffered, so the terminal never leaves canonical mode and no byte reaches the process before Enter. An in-process renderer call can never observe that difference.",
+      "test_escape": "No check distinguished 'the palette registry is described' from 'a keystroke opens the palette'. GuidedEntry, render_action_preview, and render_results_table were additionally reachable only from tests and from the gate itself, so PIPE-02's ban on test-only production code was unenforced.",
+      "repair": "Dropped UX-CMD-01 from the registry check; added interactive_input_capability (structural capability scan, FAIL when no raw-mode mechanism is imported), guided_entry_wiring (AST reference scan, FAIL when required operator surfaces are unwired), and interactive_pty_operator_experience (behavioural, NOT_EXECUTED without a retained real-PTY bundle).",
+      "raw_evidence_path": "logs/prod_closure_evidence/phase0/prod_check_baseline.txt, logs/prod_closure_evidence/phase0/prod_check_after_repair.txt",
+      "gate_sha256": {
+        "src/exo_toolkit/prod_check.py": "e4f53acf06ab8fbdb4651bad84db6c5d118e814713b5fa5a3f5bc4aef2b6fa29",
+        "tests/test_prod_check.py": "eaa8f912b613a9bd8669f983666db4bec0994185c102dcda4cab5d3504150a4e",
+        "src/exo_toolkit/hunter_shell.py": "80c17886442e0398f3cfd9a1a910e8edc363d89b95f5c75239999a709c6b3cb4",
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840"
+      },
+      "regression_tests": "tests/test_prod_check.py::TestInteractiveInputCapability, ::TestGuidedEntryWiring, ::TestPtyOperatorExperienceGate -- 13 fixture-based negative controls (known-good and known-bad synthetic shells; a docstring-only mention is proven not to satisfy wiring). 32 passed across both gate test files.",
+      "tested_commit": "76dea1e56a676ccfc0876e31bdb16829ad11cd36 (working tree, uncommitted)",
+      "tested_at_utc": "2026-08-01T00:00:00Z"
+    },
+    "PHASE2-PTY-OPERATOR": {
+      "requirement_id": "UX-CMD-01",
+      "phase": "PHASE 2",
+      "exact_command": "bash scripts/run_pty_gate.sh",
+      "environment": "macOS darwin 25.6.0; real pty via pty.openpty() -> /dev/ttys009; installed console script .venv/bin/EXO-Hunter; run through sandbox.excludedCommands",
+      "observable_assertion": "20/20 passed, exit 0. Baseline before implementation was 11 failed / 9 passed. Sending '/' with no trailing newline now opens a searchable palette listing all seven required commands with descriptions; typing filters live; Up/Down move a visible selection marker; Escape closes; /New-Search opens guided fields; 'twenty' is rejected inline with the spec sentinel before execution; a corrected value renders the resolved-action preview; Escape cancels back to the prompt; /Exit returns 0; the terminal is left canonical with echo on and the cursor shown; no line exceeds 40, 80, or 140 columns; non-TTY output carries no ANSI; the executable runs from a directory outside the repository.",
+      "root_cause_of_baseline": "HunterShell.run_interactive used builtins.input(), a line-buffered read. A terminal in canonical mode withholds every byte until Enter, so '/' could not reach the process in time. GuidedEntry and render_action_preview existed but were referenced only by tests and the gate (PIPE-02).",
+      "repair": "Added cbreak-mode terminal handling with guaranteed restore, an escape-timeout KeyDecoder, and pure PaletteState/KeyDecoder state machines in hunter_ux so the interaction logic is testable without a PTY. Enter executes once required fields are valid and Tab advances to optional ones (UX-IN-02). The orbit animation is clipped to terminal width. Non-TTY falls back to the existing line-buffered loop. Every execution still re-enters dispatch(), so interactive and scriptable paths share one pipeline (CLI-03).",
+      "gate_sha256": "4d61546bb82ee88c72558eb681a5fc9a2f7c9eee04a70f86f7759db7b0b73c7f (frozen before implementation)",
+      "authorized_gate_change": "test_exit_returns_zero blocked on proc.wait() without draining the terminal, filling the PTY buffer and stopping the child mid-write so it never reached its exit path. Proven a harness artifact by probe: identical keystrokes return 0 the instant draining resumes. Changed to drain while polling within the same 8s bound; the assertion (exit code 0 from real keystrokes) is unchanged. User-authorized 2026-08-01.",
+      "raw_evidence_path": "logs/prod_closure_evidence/phase2/baseline_frozen.txt (11F/9P), logs/prod_closure_evidence/phase2/run_final.txt (20/20), artifacts/manifests/exohunter_pty_acceptance.json",
+      "tested_commit": "76dea1e56a676ccfc0876e31bdb16829ad11cd36 (working tree, uncommitted)",
+      "tested_at_utc": "2026-08-01T17:05:00Z"
+    },
+    "PHASE5-REAL-DATA": {
+      "requirement_id": "E2E-01",
+      "phase": "PHASE 5",
+      "exact_command": "bash scripts/run_acceptance.sh",
+      "environment": "installed console scripts; live MAST and NASA Exoplanet Archive; disposable copy of the production database; XDG_CACHE_HOME redirected repo-local",
+      "result": "PARTIAL - Follow-up path passed, New path BLOCKED",
+      "observable_assertion": "Follow-up create returned exit 0 and froze an exact manifest (manifest_sha256 faad3b7c4cd508289560f345ae127e482d9a9d92db6403b79bfdbb1f83393101); Run-Search executed it exit 0; Show-Follow-Ups returned durable rows with per-source provenance URIs and content hashes; a fresh process then reported 'No pending or resumable search exists', proving completed work is not regenerated (DUR-02/E2E-03). New-mode create failed exit 2 before any durable state was written.",
+      "production_database_guard": "sha256 ac81633033110429c1f273bb22417b8ed7c2eaeb5b20b7e2c0369aceeab55892 before and after both runs - byte-identical, unmutated.",
+      "blocker": "EXO-FIELD-05",
+      "raw_evidence_path": "logs/prod_closure_evidence/phase5/",
+      "tested_commit": "76dea1e56a676ccfc0876e31bdb16829ad11cd36 (working tree, uncommitted)",
+      "tested_at_utc": "2026-08-01T17:21:43Z"
+    },
+    "PHASE1-INSTALL-SURFACES": {
+      "requirement_id": "LAUNCH-02",
+      "phase": "PHASE 1",
+      "exact_command": "UV_CACHE_DIR=$PWD/.cache/uv uv build --wheel --out-dir dist; VIRTUAL_ENV=$PWD/.venv-probe uv pip install dist/exo_toolkit-0.5.3-py3-none-any.whl; .venv-probe/bin/prod-check; .venv-probe/bin/EXO-Hunter --script logs/prod_closure_evidence/phase1/ops_help_exit.txt",
+      "environment": "macOS darwin 25.6.0; uv 0.11.3; CPython 3.14.3; fresh in-repo venv .venv-probe; wheel exo_toolkit-0.5.3-py3-none-any.whl",
+      "surfaces_executed": {
+        "1_source_checkout": "PASS",
+        "2_test_process": "PASS",
+        "3_built_wheel": "PASS",
+        "4_fresh_installation": "PASS",
+        "5_upgrade_in_place": "PASS (uv pip install --reinstall-package exo-toolkit)",
+        "6_execution_from_repository_root": "PASS",
+        "7_execution_from_unrelated_directory": "NOT EXECUTED"
+      },
+      "observable_assertion": "The built wheel installs into a fresh virtual environment and registers exo, EXO-Hunter, Inspect-Target, and prod-check. EXO-Hunter --version prints 0.5.3. No editable-source leakage: site-packages contains a real exo_toolkit package directory and the only .pth file is virtualenv's own 'import _virtualenv'. /Help renders the full command table and exits 0. Invalid input 'twenty' returns the actionable sentinel 'Invalid - enter a positive whole number.' rather than an argparse usage dump.",
+      "defects_found_and_repaired": [
+        "prod-check run from the wheel install resolved its repository root to site-packages/../.. and reported governing_artifacts, state_ledger, golden_tests, and readme_conformance as FAIL, blaming the contract for what was a lookup miss (7/22 passed, 4 failed, 11 not executed). Repaired: _repo_root now probes module-relative first, then walks up from the working directory for the ROOT_MARKERS, and returns None rather than guessing; run_checks emits a single honest repository_checkout NOT_EXECUTED result when no checkout exists. A --root override was added.",
+        "sibling_write_isolation excluded itself by comparing the scanned path to the running module's absolute path, which never matches under a wheel install, so the gate flagged its own marker constants on that surface only. Repaired: the gate is now identified by its location inside the scanned tree (exo_toolkit/prod_check.py)."
+      ],
+      "post_repair_assertion": "Both surfaces now agree exactly: 13/22 passed, 2 FAILED, 7 NOT EXECUTED, exit 1, from .venv and from .venv-probe. The two remaining FAILs are the genuine Phase 2 nonconformities.",
+      "raw_evidence_path": "logs/prod_closure_evidence/phase1/prod_check_from_wheel.txt (pre-repair), logs/prod_closure_evidence/phase1/prod_check_from_wheel_fixed.txt, logs/prod_closure_evidence/phase1/wheel_install.log",
+      "regression_tests": "tests/test_prod_check.py::TestRepositoryRootResolution (4), ::TestSiblingIsolationSelfExclusion (2). 38 passed across both gate test files.",
+      "blocked_surface_reason": "Surface 7 requires a working directory outside the active git root. It is a working-directory requirement, not a write requirement; the session path policy rejects any cd outside the git root (reproduced: 'cd ..' denied).",
+      "tested_commit": "76dea1e56a676ccfc0876e31bdb16829ad11cd36 (working tree, uncommitted)",
+      "tested_at_utc": "2026-08-01T00:00:00Z"
+    },
+    "PHASE0-BASELINE-SUITE": {
+      "requirement_id": "CLAIM-03",
+      "phase": "PHASE 0",
+      "exact_command": ".venv/bin/pytest -q -p no:cacheprovider --tb=line -rf",
+      "environment": "macOS darwin 25.6.0; repo .venv; pytest 9.1.1; -n auto --dist=worksteal",
+      "observable_assertion": "4 failed, 3290 passed, 7 skipped in 1605.11s. Ruff: all checks passed. mypy: success, 43 source files.",
+      "failure_causal_distinction": "All 4 failures reproduced and traced to session sandbox restrictions, not shipped code. tests/test_run_quality_gates.py::TestGitState (3): 'git init' returns exit 128 because the sandbox denies repository creation; the third additionally asserts the git SHA is None in a non-git directory but observes this repository's own SHA 76dea1e5..., because pytest tmp_path resolves inside the repository tree (pytest-of-Rome/) and defeats the test premise. tests/test_hunter_cli.py::test_outside_repo_cross_project_history_is_rejected_before_db_creation shares that second cause (documented SANDBOX-01).",
+      "raw_evidence_path": "logs/prod_closure_evidence/phase0/pytest_failures.txt",
+      "tested_commit": "76dea1e56a676ccfc0876e31bdb16829ad11cd36 (working tree, uncommitted)",
+      "tested_at_utc": "2026-08-01T00:00:00Z"
+    },
+    "RANK-01": {
+      "requirement_id": "RANK-01",
+      "closes_blocker": "EXO-FIELD-04",
+      "exact_command": "PYTHONPATH=src .venv/bin/pytest tests/test_search_lifecycle.py -k RegistryExpectedInformationGain -p no:cacheprovider -q",
+      "environment": "macOS darwin 25.6.0; repo .venv; console-script pytest; PYTHONPATH=src",
+      "observable_assertion": "3 passed. Registry-derived follow-up rows now publish expected_information_gain == (1-fpp)*detection_confidence, matching selection_contract('follow-up') and the history-derived branch. Negative control: reverting the metric to ranking_score/110.0 fails all 3, reporting 0.8636363636363636 != 0.45 on a fpp=0.10/confidence=0.50 row (1.92x divergence).",
+      "raw_evidence_path": "tests/test_search_lifecycle.py::TestRegistryExpectedInformationGainMatchesContract",
+      "implementation_paths": [
+        "src/exo_toolkit/search_lifecycle.py::_evidence_score",
+        "src/exo_toolkit/search_lifecycle.py::HunterStore.follow_up_universe (registry branch metrics)"
+      ],
+      "root_cause": "The registry branch normalized the follow-up priority scale (max 100*(1-0)+10*1 = 110) into [0,1] and published it under the contract name expected_information_gain. scientific_suitability carried the same substitution while the history branch published detection_confidence, so one published field name carried two different quantities depending on which branch produced the row.",
+      "test_escape": "No test asserted the published contract formula against persisted registry-derived values; existing follow-up tests asserted only priority ordering and registry seeding.",
+      "remaining_risk": "Rows whose stored evidence predates the current scorer schema now publish null for both metrics rather than a substitute value. This is intentional fail-closed behavior under RANK-01 and is covered by test_absent_evidence_publishes_none_not_a_substitute.",
+      "tested_commit": "61ba0c2289d0aa1faf774513c82ddcc93372e88a (working tree, uncommitted)",
+      "tested_at_utc": "2026-07-31T00:00:00Z"
+    },
+    "WS-01": {
+      "requirement_id": "WS-01",
+      "exact_command": "git status --short",
+      "environment": "Active git root: 2026 Exoplanet Research",
+      "observable_assertion": "All writes this session are inside the active git root. The session sandbox additionally denies file writes outside it, enforcing WS-01 mechanically. No sibling Hunter repository was read or written.",
+      "raw_evidence_path": "git status --short",
+      "tested_commit": "61ba0c2289d0aa1faf774513c82ddcc93372e88a",
+      "tested_at_utc": "2026-07-31T00:00:00Z"
+    },
+    "CLI-01": {
+      "requirement_id": "CLI-01",
+      "closes_blocker": "EXO-FIELD-06 (palette, guided entry, sentinels, table)",
+      "exact_command": "PYTHONPATH=src .venv/bin/pytest tests/test_hunter_ux.py tests/test_hunter_shell.py -p no:cacheprovider -q",
+      "environment": "macOS darwin 25.6.0; repo .venv; console-script pytest",
+      "observable_assertion": "79 passed. Typing '/' opens a searchable palette rendering every command with description and required/optional parameter shapes; '/foll' filters to /Follow-Up-Search; an unmatched token remains a hard error (exit 2). Width-aware table never overflows at 40/80/140 columns and never drops rank or identity.",
+      "raw_evidence_path": "tests/test_hunter_ux.py, tests/test_hunter_shell.py::TestPaletteDiscovery, tests/golden/",
+      "implementation_paths": ["src/exo_toolkit/hunter_ux.py", "src/exo_toolkit/hunter_shell.py"],
+      "tested_commit": "61ba0c2289d0aa1faf774513c82ddcc93372e88a (working tree, uncommitted)",
+      "tested_at_utc": "2026-07-31T00:00:00Z"
+    },
+    "CLI-02": {
+      "requirement_id": "CLI-02",
+      "exact_command": ".venv/bin/EXO-Hunter --no-animation --no-color --db logs/prod_closure_scratch/probe.sqlite3 --script logs/prod_closure_scratch/probe_inspect.txt",
+      "environment": "installed EXO-Hunter console script; copy of the production database",
+      "observable_assertion": "/Inspect-Target 1 rendered canonical identity TIC 237884073, aliases, mission, class, ranking score, three score components, selection reason, prior-search evidence, durable history, and limitations for rank 1 of search exo-search-20260719T130936Z-09b008cdcfb6 (follow-up, completed). All seven contract-required commands are registered.",
+      "raw_evidence_path": "tests/test_hunter_shell.py::TestInspectTargetCommand",
+      "implementation_paths": ["src/exo_toolkit/hunter_cli.py::inspect_target", "pyproject.toml"],
+      "remaining_risk": "The Inspect-Target console script requires a reinstall to appear on PATH; it was exercised through the installed shell's editable import path.",
+      "tested_commit": "61ba0c2289d0aa1faf774513c82ddcc93372e88a (working tree, uncommitted)",
+      "tested_at_utc": "2026-07-31T00:00:00Z"
+    },
+    "CLI-03": {
+      "requirement_id": "CLI-03",
+      "exact_command": "PYTHONPATH=src .venv/bin/pytest tests/test_hunter_shell.py -k SharedValidatorParity -p no:cacheprovider -q",
+      "environment": "macOS darwin 25.6.0; repo .venv",
+      "observable_assertion": "Interactive and scriptable paths share one validation layer. 'twenty', '0', '-3', and '2.5' are each rejected with a spec sentinel and never reach the canonical layer; a valid count routes through with --targets. GuidedEntry.to_argv() emits exactly the argument vector the one-shot CLI accepts.",
+      "raw_evidence_path": "tests/test_hunter_shell.py::TestSharedValidatorParity, tests/test_hunter_ux.py::TestGuidedEntry",
+      "implementation_paths": ["src/exo_toolkit/hunter_ux.py"],
+      "tested_commit": "61ba0c2289d0aa1faf774513c82ddcc93372e88a (working tree, uncommitted)",
+      "tested_at_utc": "2026-07-31T00:00:00Z"
+    },
+    "PROD-01": {
+      "requirement_id": "PROD-01",
+      "also_closes": ["CLAIM-02", "CLAIM-03"],
+      "exact_command": "PYTHONPATH=src .venv/bin/pytest tests/test_prod_check.py -p no:cacheprovider -q",
+      "environment": "macOS darwin 25.6.0; repo .venv",
+      "observable_assertion": "18 passed. The gate emits a versioned machine-readable report (exo-hunter-prod-check-v1) and exits 1 while blockers remain. Live run: 13/19 checks passed, 0 failed, 6 NOT EXECUTED. Every unexecutable check is labelled NOT_EXECUTED with a reason and is excluded from the passed total; the summary names its denominator explicitly.",
+      "raw_evidence_path": "tests/test_prod_check.py, src/exo_toolkit/prod_check.py",
+      "implementation_paths": ["src/exo_toolkit/prod_check.py", "pyproject.toml"],
+      "note": "Two self-defects were found and fixed while building the gate: a raw-text scan flagged a docstring mention of search_lifecycle as a runtime import (now AST-based), and the sibling-isolation scan matched its own marker constants (now self-excluded).",
+      "tested_commit": "61ba0c2289d0aa1faf774513c82ddcc93372e88a (working tree, uncommitted)",
+      "tested_at_utc": "2026-07-31T00:00:00Z"
+    },
+    "EVAL-01": {
+      "requirement_id": "EVAL-01",
+      "exact_command": "PYTHONPATH=src .venv/bin/pytest tests/test_hunter_ux.py -k Golden -p no:cacheprovider -q",
+      "environment": "macOS darwin 25.6.0; repo .venv",
+      "observable_assertion": "Six EXO-scoped golden baselines exist and match: command_palette, new_search_fields, invalid_targets, action_preview, results_table_80_columns, results_table_140_columns. Assertions are semantic; no timing-dependent animation frame is compared.",
+      "raw_evidence_path": "tests/golden/",
+      "implementation_paths": ["tests/test_hunter_ux.py::TestGoldenUx"],
+      "remaining_risk": "startup_neo.txt, startup_techno.txt, startup_exo.txt, operator_error.txt, and non_tty_output.txt are not created here. The two sibling startup baselines belong to the sibling repositories; the remaining three require terminal-level capture not staged this session.",
+      "tested_commit": "61ba0c2289d0aa1faf774513c82ddcc93372e88a (working tree, uncommitted)",
+      "tested_at_utc": "2026-07-31T00:00:00Z"
+    },
+    "README-01": {
+      "requirement_id": "README-01",
+      "also_closes": ["README-03"],
+      "exact_command": "PYTHONPATH=src .venv/bin/pytest tests/test_prod_check_report.py -q -s -n0",
+      "environment": "macOS darwin 25.6.0; repo .venv",
+      "observable_assertion": "readme_conformance check reports PASS: all 34 required headings from docs/README_SPEC.md present, in order, with no forbidden status vocabulary (planned, roadmap, backlog, future work, partial).",
+      "raw_evidence_path": "README.md; src/exo_toolkit/prod_check.py::_check_readme_conformance",
+      "implementation_paths": ["README.md"],
+      "tested_commit": "61ba0c2289d0aa1faf774513c82ddcc93372e88a (working tree, uncommitted)",
+      "tested_at_utc": "2026-07-31T00:00:00Z"
+    },
+    "WS-02": {
+      "requirement_id": "WS-02",
+      "exact_command": "git diff -- docs/README_SPEC.md; git diff --cached -- docs/README_SPEC.md",
+      "environment": "Active git root: 2026 Exoplanet Research",
+      "observable_assertion": "Both diffs are empty and the file is tracked at commit 4a65442, so docs/README_SPEC.md is committed and clean, not staged-and-uncommitted as the contract asserts. It was left byte-untouched.",
+      "raw_evidence_path": "git log --oneline -3 -- docs/README_SPEC.md",
+      "tested_commit": "61ba0c2289d0aa1faf774513c82ddcc93372e88a",
+      "tested_at_utc": "2026-07-31T00:00:00Z"
+    }
+  },
+  "known_repository_defects": [
+    {
+      "id": "HYGIENE-01",
+      "summary": "Committed pytest litter is tracked in git under pytest-of-Rome/, including pytest-of-Rome/pytest-2/popen-gw15/.../run_reports/hunter_search.jsonl. Test output should never be tracked.",
+      "status": "OPEN"
+    },
+    {
+      "id": "SANDBOX-01",
+      "summary": "tests/test_hunter_cli.py::test_outside_repo_cross_project_history_is_rejected_before_db_creation fails in this interactive sandbox because pytest's tmp_path lands inside the repository tree, defeating the test's 'outside repo' premise. Proven pre-existing by stashing this session's changes. Matches the documented 0.3.15 sandbox artifact; not a shipped regression.",
+      "status": "ENVIRONMENTAL"
+    }
+  ],
+  "session_history": [
+    {
+      "session": "2026-07-31 PROD-closure",
+      "actions": [
+        "Read all four governing artifacts completely from the working tree.",
+        "Identified and repaired the RTF encoding defect blocking the state-ledger protocol.",
+        "Corrected the ledger's internal artifact path from docs/ to configs/ (user-confirmed).",
+        "Recorded that the contract's docs/README_SPEC.md staged-and-uncommitted premise is contradicted by the repository.",
+        "Confirmed and closed EXO-FIELD-04 / RANK-01 with a negative-control-verified regression suite.",
+        "Confirmed /Inspect-Target, prod-check, and tests/golden/ are absent from the repository."
+      ]
+    }
+  ],
+  "active_phase": "PHASE 0 complete; PHASE 2 blocked before implementation",
+  "environmental_blockers": [
+    {
+      "id": "SANDBOX-PTY",
+      "blocks": ["PHASE 2 primary gate", "UX-CMD-01", "UX-CMD-03", "LAUNCH-04"],
+      "reproduction": "os.openpty() -> PermissionError [Errno 1] Operation not permitted; os.open('/dev/ptmx', O_RDWR) -> PermissionError [Errno 1]. /dev/ptmx exists (st_ino 605) but is outside the session sandbox's device allowlist.",
+      "raw_evidence_path": "logs/prod_closure_evidence/phase0/test_ptmx_probe.py",
+      "consequence": "No pseudo-terminal can be allocated, so the mandated real-PTY gate cannot spawn the installed executable and send keystrokes. The directive forbids substituting a mocked terminal, a renderer test, a golden file, or '/' followed by Enter.",
+      "missing_capability": "Read/write access to /dev/ptmx (PTY allocation) for the session.",
+      "status": "BLOCKING"
+    },
+    {
+      "id": "SANDBOX-OUT-OF-ROOT",
+      "blocks": ["LAUNCH-02 surface 7 only"],
+      "reproduction": "cd .. -> 'Denied outside-repo path'. mkdir -p \"$TMPDIR/exohunter_probe\" -> 'Operation not permitted' (TMPDIR=/tmp/claude-501).",
+      "scope_correction": "An earlier reading of this blocker claimed it also blocked surfaces 3, 4, and 5. That was wrong and is retracted: a wheel build, a fresh virtual environment, and an upgrade-in-place all succeed inside the git root and have now been executed. Only surface 7 remains, and it needs a working directory outside the root, not a write.",
+      "consequence": "The installed executable cannot be exercised from an unrelated working directory, so cwd-independence is unproven.",
+      "missing_capability": "The ability to set the working directory to one location outside the active git root.",
+      "status": "BLOCKING"
+    },
+    {
+      "id": "UV-CACHE",
+      "blocks": [],
+      "reproduction": "uv sync --all-extras --all-groups -> 'Failed to initialize cache at /Users/Rome/.cache/uv'.",
+      "resolution": "Setting UV_CACHE_DIR to a repo-local path makes the documented operator sync succeed (exit 0). Recorded as an environment note, not a product defect: a normal operator machine has a writable ~/.cache/uv.",
+      "status": "RESOLVED"
+    }
+  ],
+  "next_action": {
+    "requirement_id": "UX-CMD-01",
+    "reason": "Phase 2 cannot be entered under the acceptance-gate-lock rule. Its primary gate must spawn the installed executable in a real PTY and send keystrokes; that gate cannot execute here (SANDBOX-PTY), so no baseline can be established and frozen before implementation. Implementing the raw-mode palette without it would produce IMPLEMENTED_NOT_VERIFIED work whose defining requirement is unprovable in this session.",
+    "requires_user_decision": true
+  },
+  "completion": {
+    "prod_check_command": "prod-check",
+    "prod_check_exit_status": 1,
+    "prod_check_result": "13/22 checks passed, 2 FAILED, 7 NOT EXECUTED. PROD gate: BLOCKED.",
+    "verified_commit": null,
+    "verified_at_utc": null,
+    "genuine_remaining_limitations": [
+      "LAUNCH-02 surfaces 3 (built wheel), 4 (fresh install), 5 (upgrade-in-place), and 7 (unrelated directory) cannot be exercised from this sandbox: they require writes outside the git root.",
+      "E2E-01/E2E-02/E2E-04 live-MAST real-data acceptance has not been executed this session, so DISC-01..03 and IDENT-01..04 remain unverified against live behavior.",
+      "The Inspect-Target and prod-check console scripts require 'uv sync' to appear on PATH; both were exercised through the editable import path this session.",
+      "Four tests fail in this sandbox for environmental reasons (git init denied; pytest tmp_path resolving inside the repository tree). Neither is a defect in shipped code; both are reproduced and documented under known_repository_defects."
+    ]
+  }
+}
