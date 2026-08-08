@@ -1,4 +1,5 @@
 """Tests for the three EXO-Hunter production shell entry points."""
+
 from __future__ import annotations
 
 import json
@@ -123,9 +124,7 @@ def test_create_run_show_complete_offline_path(tmp_path: Path, capsys: object) -
     assert stored["selector_version"] == NEW_SELECTOR_VERSION
     assert stored["config"]["selection_contract"] == selection_contract("new")
     registered = HunterStore(db).list_follow_ups(status="all")[0]
-    assert registered["prior_search_provenance"][-1]["decision_validity"]["state"] == (
-        "valid"
-    )
+    assert registered["prior_search_provenance"][-1]["decision_validity"]["state"] == ("valid")
 
 
 def test_create_reports_shortfall_and_still_creates_best_available_search(
@@ -254,9 +253,7 @@ def test_candidate_grid_exposes_required_selection_context(tmp_path: Path) -> No
     assert "strict bar=yes" in rendered
 
 
-def test_large_search_writes_visibly_timestamped_manifest(
-    tmp_path: Path, capsys: object
-) -> None:
+def test_large_search_writes_visibly_timestamped_manifest(tmp_path: Path, capsys: object) -> None:
     db = tmp_path / "hunter.sqlite3"
     manifest_dir = tmp_path / "manifests"
 
@@ -362,7 +359,23 @@ def test_live_selector_stamps_versioned_information_gain_contract(
     assert candidate.ranking_score == pytest.approx(67.2)
     assert search_log["stage_two_eligible_count"] == 1
     assert search_log["selection_sufficiency_reason"] == "top_n_score_upper_bound"
-    assert search_log["discovery_expansion_attempts"][0]["selection_supported"] is True
+    first_round = search_log["discovery_expansion_attempts"][0]
+    assert first_round["selection_supported"] is True
+    assert first_round["candidates_added"] == 1
+    assert first_round["top_n_target_ids"] == ["TIC 42"]
+    assert first_round["top_n_membership_churn"]["added"] == ["TIC 42"]
+    assert search_log["requested_target_count"] == 1
+    assert search_log["discovered_count"] == 1
+    assert search_log["eligible_count"] == 1
+    assert search_log["rejection_counts_by_reason"] == {}
+    assert search_log["remaining_unexplored_universe"] == 0
+    assert search_log["termination_reason"] == "top_n_score_upper_bound"
+    assert search_log["quality_distribution"]["count"] == 1
+    assert search_log["quality_distribution"]["minimum"] == pytest.approx(67.2)
+    assert search_log["quality_distribution"]["maximum"] == pytest.approx(67.2)
+    assert search_log["source_identities"]
+    assert search_log["source_watermarks"]
+    assert isinstance(search_log["limitations"], list)
     assert candidate.decision_validity is not None
     assert candidate.decision_validity.state == "valid"
     assert candidate.aliases == ("42",)
@@ -418,9 +431,7 @@ def test_live_selector_preserves_scientific_constraints_when_universe_is_thin(
 
     assert calls == [(12.0, 14.5)]
     assert len(candidates) == 1
-    assert search_log["selection_sufficiency_reason"] == (
-        "accessible_filtered_universe_exhausted"
-    )
+    assert search_log["selection_sufficiency_reason"] == ("accessible_filtered_universe_exhausted")
 
 
 def test_live_selector_expansion_never_raises_when_still_thin(
@@ -461,9 +472,7 @@ def test_live_selector_expansion_never_raises_when_still_thin(
 
     assert len(candidates) == 1
     assert len(search_log["discovery_expansion_attempts"]) == 1
-    assert search_log["selection_sufficiency_reason"] == (
-        "accessible_filtered_universe_exhausted"
-    )
+    assert search_log["selection_sufficiency_reason"] == ("accessible_filtered_universe_exhausted")
 
 
 def test_live_selector_expands_when_raw_count_is_sufficient_but_eligible_is_not(
@@ -577,6 +586,12 @@ def test_live_selector_expands_retained_pool_and_selects_outside_candidate(
     assert limits_seen == [3, 4]
     attempts = search_log["discovery_expansion_attempts"]
     assert attempts[-1]["full_filtered_universe_inspected"] is True
+    assert attempts[-1]["candidates_added"] == 1
+    assert attempts[-1]["top_n_target_ids"] == ["TIC 999"]
+    assert attempts[-1]["top_n_membership_churn"]["added"] == ["TIC 999"]
+    assert attempts[-1]["top_n_membership_churn"]["removed"] == ["TIC 1"]
+    assert search_log["remaining_unexplored_universe"] == 0
+    assert search_log["termination_reason"] == "top_n_score_upper_bound"
     assert {candidate.target_id for candidate in candidates} == {
         "TIC 1",
         "TIC 2",
@@ -727,21 +742,24 @@ def test_default_follow_up_imports_and_ranks_durable_history(
         encoding="utf-8",
     )
 
-    assert create_new_search(
-        [
-            "--targets",
-            "1",
-            "--mode",
-            "follow-up",
-            "--db",
-            str(db),
-            "--history-manifest",
-            str(history),
-            "--history-source-root",
-            str(tmp_path),
-            "--json",
-        ]
-    ) == 0
+    assert (
+        create_new_search(
+            [
+                "--targets",
+                "1",
+                "--mode",
+                "follow-up",
+                "--db",
+                str(db),
+                "--history-manifest",
+                str(history),
+                "--history-source-root",
+                str(tmp_path),
+                "--json",
+            ]
+        )
+        == 0
+    )
     output = json.loads(capsys.readouterr().out)  # type: ignore[attr-defined]
     assert output["candidate_pool_count"] == 1
     stored = HunterStore(db)
@@ -956,16 +974,20 @@ def test_import_reviewed_follow_up_verifies_sources_and_reports(
     )
     reports: list[object] = []
 
-    assert import_follow_up(
-        ["--evidence-file", str(evidence), "--db", str(tmp_path / "hunter.db"), "--json"],
-        report_fn=lambda *args: reports.append(args),
-    ) == 0
+    assert (
+        import_follow_up(
+            ["--evidence-file", str(evidence), "--db", str(tmp_path / "hunter.db"), "--json"],
+            report_fn=lambda *args: reports.append(args),
+        )
+        == 0
+    )
     assert len(reports) == 1
     output = capsys.readouterr().out  # type: ignore[attr-defined]
     assert '"created": true' in output
-    assert show_follow_ups(
-        ["--db", str(tmp_path / "hunter.db"), "--status", "deferred", "--json"]
-    ) == 0
+    assert (
+        show_follow_ups(["--db", str(tmp_path / "hunter.db"), "--status", "deferred", "--json"])
+        == 0
+    )
     output = capsys.readouterr().out  # type: ignore[attr-defined]
     assert '"search_eligible": false' in output
     assert "new observations required" in output
@@ -991,15 +1013,16 @@ def test_import_reviewed_follow_up_rejects_changed_source(tmp_path: Path) -> Non
         ),
         encoding="utf-8",
     )
-    assert import_follow_up(
-        ["--evidence-file", str(evidence), "--db", str(tmp_path / "hunter.db")],
-        report_fn=lambda *_: None,
-    ) == 2
+    assert (
+        import_follow_up(
+            ["--evidence-file", str(evidence), "--db", str(tmp_path / "hunter.db")],
+            report_fn=lambda *_: None,
+        )
+        == 2
+    )
 
 
-def test_hunter_run_report_commit_failure_is_loud(
-    tmp_path: Path, capsys: object
-) -> None:
+def test_hunter_run_report_commit_failure_is_loud(tmp_path: Path, capsys: object) -> None:
     class FailedReportModule:
         @staticmethod
         def run_and_commit_report(*_: object) -> bool:
@@ -1134,9 +1157,7 @@ def test_invalid_scorer_fails_before_starting_attempt(tmp_path: Path) -> None:
 
 def test_historical_acceptance_chain_is_preserved_without_self_attestation() -> None:
     acceptance = json.loads(
-        Path("artifacts/manifests/hunter_live_acceptance_v2.json").read_text(
-            encoding="utf-8"
-        )
+        Path("artifacts/manifests/hunter_live_acceptance_v2.json").read_text(encoding="utf-8")
     )
     reassessment = json.loads(
         Path("artifacts/manifests/hunter_live_acceptance_v2_reassessment.json").read_text(
@@ -1144,14 +1165,10 @@ def test_historical_acceptance_chain_is_preserved_without_self_attestation() -> 
         )
     )
     current = json.loads(
-        Path("artifacts/manifests/hunter_live_acceptance_v3.json").read_text(
-            encoding="utf-8"
-        )
+        Path("artifacts/manifests/hunter_live_acceptance_v3.json").read_text(encoding="utf-8")
     )
     replacement = json.loads(
-        Path("artifacts/manifests/hunter_live_acceptance_v4.json").read_text(
-            encoding="utf-8"
-        )
+        Path("artifacts/manifests/hunter_live_acceptance_v4.json").read_text(encoding="utf-8")
     )
     assert acceptance["core_ai_dependency"] is False
     assert acceptance["live_search_execution"]["candidate_pool_count"] >= 10_000
@@ -1165,22 +1182,18 @@ def test_historical_acceptance_chain_is_preserved_without_self_attestation() -> 
     assert current["real_follow_up_state"]["status"] == "deferred"
     assert current["real_follow_up_state"]["event_states"] == ["open", "deferred"]
     assert current["current_archive_check"]["products_found"] == 2
-    assert current["production_requirements"][
-        "durable_follow_up_history_universe"
-    ].startswith("gap:")
+    assert current["production_requirements"]["durable_follow_up_history_universe"].startswith(
+        "gap:"
+    )
     assert current["highest_priority_gap"]["evidence"].startswith(
         "The default CLI calls follow_up_candidates()"
     )
-    assert replacement["supersedes"]["partial_artifact"].endswith(
-        "hunter_live_acceptance_v3.json"
-    )
+    assert replacement["supersedes"]["partial_artifact"].endswith("hunter_live_acceptance_v3.json")
     assert replacement["history_contract"]["event_count"] == 608
     assert replacement["follow_up_universe"]["evaluated_target_count"] == 202
     assert replacement["follow_up_universe"]["eligible_target_count"] == 0
 
-    report_lines = Path(
-        acceptance["durable_state"]["run_report_path"]
-    ).read_text(encoding="utf-8")
+    report_lines = Path(acceptance["durable_state"]["run_report_path"]).read_text(encoding="utf-8")
     assert acceptance["reviewed_follow_up_import"]["imported_search_id"] in report_lines
 
 
@@ -1188,13 +1201,12 @@ def test_committed_hunter_history_manifest_preserves_available_project_universe(
     from exo_toolkit.hunter_history import load_verified_history_manifest
 
     payload = json.loads(
-        Path("data_selection/hunter_prior_search_history_v1.json").read_text(
-            encoding="utf-8"
-        )
+        Path("data_selection/hunter_prior_search_history_v1.json").read_text(encoding="utf-8")
     )
-    assert load_verified_history_manifest(
-        Path("data_selection/hunter_prior_search_history_v1.json")
-    ) == payload
+    assert (
+        load_verified_history_manifest(Path("data_selection/hunter_prior_search_history_v1.json"))
+        == payload
+    )
     sources = payload["sources"]
     events = [entry for source in sources for entry in source["entries"]]
     assert payload["schema_version"] == 1

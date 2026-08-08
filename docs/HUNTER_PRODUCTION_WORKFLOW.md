@@ -1,9 +1,124 @@
 # EXO-Hunter Production Workflow
 
+## PROD closure plan under contract HUNTER-PROD-2026-07-30.3 (2026-07-31)
+
+**Current state: PROD is REVOKED_UNTIL_VERIFIED.** A new governing contract
+(`docs/HUNTER_PROD_CONTRACT.md`, version `HUNTER-PROD-2026-07-30.3`) and a new
+shared CLI/UX specification (`docs/CLI_UX_SPEC.md`, version
+`HUNTER-CLI-UX-2026-07-30.3`) supersede every prior acceptance statement in
+this file, including the 0.5.3 acceptance recorded in the next section. Under
+contract §14 no prior declaration overrides the completion rule, so the
+0.5.3 claim below is retained as history, not as current authority.
+
+The durable state and acceptance ledger is `configs/HUNTER_PROD_STATE.json`.
+It is the system of record for requirement status; this document is the
+operator-facing narrative.
+
+### Governing-artifact defects found and repaired (2026-07-31)
+
+| Defect | Status |
+|---|---|
+| All three new governing artifacts were delivered as RTF payloads carrying `.md`/`.json` extensions. `configs/HUNTER_PROD_STATE.json` could not be parsed as JSON, so the mandated ledger protocol could not run. | **Repaired.** Converted losslessly with `textutil`; originals preserved at `logs/prod_closure_scratch/*.rtf.bak`. |
+| The ledger's internal `artifact` value read `ARTIFACT 3 — docs/HUNTER_PROD_STATE.json`. No such file exists under `docs/`; the real and mandated location is `configs/`. | **Repaired**, user-confirmed. |
+| Contract WS-02 and the ledger both assert `docs/README_SPEC.md` is "staged and uncommitted". It is committed at `4a65442` and clean — both `git diff` and `git diff --cached` are empty. | **Premise contradicted by repository.** File left byte-untouched. |
+
+### Requirement closure ladder
+
+Work strictly by dependency. A lower gate is not worked while a higher-priority
+blocker remains, except for safe parallel investigation.
+
+| Priority | Requirement | State entering this plan | Planned closure |
+|---|---|---|---|
+| P0 | `WS-01`, `WS-02` | VERIFIED | Sandbox denies writes outside the git root, enforcing WS-01 mechanically. |
+| P0 | `LAUNCH-01`, `LAUNCH-03` | IN_PROGRESS | Drive the installed `EXO-Hunter` console script as an OS subprocess and capture the full environment record. |
+| P0 | `LAUNCH-02` | **BLOCKING — environmental** | Surfaces 3 (built wheel), 4 (fresh install), 5 (upgrade-in-place), and 7 (unrelated directory) require writes outside the git root. Not closable from this session; see "Environment limits". |
+| P0 | `LAUNCH-04` | BLOCKING | Requires the command palette and `/Inspect-Target` to exist. |
+| P1 | `RANK-01` | **CLOSED** | Registry-derived follow-up rows now publish the exact contract formula. See "RANK-01 closure". |
+| P1 | `IDENT-01..04`, `DISC-01..03`, `DUR-01..04`, `PIPE-01..03` | UNVERIFIED | Re-verify against current behavior rather than inheriting prior VERIFIED status. |
+| P2 | `E2E-01..04` | UNVERIFIED | Live-MAST real-data New(5) + Follow-up(5) + restart/resume with a retained evidence bundle. |
+| P3 | `CLI-01`, `CLI-02`, `CLI-03` | BLOCKING | Implement `/Inspect-Target`, the `/` palette, guided parameter entry, live validity sentinels, and a width-aware results table. |
+| P4 | `PROD-01` | BLOCKING | Implement the repository-native `prod-check` gate. |
+| P4 | `EVAL-01` | BLOCKING | Create `tests/golden/` with the eleven specified semantic golden tests. |
+| P4 | `README-01..03` | BLOCKING | Restructure `README.md` to `docs/README_SPEC.md`'s mandated headings and capability vocabulary. |
+
+### Confirmed absent capabilities
+
+These were searched for across `src/`, `Skills/`, `tests/`, `pyproject.toml`,
+and the docs tree and do not exist anywhere in the repository:
+
+- `/Inspect-Target` — required by contract CLI-02 and CLI/UX spec §3, and the
+  detail-view target that UX-TABLE-02 depends on.
+- `prod-check` — required by contract PROD-01. Until it exists, every
+  requirement claim is assertion rather than machine-enforced evidence, which
+  CLAIM-04 forbids.
+- `tests/golden/` — required by CLI/UX spec §13 and contract EVAL-01.
+
+Per README-03 these are **Nonconforming**, not planned work.
+
+### RANK-01 closure (closes EXO-FIELD-04)
+
+`selection_contract("follow-up")` publishes exactly one definition of
+`expected_information_gain`: `(1-fpp)*detection_confidence`. The
+registry-derived branch of `HunterStore.follow_up_universe()` instead persisted
+`ranking_score / 110.0` — a normalization of the *priority* scale, whose
+maximum is `100*(1-0) + 10*1 = 110`. `scientific_suitability` carried the same
+substitution while the history-derived branch published `detection_confidence`.
+One published field name therefore carried two different quantities depending
+on which branch produced the row.
+
+On a representative row (`fpp=0.10`, `confidence=0.50`) the divergence is
+`0.8636` versus `0.45` — a factor of 1.92.
+
+Both metrics are now computed from the stored evidence payload via
+`_evidence_score()`, which tolerates both the production shape (scores nested
+under `scores`) and the legacy top-level shape. Evidence that predates the
+current scorer schema publishes `null` rather than a substitute value, which is
+the fail-closed behavior RANK-01 requires.
+
+Regression suite:
+`tests/test_search_lifecycle.py::TestRegistryExpectedInformationGainMatchesContract`
+(3 tests). Negative control performed: reverting the metric to
+`ranking_score / 110.0` fails all three.
+
+**Test escape:** no test asserted the published contract formula against
+persisted registry-derived values. Existing follow-up tests asserted only
+priority ordering and registry seeding.
+
+### Environment limits (bounds what "verified" can mean here)
+
+These are genuine sandbox constraints, recorded so no later reader mistakes
+them for passing evidence:
+
+- `.venv/bin/python` resolves outside the git root and is denied. Console
+  scripts (`EXO-Hunter`, `pytest`, `ruff`, `mypy`) execute normally, matching
+  the finding already recorded in the AGENTS.md Python Environment Policy.
+- The Bash policy hook rejects any argument beginning with `/` as an
+  out-of-repo path, so slash commands must be driven through `--script` files
+  written inside the repository.
+- Writes outside the git root are denied, so no fresh out-of-tree virtual
+  environment, wheel install, or unrelated-directory execution can be staged.
+  `LAUNCH-02` surfaces 3, 4, 5, and 7 are therefore **NOT EXECUTED —
+  environmental**, and must not be counted in any `N/N passed` total.
+
+### Known repository defects
+
+- **HYGIENE-01** — committed pytest litter is tracked in git under
+  `pytest-of-Rome/`, including
+  `pytest-of-Rome/pytest-2/popen-gw15/.../run_reports/hunter_search.jsonl`.
+  Test output should never be tracked.
+- **SANDBOX-01** —
+  `tests/test_hunter_cli.py::test_outside_repo_cross_project_history_is_rejected_before_db_creation`
+  fails in this interactive sandbox because pytest's `tmp_path` lands inside the
+  repository tree, defeating the test's "outside repo" premise. Proven
+  pre-existing by stashing this session's changes; matches the documented 0.3.15
+  sandbox artifact. Not a shipped regression.
+
 ## Adversarial requalification gate (2026-07-29)
 
-**Current state: version 0.5.3 is PROD ACCEPTED. The stricter adversarial
-requalification plan and every delivery gate below are verified.**
+**Superseded as current authority by the 2026-07-31 closure plan above.
+Retained as history.** Version 0.5.3 was PROD accepted under the prior
+contract; contract `HUNTER-PROD-2026-07-30.3` §14 revokes that standing until
+its own completion rule is satisfied.
 
 Production outcome: make the active repository the sole runtime filesystem
 authority and produce one reproducible, inspectable proof that the installed

@@ -1,14 +1,60 @@
 {
   "artifact": "configs/HUNTER_PROD_STATE.json",
-  "schema_version": "1.2.0",
+  "schema_version": "1.3.0",
   "contract_version": "HUNTER-PROD-2026-07-30.3",
   "cli_ux_version": "HUNTER-CLI-UX-2026-07-30.3",
   "active_repository": "2026 Exoplanet Research (ares0311/2026-Exoplanet-Research)",
   "repository_profile": "EXOHunter",
   "bootstrap_complete": true,
-  "prod_status": "REVOKED_UNTIL_VERIFIED",
+  "prod_status": null,
   "current_priority": "P0",
-  "active_requirement_id": "PROD-01",
+  "active_requirement_id": "WS-04",
+  "active_phase": "PHASE 6",
+  "implementation_state": "BLOCKING",
+  "gate_execution_state": "EXECUTED",
+  "gate_result": "NOT_EXECUTED",
+  "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+  "gate_exit_code": 1,
+  "gate_evidence_path": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+  "tested_code_identity": {
+    "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+    "git_dirty": true,
+    "branch": "claude/cross-project-history-federation"
+  },
+  "gate_environment": {
+    "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+    "python": "3.14.3",
+    "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+    "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+  },
+  "gate_hashes": {
+    "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+    "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+    "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+    "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+    "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+  },
+  "verification_authority": {
+    "human_writable_states": [
+      "BLOCKING",
+      "IN_PROGRESS",
+      "IMPLEMENTED_NOT_VERIFIED"
+    ],
+    "machine_gate_results": [
+      "PASS",
+      "FAIL",
+      "NOT_EXECUTED",
+      "UNKNOWN"
+    ],
+    "verified_and_prod_writer": "exo_toolkit.prod_state:update_state_from_report",
+    "status": "ACTIVE",
+    "reason": "Machine verification and PROD state are derived only from executable gate results and are revoked by FAIL or NOT_EXECUTED."
+  },
+  "reconciliation_authorization": {
+    "authorized_by": "User response 'yes'",
+    "authorized_at_utc": "2026-08-03T00:38:46Z",
+    "scope": "Reconcile configs/HUNTER_PROD_STATE.json only; preserve historical evidence, revoke stale phase claims, replay existing unmodified gates, and record one current phase and current hashes."
+  },
   "artifact_normalization_note": {
     "defect": "HUNTER_PROD_CONTRACT.md, CLI_UX_SPEC.md, and HUNTER_PROD_STATE.json were delivered as RTF (Rich Text Format) payloads carrying .md/.json extensions. This file could not be parsed as JSON, so the mandated state-ledger protocol could not run.",
     "reproduction": "python3 -c \"import json;json.load(open('configs/HUNTER_PROD_STATE.json'))\" -> JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 2",
@@ -32,47 +78,60 @@
     "documented_install_command": "uv sync --all-extras --all-groups",
     "canonical_executable": "EXO-Hunter",
     "entry_point": "exo_toolkit.hunter_shell:exohunter_entry",
-    "python_version": "3.14 (venv interpreter; not directly invocable from this sandbox)",
-    "package_manager_version": "uv (not resolvable from this sandbox)",
+    "python_version": "3.14.3",
+    "package_manager_version": "uv 0.11.3",
     "virtual_environment": ".venv",
     "resolved_executable": ".venv/bin/EXO-Hunter",
     "installation_mode": "pre-existing editable/synced .venv",
-    "last_verified_commit": "61ba0c2289d0aa1faf774513c82ddcc93372e88a",
-    "last_verified_at_utc": "2026-07-31T00:00:00Z",
-    "sandbox_limitations": [
-      ".venv/bin/python resolves to /Library/Frameworks/Python.framework/... which is outside the git root and is denied by the session sandbox. Console scripts (EXO-Hunter, pytest, ruff, mypy) execute normally.",
-      "The Bash policy hook rejects any argument beginning with '/' as an out-of-repo path, so slash commands must be driven through --script files written inside the repository.",
-      "File writes outside the git root are denied, so no fresh out-of-tree virtual environment, wheel install, or unrelated-directory execution can be staged from this session."
-    ]
+    "last_verified_commit": null,
+    "last_verified_at_utc": null,
+    "current_observation": "The installed executable and .venv interpreter are runnable in this session. Historical sandbox limitations below are retained only as non-authoritative evidence."
   },
-  "applicable_blockers": [
+  "legacy_applicable_blockers": [
     {
       "id": "EXO-FIELD-01",
       "priority": "P1",
-      "requirements": ["IDENT-01", "IDENT-03", "IDENT-04"],
+      "requirements": [
+        "IDENT-01",
+        "IDENT-03",
+        "IDENT-04"
+      ],
       "summary": "Stale copied Techno history allowed known searched targets to remain eligible as New.",
-      "known_examples": ["HIP 60759", "HIP 61099", "HIP 3419"],
+      "known_examples": [
+        "HIP 60759",
+        "HIP 61099",
+        "HIP 3419"
+      ],
       "status": "UNVERIFIED",
       "note": "README claims 0.5.3 removed sibling-repository runtime reads and constrained cross-project history to a verified repo-local copy. Not independently re-verified this session."
     },
     {
       "id": "EXO-FIELD-02",
       "priority": "P1",
-      "requirements": ["IDENT-01", "IDENT-04"],
+      "requirements": [
+        "IDENT-01",
+        "IDENT-04"
+      ],
       "summary": "Approximately 590 HIP identities were flattened into one aliases field.",
       "status": "UNVERIFIED"
     },
     {
       "id": "EXO-FIELD-03",
       "priority": "P2",
-      "requirements": ["E2E-01", "E2E-04", "CLAIM-04"],
+      "requirements": [
+        "E2E-01",
+        "E2E-04",
+        "CLAIM-04"
+      ],
       "summary": "A claimed 39053-row live-source smoke was supported only by prose while the acceptance harness was fixture-controlled.",
       "status": "BLOCKING"
     },
     {
       "id": "EXO-FIELD-04",
       "priority": "P1",
-      "requirements": ["RANK-01"],
+      "requirements": [
+        "RANK-01"
+      ],
       "summary": "The published follow-up expected-information-gain formula disagreed with registry-derived persistence.",
       "documented_formula": "(1 - fpp) * confidence",
       "observed_alternative": "follow_up_priority / 110",
@@ -82,7 +141,11 @@
     {
       "id": "EXO-FIELD-05",
       "priority": "P0",
-      "requirements": ["LAUNCH-04", "DUR-04", "CLAIM-01"],
+      "requirements": [
+        "LAUNCH-04",
+        "DUR-04",
+        "CLAIM-01"
+      ],
       "summary": "Live TIC operation produced repeated RemoteDisconnected failures and raw exception-style output. Root cause and test escape are unknown.",
       "status": "BLOCKING",
       "reproduced_2026_08_01": {
@@ -101,10 +164,19 @@
     {
       "id": "EXO-FIELD-06",
       "priority": "P3",
-      "requirements": ["CLI-01", "CLI-02", "CLI-03"],
+      "requirements": [
+        "CLI-01",
+        "CLI-02",
+        "CLI-03"
+      ],
       "summary": "The CLI lacks the required command palette, guided parameter entry, validity sentinels, engaging animation, and clean result tables.",
       "status": "CLOSED",
-      "closed_by": ["CLI-01", "CLI-02", "CLI-03", "EVAL-01"],
+      "closed_by": [
+        "CLI-01",
+        "CLI-02",
+        "CLI-03",
+        "EVAL-01"
+      ],
       "resolved_sub_gaps": [
         "/Inspect-Target implemented, registered in _SLASH_COMMANDS and pyproject, exercised against real durable data.",
         "Typing '/' now opens a searchable described palette; '/text' filters it; discovery no longer requires /Help.",
@@ -115,11 +187,25 @@
       "residual": "Five of the eleven golden filenames named in CLI/UX spec §13 are not created here: two are sibling-repository startup baselines, and operator_error/non_tty_output/startup_exo require terminal-level capture not staged this session."
     }
   ],
-  "requirements": {
-    "WS-01": {"priority": "P0", "status": "VERIFIED", "evidence_ref": "WS-01"},
-    "WS-02": {"priority": "P0", "status": "VERIFIED", "evidence_ref": "WS-02"},
-    "WS-03": {"priority": "P0", "status": "UNVERIFIED"},
-    "WS-04": {"priority": "P0", "status": "UNVERIFIED"},
+  "legacy_requirements": {
+    "WS-01": {
+      "priority": "P0",
+      "status": "VERIFIED",
+      "evidence_ref": "WS-01"
+    },
+    "WS-02": {
+      "priority": "P0",
+      "status": "VERIFIED",
+      "evidence_ref": "WS-02"
+    },
+    "WS-03": {
+      "priority": "P0",
+      "status": "UNVERIFIED"
+    },
+    "WS-04": {
+      "priority": "P0",
+      "status": "UNVERIFIED"
+    },
     "LAUNCH-01": {
       "priority": "P0",
       "status": "VERIFIED",
@@ -138,26 +224,88 @@
       "evidence_ref": "PHASE1-INSTALL-SURFACES",
       "note": "Commit, working-tree state, Python and uv versions, virtual-environment paths, resolved executables, installation mode, working directory, exact commands, exit statuses, and captured output are all recorded."
     },
-    "LAUNCH-04": {"priority": "P0", "status": "BLOCKING", "blocked_reason": "Command palette and /Inspect-Target do not exist."},
-    "PIPE-01": {"priority": "P1", "status": "UNVERIFIED"},
-    "PIPE-02": {"priority": "P1", "status": "UNVERIFIED"},
-    "PIPE-03": {"priority": "P1", "status": "UNVERIFIED"},
-    "IDENT-01": {"priority": "P1", "status": "UNVERIFIED"},
-    "IDENT-02": {"priority": "P1", "status": "UNVERIFIED"},
-    "IDENT-03": {"priority": "P1", "status": "UNVERIFIED"},
-    "IDENT-04": {"priority": "P1", "status": "UNVERIFIED"},
-    "DISC-01": {"priority": "P1", "status": "UNVERIFIED"},
-    "DISC-02": {"priority": "P1", "status": "UNVERIFIED"},
-    "DISC-03": {"priority": "P1", "status": "UNVERIFIED"},
-    "RANK-01": {"priority": "P1", "status": "VERIFIED", "evidence_ref": "RANK-01"},
-    "DUR-01": {"priority": "P1", "status": "UNVERIFIED"},
-    "DUR-02": {"priority": "P1", "status": "UNVERIFIED"},
-    "DUR-03": {"priority": "P1", "status": "UNVERIFIED"},
-    "DUR-04": {"priority": "P1", "status": "UNVERIFIED"},
-    "E2E-01": {"priority": "P2", "status": "UNVERIFIED"},
-    "E2E-02": {"priority": "P2", "status": "UNVERIFIED"},
-    "E2E-03": {"priority": "P2", "status": "UNVERIFIED"},
-    "E2E-04": {"priority": "P2", "status": "UNVERIFIED"},
+    "LAUNCH-04": {
+      "priority": "P0",
+      "status": "BLOCKING",
+      "blocked_reason": "Command palette and /Inspect-Target do not exist."
+    },
+    "PIPE-01": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "PIPE-02": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "PIPE-03": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "IDENT-01": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "IDENT-02": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "IDENT-03": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "IDENT-04": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "DISC-01": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "DISC-02": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "DISC-03": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "RANK-01": {
+      "priority": "P1",
+      "status": "VERIFIED",
+      "evidence_ref": "RANK-01"
+    },
+    "DUR-01": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "DUR-02": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "DUR-03": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "DUR-04": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "E2E-01": {
+      "priority": "P2",
+      "status": "UNVERIFIED"
+    },
+    "E2E-02": {
+      "priority": "P2",
+      "status": "UNVERIFIED"
+    },
+    "E2E-03": {
+      "priority": "P2",
+      "status": "UNVERIFIED"
+    },
+    "E2E-04": {
+      "priority": "P2",
+      "status": "UNVERIFIED"
+    },
     "CLI-01": {
       "priority": "P3",
       "status": "BLOCKING",
@@ -165,8 +313,16 @@
       "revoked_by": "PHASE0-STATUS-AUTHORITY",
       "blocked_reason": "UX-CMD-01 is not satisfied: the shipped interactive loop has no character-at-a-time input mechanism, so '/' cannot open the palette until Enter is pressed. The prior VERIFIED rested on an in-process render_palette() call, which the directive names as a forbidden substitute for interactive keystrokes."
     },
-    "CLI-02": {"priority": "P3", "status": "VERIFIED", "evidence_ref": "CLI-02"},
-    "CLI-03": {"priority": "P3", "status": "VERIFIED", "evidence_ref": "CLI-03"},
+    "CLI-02": {
+      "priority": "P3",
+      "status": "VERIFIED",
+      "evidence_ref": "CLI-02"
+    },
+    "CLI-03": {
+      "priority": "P3",
+      "status": "VERIFIED",
+      "evidence_ref": "CLI-03"
+    },
     "UX-CMD-01": {
       "priority": "P3",
       "status": "BLOCKING",
@@ -177,10 +333,24 @@
       "status": "BLOCKING",
       "blocked_reason": "GuidedEntry, render_action_preview, and render_results_table are never referenced by the shipped shell (PIPE-02: reachable only from tests and the gate)."
     },
-    "CLAIM-01": {"priority": "P4", "status": "UNVERIFIED"},
-    "CLAIM-02": {"priority": "P4", "status": "VERIFIED", "evidence_ref": "PROD-01"},
-    "CLAIM-03": {"priority": "P4", "status": "VERIFIED", "evidence_ref": "PROD-01"},
-    "CLAIM-04": {"priority": "P4", "status": "UNVERIFIED"},
+    "CLAIM-01": {
+      "priority": "P4",
+      "status": "UNVERIFIED"
+    },
+    "CLAIM-02": {
+      "priority": "P4",
+      "status": "VERIFIED",
+      "evidence_ref": "PROD-01"
+    },
+    "CLAIM-03": {
+      "priority": "P4",
+      "status": "VERIFIED",
+      "evidence_ref": "PROD-01"
+    },
+    "CLAIM-04": {
+      "priority": "P4",
+      "status": "UNVERIFIED"
+    },
     "PROD-01": {
       "priority": "P4",
       "status": "IMPLEMENTED_NOT_VERIFIED",
@@ -196,17 +366,1321 @@
       "revoked_by": "PHASE0-STATUS-AUTHORITY",
       "blocked_reason": "The golden baselines assert renderer output only. CLI/UX spec section 13 also requires startup_exo.txt, operator_error.txt, and non_tty_output.txt, and EVAL-01's '/ command discovery' regression case needs keystroke evidence a golden file cannot supply."
     },
-    "README-01": {"priority": "P4", "status": "VERIFIED", "evidence_ref": "README-01"},
-    "README-02": {"priority": "P4", "status": "IMPLEMENTED_NOT_VERIFIED", "note": "Content derives from verified code and gate output, but the live-data capability rows remain Nonconforming pending E2E evidence."},
-    "README-03": {"priority": "P4", "status": "VERIFIED", "evidence_ref": "README-01"}
+    "README-01": {
+      "priority": "P4",
+      "status": "VERIFIED",
+      "evidence_ref": "README-01"
+    },
+    "README-02": {
+      "priority": "P4",
+      "status": "IMPLEMENTED_NOT_VERIFIED",
+      "note": "Content derives from verified code and gate output, but the live-data capability rows remain Nonconforming pending E2E evidence."
+    },
+    "README-03": {
+      "priority": "P4",
+      "status": "VERIFIED",
+      "evidence_ref": "README-01"
+    }
   },
-  "allowed_statuses": [
-    "UNVERIFIED",
+  "requirements": {
+    "PHASE0-STATUS-AUTHORITY": {
+      "priority": "P0",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "WS-01": {
+      "priority": "P0",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "WS-02": {
+      "priority": "P0",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "UNKNOWN",
+      "gate_result": "UNKNOWN"
+    },
+    "WS-03": {
+      "priority": "P0",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "WS-04": {
+      "priority": "P0",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "LAUNCH-01": {
+      "priority": "P0",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "NOT_EXECUTED",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": null,
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "LAUNCH-02": {
+      "priority": "P0",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "NOT_EXECUTED",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": null,
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "LAUNCH-03": {
+      "priority": "P0",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "NOT_EXECUTED",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": null,
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "LAUNCH-04": {
+      "priority": "P0",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "PIPE-01": {
+      "priority": "P1",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "PIPE-02": {
+      "priority": "P1",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "PIPE-03": {
+      "priority": "P1",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "verification_state": "VERIFIED",
+      "evidence_ref": "logs/prod_closure_evidence/phase3/canonical_pipeline_gate_final.json",
+      "gate_command": ".venv/bin/python scripts/run_canonical_pipeline_gate.py --output logs/prod_closure_evidence/phase3/canonical_pipeline_gate_final.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/python",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter",
+        "terminal": "non-interactive installed console-script subprocesses"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "scripts/run_canonical_pipeline_gate.py": "d460d6de168319e8ba434de34da17b27a30c4a1cb1862f2bb8619bd0dc100f82",
+        "tests/hunter_phase3_bootstrap/sitecustomize.py": "9cc71a96fa992f2a240b3593b4472346362fadf5c472d2aedc225f6abaf3e62c",
+        "Skills/run_hunter_production_acceptance.py": "104d2a1c26c1c5d77094f4404914ffc800729654cf30e2275f1b3047ced3fa50",
+        "tests/hunter_acceptance_bootstrap/sitecustomize.py": "29117988a95c813483c580c59e745d7e1731a0ac9597a018cc0dc87d9b494f60"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T02:09:22.818250+00:00"
+    },
+    "IDENT-01": {
+      "priority": "P1",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "NOT_EXECUTED",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": null,
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "IDENT-02": {
+      "priority": "P1",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "NOT_EXECUTED",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": null,
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "IDENT-03": {
+      "priority": "P1",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "NOT_EXECUTED",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": null,
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "IDENT-04": {
+      "priority": "P1",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "NOT_EXECUTED",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": null,
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "DISC-01": {
+      "priority": "P1",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "NOT_EXECUTED",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": null,
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "DISC-02": {
+      "priority": "P1",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "NOT_EXECUTED",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": null,
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "DISC-03": {
+      "priority": "P1",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "NOT_EXECUTED",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": null,
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "RANK-01": {
+      "priority": "P1",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "DUR-01": {
+      "priority": "P1",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "verification_state": "VERIFIED",
+      "evidence_ref": "logs/prod_closure_evidence/phase4/adaptive_manifest_gate_final.json",
+      "gate_command": ".venv/bin/python scripts/run_adaptive_manifest_gate.py --output logs/prod_closure_evidence/phase4/adaptive_manifest_gate_final.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/python",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter",
+        "terminal": "non-interactive installed console-script subprocesses"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "scripts/run_adaptive_manifest_gate.py": "ed0da69393cf609c5c6c2cb7af6d36db1e2441f73184a6fb71b8a29cb2cf1996",
+        "Skills/run_hunter_production_acceptance.py": "104d2a1c26c1c5d77094f4404914ffc800729654cf30e2275f1b3047ced3fa50",
+        "tests/hunter_acceptance_bootstrap/sitecustomize.py": "29117988a95c813483c580c59e745d7e1731a0ac9597a018cc0dc87d9b494f60"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T02:15:22.118404+00:00"
+    },
+    "DUR-02": {
+      "priority": "P1",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "NOT_EXECUTED",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": null,
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "DUR-03": {
+      "priority": "P1",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "NOT_EXECUTED",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": null,
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "DUR-04": {
+      "priority": "P1",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "NOT_EXECUTED",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": null,
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "E2E-01": {
+      "priority": "P2",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "NOT_EXECUTED",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": null,
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "E2E-02": {
+      "priority": "P2",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "NOT_EXECUTED",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": null,
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "E2E-03": {
+      "priority": "P2",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "NOT_EXECUTED",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": null,
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "E2E-04": {
+      "priority": "P2",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "NOT_EXECUTED",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": null,
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "CLI-01": {
+      "priority": "P3",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "CLI-02": {
+      "priority": "P3",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "CLI-03": {
+      "priority": "P3",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "UX-CMD-01": {
+      "priority": "P3",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "UX-CMD-02": {
+      "priority": "P3",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "UX-CMD-03": {
+      "priority": "P3",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "UX-IN-01": {
+      "priority": "P3",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "UX-IN-02": {
+      "priority": "P3",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "UX-IN-03": {
+      "priority": "P3",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "UX-IN-04": {
+      "priority": "P3",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "UX-START-04": {
+      "priority": "P3",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "UX-TABLE-01": {
+      "priority": "P3",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "UX-A11Y-01": {
+      "priority": "P3",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "CLAIM-01": {
+      "priority": "P4",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "UNKNOWN",
+      "gate_result": "UNKNOWN"
+    },
+    "CLAIM-02": {
+      "priority": "P4",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "UNKNOWN",
+      "gate_result": "UNKNOWN"
+    },
+    "CLAIM-03": {
+      "priority": "P4",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "PHASE0-RECONCILIATION"
+    },
+    "CLAIM-04": {
+      "priority": "P4",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "PROD-01": {
+      "priority": "P4",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "EVAL-01": {
+      "priority": "P4",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "README-01": {
+      "priority": "P4",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    },
+    "README-02": {
+      "priority": "P4",
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "UNKNOWN",
+      "gate_result": "UNKNOWN"
+    },
+    "README-03": {
+      "priority": "P4",
+      "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "evidence_ref": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "gate_environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    }
+  },
+  "allowed_implementation_states": [
     "BLOCKING",
     "IN_PROGRESS",
-    "IMPLEMENTED_NOT_VERIFIED",
-    "VERIFIED",
-    "NOT_APPLICABLE"
+    "IMPLEMENTED_NOT_VERIFIED"
   ],
   "evidence_contract": {
     "required_fields": [
@@ -218,10 +1692,11 @@
       "tested_commit",
       "tested_at_utc"
     ],
-    "verified_rule": "A requirement may be VERIFIED only when every required evidence field is populated and the result is reproducible.",
-    "revocation_rule": "Any reproducible documented-user-workflow failure reopens every contradicted requirement."
+    "verified_rule": "Only the deterministic gate runner may write a VERIFIED requirement state, and only from an executed PASS bound to the recorded gate hash, fixture hashes, environment, evidence path, and tested code identity. Evidence-field presence alone is insufficient.",
+    "prod_rule": "Only the repository-native deterministic PROD runner may write PROD, and only when every mandatory phase executed and passed. FAIL, NOT_EXECUTED, and UNKNOWN force nonzero status.",
+    "revocation_rule": "Any reproducible documented-user-workflow failure reopens every contradicted requirement and clears machine-owned VERIFIED or PROD state."
   },
-  "evidence": {
+  "legacy_evidence": {
     "PHASE0-STATUS-AUTHORITY": {
       "requirement_id": "PROD-01",
       "phase": "PHASE 0",
@@ -341,7 +1816,10 @@
       "environment": "macOS darwin 25.6.0; repo .venv; console-script pytest",
       "observable_assertion": "79 passed. Typing '/' opens a searchable palette rendering every command with description and required/optional parameter shapes; '/foll' filters to /Follow-Up-Search; an unmatched token remains a hard error (exit 2). Width-aware table never overflows at 40/80/140 columns and never drops rank or identity.",
       "raw_evidence_path": "tests/test_hunter_ux.py, tests/test_hunter_shell.py::TestPaletteDiscovery, tests/golden/",
-      "implementation_paths": ["src/exo_toolkit/hunter_ux.py", "src/exo_toolkit/hunter_shell.py"],
+      "implementation_paths": [
+        "src/exo_toolkit/hunter_ux.py",
+        "src/exo_toolkit/hunter_shell.py"
+      ],
       "tested_commit": "61ba0c2289d0aa1faf774513c82ddcc93372e88a (working tree, uncommitted)",
       "tested_at_utc": "2026-07-31T00:00:00Z"
     },
@@ -351,7 +1829,10 @@
       "environment": "installed EXO-Hunter console script; copy of the production database",
       "observable_assertion": "/Inspect-Target 1 rendered canonical identity TIC 237884073, aliases, mission, class, ranking score, three score components, selection reason, prior-search evidence, durable history, and limitations for rank 1 of search exo-search-20260719T130936Z-09b008cdcfb6 (follow-up, completed). All seven contract-required commands are registered.",
       "raw_evidence_path": "tests/test_hunter_shell.py::TestInspectTargetCommand",
-      "implementation_paths": ["src/exo_toolkit/hunter_cli.py::inspect_target", "pyproject.toml"],
+      "implementation_paths": [
+        "src/exo_toolkit/hunter_cli.py::inspect_target",
+        "pyproject.toml"
+      ],
       "remaining_risk": "The Inspect-Target console script requires a reinstall to appear on PATH; it was exercised through the installed shell's editable import path.",
       "tested_commit": "61ba0c2289d0aa1faf774513c82ddcc93372e88a (working tree, uncommitted)",
       "tested_at_utc": "2026-07-31T00:00:00Z"
@@ -362,18 +1843,26 @@
       "environment": "macOS darwin 25.6.0; repo .venv",
       "observable_assertion": "Interactive and scriptable paths share one validation layer. 'twenty', '0', '-3', and '2.5' are each rejected with a spec sentinel and never reach the canonical layer; a valid count routes through with --targets. GuidedEntry.to_argv() emits exactly the argument vector the one-shot CLI accepts.",
       "raw_evidence_path": "tests/test_hunter_shell.py::TestSharedValidatorParity, tests/test_hunter_ux.py::TestGuidedEntry",
-      "implementation_paths": ["src/exo_toolkit/hunter_ux.py"],
+      "implementation_paths": [
+        "src/exo_toolkit/hunter_ux.py"
+      ],
       "tested_commit": "61ba0c2289d0aa1faf774513c82ddcc93372e88a (working tree, uncommitted)",
       "tested_at_utc": "2026-07-31T00:00:00Z"
     },
     "PROD-01": {
       "requirement_id": "PROD-01",
-      "also_closes": ["CLAIM-02", "CLAIM-03"],
+      "also_closes": [
+        "CLAIM-02",
+        "CLAIM-03"
+      ],
       "exact_command": "PYTHONPATH=src .venv/bin/pytest tests/test_prod_check.py -p no:cacheprovider -q",
       "environment": "macOS darwin 25.6.0; repo .venv",
       "observable_assertion": "18 passed. The gate emits a versioned machine-readable report (exo-hunter-prod-check-v1) and exits 1 while blockers remain. Live run: 13/19 checks passed, 0 failed, 6 NOT EXECUTED. Every unexecutable check is labelled NOT_EXECUTED with a reason and is excluded from the passed total; the summary names its denominator explicitly.",
       "raw_evidence_path": "tests/test_prod_check.py, src/exo_toolkit/prod_check.py",
-      "implementation_paths": ["src/exo_toolkit/prod_check.py", "pyproject.toml"],
+      "implementation_paths": [
+        "src/exo_toolkit/prod_check.py",
+        "pyproject.toml"
+      ],
       "note": "Two self-defects were found and fixed while building the gate: a raw-text scan flagged a docstring mention of search_lifecycle as a runtime import (now AST-based), and the sibling-isolation scan matched its own marker constants (now self-excluded).",
       "tested_commit": "61ba0c2289d0aa1faf774513c82ddcc93372e88a (working tree, uncommitted)",
       "tested_at_utc": "2026-07-31T00:00:00Z"
@@ -384,19 +1873,25 @@
       "environment": "macOS darwin 25.6.0; repo .venv",
       "observable_assertion": "Six EXO-scoped golden baselines exist and match: command_palette, new_search_fields, invalid_targets, action_preview, results_table_80_columns, results_table_140_columns. Assertions are semantic; no timing-dependent animation frame is compared.",
       "raw_evidence_path": "tests/golden/",
-      "implementation_paths": ["tests/test_hunter_ux.py::TestGoldenUx"],
+      "implementation_paths": [
+        "tests/test_hunter_ux.py::TestGoldenUx"
+      ],
       "remaining_risk": "startup_neo.txt, startup_techno.txt, startup_exo.txt, operator_error.txt, and non_tty_output.txt are not created here. The two sibling startup baselines belong to the sibling repositories; the remaining three require terminal-level capture not staged this session.",
       "tested_commit": "61ba0c2289d0aa1faf774513c82ddcc93372e88a (working tree, uncommitted)",
       "tested_at_utc": "2026-07-31T00:00:00Z"
     },
     "README-01": {
       "requirement_id": "README-01",
-      "also_closes": ["README-03"],
+      "also_closes": [
+        "README-03"
+      ],
       "exact_command": "PYTHONPATH=src .venv/bin/pytest tests/test_prod_check_report.py -q -s -n0",
       "environment": "macOS darwin 25.6.0; repo .venv",
       "observable_assertion": "readme_conformance check reports PASS: all 34 required headings from docs/README_SPEC.md present, in order, with no forbidden status vocabulary (planned, roadmap, backlog, future work, partial).",
       "raw_evidence_path": "README.md; src/exo_toolkit/prod_check.py::_check_readme_conformance",
-      "implementation_paths": ["README.md"],
+      "implementation_paths": [
+        "README.md"
+      ],
       "tested_commit": "61ba0c2289d0aa1faf774513c82ddcc93372e88a (working tree, uncommitted)",
       "tested_at_utc": "2026-07-31T00:00:00Z"
     },
@@ -410,7 +1905,263 @@
       "tested_at_utc": "2026-07-31T00:00:00Z"
     }
   },
-  "known_repository_defects": [
+  "evidence": {
+    "PHASE0-RECONCILIATION": {
+      "requirement_id": "PHASE0-STATUS-AUTHORITY",
+      "phase": "PHASE 0",
+      "exact_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase0/reconciliation_after_ledger.json",
+      "environment": "Darwin 25.6.0 arm64; Python 3.14.3; uv 0.11.3; active .venv; resolved executable .venv/bin/EXO-Hunter",
+      "observable_assertion": "Gate executed after reconciliation and exited 1: 15/22 PASS, 1 FAIL, 6 NOT_EXECUTED. state_ledger passed schema 1.3.0 parseability; sibling_write_isolation failed. The unchanged gate still has no deterministic writer for machine-owned verification state.",
+      "raw_evidence_path": "logs/prod_closure_evidence/phase0/reconciliation_after_ledger.json",
+      "tested_commit": "04ce59aa44990a1e3c05459713c05bb7e762fe05 (working tree dirty with preserved pre-existing changes)",
+      "tested_at_utc": "2026-08-03T00:42:48Z",
+      "root_causes": [
+        "prod-check emits a deterministic report but has no deterministic writer for machine-owned VERIFIED or PROD fields.",
+        "_check_state_ledger validates JSON parseability, artifact path, and repository profile but not internal consistency, active-phase uniqueness, status vocabulary, gate-hash freshness, or deterministic ownership.",
+        "sibling_write_isolation rejects any runtime mention of sibling directory names, while the governing directive explicitly requires versioned read-only sibling-history consumption and forbids sibling writes, imports, and generated output instead. The current check does not distinguish permitted reads from prohibited writes."
+      ]
+    },
+    "PHASE0-LATEST": {
+      "requirement_id": "PHASE1-PRIMARY-GATE",
+      "phase": "PHASE 0",
+      "exact_command": ".venv/bin/prod-check --phase 0 --update-state --output logs/prod_closure_evidence/phase0/status_authority_gate_final.json",
+      "environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "observable_assertion": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "not_executed": 0,
+        "passed_denominator": "5/5 checks passed; 0 NOT EXECUTED and excluded from any pass claim"
+      },
+      "raw_evidence_path": "logs/prod_closure_evidence/phase0/status_authority_gate_final.json",
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T01:03:21.118084+00:00",
+      "gate_result": "PASS"
+    },
+    "PHASE1-LATEST": {
+      "requirement_id": "PHASE2-PRIMARY-GATE",
+      "phase": "PHASE 1",
+      "exact_command": ".venv/bin/python scripts/run_installed_operator_gate.py --output logs/prod_closure_evidence/phase1/installed_operator_gate_final.json --update-state",
+      "environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "uv": "uv 0.11.3 (45da18ac3 2026-04-01 aarch64-apple-darwin)",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "observable_assertion": {
+        "total": 20,
+        "passed": 20,
+        "failed": 0,
+        "not_executed": 0,
+        "passed_denominator": "20/20 checks passed; 0 NOT EXECUTED and excluded from any pass claim"
+      },
+      "raw_evidence_path": "logs/prod_closure_evidence/phase1/installed_operator_gate_final.json",
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "README.md": "593183b4c82d94f2d99ec2c818ab77c1d00cbbd2c373047ea5b7b840872e7bf8",
+        "pyproject.toml": "d1d5d4086a21bc03bf545689c60751a26ac912e35b17fe367208d7f8c80d39f4",
+        "uv.lock": "9931bd84c262d3ae275ae2bf9db929bb16aef9df4a42266e05943c4001f98685",
+        "scripts/run_installed_operator_gate.py": "c0f95f4d01048903ae83b4a17b3f86969cb60794d3a086f0d83abdf5e29c95b4"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T01:31:04.395561+00:00",
+      "gate_result": "PASS"
+    },
+    "PHASE2-LATEST": {
+      "requirement_id": "PHASE3-PRIMARY-GATE",
+      "phase": "PHASE 2",
+      "exact_command": "bash scripts/run_pty_gate.sh",
+      "environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter",
+        "terminal": "real pty (pty.openpty)"
+      },
+      "observable_assertion": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "not_executed": 0,
+        "passed_denominator": "1/1 checks passed; 0 NOT EXECUTED and excluded from any pass claim"
+      },
+      "raw_evidence_path": "logs/prod_closure_evidence/phase2/pty_gate_report.json",
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "scripts/run_pty_gate.sh": "0ab7d1c4f8617a21ba165a330eb5b5c87bc225e6a53062c9084a7e511ae37fc7",
+        "tests/test_pty_operator_acceptance.py": "8400e967f66cb9f33ef92eda1ea5f5050548e89ff7f594ef4b9ea72bbda09886",
+        "artifacts/manifests/exohunter_pty_acceptance.json": "fb2c015a5207e51bd6b747a41ca45703dd88c0337e7a0aff4d32d248988e3989",
+        "logs/prod_closure_evidence/phase2/pty_gate.txt": "a0217a925319a9910760e7d3ee05b58216cecba037bf91c8cef22883ae58a81c"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T01:34:27.520804+00:00",
+      "gate_result": "PASS"
+    },
+    "PHASE3-LATEST": {
+      "requirement_id": "PHASE4-PRIMARY-GATE",
+      "phase": "PHASE 3",
+      "exact_command": ".venv/bin/python scripts/run_canonical_pipeline_gate.py --output logs/prod_closure_evidence/phase3/canonical_pipeline_gate_final.json --update-state",
+      "environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/python",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter",
+        "terminal": "non-interactive installed console-script subprocesses"
+      },
+      "observable_assertion": {
+        "passed": 4,
+        "total": 4,
+        "result": "PASS"
+      },
+      "raw_evidence_path": "logs/prod_closure_evidence/phase3/canonical_pipeline_gate_final.json",
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "scripts/run_canonical_pipeline_gate.py": "d460d6de168319e8ba434de34da17b27a30c4a1cb1862f2bb8619bd0dc100f82",
+        "tests/hunter_phase3_bootstrap/sitecustomize.py": "9cc71a96fa992f2a240b3593b4472346362fadf5c472d2aedc225f6abaf3e62c",
+        "Skills/run_hunter_production_acceptance.py": "104d2a1c26c1c5d77094f4404914ffc800729654cf30e2275f1b3047ced3fa50",
+        "tests/hunter_acceptance_bootstrap/sitecustomize.py": "29117988a95c813483c580c59e745d7e1731a0ac9597a018cc0dc87d9b494f60"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T02:09:22.818250+00:00",
+      "gate_result": "PASS"
+    },
+    "PHASE4-LATEST": {
+      "requirement_id": "PHASE5-PRIMARY-GATE",
+      "phase": "PHASE 4",
+      "exact_command": ".venv/bin/python scripts/run_adaptive_manifest_gate.py --output logs/prod_closure_evidence/phase4/adaptive_manifest_gate_final.json --update-state",
+      "environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/python",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter",
+        "terminal": "non-interactive installed console-script subprocesses"
+      },
+      "observable_assertion": {
+        "passed": 2,
+        "total": 2,
+        "result": "PASS"
+      },
+      "raw_evidence_path": "logs/prod_closure_evidence/phase4/adaptive_manifest_gate_final.json",
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "scripts/run_adaptive_manifest_gate.py": "ed0da69393cf609c5c6c2cb7af6d36db1e2441f73184a6fb71b8a29cb2cf1996",
+        "Skills/run_hunter_production_acceptance.py": "104d2a1c26c1c5d77094f4404914ffc800729654cf30e2275f1b3047ced3fa50",
+        "tests/hunter_acceptance_bootstrap/sitecustomize.py": "29117988a95c813483c580c59e745d7e1731a0ac9597a018cc0dc87d9b494f60"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T02:15:22.118404+00:00",
+      "gate_result": "PASS"
+    },
+    "PHASE5-LATEST": {
+      "requirement_id": "PHASE6-PRIMARY-GATE",
+      "phase": "PHASE 5",
+      "exact_command": ".venv/bin/python scripts/run_real_data_gate.py --output logs/prod_closure_evidence/phase5/real_data_gate_final.json --update-state",
+      "environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/python",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter",
+        "data_mode": "live MAST/NEA; no fixtures or mocks"
+      },
+      "observable_assertion": {
+        "passed": 4,
+        "total": 4,
+        "result": "PASS"
+      },
+      "raw_evidence_path": "logs/prod_closure_evidence/phase5/real_data_gate_final.json",
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "scripts/run_real_data_gate.py": "405c6806abecb428aa13b21a4c758d012c93fcacbe08611229608d2f385d7b63"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:26:33.412943+00:00",
+      "gate_result": "PASS"
+    },
+    "PHASE6-LATEST": {
+      "requirement_id": "WS-04",
+      "phase": "PHASE 6",
+      "exact_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "observable_assertion": {
+        "total": 24,
+        "passed": 18,
+        "failed": 0,
+        "not_executed": 6,
+        "passed_denominator": "18/24 checks passed; 6 NOT EXECUTED and excluded from any pass claim"
+      },
+      "raw_evidence_path": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00",
+      "gate_result": "NOT_EXECUTED"
+    }
+  },
+  "active_blockers": [
+    {
+      "id": "PHASE6-PRIMARY-GATE",
+      "priority": "P0",
+      "implementation_state": "BLOCKING",
+      "gate_result": "NOT_EXECUTED",
+      "reason": "The PHASE 6 primary gate returned NOT_EXECUTED.",
+      "raw_evidence_path": "logs/prod_closure_evidence/phase6/prod_check_baseline.json"
+    }
+  ],
+  "legacy_known_repository_defects": [
     {
       "id": "HYGIENE-01",
       "summary": "Committed pytest litter is tracked in git under pytest-of-Rome/, including pytest-of-Rome/pytest-2/popen-gw15/.../run_reports/hunter_search.jsonl. Test output should never be tracked.",
@@ -433,13 +2184,27 @@
         "Confirmed and closed EXO-FIELD-04 / RANK-01 with a negative-control-verified regression suite.",
         "Confirmed /Inspect-Target, prod-check, and tests/golden/ are absent from the repository."
       ]
+    },
+    {
+      "session": "2026-08-03 Phase 0 ledger reconciliation",
+      "actions": [
+        "Re-read all four governing artifacts from the working filesystem and preserved every pre-existing working-tree change.",
+        "Replayed the existing unmodified prod-check against HEAD 04ce59aa44990a1e3c05459713c05bb7e762fe05; it exited 1 with 15 PASS, 1 FAIL, and 6 NOT_EXECUTED.",
+        "Moved contradictory prior requirements, evidence, blockers, and environment claims into explicitly legacy, non-authoritative sections.",
+        "Established PHASE 0 as the sole active phase and separated implementation state, gate execution state, gate result, evidence path, environment, hashes, and tested code identity.",
+        "Cleared human-authored PROD and active VERIFIED claims; no deterministic writer exists yet, so verification authority remains BLOCKING."
+      ]
     }
   ],
-  "active_phase": "PHASE 0 complete; PHASE 2 blocked before implementation",
-  "environmental_blockers": [
+  "legacy_environmental_blockers": [
     {
       "id": "SANDBOX-PTY",
-      "blocks": ["PHASE 2 primary gate", "UX-CMD-01", "UX-CMD-03", "LAUNCH-04"],
+      "blocks": [
+        "PHASE 2 primary gate",
+        "UX-CMD-01",
+        "UX-CMD-03",
+        "LAUNCH-04"
+      ],
       "reproduction": "os.openpty() -> PermissionError [Errno 1] Operation not permitted; os.open('/dev/ptmx', O_RDWR) -> PermissionError [Errno 1]. /dev/ptmx exists (st_ino 605) but is outside the session sandbox's device allowlist.",
       "raw_evidence_path": "logs/prod_closure_evidence/phase0/test_ptmx_probe.py",
       "consequence": "No pseudo-terminal can be allocated, so the mandated real-PTY gate cannot spawn the installed executable and send keystrokes. The directive forbids substituting a mocked terminal, a renderer test, a golden file, or '/' followed by Enter.",
@@ -448,7 +2213,9 @@
     },
     {
       "id": "SANDBOX-OUT-OF-ROOT",
-      "blocks": ["LAUNCH-02 surface 7 only"],
+      "blocks": [
+        "LAUNCH-02 surface 7 only"
+      ],
       "reproduction": "cd .. -> 'Denied outside-repo path'. mkdir -p \"$TMPDIR/exohunter_probe\" -> 'Operation not permitted' (TMPDIR=/tmp/claude-501).",
       "scope_correction": "An earlier reading of this blocker claimed it also blocked surfaces 3, 4, and 5. That was wrong and is retracted: a wheel build, a fresh virtual environment, and an upgrade-in-place all succeed inside the git root and have now been executed. Only surface 7 remains, and it needs a working directory outside the root, not a write.",
       "consequence": "The installed executable cannot be exercised from an unrelated working directory, so cwd-independence is unproven.",
@@ -464,21 +2231,266 @@
     }
   ],
   "next_action": {
-    "requirement_id": "UX-CMD-01",
-    "reason": "Phase 2 cannot be entered under the acceptance-gate-lock rule. Its primary gate must spawn the installed executable in a real PTY and send keystrokes; that gate cannot execute here (SANDBOX-PTY), so no baseline can be established and frozen before implementation. Implementing the raw-mode palette without it would produce IMPLEMENTED_NOT_VERIFIED work whose defining requirement is unprovable in this session.",
-    "requires_user_decision": true
+    "requirement_id": "WS-04",
+    "reason": "Resolve the first PHASE 6 gate blocker and replay the frozen gate.",
+    "requires_user_decision": false
   },
   "completion": {
-    "prod_check_command": "prod-check",
+    "prod_check_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase0/reconciliation_after_ledger.json",
     "prod_check_exit_status": 1,
-    "prod_check_result": "13/22 checks passed, 2 FAILED, 7 NOT EXECUTED. PROD gate: BLOCKED.",
+    "prod_check_result": "15/22 checks passed, 1 FAILED, 6 NOT_EXECUTED. PROD gate: BLOCKED.",
     "verified_commit": null,
     "verified_at_utc": null,
     "genuine_remaining_limitations": [
-      "LAUNCH-02 surfaces 3 (built wheel), 4 (fresh install), 5 (upgrade-in-place), and 7 (unrelated directory) cannot be exercised from this sandbox: they require writes outside the git root.",
-      "E2E-01/E2E-02/E2E-04 live-MAST real-data acceptance has not been executed this session, so DISC-01..03 and IDENT-01..04 remain unverified against live behavior.",
-      "The Inspect-Target and prod-check console scripts require 'uv sync' to appear on PATH; both were exercised through the editable import path this session.",
-      "Four tests fail in this sandbox for environmental reasons (git init denied; pytest tmp_path resolving inside the repository tree). Neither is a defect in shipped code; both are reproduced and documented under known_repository_defects."
+      "Phase 0 status authority is not implemented: no deterministic runner owns VERIFIED or PROD ledger fields.",
+      "The current sibling isolation assertion is defective against the read-only interoperability requirement and cannot be changed without authorization.",
+      "Installation, adaptive discovery, identity/history completeness, exact execution, resume, and real-data stages remain NOT_EXECUTED for the current code identity."
     ]
+  },
+  "last_gate_at_utc": "2026-08-03T03:27:35.772949+00:00",
+  "phase_results": {
+    "PHASE 0": {
+      "implementation_state": "IN_PROGRESS",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "gate_exit_code": 0,
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/prod-check --phase 0 --update-state --output logs/prod_closure_evidence/phase0/status_authority_gate_final.json",
+      "environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "observable_result": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "not_executed": 0,
+        "passed_denominator": "5/5 checks passed; 0 NOT EXECUTED and excluded from any pass claim"
+      },
+      "raw_evidence_path": "logs/prod_closure_evidence/phase0/status_authority_gate_final.json",
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T01:03:21.118084+00:00"
+    },
+    "PHASE 1": {
+      "implementation_state": "IN_PROGRESS",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "gate_exit_code": 0,
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/python scripts/run_installed_operator_gate.py --output logs/prod_closure_evidence/phase1/installed_operator_gate_final.json --update-state",
+      "environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "uv": "uv 0.11.3 (45da18ac3 2026-04-01 aarch64-apple-darwin)",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "observable_result": {
+        "total": 20,
+        "passed": 20,
+        "failed": 0,
+        "not_executed": 0,
+        "passed_denominator": "20/20 checks passed; 0 NOT EXECUTED and excluded from any pass claim"
+      },
+      "raw_evidence_path": "logs/prod_closure_evidence/phase1/installed_operator_gate_final.json",
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "README.md": "593183b4c82d94f2d99ec2c818ab77c1d00cbbd2c373047ea5b7b840872e7bf8",
+        "pyproject.toml": "d1d5d4086a21bc03bf545689c60751a26ac912e35b17fe367208d7f8c80d39f4",
+        "uv.lock": "9931bd84c262d3ae275ae2bf9db929bb16aef9df4a42266e05943c4001f98685",
+        "scripts/run_installed_operator_gate.py": "c0f95f4d01048903ae83b4a17b3f86969cb60794d3a086f0d83abdf5e29c95b4"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T01:31:04.395561+00:00"
+    },
+    "PHASE 2": {
+      "implementation_state": "IN_PROGRESS",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "gate_exit_code": 0,
+      "verification_state": "VERIFIED",
+      "gate_command": "bash scripts/run_pty_gate.sh",
+      "environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter",
+        "terminal": "real pty (pty.openpty)"
+      },
+      "observable_result": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "not_executed": 0,
+        "passed_denominator": "1/1 checks passed; 0 NOT EXECUTED and excluded from any pass claim"
+      },
+      "raw_evidence_path": "logs/prod_closure_evidence/phase2/pty_gate_report.json",
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "scripts/run_pty_gate.sh": "0ab7d1c4f8617a21ba165a330eb5b5c87bc225e6a53062c9084a7e511ae37fc7",
+        "tests/test_pty_operator_acceptance.py": "8400e967f66cb9f33ef92eda1ea5f5050548e89ff7f594ef4b9ea72bbda09886",
+        "artifacts/manifests/exohunter_pty_acceptance.json": "fb2c015a5207e51bd6b747a41ca45703dd88c0337e7a0aff4d32d248988e3989",
+        "logs/prod_closure_evidence/phase2/pty_gate.txt": "a0217a925319a9910760e7d3ee05b58216cecba037bf91c8cef22883ae58a81c"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T01:34:27.520804+00:00"
+    },
+    "PHASE 3": {
+      "implementation_state": "IN_PROGRESS",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "gate_exit_code": 0,
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/python scripts/run_canonical_pipeline_gate.py --output logs/prod_closure_evidence/phase3/canonical_pipeline_gate_final.json --update-state",
+      "environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/python",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter",
+        "terminal": "non-interactive installed console-script subprocesses"
+      },
+      "observable_result": {
+        "passed": 4,
+        "total": 4,
+        "result": "PASS"
+      },
+      "raw_evidence_path": "logs/prod_closure_evidence/phase3/canonical_pipeline_gate_final.json",
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "scripts/run_canonical_pipeline_gate.py": "d460d6de168319e8ba434de34da17b27a30c4a1cb1862f2bb8619bd0dc100f82",
+        "tests/hunter_phase3_bootstrap/sitecustomize.py": "9cc71a96fa992f2a240b3593b4472346362fadf5c472d2aedc225f6abaf3e62c",
+        "Skills/run_hunter_production_acceptance.py": "104d2a1c26c1c5d77094f4404914ffc800729654cf30e2275f1b3047ced3fa50",
+        "tests/hunter_acceptance_bootstrap/sitecustomize.py": "29117988a95c813483c580c59e745d7e1731a0ac9597a018cc0dc87d9b494f60"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T02:09:22.818250+00:00"
+    },
+    "PHASE 4": {
+      "implementation_state": "IN_PROGRESS",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "gate_exit_code": 0,
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/python scripts/run_adaptive_manifest_gate.py --output logs/prod_closure_evidence/phase4/adaptive_manifest_gate_final.json --update-state",
+      "environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/python",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter",
+        "terminal": "non-interactive installed console-script subprocesses"
+      },
+      "observable_result": {
+        "passed": 2,
+        "total": 2,
+        "result": "PASS"
+      },
+      "raw_evidence_path": "logs/prod_closure_evidence/phase4/adaptive_manifest_gate_final.json",
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "scripts/run_adaptive_manifest_gate.py": "ed0da69393cf609c5c6c2cb7af6d36db1e2441f73184a6fb71b8a29cb2cf1996",
+        "Skills/run_hunter_production_acceptance.py": "104d2a1c26c1c5d77094f4404914ffc800729654cf30e2275f1b3047ced3fa50",
+        "tests/hunter_acceptance_bootstrap/sitecustomize.py": "29117988a95c813483c580c59e745d7e1731a0ac9597a018cc0dc87d9b494f60"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T02:15:22.118404+00:00"
+    },
+    "PHASE 5": {
+      "implementation_state": "IN_PROGRESS",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "PASS",
+      "gate_exit_code": 0,
+      "verification_state": "VERIFIED",
+      "gate_command": ".venv/bin/python scripts/run_real_data_gate.py --output logs/prod_closure_evidence/phase5/real_data_gate_final.json --update-state",
+      "environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/python",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter",
+        "data_mode": "live MAST/NEA; no fixtures or mocks"
+      },
+      "observable_result": {
+        "passed": 4,
+        "total": 4,
+        "result": "PASS"
+      },
+      "raw_evidence_path": "logs/prod_closure_evidence/phase5/real_data_gate_final.json",
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "scripts/run_real_data_gate.py": "405c6806abecb428aa13b21a4c758d012c93fcacbe08611229608d2f385d7b63"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:26:33.412943+00:00"
+    },
+    "PHASE 6": {
+      "implementation_state": "BLOCKING",
+      "gate_execution_state": "EXECUTED",
+      "gate_result": "NOT_EXECUTED",
+      "gate_exit_code": 1,
+      "verification_state": null,
+      "gate_command": ".venv/bin/prod-check --output logs/prod_closure_evidence/phase6/prod_check_baseline.json --update-state",
+      "environment": {
+        "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+        "python": "3.14.3",
+        "python_executable": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "resolved_executable": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research/.venv/bin/EXO-Hunter"
+      },
+      "observable_result": {
+        "total": 24,
+        "passed": 18,
+        "failed": 0,
+        "not_executed": 6,
+        "passed_denominator": "18/24 checks passed; 6 NOT EXECUTED and excluded from any pass claim"
+      },
+      "raw_evidence_path": "logs/prod_closure_evidence/phase6/prod_check_baseline.json",
+      "gate_hashes": {
+        "docs/HUNTER_PROD_CONTRACT.md": "faea8506473ba34adee9575f5c0420feec53f04d11e10eb7efcd24c606ebd9cb",
+        "docs/CLI_UX_SPEC.md": "9699e291c54bb0987c74ead955cf2e920ea881b8fb35be54724938e75b84a8e6",
+        "docs/README_SPEC.md": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+        "src/exo_toolkit/prod_check.py": "cd4ced36888ed65b76557664f4988d2a28546d606ac975d40e11fc55090221b3",
+        "tests/test_prod_check.py": "b5dd6d4cccba6942b9755dd0767ca759d14e20a0e9279202c56f766f55d7b609"
+      },
+      "tested_code_identity": {
+        "git_head_sha": "04ce59aa44990a1e3c05459713c05bb7e762fe05",
+        "git_dirty": true,
+        "branch": "claude/cross-project-history-federation"
+      },
+      "tested_at_utc": "2026-08-03T03:27:35.772949+00:00"
+    }
   }
 }

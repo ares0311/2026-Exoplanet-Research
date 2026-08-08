@@ -1,19 +1,24 @@
 """Tests for the repository-native production gate (contract PROD-01)."""
 from __future__ import annotations
 
+import importlib
 import json
 from pathlib import Path
 
 import pytest
 
 from exo_toolkit.prod_check import (
+    LEDGER_SCHEMA_VERSION,
     PTY_EVIDENCE_PATH,
     REPORT_VERSION,
+    STATE_WRITER,
     CheckResult,
     _check_guided_entry_wiring,
     _check_interactive_input_capability,
     _check_pty_operator_experience,
     _check_sibling_write_isolation,
+    _check_state_authority,
+    _check_state_ledger,
     _looks_like_repo,
     _repo_root,
     build_report,
@@ -55,6 +60,14 @@ class TestReportShape:
     def test_all_pass_is_prod_ready(self) -> None:
         report = build_report([CheckResult("a", ("WS-01",), "PASS", "ok")])
         assert report["prod_ready"] is True
+
+    def test_phase_pass_is_not_a_prod_claim(self) -> None:
+        report = build_report(
+            [CheckResult("a", ("WS-01",), "PASS", "ok")], phase=0
+        )
+        assert report["gate_passed"] is True
+        assert report["prod_ready"] is False
+        assert report["gate_scope"] == "PHASE 0"
 
     def test_denominator_is_always_named(self) -> None:
         """CLAIM-02: coverage-style claims must name their denominator."""
@@ -362,11 +375,284 @@ class TestSiblingIsolationSelfExclusion:
         (pkg / "prod_check.py").write_text(self.MARKER_SOURCE, encoding="utf-8")
         assert _check_sibling_write_isolation(tmp_path).status == "PASS"
 
-    def test_a_genuine_sibling_reference_still_fails(self, tmp_path: Path) -> None:
+    def _write_runtime(self, tmp_path: Path, source: str) -> Path:
         pkg = tmp_path / "src" / "exo_toolkit"
         pkg.mkdir(parents=True)
         (pkg / "prod_check.py").write_text(self.MARKER_SOURCE, encoding="utf-8")
-        (pkg / "leaky.py").write_text("PATH = '2026 Technosignatures'\n", encoding="utf-8")
+        (pkg / "runtime.py").write_text(source, encoding="utf-8")
+        return tmp_path
+
+    def test_read_only_sibling_reference_is_permitted(self, tmp_path: Path) -> None:
+        root = self._write_runtime(
+            tmp_path,
+            "from pathlib import Path\n"
+            "PATH = Path('../2026 Technosignatures/history.json')\n"
+            "PAYLOAD = PATH.read_text(encoding='utf-8')\n",
+        )
+        result = _check_sibling_write_isolation(root)
+        assert result.status == "PASS", result.detail
+
+    @pytest.mark.parametrize(
+        "source, operation",
+        [
+            (
+                "from pathlib import Path\n"
+                "PATH = Path('../2026 Technosignatures/history.json')\n"
+                "PATH.write_text('{}')\n",
+                "write_text",
+            ),
+            (
+                "from pathlib import Path\n"
+                "PATH = Path('../2026 Near Earth Objects/history.json')\n"
+                "open(PATH, 'w').write('{}')\n",
+                "open-write",
+            ),
+            (
+                "import subprocess\n"
+                "from pathlib import Path\n"
+                "ROOT = Path('../2026 Technosignatures')\n"
+                "subprocess.run(['git', '-C', ROOT, 'status'])\n",
+                "sibling-command",
+            ),
+            (
+                "import sys\n"
+                "from pathlib import Path\n"
+                "ROOT = Path('../2026 Near Earth Objects')\n"
+                "sys.path.insert(0, ROOT)\n",
+                "runtime-import-path",
+            ),
+            (
+                "from exo_toolkit.hunter_cross_project_history import "
+                "sibling_history_export_path\n"
+                "sibling_history_export_path('techno_hunter').unlink()\n",
+                "unlink",
+            ),
+        ],
+    )
+    def test_sibling_mutation_or_runtime_coupling_fails(
+        self, tmp_path: Path, source: str, operation: str
+    ) -> None:
+        self._write_runtime(tmp_path, source)
         result = _check_sibling_write_isolation(tmp_path)
         assert result.status == "FAIL"
-        assert "leaky.py" in result.detail
+        assert operation in result.detail
+
+    def test_hardcoded_absolute_sibling_path_fails_even_for_a_read(
+        self, tmp_path: Path
+    ) -> None:
+        root = self._write_runtime(
+            tmp_path,
+            "from pathlib import Path\n"
+            "Path('/Users/operator/2026 Technosignatures/history.json').read_text()\n",
+        )
+        result = _check_sibling_write_isolation(root)
+        assert result.status == "FAIL"
+        assert "hardcoded-absolute-sibling-path" in result.detail
+
+
+def _write_ledger(tmp_path: Path, *, overrides: dict[str, object] | None = None) -> Path:
+    root = tmp_path
+    ledger = {
+        "artifact": "configs/HUNTER_PROD_STATE.json",
+        "schema_version": LEDGER_SCHEMA_VERSION,
+        "contract_version": "HUNTER-PROD-2026-07-30.3",
+        "active_phase": "PHASE 0",
+        "implementation_state": "BLOCKING",
+        "allowed_implementation_states": [
+            "BLOCKING",
+            "IN_PROGRESS",
+            "IMPLEMENTED_NOT_VERIFIED",
+        ],
+        "gate_execution_state": "EXECUTED",
+        "gate_result": "FAIL",
+        "prod_status": None,
+        "verification_authority": {"verified_and_prod_writer": STATE_WRITER},
+        "requirements": {
+            "CLAIM-04": {
+                "implementation_state": "BLOCKING",
+                "gate_execution_state": "EXECUTED",
+                "gate_result": "FAIL",
+            }
+        },
+    }
+    ledger.update(overrides or {})
+    path = root / "configs" / "HUNTER_PROD_STATE.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(ledger), encoding="utf-8")
+    return root
+
+
+class TestStateAuthority:
+    """CLAIM-04: prose or an agent-authored string cannot verify a requirement."""
+
+    def test_coherent_separated_ledger_passes(self, tmp_path: Path) -> None:
+        root = _write_ledger(tmp_path)
+        assert _check_state_ledger(root).status == "PASS"
+
+    def test_compound_active_phase_fails(self, tmp_path: Path) -> None:
+        root = _write_ledger(tmp_path, overrides={"active_phase": "PHASE 0; PHASE 2"})
+        result = _check_state_ledger(root)
+        assert result.status == "FAIL"
+        assert "exactly one active phase" in result.detail
+
+    def test_ambiguous_requirement_status_fails(self, tmp_path: Path) -> None:
+        root = _write_ledger(
+            tmp_path,
+            overrides={
+                "requirements": {
+                    "CLAIM-04": {
+                        "status": "VERIFIED",
+                        "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+                        "gate_execution_state": "EXECUTED",
+                        "gate_result": "PASS",
+                    }
+                }
+            },
+        )
+        result = _check_state_ledger(root)
+        assert result.status == "FAIL"
+        assert "ambiguous agent-writable status" in result.detail
+
+    def test_agent_authored_prod_alias_fails(self, tmp_path: Path) -> None:
+        root = _write_ledger(tmp_path, overrides={"prod_status": "PROD_ACCEPTED"})
+        assert _check_state_ledger(root).status == "FAIL"
+
+    def test_verified_without_machine_evidence_fails(self, tmp_path: Path) -> None:
+        root = _write_ledger(
+            tmp_path,
+            overrides={
+                "requirements": {
+                    "CLAIM-04": {
+                        "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+                        "gate_execution_state": "EXECUTED",
+                        "gate_result": "PASS",
+                        "verification_state": "VERIFIED",
+                    }
+                }
+            },
+        )
+        result = _check_state_ledger(root)
+        assert result.status == "FAIL"
+        assert "complete passing machine evidence" in result.detail
+
+    def test_missing_writer_fails_authority(self, tmp_path: Path) -> None:
+        root = _write_ledger(tmp_path)
+        result = _check_state_authority(root)
+        assert result.status == "FAIL"
+        assert "prod_state.py is missing" in result.detail
+
+    def test_unbound_writer_fails_authority(self, tmp_path: Path) -> None:
+        root = _write_ledger(
+            tmp_path,
+            overrides={"verification_authority": {"verified_and_prod_writer": None}},
+        )
+        writer = root / "src" / "exo_toolkit" / "prod_state.py"
+        writer.parent.mkdir(parents=True)
+        writer.write_text("def update_state_from_report():\n    pass\n", encoding="utf-8")
+        assert _check_state_authority(root).status == "FAIL"
+
+    def test_bound_concrete_writer_passes_structural_authority(self, tmp_path: Path) -> None:
+        root = _write_ledger(tmp_path)
+        writer = root / "src" / "exo_toolkit" / "prod_state.py"
+        writer.parent.mkdir(parents=True)
+        writer.write_text(
+            "def update_state_from_report(*, root, report, phase, **kwargs):\n"
+            "    return None\n",
+            encoding="utf-8",
+        )
+        assert _check_state_authority(root).status == "PASS"
+
+
+class TestDeterministicStateWriter:
+    """The bound writer derives state from results and fails closed."""
+
+    ENVIRONMENT = {
+        "platform": "test-platform",
+        "python": "3.14.3",
+        "python_executable": "/test/python",
+        "resolved_executable": "/test/EXO-Hunter",
+    }
+    HASHES = {"src/exo_toolkit/prod_check.py": "a" * 64}
+
+    @staticmethod
+    def _writer():
+        module = importlib.import_module("exo_toolkit.prod_state")
+        return module.update_state_from_report
+
+    def _run(
+        self,
+        root: Path,
+        result: CheckResult,
+        *,
+        phase: int = 0,
+        full_prod: bool = False,
+    ) -> dict[str, object]:
+        report = build_report(
+            [result],
+            commit="abc123",
+            phase=None if full_prod else phase,
+        )
+        self._writer()(
+            root=root,
+            report=report,
+            phase=phase,
+            command="prod-check --phase 0 --update-state --output evidence.json",
+            evidence_path="evidence.json",
+            gate_hashes=self.HASHES,
+            environment=self.ENVIRONMENT,
+        )
+        return json.loads(
+            (root / "configs" / "HUNTER_PROD_STATE.json").read_text(encoding="utf-8")
+        )
+
+    def test_pass_is_verified_and_advances_without_claiming_prod(self, tmp_path: Path) -> None:
+        root = _write_ledger(tmp_path)
+        state = self._run(root, CheckResult("state_ledger", ("CLAIM-04",), "PASS", "ok"))
+        assert state["gate_result"] == "PASS"
+        assert state["gate_exit_code"] == 0
+        assert state["active_phase"] == "PHASE 1"
+        assert state["prod_status"] is None
+        assert state["phase_results"]["PHASE 0"]["verification_state"] == "VERIFIED"
+        requirement = state["requirements"]["CLAIM-04"]
+        assert requirement["verification_state"] == "VERIFIED"
+        assert requirement["tested_code_identity"]["git_head_sha"] == "abc123"
+        assert requirement["gate_hashes"] == self.HASHES
+
+    @pytest.mark.parametrize("status", ["FAIL", "NOT_EXECUTED"])
+    def test_nonpass_is_blocking_nonzero_and_never_verified(
+        self, tmp_path: Path, status: str
+    ) -> None:
+        root = _write_ledger(tmp_path)
+        state = self._run(
+            root,
+            CheckResult("state_ledger", ("CLAIM-04",), status, "blocked"),  # type: ignore[arg-type]
+        )
+        assert state["gate_result"] == status
+        assert state["gate_exit_code"] == 1
+        assert state["active_phase"] == "PHASE 0"
+        assert state["prod_status"] is None
+        assert state["phase_results"]["PHASE 0"]["verification_state"] is None
+        assert state["requirements"]["CLAIM-04"]["verification_state"] is None
+
+    def test_only_full_phase_six_pass_may_write_prod(self, tmp_path: Path) -> None:
+        root = _write_ledger(tmp_path, overrides={"active_phase": "PHASE 6"})
+        state = self._run(
+            root,
+            CheckResult("full_prod", ("CLAIM-04",), "PASS", "ok"),
+            phase=6,
+            full_prod=True,
+        )
+        assert state["prod_status"] == "PROD"
+        assert state["phase_results"]["PHASE 6"]["verification_state"] == "VERIFIED"
+        assert state["active_phase"] == "PHASE 7"
+
+    def test_out_of_order_phase_write_is_rejected(self, tmp_path: Path) -> None:
+        root = _write_ledger(tmp_path)
+        before = (root / "configs" / "HUNTER_PROD_STATE.json").read_bytes()
+        with pytest.raises(ValueError, match="active phase"):
+            self._run(
+                root,
+                CheckResult("phase_two", ("CLAIM-04",), "PASS", "ok"),
+                phase=2,
+            )
+        assert (root / "configs" / "HUNTER_PROD_STATE.json").read_bytes() == before

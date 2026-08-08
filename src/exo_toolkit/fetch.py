@@ -86,8 +86,9 @@ _SECTOR_META_KEY: dict[str, str] = {
     "K2": "CAMPAIGN",
 }
 
-# Path to the Skills directory (resolved once at import time)
-_SKILLS_DIR: Path = Path(__file__).resolve().parent.parent.parent / "Skills"
+# Optional filesystem override retained for focused tests and deliberate local
+# module probes. Production loads the installed ``Skills`` package instead.
+_SKILLS_DIR: Path | None = None
 
 # Fallback cadence in seconds when lc.meta["EXPTIME"] is absent
 _EXPTIME_FALLBACK: dict[str, float] = {
@@ -592,15 +593,24 @@ def _fetch_jwst(obsid: str, *, _skills_dir: Path | None = None) -> FetchResult:
         ImportError: fetch_jwst_lc.py cannot be loaded from the Skills directory.
         ValueError: No JWST data found for the given obsid.
     """
-    skills_dir = _skills_dir or _SKILLS_DIR
-    jwst_path = skills_dir / "fetch_jwst_lc.py"
-    if not jwst_path.exists():
-        raise ImportError(f"Cannot find fetch_jwst_lc.py at {jwst_path}")
-    spec = importlib.util.spec_from_file_location("fetch_jwst_lc", jwst_path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"Cannot load fetch_jwst_lc.py from {jwst_path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    skills_dir = _skills_dir if _skills_dir is not None else _SKILLS_DIR
+    if skills_dir is None:
+        try:
+            module = importlib.import_module("Skills.fetch_jwst_lc")
+        except Exception as exc:  # noqa: BLE001 - installed package failure is actionable
+            raise ImportError(
+                "Cannot import required installed runtime package Skills.fetch_jwst_lc; "
+                "reinstall EXO-Hunter from the canonical built wheel"
+            ) from exc
+    else:
+        jwst_path = skills_dir / "fetch_jwst_lc.py"
+        if not jwst_path.exists():
+            raise ImportError(f"Cannot find fetch_jwst_lc.py at {jwst_path}")
+        spec = importlib.util.spec_from_file_location("fetch_jwst_lc", jwst_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Cannot load fetch_jwst_lc.py from {jwst_path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
 
     result = module.fetch_jwst_lc(obsid)
     if result is None:

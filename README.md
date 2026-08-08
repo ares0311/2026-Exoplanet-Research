@@ -1,483 +1,576 @@
 # EXO-Hunter — 2026 Exoplanet Research
 
-[![CI](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml/badge.svg)](https://github.com/ares0311/2026-Exoplanet-Research/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.5.3-blue.svg)](pyproject.toml)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
-[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+| Field | Value |
+|---|---|
+| Research domain | Transiting-exoplanet detection and candidate vetting (TESS, Kepler, K2) |
+| Primary task | Given a request for `N` targets, select, freeze, execute, and persist the best available `N` New or Follow-up searches |
+| Validated status | **Nonconforming** against contract `HUNTER-PROD-2026-07-30.3`; see §1.4 |
+| Canonical CLI entry point | `EXO-Hunter` (`exo_toolkit.hunter_shell:exohunter_entry`) |
+| Durable schema version | Hunter SQLite schema v6 (`HUNTER_SCHEMA_VERSION`, `src/exo_toolkit/search_lifecycle.py`) |
+| Sibling repositories | `2026 Near Earth Objects` (NEOHunter), `2026 Technosignatures` (TechnoHunter) |
+| Canonical documentation | `docs/HUNTER_PRODUCTION_WORKFLOW.md`, `docs/HUNTER_PROD_CONTRACT.md`, `docs/CLI_UX_SPEC.md` |
+| Package | `exo-toolkit` 0.5.3, Python >= 3.11 |
 
-EXO-Hunter is a reproducible exoplanet transit-search system for TESS,
-Kepler, K2, and JWST photometry. It acquires archive data, cleans light curves,
-finds periodic signals, computes interpretable diagnostics, scores competing
-astrophysical hypotheses, preserves complete search provenance, and recommends
-evidence-based follow-up without making confirmation or discovery claims.
+## Table of Contents
 
-The core application does not require AI. Its default Bayesian path and the
-entire Hunter search lifecycle are deterministic, explainable, and testable.
-XGBoost, CNN, and ensemble scorers are optional.
+- [1. Executive Summary](#1-executive-summary)
+- [2. CLI Tool Usage](#2-cli-tool-usage)
+- [3. Analytics, Mathematics, and Theoretical Foundation](#3-analytics-mathematics-and-theoretical-foundation)
+- [4. Sibling Repositories and Shared Data](#4-sibling-repositories-and-shared-data)
 
-## Current production state
+## 1. Executive Summary
 
-Version 0.5.3 is the current production release represented by this repository.
+### 1.1 Research Objective and Scientific Context
 
-| Area | Status | Current evidence |
+This repository detects and ranks transiting-exoplanet candidate signals in
+public photometry from TESS, Kepler, and K2, and manages the durable lifecycle
+of the searches that produce them.
+
+The scientific question is a decision problem, not a classification problem
+alone: given finite observing and compute budget, which targets should be
+searched next, and what does the resulting evidence support? The pipeline
+therefore pairs a transit search with an explicit six-hypothesis Bayesian model
+that scores competing astrophysical and instrumental explanations for every
+detected signal, instead of emitting an undifferentiated "planet score".
+
+Target selection favors lightly-worked parts of the archive: later TESS
+sectors, fainter stars (Tmag 10-14), and less-crowded fields.
+
+### 1.2 Scope, Boundaries, and Exclusions
+
+In scope: archival photometry acquisition, detrending, box-least-squares
+transit search, false-positive vetting diagnostics, Bayesian hypothesis
+scoring, submission-pathway classification, and the durable EXO-Hunter search
+lifecycle.
+
+Out of scope, and verified as such:
+
+- Radial-velocity confirmation, astrometric confirmation, and dynamical mass
+  determination — **Not applicable**.
+- Atmospheric retrieval from JWST spectra — **Not applicable**. JWST light
+  curves are acquired (`Skills/fetch_jwst_lc.py`) but no retrieval model ships.
+- Near-Earth-object and technosignature analysis — **Not applicable**. These are
+  the responsibilities of the two sibling repositories named in §4.1.
+- Autonomous external submission or public discovery claims — **Not
+  applicable** by policy. No command submits to an external authority; that
+  boundary is human-gated.
+
+This repository never emits the phrase "confirmed planet". Detected signals are
+reported as candidate signals or follow-up targets.
+
+Target selection is owned entirely by the canonical selector. `Create-New-Search`
+does not accept operator-ranked candidate files: the retired `--candidate-file`
+bypass is gone, so no externally-ranked list can substitute for catalog-wide
+adaptive discovery, novelty exclusion, and deterministic ranking.
+
+### 1.3 System and Workflow Overview
+
+The scientific pipeline is a fixed sequence:
+
+```
+Fetch -> Clean -> Search -> Vet -> Score -> Classify
+```
+
+The Hunter lifecycle wraps that pipeline with durable state:
+
+```
+request -> adaptive discovery -> identity and history -> eligibility -> ranking
+-> sufficiency and expansion -> exact frozen manifest -> durable search creation
+-> acquisition -> scoring -> durable results -> history and follow-up update
+```
+
+Creating a search freezes the exact selected targets. Execution runs those exact
+targets and never silently regenerates, substitutes, or reorders them.
+
+### 1.4 Verified Capability Status
+
+Status vocabulary is restricted to Implemented, Experimental, Deprecated,
+Nonconforming, and Not applicable.
+
+| Capability | Status | Evidence |
 |---|---|---|
-| EXO-Hunter lifecycle | **PROD accepted at 0.5.3** | The 2026-07-29 adversarial requalification is complete. Version 0.5.3 removes sibling-repository runtime reads, constrains cross-project history to a verified repo-local copy, repairs completed-follow-up validity, and adds deterministic clean-state acceptance through the installed `EXO-Hunter` shell. The v16 harness passes 17/17 controlled assertions and a bounded live-source smoke passes on merged `main`. Local implementation and merged-main gates pass 10/10 with 3,225 tests; PR #328, all branch/PR CI events, squash merge `6ad5c81`, synchronization, and merged-main CI pass. Evidence is [`hunter_live_acceptance_v16.json`](artifacts/manifests/hunter_live_acceptance_v16.json) plus its hash-verifiable schema-v6 snapshot. |
-| Bayesian scorer | **Production ready** | Default non-ML scorer; no model artifact required |
-| XGBoost scorer | **Production ready** | Trained on 7,586 Kepler KOIs; held-out AUC 0.992 |
-| XGBoost + Bayesian ensemble | **Production ready** | Conservative fallback when no CNN is supplied |
-| CNN scorer | **Production benchmark promoted** | `benchmark_cnn_v1`; validated for its Kepler domain, not unrestricted cross-mission use |
-| Full ensemble | **Production ready** | Calibrated weights: XGBoost 0.95, CNN 0.00, Bayesian 0.05 |
-| Dataset and model research | **Active, gated** | Manifested, leakage-safe experiments continue; failed model strategies are retained as evidence and not silently reused |
-| External submission | **Not implemented or authorized** | The system produces recommendations and evidence packages only |
+| Six-hypothesis Bayesian scoring | Implemented | `src/exo_toolkit/hypotheses.py`, `scoring.py`; `tests/test_hypotheses.py`, `tests/test_scoring.py` |
+| BLS transit search and vetting diagnostics | Implemented | `src/exo_toolkit/search.py`, `vet.py`; `tests/test_search.py`, `tests/test_vet.py` |
+| Submission-pathway classification | Implemented | `src/exo_toolkit/pathway.py`; `tests/test_pathway.py` |
+| Durable search lifecycle (schema v6) | Implemented | `src/exo_toolkit/search_lifecycle.py`; `tests/test_search_lifecycle.py` |
+| Exact-target freezing and resume | Implemented | `HunterStore.create_search`, `execute_search`; `tests/test_search_lifecycle.py` |
+| Persistent slash terminal | Implemented | `src/exo_toolkit/hunter_shell.py`; `tests/test_hunter_shell.py` |
+| Slash-command palette with described parameters | Implemented | `src/exo_toolkit/hunter_ux.py`; `tests/test_hunter_ux.py::TestFilterCommands` |
+| Live validity sentinels and shared validators | Implemented | `hunter_ux.validate_target_count`; `tests/test_hunter_shell.py::TestSharedValidatorParity` |
+| `/Inspect-Target` detail view | Implemented | `hunter_cli.inspect_target`; `tests/test_hunter_shell.py::TestInspectTargetCommand` |
+| Width-aware results table | Implemented | `hunter_ux.render_results_table`; `tests/test_hunter_ux.py::TestTruncateAndColumns` |
+| Follow-up ranking formula integrity | Implemented | `tests/test_search_lifecycle.py::TestRegistryExpectedInformationGainMatchesContract` |
+| Repository-native `prod-check` gate | Implemented | `src/exo_toolkit/prod_check.py`; `tests/test_prod_check.py` |
+| Golden UX assertions | Implemented | `tests/golden/`; `tests/test_hunter_ux.py::TestGoldenUx` |
+| XGBoost, CNN, and stacking scorers | Experimental | `src/exo_toolkit/ml/`; outside the Bayesian default path |
+| Representation-model baselines (Chronos-Bolt, Astromer2) | Deprecated | `docs/GROUPED_EXTERNAL_REPRESENTATION_BENCHMARK.md` records `no_external_added_value`; retained for reproducibility |
+| Installation and launch across all seven execution surfaces | Nonconforming | Contract LAUNCH-02 requires a built wheel, a fresh install, an upgrade-in-place, and execution from an unrelated directory; not verified |
+| Live-data New and Follow-up acceptance evidence | Nonconforming | Contract E2E-01, E2E-02, and E2E-04 require a retained live-MAST bundle; not verified |
+| Adaptive-discovery sufficiency evidence | Nonconforming | Contract DISC-01, DISC-02, and DISC-03 require expansion-round and churn evidence; not verified |
+| Cross-project identity and history completeness | Nonconforming | Contract IDENT-01 through IDENT-04; not independently verified |
 
-“PROD accepted” may be used only when the current acceptance artifact and
-release gates describe the exact current repository state.
-It does not mean that every search must find a candidate, that a transit signal
-is a confirmed planet, or that the software may submit an alert automatically.
-Scientific null results and ineligible follow-up universes are valid outcomes
-when every candidate was evaluated and the reasons are preserved.
+### 1.5 Evidence and Reproducibility
 
-The authoritative readiness narrative is
-[`docs/PRODUCTION_READINESS.md`](docs/PRODUCTION_READINESS.md). The active
-research sequence and completed bounded gates are recorded in
-[`docs/ROADMAP.md`](docs/ROADMAP.md).
+The durable acceptance ledger is `configs/HUNTER_PROD_STATE.json`. It records,
+per requirement, the exact command, environment, observable assertion, raw
+evidence path, tested commit, and timestamp.
 
-## Production workflow
+The machine-enforced gate is `prod-check` (§2.6). It exits nonzero while any
+mandatory requirement is unsatisfied, and reports any check it could not run as
+`NOT EXECUTED` with a reason. A `NOT EXECUTED` stage is never counted toward a
+pass total.
 
-```text
-candidate universe
-→ identity and prior-history resolution
-→ eligibility
-→ deterministic ranking and selection
-→ immutable manifest
-→ durable pending search
-→ data acquisition and preprocessing
-→ signal search, vetting, and scoring
-→ composite interpretation
-→ append-only results and provenance
-→ follow-up registration
-→ recommended next action
-```
+Current gate result on this tree: **13 of 19 checks passed, 0 failed, 6 NOT
+EXECUTED**, therefore `PROD gate: BLOCKED`. The six unexecuted checks are the
+live-environment and live-data requirements listed as Nonconforming in §1.4;
+they are reported honestly rather than assumed, and are excluded from the
+passed total.
 
-Each stage has an explicit input and output contract. A later command executes
-the exact pending manifest; it never regenerates or silently substitutes the
-target list. Partial work is reported as partial, failed work remains visible,
-and a restart resumes only unfinished or failed targets from that manifest.
+## 2. CLI Tool Usage
 
-## Install
+### 2.1 Prerequisites
 
-Requirements:
+- Python >= 3.11. The pinned environment uses 3.14.
+- `uv` for environment synchronization.
+- Network access to MAST and the NASA Exoplanet Archive for acquisition
+  commands. Analysis of already-cached data needs no network.
 
-- Python 3.11 or newer
-- Git
-- [`uv`](https://docs.astral.sh/uv/) for the supported development setup
-- Internet access for live NASA/MAST catalog and light-curve retrieval
-
-For a new checkout:
+### 2.2 Installation
 
 ```bash
-git clone https://github.com/ares0311/2026-Exoplanet-Research.git
-cd 2026-Exoplanet-Research
-git switch main
-git pull --ff-only origin main
 uv sync --all-extras --all-groups
 ```
 
-For an existing checkout:
+This installs `exo-toolkit` and every console script listed in §2.6.
 
-```bash
-git switch main
-git pull --ff-only origin main
-uv sync --all-extras --all-groups
+### 2.3 Environment Setup
+
+The durable database defaults to `data/hunter_searches.sqlite3`. Override it per
+command with `--db`.
+
+Lightkurve writes downloaded products to its own cache. To keep that cache
+inside the repository, pre-create `.cache/lightkurve/` and export
+`XDG_CACHE_HOME` to the repository-local cache root before running acquisition
+commands. Lightkurve honors that variable when the directory already exists.
+
+Accessibility and automation are controlled by `NO_COLOR`, `--no-color`,
+`--no-animation`, and the `CI`, `REDUCE_MOTION`, and `EXOHUNTER_REDUCE_MOTION`
+environment variables. Animation disables automatically on a non-TTY stream.
+
+### 2.4 Command Structure
+
+`EXO-Hunter` is a persistent terminal. It stays active until `/Exit`.
+
+```
+EXO-Hunter [--db PATH] [--command CMD] [--script FILE]
+           [--history-file PATH] [--no-color] [--no-animation] [--version]
 ```
 
-Verify the installed entry points:
+Typing `/` opens a searchable command palette listing every command with its
+description and its required and optional parameters. Typing `/` followed by
+text filters that palette. Discovery never requires `/Help`.
+
+Interactive and scriptable operation share one validation layer, so a value
+rejected interactively is rejected identically by the one-shot commands.
+
+### 2.5 End-to-End Workflow
+
+Invoke the terminal through the synchronized environment. Use
+`.venv/bin/EXO-Hunter` when the environment is not active, so the command
+resolves to this repository's interpreter rather than whatever `EXO-Hunter`
+happens to be first on `PATH`:
 
 ```bash
-git switch main
-git pull --ff-only origin main
-.venv/bin/exo --version
-.venv/bin/EXO-Hunter --help
-.venv/bin/Create-New-Search --help
-.venv/bin/Run-New-Search --help
-.venv/bin/Show-Follow-Ups --help
+.venv/bin/EXO-Hunter --version
 ```
-
-## Scan one target
-
-The direct CLI runs fetch → clean → search → vet → score → classify for one
-target. It supports TESS, Kepler, K2, and JWST.
 
 ```bash
-git switch main
-git pull --ff-only origin main
-caffeinate -i .venv/bin/exo "TIC 150428135" \
-  --mission TESS \
-  --scorer bayesian \
-  --output reports/tic_150428135.json
+# 1. Open the terminal
+EXO-Hunter
+
+# 2. Freeze the best available 5 never-before-searched targets
+/New-Search 5
+
+# 3. Review the frozen manifest, then inspect any row in full
+/Inspect-Target 1
+
+# 4. Execute the exact frozen manifest
+/Run-Search
+
+# 5. Review the follow-up recommendations the run registered
+/Show-Follow-Ups
+
+# 6. Freeze and run a follow-up search
+/Follow-Up-Search 5
+/Run-Search
 ```
 
-Useful options include:
-
-- `--pipeline SPOC|QLP|TGLC` to constrain the TESS archive product author;
-- `--exptime long|short|fast` to constrain cadence;
-- `--max-peaks` and `--max-period-grid-points` to bound the BLS search;
-- `--no-animation` for logs, CI, and redirected output;
-- `--scorer bayesian|xgboost|ensemble|cnn|full-ensemble` to select a scorer.
-
-Model-backed modes require the corresponding `--model-path` and/or
-`--cnn-checkpoint`. Cross-mission CNN use fails closed unless explicitly
-enabled because prior transfer experiments did not establish general validity.
-
-## Run EXO-Hunter
-
-The Hunter commands use `data/hunter_searches.sqlite3` by default. This ignored
-runtime database is the local durable system of record; CSV files are review
-exports only.
-
-Launch the persistent terminal:
+Non-interactive equivalent:
 
 ```bash
-git switch main
-git pull --ff-only origin main
-.venv/bin/EXO-Hunter
+EXO-Hunter --no-animation --script commands.txt
 ```
 
-Enter `/` or `/Help` to display every command. The normal workflow is:
+### 2.6 Command Reference
 
-```text
+Interactive slash commands:
+
+| Command | Action | Required | Optional |
+|---|---|---|---|
+| `/New-Search <N>` | Select and freeze the best available never-before-searched targets | targets | max-download-gb |
+| `/Follow-Up-Search <N>` | Select and freeze the highest-value previously-searched targets | targets | max-download-gb |
+| `/Run-Search` | Execute or resume the exact frozen manifest | none | none |
+| `/Show-Follow-Ups` | Show follow-up evidence, priority, and next action | none | status |
+| `/Inspect-Target <rank-or-id>` | Full identity, score components, provenance, prior-search evidence | rank-or-id | none |
+| `/Create-New-Search` | Lower-level creation taking explicit `--targets` and `--mode` | none | none |
+| `/Import-Follow-Up` | Import one checksum-verified reviewed prior result | evidence-file | none |
+| `/Recheck-Follow-Ups` | Recheck deferred follow-ups for new MAST sectors | none | none |
+| `/Help` | Full command surface with parameter shapes | none | none |
+| `/Exit` | Close the terminal | none | none |
+
+`/Run-New-Search` is a compatibility alias for `/Run-Search`.
+
+The lower-level creation form takes mode explicitly, which is useful in scripted
+operation where the mode is a parameter rather than a chosen command:
+
+```
 /Create-New-Search --targets 100 --mode new
 /Run-New-Search
-/Show-Follow-Ups
-/Create-New-Search --targets 10 --mode follow-up
-/Run-New-Search
-/Exit
 ```
 
-The session remains active until `/Exit`. Tab completes slash commands and
-readline history persists across sessions. Orbit/transit animation runs only
-while canonical Hunter work is active; it disables under redirected I/O, CI,
-reduced-motion settings, `TERM=dumb`, or `--no-animation`. Automation can use
-repeatable `--command`, `--script <path>`, or `--script -`; machine-readable
-`--json` stdout is not prefixed with a banner. `ExoHunter`, `/New-Search <N>`,
-`/Follow-Up-Search <N>`, and `/Run-Search` remain convenience aliases.
+For `N > 100` the run writes a timestamped complete export, prints a concise
+summary and the output path, and preserves the durable non-CSV system of record.
 
-The one-shot commands below remain stable automation entry points. `EXO-Hunter`
-delegates to these same functions; it does not implement another selector,
-runner, table renderer, or database path.
+Console scripts registered by `pyproject.toml`:
 
-### 1. Create a new-target search
+| Script | Target |
+|---|---|
+| `EXO-Hunter`, `ExoHunter` | `exo_toolkit.hunter_shell:exohunter_entry` |
+| `exo` | `exo_toolkit.cli:cli_entry` |
+| `Create-New-Search` | `exo_toolkit.hunter_cli:create_new_search_entry` |
+| `Run-New-Search` | `exo_toolkit.hunter_cli:run_new_search_entry` |
+| `Show-Follow-Ups` | `exo_toolkit.hunter_cli:show_follow_ups_entry` |
+| `Import-Follow-Up` | `exo_toolkit.hunter_cli:import_follow_up_entry` |
+| `Inspect-Target` | `exo_toolkit.hunter_cli:inspect_target_entry` |
+| `Recheck-Follow-Ups` | `exo_toolkit.hunter_cli:recheck_follow_ups_entry` |
+| `prod-check` | `exo_toolkit.prod_check:main_entry` |
+
+Run the production gate:
 
 ```bash
-git switch main
-git pull --ff-only origin main
-caffeinate -i .venv/bin/Create-New-Search --targets 100 --mode new
+prod-check                                    # human-readable
+prod-check --json                             # machine-readable report
+prod-check --output artifacts/prod_check.json
 ```
 
-The live selector scans every page of the accessible magnitude-filtered TIC
-criteria universe while retaining only the strongest first-stage rows in
-memory. It expands that retained pool and the ASAS-SN/QLP metadata-inspection
-depth until the Nth selected score beats the conservative upper bound of every
-uninspected row, or the filtered universe is fully inspected. Local history,
-the default source-verified Techno-Hunter HIP/TIC/KIC export, known TOIs/CTOIs,
-confirmed hosts, variables, product availability, and estimated data cost all
-feed the same canonical decision. Every production input carries an explicit
-validity state and provenance assessment.
+### 2.7 Outputs and Artifacts
 
-For 100 or fewer targets, the terminal grid shows survey and canonical
-identifiers, object class, distance, estimated storage, explicit new/follow-up
-status, prior-search summary, ranking score, domain metrics, and selection
-reason. Larger searches write a visibly timestamped CSV under
-`reports/search_manifests/` with the same fields, full prior-search provenance,
-full metric JSON, search creation time, and export time. The CSV remains an
-operator review artifact; SQLite remains the authoritative immutable manifest
-and history record. Distance is preserved directly from the MAST TIC `d`
-field in parsecs and displayed in light-years; the source field and units are
-defined by the [MAST TIC schema](https://mast.stsci.edu/api/v0/_t_i_cfields.html)
-and stamped into candidate provenance.
-
-### 2. Create a follow-up search
-
-```bash
-git switch main
-git pull --ff-only origin main
-.venv/bin/Create-New-Search --targets 10 --mode follow-up
-```
-
-The default command automatically and idempotently imports
-[`hunter_prior_search_history_v1.json`](data_selection/hunter_prior_search_history_v1.json)
-before ranking. That versioned contract normalizes seven preserved sources,
-608 search events, and 200 unique TIC targets without rewriting the source
-logs. Follow-up eligibility considers the latest result, prior work, evidence
-quality, current registry disposition, revisit policy, and data availability.
-
-If fewer valid targets exist after the durable universe is exhausted, the
-command creates the exact best-available subset and reports the shortfall.
-Absolute quality gates are reported separately from rank and never turn a
-normal top-N request into an arbitrary zero-result failure. It fails without
-creating a search only when zero usable candidates exist or required
-history/validity checks cannot be completed.
-
-### 3. Execute or resume the exact pending search
-
-```bash
-git switch main
-git pull --ff-only origin main
-caffeinate -i .venv/bin/Run-New-Search --workers 6 --scorer bayesian
-```
-
-The parent process owns all SQLite writes while workers independently acquire
-and process targets. A partial or failed run returns nonzero. Repeating the
-command resumes the same manifest, records interrupted attempts, skips only
-terminal target outcomes, and retries unfinished or failed targets. A completed
-manifest cannot be executed again.
-
-### 4. Inspect follow-ups
-
-```bash
-git switch main
-git pull --ff-only origin main
-.venv/bin/Show-Follow-Ups --status all
-```
-
-Each row includes its target, evidence, reason, priority, prior-search
-provenance, current disposition, revisit condition, and recommended action.
-Lifecycle states are `open`, `scheduled`, `completed`, and `deferred`, with
-append-only transition events and links to the consuming search.
-
-### 5. Import a reviewed prior result
-
-```bash
-git switch main
-git pull --ff-only origin main
-.venv/bin/Import-Follow-Up \
-  --evidence-file artifacts/manifests/hunter_reviewed_followup_import_v1.json
-```
-
-Import validates source hashes and writes a completed historical manifest,
-run, history event, and stable follow-up row in one durable contract. Repeating
-the same import is idempotent. Source drift fails before database mutation.
-
-All canonical Hunter commands support `--json` and `--no-color` for automation.
-`Create-New-Search` does not accept operator-ranked candidate files; new and
-follow-up modes always use the canonical discovery/history optimizer. See the
-full operator contract in
-[`docs/HUNTER_PRODUCTION_WORKFLOW.md`](docs/HUNTER_PRODUCTION_WORKFLOW.md).
-
-## Durable state and provenance
-
-The Hunter database separates concepts that must not be collapsed:
-
-| Durable concept | Storage | Invariant |
+| Artifact | Location | Role |
 |---|---|---|
-| Candidate catalog | `candidate_catalog` | Immutable snapshot per candidate and search creation |
-| Search manifest | `search_manifests`, `search_manifest_targets` | Exact ordered membership, configuration, selector version, and SHA-256 |
-| Search run | `search_runs` | One row per attempt; interruption and partial completion remain explicit |
-| Target search history | `target_search_history` | Append-only results, failures, method, source, timestamps, and provenance |
-| Search lifecycle | `search_state_events` | Append-only pending/running/interrupted/partial/failed/completed transitions |
-| Follow-up registry | `follow_up_registry` | Stable recommendation, disposition, revisit gate, and parent relationship |
-| Follow-up lifecycle | `follow_up_events` | Append-only transitions linked to consuming searches |
+| Durable search database | `data/hunter_searches.sqlite3` | System of record (schema v6) |
+| Review manifest CSV | `artifacts/manifests/` | Operator review export, not the system of record |
+| Acceptance manifests | `artifacts/manifests/hunter_live_acceptance_v*.json` | Retained acceptance evidence |
+| Acceptance ledger | `configs/HUNTER_PROD_STATE.json` | Requirement status and evidence |
+| Gate report | `prod-check --output <path>` | Versioned machine-readable gate result |
+| Golden UX baselines | `tests/golden/` | Semantic interaction assertions |
 
-Completed attempts also append small Git-visible Run Reports under
-`artifacts/manifests/run_reports/`. Runtime databases, caches, downloaded
-products, reports, and committed evidence have deliberately different
-retention policies.
+The five durable record types are the candidate catalog, review manifest, search
+run, target search history, and follow-up registry. CSV is an export only.
 
-Every completed search preserves, where applicable:
+### 2.8 Exit Codes and Failure Behavior
 
-- exact target order and candidate snapshots;
-- configuration, selector, pipeline, code, scorer, and model versions;
-- archive product URIs and acquisition metadata;
-- preprocessing context and cadence counts;
-- every signal's diagnostics and scores;
-- composite result and conservative interpretation;
-- failures and execution state;
-- prior-search and follow-up relationships.
+Hunter commands and the shell:
 
-## Scientific pipeline
+| Code | Meaning |
+|---|---|
+| 0 | Success |
+| 2 | Invalid input, unknown command, or command failure |
+| 130 | Interrupted during a scan |
 
-The package implementation lives in `src/exo_toolkit/`:
+The background automation module (`exo background-run-once` and related
+subcommands) uses a distinct set: `0` success, `20` needs follow-up, `30`
+blocked, `40` configuration error, `50` internal error.
 
-| Stage | Primary module | Responsibility |
+`prod-check` exits `0` only when every mandatory requirement passes, and `1`
+otherwise.
+
+Failure behavior: incomplete work is never presented as complete. A failed
+target records a typed error message and a non-zero exit; the search remains
+resumable, and re-running retries only the unfinished portion. Detailed
+tracebacks belong in logs rather than in the interactive response.
+
+### 2.9 Troubleshooting
+
+| Symptom | Cause and resolution |
+|---|---|
+| `ModuleNotFoundError: exo_toolkit` under pytest | Prefix the command with `PYTHONPATH=src` |
+| `mypy` reports missing pydantic or numpy imports | Use `.venv/bin/python -m mypy src`; the bare binary resolves a different package path |
+| Unknown command in the shell | Enter `/` to open the palette. A token matching no command is a hard error, not a silent success |
+| `Invalid - enter a positive whole number.` | The target count must be a positive integer. The value never reaches the canonical layer |
+| Lightkurve cache permission error | Set `XDG_CACHE_HOME` to a writable repository-local cache root (§2.3) |
+
+## 3. Analytics, Mathematics, and Theoretical Foundation
+
+### 3.1 Problem Formulation
+
+Two distinct problems are solved.
+
+**Signal interpretation.** Given a detected periodic dip, infer a posterior over
+six competing hypotheses: `planet_candidate`, `eclipsing_binary`,
+`background_eclipsing_binary`, `stellar_variability`, `instrumental_artifact`,
+and `known_object`.
+
+**Target selection.** Given a request for `N` targets and a mode, return the
+best available `N` by a deterministic ranking, reporting absolute quality
+separately from relative rank. Fewer than `N` are returned only after
+demonstrating that fewer valid candidates exist.
+
+### 3.2 Inputs, Outputs, Labels, Units, and Provenance
+
+| Quantity | Symbol | Unit | Source |
+|---|---|---|---|
+| Time | `t` | days (BJD_TDB) | MAST light curve |
+| Normalized flux | `f` | dimensionless | PDCSAP preferred |
+| Orbital period | `P` | days | BLS search |
+| Transit duration | `T` | hours | BLS and individual-event measurement |
+| Transit depth | `d` | ppm | Per-event measurement |
+| Stellar radius | `R_star` | solar radii | TIC catalog |
+| Stellar mass | `M_star` | solar masses | TIC catalog |
+| Effective temperature | `T_eff` | K | TIC catalog |
+| False-positive probability | `fpp` | dimensionless in [0,1] | `scoring.compute_scores` |
+| Detection confidence | `confidence` | dimensionless in [0,1] | `scoring.compute_scores` |
+
+Every scored candidate carries a `meta` block recording toolkit version, run
+timestamp, scorer, git commit, and which features were available or absent.
+
+### 3.3 Mathematical Notation
+
+`log_score_i` is the unnormalized log score of hypothesis `i`; `w_ij` is the
+weight of feature `j` under hypothesis `i`; `x_j` in `[0,1]` is a feature score,
+or absent; `prior_i` is the prior probability of hypothesis `i`.
+
+### 3.4 Models, Algorithms, and Scores
+
+**Hypothesis scoring.** For each hypothesis,
+
+```
+log_score_i = log(prior_i) + sum_j (w_ij * x_j)
+posterior   = softmax(log_score)
+```
+
+The softmax subtracts the maximum before exponentiating, for numerical
+stability. Implementation: `src/exo_toolkit/hypotheses.py` and `scoring.py`.
+Validation: `tests/test_hypotheses.py`, `tests/test_scoring.py`.
+
+**Absent features.** A feature whose diagnostic did not run is `None` and
+contributes exactly zero to every log score, so absence is neutral rather than
+evidence. Diagnostics requiring stellar parameters return `None` when those
+parameters are absent, rather than substituting solar values.
+
+**Provenance score.** Data quality in `[0,1]`:
+
+```
+provenance = 0.40*cadence_sub + 0.35*sector_sub + 0.25*pipeline_sub
+```
+
+`cadence_sub` ramps linearly from 1.0 at 2-minute cadence to 0.0 at 30-minute;
+`sector_sub = min(n_sectors/3, 1)`; `pipeline_sub` is 1.00 for SPOC, Kepler, and
+K2, 0.85 for QLP, 0.75 for TGLC, and 0.60 for unknown. The `tfop_ready` pathway
+requires `provenance >= 0.80`. Implementation:
+`fetch.compute_provenance_score`.
+
+**New-target ranking.**
+
+```
+score = 70*tic_priority + 20*availability + 10*EIG - storage_cost_penalty
+EIG   = tic_priority * availability
+```
+
+**Follow-up ranking.**
+
+```
+priority = 100*(1 - fpp) + 10*confidence
+EIG      = (1 - fpp) * confidence
+```
+
+`EIG` is expected information gain, dimensionless in `[0,1]`. Both the
+history-derived and registry-derived persistence paths publish this identical
+equation. Where the underlying evidence is absent, the metric is `null` rather
+than a substituted proxy. Implementation: `src/exo_toolkit/hunter_ranking.py`
+and `search_lifecycle.py`. Validation:
+`tests/test_search_lifecycle.py::TestRegistryExpectedInformationGainMatchesContract`.
+
+### 3.5 Assumptions, Objectives, and Statistical Methods
+
+- Transit signals are approximately periodic and box-like. The BLS duration grid
+  is capped at 90% of the minimum trial period.
+- Stellar density consistency uses the central-transit approximation
+  `a/R_star = P / (pi*T)` with impact parameter zero, which biases toward larger
+  inferred densities for grazing geometries.
+- Priors are deliberately conservative: `planet_candidate = 0.10`, each of the
+  four astrophysical and instrumental alternatives `0.20`, and
+  `known_object = 0.10`. Mission-specific profiles are opt-in through
+  `configs/scoring_priors_v0.json`.
+- Robust statistics are preferred throughout: median absolute deviation for
+  noise, and inverse-variance weighting for depth comparison.
+
+### 3.6 Thresholds, Calibration, and Uncertainty
+
+| Threshold | Value | Role |
 |---|---|---|
-| Fetch | `fetch.py` | Mission-aware archive retrieval and raw-product provenance |
-| Clean | `clean.py` | finite-value filtering, clipping, normalization, and detrending |
-| Search | `search.py` | bounded Box Least Squares search and iterative signal masking |
-| Vet | `vet.py` | odd/even, secondary-eclipse, shape, contamination, event timing, duration, missing-event, asymmetry, and extra-event diagnostics |
-| Features | `features.py` | normalized, typed scientific features with explicit missingness |
-| Score | `scoring.py`, `hypotheses.py`, `ml/` | Bayesian and optional model-backed competing-hypothesis scores |
-| Classify | `pathway.py` | ordered conservative recommendation gates |
-| Orchestrate | `search_lifecycle.py`, `hunter_cli.py` | deterministic selection, durable execution, recovery, history, and follow-ups |
+| `tfop_ready` provenance | >= 0.80 | Pathway gate |
+| `known_object_annotation` | posterior >= 0.80 | Pathway gate |
+| `github_only_reproducibility` | fpp >= 0.70 | Pathway gate |
+| Strict follow-up bar | fpp < 0.15 and confidence > 0.40 | Reported, not a selection gate |
+| Depth-scatter saturation | reduced chi-square = 3.0 | Feature saturation |
+| Extra-event significance | 3 sigma below out-of-transit median | Event flagging |
 
-The scoring output is a candidate assessment, not a validation. The system
-exposes positive evidence, false-positive evidence, missing diagnostics, FPP,
-detection confidence, and the recommended review pathway. The unchanged
-follow-up gate requires FPP below 0.15, detection confidence above 0.40, and an
-eligible pathway.
+Calibration supports Platt scaling and isotonic regression
+(`src/exo_toolkit/calibration.py`), applied one-vs-rest per hypothesis and
+renormalized to sum to 1. A non-converged or failed Platt fit raises rather than
+silently returning the identity transform.
 
-Phase 4's bounded individual-event core now measures event midpoints and
-durations plus `missing_transit_fraction`, `transit_asymmetry`, and
-`extra_event_count`. These diagnostics help distinguish coherent planetary
-events from instrumental, stellar, or ephemeris-mismatch behavior. The exact
-scoring definitions and versioned weights are documented in
-[`docs/SCORING_MODEL.md`](docs/SCORING_MODEL.md).
+The strict follow-up bar is reported per candidate as
+`meets_strict_follow_up_bar`. It does not remove candidates from the selectable
+pool, because relative rank and absolute quality are reported separately.
 
-## Verified production evidence
+### 3.7 Evaluation and Validation
 
-The v0.3.8 baseline and current v0.3.9 acceptance artifacts record:
+Metrics implemented in `calibration.py`: Brier score, reliability curves,
+precision, recall, F1, and confusion matrix.
 
-- a live 10,000-candidate new-target universe;
-- a completed real follow-up search for TIC 237884073;
-- nine exact QLP product URIs and 63,205 processed cadences;
-- zero failures in that follow-up execution;
-- schema-v5 SQLite integrity, zero foreign-key violations, and 12 append-only
-  storage triggers;
-- 608 normalized historical events plus existing live events, preserved as
-  611 append-only history rows;
-- a 202-target combined follow-up universe with an idempotent repeat import;
-- a real reviewed recommendation for TIC 355651994 with preserved
-  `open → deferred` lifecycle history;
-- recomputed hashes for all 10 manifests and 10,610 candidate snapshots;
-- byte-level SHA-256 verification of all seven committed history sources;
-- all defined launch, selection, execution, provenance, follow-up, recovery,
-  no-AI, no-manual-bridge, and no-substitution requirements represented by
-  structured evidence rather than self-attested pass strings.
+Injection-recovery evidence is recorded in
+`docs/REPRESENTATION_VARIABILITY_INJECTION_BENCHMARK.md`: 48 targets, 192
+trials, with blind BLS recovering 13 of 192.
 
-At that acceptance snapshot, zero of the 202 follow-up targets was eligible:
-190 were incomplete or below the evidence gate, six had no signal, three had
-already been followed up, one was deferred, one had failed, and one had no
-data. That is not “there are no scientifically interesting targets in the
-sky.” It means none of the currently imported, previously searched targets
-meets every rule for scheduling an exact follow-up today. The software can
-still create new-target searches, ingest additional reliable history sources,
-and schedule a future follow-up when new evidence satisfies its revisit gate.
+The strongest evaluated classifier remains the frozen calibrated CNN
+(`benchmark_cnn_v1`): test AUC 0.923096, average precision 0.899184, and
+top-100 yield 91, against Chronos-Bolt tiny at 0.722778 and Astromer2 at
+0.708984 on the same grouped split. Details:
+`docs/GROUPED_EXTERNAL_REPRESENTATION_BENCHMARK.md`.
 
-TIC 355651994 is deferred specifically because currently available MAST
-products do not cover a predicted event and the independent-event requirement
-is not met. The row remains visible with its evidence and revisit condition;
-it is not erased, mislabeled as actionable, or replaced.
+### 3.8 Limitations and Failure Modes
 
-## Data sources and research scope
+- The sky sweep is a documented sample, not an exhaustive survey: 126 base tiles
+  plus a 180-tile expansion ring.
+- TIC catalog completeness is poorer for the faint stars this project targets,
+  so stellar-parameter-dependent diagnostics are frequently absent.
+- `stellar_density_consistency_score` assumes a central transit and is biased
+  for grazing geometries.
+- Automated variability classes (ASAS-SN `Class`) are machine output, not human
+  ground truth, and do not authorize training.
+- Metrics are frozen at selection time and are not recomputed on inspection.
 
-Supported mission paths:
+### 3.9 Implementation and Test Traceability
 
-- **TESS:** SPOC, QLP, and other explicitly selected MAST light-curve products;
-- **Kepler and K2:** archive light curves, catalog labels, frozen calibration,
-  sensitivity, and benchmark roles;
-- **JWST:** time-series products converted to white-light curves before transit
-  search; spectral series are not passed directly to BLS.
+| Component | Implementation | Validation |
+|---|---|---|
+| Schemas | `src/exo_toolkit/schemas.py` | `tests/test_schemas.py` |
+| Features | `src/exo_toolkit/features.py` | `tests/test_features.py` |
+| Hypotheses | `src/exo_toolkit/hypotheses.py` | `tests/test_hypotheses.py` |
+| Scoring | `src/exo_toolkit/scoring.py` | `tests/test_scoring.py` |
+| Pathway | `src/exo_toolkit/pathway.py` | `tests/test_pathway.py` |
+| Search lifecycle | `src/exo_toolkit/search_lifecycle.py` | `tests/test_search_lifecycle.py` |
+| Hunter CLI | `src/exo_toolkit/hunter_cli.py` | `tests/test_hunter_cli.py` |
+| Shell | `src/exo_toolkit/hunter_shell.py` | `tests/test_hunter_shell.py` |
+| CLI interaction contract | `src/exo_toolkit/hunter_ux.py` | `tests/test_hunter_ux.py` |
+| Production gate | `src/exo_toolkit/prod_check.py` | `tests/test_prod_check.py` |
 
-The project uses NASA Exoplanet Archive, MAST, ExoFOP-TESS, and verified public
-catalogs. Dataset roles are explicit: training, validation, calibration,
-frozen evaluation, live search, or follow-up live search. A live-search dataset
-cannot silently become training data, and unlabeled examples are not treated as
-negatives.
-
-The exoplanet classifier/ranker is the production path. Exomoon work remains a
-separate residual/anomaly-ranking research track because no large confirmed
-real-positive exomoon label set exists. The project does not claim a supervised
-exomoon detector.
-
-See [`docs/exoplanet_exomoon_dataset_handoff.md`](docs/exoplanet_exomoon_dataset_handoff.md)
-for the dataset contract and
-[`docs/exoplanet_detection_research_brief.md`](docs/exoplanet_detection_research_brief.md)
-for mission, method, literature, and responsible follow-up context.
-
-## Known limits
-
-- The live new-target selector's 126 cone-search tiles cover about 99 square
-  degrees, not the whole sky. Achieved coverage is recorded in each selector log.
-- Day-one Hunter execution uses archive-extracted light curves. Raw TESS FFI
-  photometric extraction is a separate gated phase.
-- Public catalog and MAST metadata can change. Reproducibility applies to the
-  frozen snapshot and exact provenance, not to future archive responses.
-- The committed follow-up history is complete for its seven known source logs,
-  not for every search ever performed by every external project.
-- `benchmark_cnn_v1` is a Kepler-domain benchmark. Cross-mission transfer is
-  not silently assumed.
-- The historical `star_scanner.py` run006/run008 scans are preserved evidence,
-  not the primary production workflow. `exo background-run-once` exercises
-  seven static fixtures and is a CI/automation check, not a discovery engine.
-- The system does not confirm planets, publish discoveries, contact authorities,
-  or submit candidates without independent human review and authorization.
-
-## Quality and verification
-
-The canonical local gate partitions all default test modules across six pytest
-shards with six xdist workers each while Ruff and strict mypy run concurrently.
-It also runs the repository's reliability controls and incomplete-implementation
-checks.
+Quality gates:
 
 ```bash
-git switch main
-git pull --ff-only origin main
-UV_CACHE_DIR=.uv-cache caffeinate -i \
-  .venv/bin/python Skills/run_quality_gates.py
+.venv/bin/python Skills/run_quality_gates.py     # ten supervised gates, 6x6 topology
+PYTHONPATH=src .venv/bin/pytest                  # test suite
+.venv/bin/python -m ruff check .
+.venv/bin/python -m mypy src
+prod-check
 ```
 
-Focused tests remain appropriate while diagnosing a change, but a production
-claim requires the full current-tree gate. Live-service tests are marked
-`integration_live` and excluded from the default suite; committed acceptance
-artifacts provide the audited live evidence.
+Recorded result on this tree: **3,297 tests passed and 4 failed**. All four
+failures are environmental rather than defects in shipped code. Three
+`tests/test_run_quality_gates.py::TestGitState` cases fail because `git init` is
+denied inside the sandbox, returning exit status 128, and
+`test_outside_repo_cross_project_history_is_rejected_before_db_creation` fails
+because pytest's `tmp_path` resolves inside the repository tree, defeating that
+test's own out-of-repository premise. Ruff and mypy both pass across 43 source
+files.
 
-The test philosophy is fail-loud and behavior-first:
+Coverage claims in this repository must name their denominator. The configured
+coverage source is the `exo_toolkit` package only; it does not measure
+`Skills/`.
 
-- required dependency, schema, input, and archive failures return nonzero;
-- partial success never appears complete;
-- expected safe fallbacks are explicit and directly tested;
-- manifests, histories, and source files are checksum-verified;
-- selection is deterministic and exact manifests are immutable;
-- restart, interruption, idempotency, and stale-candidate races are tested.
+## 4. Sibling Repositories and Shared Data
 
-See [`docs/RELIABILITY_CONTROLS.md`](docs/RELIABILITY_CONTROLS.md) for the
-agent/repository controls and [`AGENTS.md`](AGENTS.md) for binding contribution
-rules.
+### 4.1 Research Program and Repository Responsibilities
 
-## Repository map
+| Repository | Hunter | Scientific responsibility |
+|---|---|---|
+| `2026 Exoplanet Research` | EXO-Hunter | Transiting-exoplanet detection, vetting, and candidate ranking |
+| `2026 Near Earth Objects` | NEOHunter | Near-Earth-object discovery, orbit resolution, and close-approach ranking |
+| `2026 Technosignatures` | TechnoHunter | Technosignature search, RFI rejection, and signal scoring |
 
-```text
-src/exo_toolkit/       installable scientific pipeline and Hunter lifecycle
-tests/                 offline unit, integration, contract, and recovery tests
-Skills/                bounded acquisition, processing, evaluation, and QA tools
-docs/                  readiness, runbooks, methods, policies, and research plans
-data_selection/        versioned candidate/history/dataset contracts and decisions
-metadata/              frozen source, benchmark, and schema contracts
-models/                promoted model and calibration artifacts
-artifacts/manifests/   committed acceptance evidence and Run Reports
-reports/               generated local review output and manifest CSV exports
-data/                  ignored runtime databases and working data
-```
+The three share one logical interaction architecture and one logical identity
+and history contract. They do not share commands, algorithms, datasets, or
+maturity labels.
 
-Start with these documents:
+### 4.2 Local Discovery and Configuration
 
-1. [`docs/PRODUCTION_READINESS.md`](docs/PRODUCTION_READINESS.md) — current
-   acceptance, scorer status, and evidence.
-2. [`docs/HUNTER_PRODUCTION_WORKFLOW.md`](docs/HUNTER_PRODUCTION_WORKFLOW.md) —
-   operator contract and durable lifecycle semantics.
-3. [`docs/DISCOVERY_RUNBOOK.md`](docs/DISCOVERY_RUNBOOK.md) — live-search and
-   responsible review procedure.
-4. [`docs/ROADMAP.md`](docs/ROADMAP.md) — completed and next research gates.
-5. [`docs/astrometrics_data_selection_policy.md`](docs/astrometrics_data_selection_policy.md)
-   and [`docs/astrometrics_external_and_cloud_storage_policy.md`](docs/astrometrics_external_and_cloud_storage_policy.md)
-   — data roles, download limits, cache, external-drive, and retention rules.
-6. [`docs/HUNTER_CROSS_PROJECT_INTERFACE.md`](docs/HUNTER_CROSS_PROJECT_INTERFACE.md)
-   — if you arrived here from `2026 Technosignatures` or
-   `2026 Near Earth Objects`, start there instead of here.
+Sibling locations are supplied explicitly per invocation. This repository
+publishes no absolute personal path and performs no filesystem search for its
+siblings.
 
-## Scientific and operational guardrails
+Cross-project history is consumed from a verified repository-local copy whose
+path is given by `--cross-project-history-path`. `--history-source-root`
+overrides the repository-root resolution heuristic when a manifest is read from
+outside this checkout.
 
-- Never call a transit-like signal a confirmed planet without authoritative
-  external confirmation.
-- Never silently replace missing data, targets, model outputs, or failed work.
-- Preserve every search event, failure, source, timestamp, and follow-up link.
-- Keep frozen evaluation and live-search data isolated from model training.
-- Verify public resource schemas before use; do not guess renamed fields or
-  substitute mirrors.
-- Estimate storage before acquisition and preserve enough provenance to
-  reproduce or re-download exact products.
-- Treat external submission, alerts, and authority-facing communication as
-  separate human-approved actions.
+### 4.3 Shared Artifacts, Ownership, and Access
+
+| Artifact | Owner | Readers | Access |
+|---|---|---|---|
+| Target search history | Producing Hunter | All three, read-only | Verified repository-local copy |
+| Follow-up registry | EXO-Hunter | EXO-Hunter | `data/hunter_searches.sqlite3` |
+| Candidate catalog | EXO-Hunter | EXO-Hunter | `data/hunter_searches.sqlite3` |
+
+Each Hunter publishes only the validated records it owns, and consumes sibling
+records read-only.
+
+### 4.4 Schemas, Provenance, Versioning, and Compatibility
+
+The durable schema is Hunter SQLite schema v6. Imported history manifests are
+checksum-verified before use; a hash mismatch fails closed and no records are
+imported.
+
+Decision validity is one of `valid`, `stale-but-usable`, `refresh-required`,
+`invalid`, or `unknown`. A target cannot be treated as New when required history
+is incomplete, malformed, incompatible, refresh-required, or known to omit newer
+records. `stale-but-usable` cannot justify a known-incomplete novelty decision.
+
+The interface contract is documented in
+`docs/HUNTER_CROSS_PROJECT_INTERFACE.md`.
+
+### 4.5 Availability, Failure Behavior, and Regeneration
+
+If a sibling history copy is absent, malformed, or fails checksum verification,
+the affected command fails closed before creating or mutating any durable
+record, and reports the exact defect. It does not proceed with reduced history,
+because that would let an already-searched target reappear as New.
+
+Regeneration: re-export the history manifest from the owning repository and
+re-import it with `--cross-project-history-path`. Import is idempotent and
+append-only; existing records are never rewritten.
+
+### 4.6 Cross-Repository Safety Boundaries
+
+Exactly one repository is writable per session. This repository never modifies,
+formats, migrates, commits, branches, pushes, or opens a pull request in a
+sibling repository.
+
+Prohibited, and verified absent from `src/` runtime code by the `prod-check`
+`sibling_write_isolation` check: runtime imports from sibling repositories,
+cross-repository symlinks, hard-coded personal paths, and undocumented
+filesystem dependencies.
 
 ## License
 
-Licensed under the [Apache License 2.0](LICENSE).
+Apache-2.0. See `LICENSE`.

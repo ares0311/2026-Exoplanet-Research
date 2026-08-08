@@ -38,7 +38,9 @@ from Skills.star_scanner import (  # noqa: E402
     _load_prior_discovery_tic_ids,
     _load_toi_tic_ids,
     _manual_scan_history_entry,
+    _query_tic_criteria_page,
     _search_centers,
+    _TicFilteredTile,
     _write_run_report,
     inspect_target_products,
     load_prepared_live_search_bundle,
@@ -542,6 +544,102 @@ class TestSearchCenters:
 
 
 class TestCatalogCriteriaDiscovery:
+    @patch("astroquery.mast.conf")
+    @patch("astroquery.mast.Mast")
+    def test_live_query_uses_filtered_position_service(
+        self,
+        mock_mast: MagicMock,
+        mock_conf: MagicMock,
+    ) -> None:
+        mock_mast.service_request.return_value = [
+            {"ID": 1, "objType": "STAR", "Tmag": 12.5}
+        ]
+
+        result = _query_tic_criteria_page(
+            1,
+            10_000,
+            (12.0, 14.5),
+            query_timeout_seconds=30.0,
+        )
+
+        assert isinstance(result, _TicFilteredTile)
+        assert result.rows[0]["ID"] == 1
+        assert mock_conf.timeout == 30
+        service, params = mock_mast.service_request.call_args.args
+        assert service == "Mast.Catalogs.Filtered.Tic.Position.Rows"
+        assert params["columns"] == (
+            "ID,HIP,objType,Tmag,Teff,contratio,rad,ra,dec,d,e_d,distFlag,version"
+        )
+        assert params["filters"] == [
+            {
+                "paramName": "Tmag",
+                "values": [{"min": 12.0, "max": 14.5}],
+            },
+            {"paramName": "objType", "values": ["STAR"]},
+        ]
+        assert mock_mast.service_request.call_args.kwargs == {
+            "pagesize": 10_000,
+            "page": 1,
+        }
+
+    def test_filtered_position_expands_to_outside_high_value_candidate(self) -> None:
+        calls: list[int] = []
+
+        def tile(
+            page: int,
+            _pagesize: int,
+            _range: tuple[float, float],
+            *,
+            query_timeout_seconds: float,
+        ) -> _TicFilteredTile:
+            assert query_timeout_seconds == 120.0
+            calls.append(page)
+            rows = (
+                [{"ID": 1, "objType": "STAR", "Tmag": 14.4, "Teff": 7000.0}]
+                if page == 1
+                else [
+                    {
+                        "ID": 999,
+                        "objType": "STAR",
+                        "Tmag": 12.5,
+                        "Teff": 4000.0,
+                        "contratio": 0.0,
+                        "rad": 0.7,
+                    },
+                    {
+                        "ID": 998,
+                        "objType": "STAR",
+                        "Tmag": 12.5,
+                        "Teff": 4000.0,
+                        "contratio": 0.0,
+                        "rad": 0.7,
+                    },
+                ]
+            )
+            return _TicFilteredTile(
+                rows=tuple(rows),
+                tile_index=page,
+                tile_count=2,
+                pages_queried=1,
+                ra_deg=float(page),
+                dec_deg=0.0,
+                radius_deg=0.5,
+            )
+
+        log: dict[str, Any] = {}
+        targets = select_targets_catalog(
+            2,
+            search_log=log,
+            query_page_fn=tile,
+            max_workers=1,
+        )
+
+        assert calls == [1, 2]
+        assert [row["tic_id"] for row in targets] == [998, 999]
+        assert log["discovery_method"] == "mast_tic_filtered_position_adaptive_v1"
+        assert log["termination_reason"] == "top_n_theoretical_priority_bound"
+        assert log["source_expansion_rounds"][-1]["selection_supported"] is True
+
     def test_scans_past_initial_page_and_retains_global_best(self) -> None:
         pages = {
             1: [

@@ -369,9 +369,48 @@ def cross_project_history_federation_validity(
 
     Returns ``(weakest_state, detail, per_project)``.
     """
+    state, detail, per_project, _ = cross_project_history_federation_snapshot(
+        history_path
+    )
+    return state, detail, per_project
+
+
+def cross_project_history_federation_snapshot(
+    history_path: Path | None = None,
+) -> tuple[
+    str,
+    str,
+    dict[str, tuple[str, str]],
+    dict[str, Any] | None,
+]:
+    """Validate and freeze the exact federation evidence used for New mode.
+
+    The validity-only API above originally checked live sibling exports and
+    then the CLI imported an older repository-local copy.  That split allowed
+    identities added after the copy -- including HIP 60759, HIP 61099, and
+    HIP 3419 -- to pass the validity gate but remain eligible as New.  This
+    function returns one import-compatible snapshot built from the same
+    already hash-validated payloads used for the federation decision.
+
+    Only decision-grade entries are included.  Failed/no-data/unrecognized
+    records remain in their owning exports but are not converted into prior-
+    search evidence.  Per-entry source and export provenance is retained so
+    the durable import is auditable without importing sibling code or writing
+    outside this repository.
+    """
     per_project: dict[str, tuple[str, str]] = {}
+    payloads: dict[str, tuple[Path, dict[str, Any]]] = {}
+    own_path = history_path or (
+        Path(override)
+        if (override := os.environ.get(CROSS_PROJECT_HISTORY_PATH_ENV))
+        else own_history_export_path()
+    )
     own_state, own_detail, _ = cross_project_history_validity(history_path)
     per_project[OWN_PROJECT_KEY] = (own_state, own_detail)
+    if own_state in CROSS_PROJECT_DECISION_STATES:
+        _, _, own_payload = cross_project_history_validity(own_path)
+        if own_payload is not None:
+            payloads[OWN_PROJECT_KEY] = (own_path, own_payload)
 
     for project in sorted(CROSS_PROJECT_ROOT_NAMES):
         try:
@@ -381,8 +420,10 @@ def cross_project_history_federation_validity(
             continue
         # Validated by exactly the same rules as our own export: a sibling is
         # trusted neither more nor less for being remote.
-        state, detail, _ = cross_project_history_validity(sibling_path)
+        state, detail, payload = cross_project_history_validity(sibling_path)
         per_project[project] = (state, detail)
+        if state in CROSS_PROJECT_DECISION_STATES and payload is not None:
+            payloads[project] = (sibling_path, payload)
 
     weakest = min(
         (state for state, _ in per_project.values()),
@@ -394,7 +435,58 @@ def cross_project_history_federation_validity(
         f"{project}={state} ({project_detail})"
         for project, (state, project_detail) in sorted(per_project.items())
     )
-    return weakest, detail, per_project
+    if weakest not in CROSS_PROJECT_DECISION_STATES:
+        return weakest, detail, per_project, None
+
+    merged_sources: list[dict[str, Any]] = []
+    for project, (export_path, payload) in sorted(payloads.items()):
+        export_sha256 = hashlib.sha256(export_path.read_bytes()).hexdigest()
+        for source in payload.get("sources", []):
+            entries: list[dict[str, Any]] = []
+            for entry in source.get("entries", []):
+                if entry.get("validity_state") not in CROSS_PROJECT_DECISION_STATES:
+                    continue
+                frozen_entry = {
+                    key: value
+                    for key, value in entry.items()
+                    if key != "validity_state"
+                }
+                frozen_entry["federation_provenance"] = {
+                    "project_key": project,
+                    "export_path": str(export_path),
+                    "export_sha256": export_sha256,
+                    "source_path": str(source["source_path"]),
+                    "source_sha256": str(source["source_sha256"]),
+                    "source_validity_state": str(source["validity_state"]),
+                    "entry_validity_state": str(entry["validity_state"]),
+                }
+                entries.append(frozen_entry)
+            merged_sources.append(
+                {
+                    key: value
+                    for key, value in source.items()
+                    if key not in {"entries", "validity_state"}
+                }
+                | {
+                    "entries": entries,
+                    "federation_project_key": project,
+                    "federation_export_path": str(export_path),
+                    "federation_export_sha256": export_sha256,
+                    "federation_source_validity_state": str(
+                        source["validity_state"]
+                    ),
+                }
+            )
+    snapshot = {
+        "schema_version": CROSS_PROJECT_HISTORY_SCHEMA_VERSION,
+        "manifest_id": "hunter-cross-project-federation-snapshot-v1",
+        "description": (
+            "Read-only, hash-validated snapshot of the current EXO, NEO, and "
+            "Techno Hunter history exports used for one New eligibility decision."
+        ),
+        "sources": merged_sources,
+    }
+    return weakest, detail, per_project, snapshot
 
 
 # --------------------------------------------------------------------------

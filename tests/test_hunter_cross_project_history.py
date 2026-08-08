@@ -25,6 +25,7 @@ from exo_toolkit.hunter_cross_project_history import (
     SCANNER_STATUS_TO_CROSS_PROJECT,
     cross_project_alias_counts,
     cross_project_evidence_by_alias,
+    cross_project_history_federation_snapshot,
     cross_project_history_federation_validity,
     cross_project_history_validity,
     export_cross_project_history,
@@ -269,6 +270,58 @@ def test_degraded_sibling_degrades_the_federation(
     state, _detail, per_project = cross_project_history_federation_validity(own)
     assert per_project["techno_hunter"][0] == "stale-but-usable"
     assert state == "stale-but-usable"
+
+
+def test_federation_snapshot_imports_current_identities_as_distinct_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    own = _write_export(tmp_path / "own")
+    roots = {name: tmp_path / name for name in CROSS_PROJECT_ROOT_NAMES}
+    for root in roots.values():
+        _write_export(root)
+    techno_export = (
+        roots["techno_hunter"]
+        / "data_selection"
+        / "hunter_prior_search_history_v1.json"
+    )
+    techno_payload = json.loads(techno_export.read_text(encoding="utf-8"))
+    techno_payload["sources"][0]["entries"] = [
+        {
+            "target_id": identity.replace(" ", ""),
+            "canonical_id": identity,
+            "mission": "GBT/MeerKAT radio",
+            "status": "human_review_queue",
+            "searched_at": "2026-01-01T12:00:00+00:00",
+        }
+        for identity in ("HIP 60759", "HIP 61099", "HIP 3419")
+    ]
+    techno_export.write_text(
+        json.dumps(techno_payload, indent=2, sort_keys=True), encoding="utf-8"
+    )
+    _federated(monkeypatch, roots)
+
+    state, detail, per_project, snapshot = cross_project_history_federation_snapshot(
+        own
+    )
+    assert state == "valid"
+    assert "techno_hunter=valid" in detail
+    assert set(per_project) == {"exo_hunter", *CROSS_PROJECT_ROOT_NAMES}
+    assert snapshot is not None
+
+    store = HunterStore(tmp_path / "hunter.sqlite3")
+    summary = store.import_cross_project_history(snapshot, source_root=None)
+    assert summary["entries_created"] >= 3
+    identities = store.cross_project_searched_identities()
+    assert {"HIP 60759", "HIP 61099", "HIP 3419"} <= identities
+    with store.connect() as connection:
+        imported = [
+            json.loads(row[0])
+            for row in connection.execute(
+                "SELECT identities_json FROM cross_project_search_history"
+            )
+        ]
+    for identity in ("HIP 60759", "HIP 61099", "HIP 3419"):
+        assert [row for row in imported if identity in row] == [[identity]]
 
 
 def test_sibling_discovery_is_repo_relative_and_never_hardcoded() -> None:

@@ -116,3 +116,8 @@ reports/*
 !reports/background/
 reports/background/*
 !reports/background/.gitignore
+
+# Sandbox-only pytest tmp_path litter (HYGIENE-01). Some paths under this
+# directory are already tracked from an earlier commit; this rule prevents
+# further accumulation but does not untrack them.
+pytest-of-*/

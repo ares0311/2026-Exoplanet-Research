@@ -1,4 +1,5 @@
 """Polished shell entry points for the durable EXO-Hunter workflow."""
+
 from __future__ import annotations
 
 import argparse
@@ -13,6 +14,7 @@ from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from pathlib import Path
+from statistics import median
 from types import ModuleType
 from typing import Any
 
@@ -22,11 +24,12 @@ from rich.table import Table
 from exo_toolkit import __version__
 from exo_toolkit.cli import run_pipeline
 from exo_toolkit.hunter_cross_project import (
-    DEFAULT_COPIED_HISTORY,
+    load_cross_project_history,
     require_repo_local_history_path,
 )
 from exo_toolkit.hunter_cross_project_history import (
     CROSS_PROJECT_DECISION_STATES,
+    cross_project_history_federation_snapshot,
     cross_project_history_federation_validity,
     write_cross_project_history_export,
 )
@@ -63,9 +66,7 @@ from exo_toolkit.search_lifecycle import (
 DEFAULT_HUNTER_DB = Path("data/hunter_searches.sqlite3")
 DEFAULT_MANIFEST_DIR = Path("reports/search_manifests")
 DEFAULT_HISTORY_MANIFEST = (
-    Path(__file__).resolve().parents[2]
-    / "data_selection"
-    / "hunter_prior_search_history_v1.json"
+    Path(__file__).resolve().parents[2] / "data_selection" / "hunter_prior_search_history_v1.json"
 )
 DEFAULT_POOL_SIZE = 10_000
 VALID_SCORERS = {"bayesian", "xgboost", "ensemble", "cnn", "full-ensemble"}
@@ -128,23 +129,20 @@ def _model_artifact_identities(
 
 
 def _load_project_skill(module_name: str) -> ModuleType:
-    """Load a repository Skill from installed console-script entry points."""
-    repo_root = Path(__file__).resolve().parents[2]
-    expected_path = repo_root / "Skills" / f"{module_name}.py"
-    if not expected_path.is_file():
-        raise RuntimeError(
-            f"Required project Skill is missing: {expected_path}. "
-            "Run EXO-Hunter from an editable checkout of this repository."
-        )
-    root_text = str(repo_root)
-    if root_text not in sys.path:
-        sys.path.insert(0, root_text)
+    """Load a required Skill from the installed distribution.
+
+    ``Skills`` is a runtime package in the wheel.  Never synthesize an import
+    path to a checkout: that makes an editable tree silently satisfy a broken
+    installed artifact and prevents EXO-Hunter from working in a normal wheel
+    environment.
+    """
     try:
         return importlib.import_module(f"Skills.{module_name}")
     except Exception as exc:  # noqa: BLE001
         raise RuntimeError(
-            f"Required project Skill Skills.{module_name} could not be imported: "
-            f"{type(exc).__name__}: {exc}"
+            f"Required installed runtime package Skills.{module_name} could not be "
+            f"imported: {type(exc).__name__}: {exc}. Reinstall EXO-Hunter from the "
+            "canonical built wheel."
         ) from exc
 
 
@@ -206,9 +204,7 @@ def _prior_search_summary(candidate: HunterCandidate) -> str:
     )
 
 
-def _timestamped_manifest_path(
-    manifest_dir: Path, search: Mapping[str, Any]
-) -> Path:
+def _timestamped_manifest_path(manifest_dir: Path, search: Mapping[str, Any]) -> Path:
     created_at = datetime.fromisoformat(str(search["created_at"]))
     timestamp = created_at.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
     return manifest_dir / f"{timestamp}_{search['search_id']}.csv"
@@ -376,9 +372,7 @@ def _load_reviewed_follow_up(path: Path) -> dict[str, Any]:
                 f"expected={expected} actual={actual}"
             )
     payload["candidate"] = HunterCandidate.model_validate(payload["candidate"])
-    payload["recommendation"] = FollowUpRecommendation.model_validate(
-        payload["recommendation"]
-    )
+    payload["recommendation"] = FollowUpRecommendation.model_validate(payload["recommendation"])
     payload["completed_at"] = datetime.fromisoformat(str(payload["completed_at"]))
     if payload["completed_at"].tzinfo is None:
         raise RuntimeError("Reviewed evidence completed_at must include a timezone")
@@ -465,8 +459,8 @@ def _build_new_candidates(
         else:
             eligibility_reason = "eligible_with_qlp_products"
 
-        base_priority = float(product.get("priority", row["priority"])) if product else float(
-            row["priority"]
+        base_priority = (
+            float(product.get("priority", row["priority"])) if product else float(row["priority"])
         )
         distance_pc = _positive_float_or_none(row.get("distance_pc"))
         availability_score = min(product_count / 5.0, 1.0) if product_count else 0.0
@@ -475,8 +469,7 @@ def _build_new_candidates(
         ranking_score = (
             NEW_RANKING_WEIGHTS["tic_priority"] * base_priority
             + NEW_RANKING_WEIGHTS["availability"] * availability_score
-            + NEW_RANKING_WEIGHTS["expected_information_gain"]
-            * expected_information_gain
+            + NEW_RANKING_WEIGHTS["expected_information_gain"] * expected_information_gain
             + NEW_RANKING_WEIGHTS["storage_cost_penalty"] * cost_penalty
         )
         aliases = [str(tic_id)]
@@ -495,9 +488,7 @@ def _build_new_candidates(
         )
         if shared_history_match is not None:
             eligible = False
-            eligibility_reason = (
-                f"excluded_cross_project_prior_search:{shared_history_match}"
-            )
+            eligibility_reason = f"excluded_cross_project_prior_search:{shared_history_match}"
         candidates.append(
             HunterCandidate(
                 target_id=f"TIC {tic_id}",
@@ -531,12 +522,8 @@ def _build_new_candidates(
                     "tmag": row.get("tmag"),
                     "teff_k": row.get("teff"),
                     "radius_rsun": row.get("radius_rsun"),
-                    "distance_error_pc": _positive_float_or_none(
-                        row.get("distance_error_pc")
-                    ),
-                    "distance_source_flag": _json_safe_metadata(
-                        row.get("distance_source_flag")
-                    ),
+                    "distance_error_pc": _positive_float_or_none(row.get("distance_error_pc")),
+                    "distance_source_flag": _json_safe_metadata(row.get("distance_source_flag")),
                     "contamination_ratio": row.get("contratio"),
                     "qlp_product_count": product_count,
                     "availability_score": availability_score,
@@ -581,6 +568,27 @@ def _select_live_new_candidates(
     sufficiency_reason = ""
     nth_selected_score: float | None = None
     remaining_score_upper_bound: float | None = None
+    evaluated_target_ids: set[str] = set()
+    previous_top_n: list[str] = []
+    previous_rank_by_id: dict[str, int] = {}
+    previous_score_by_id: dict[str, float] = {}
+
+    with store.connect() as connection:
+        federation_watermarks = [
+            {
+                "manifest_sha256": str(row["manifest_sha256"]),
+                "manifest_path": str(row["manifest_path"]),
+                "source_project": str(row["source_project"]),
+                "source_path": str(row["source_path"]),
+                "source_sha256": str(row["source_sha256"]),
+                "validity_state": str(row["validity_state"]),
+            }
+            for row in connection.execute(
+                "SELECT DISTINCT manifest_sha256, manifest_path, source_project, "
+                "source_path, source_sha256, validity_state "
+                "FROM cross_project_search_history ORDER BY source_project, source_path"
+            )
+        ]
 
     while True:
         catalog_log: dict[str, Any] = {}
@@ -608,8 +616,7 @@ def _select_live_new_candidates(
             inspect_rows = [
                 row
                 for row in candidate_rows
-                if int(row["tic_id"]) not in known_variables
-                and int(row["tic_id"]) not in inspected
+                if int(row["tic_id"]) not in known_variables and int(row["tic_id"]) not in inspected
             ]
             inspection_started = time.monotonic()
             if progress_fn is not None:
@@ -647,9 +654,7 @@ def _select_live_new_candidates(
                         elapsed = time.monotonic() - inspection_started
                         rate = completed / elapsed if elapsed > 0 else 0.0
                         remaining = (
-                            (len(inspect_rows) - completed) / rate
-                            if rate > 0
-                            else float("inf")
+                            (len(inspect_rows) - completed) / rate if rate > 0 else float("inf")
                         )
                         progress_fn(
                             f"  [{completed}/{len(inspect_rows)}] "
@@ -660,6 +665,24 @@ def _select_live_new_candidates(
                 str(catalog_log.get("retrieved_at", datetime.now(UTC).isoformat()))
             )
             source_versions = catalog_log.get("source_versions") or ["unknown"]
+            discovery_method = str(catalog_log.get("discovery_method", "unknown"))
+            if discovery_method == "mast_tic_filtered_position_adaptive_v1":
+                validity_basis = (
+                    "MAST filtered-position discovery retained the strongest "
+                    "first-stage rows until the recorded theoretical score bound; "
+                    "metadata was refreshed for every row needed by the final "
+                    "top-N score bound"
+                )
+                discovery_transformation = (
+                    "bounded MAST TIC filtered-position expansion with a "
+                    "theoretical first-stage score bound"
+                )
+            else:
+                validity_basis = (
+                    "Catalog criteria universe exhausted; metadata refreshed for "
+                    "every row needed by the top-N score bound"
+                )
+                discovery_transformation = "TIC structural and magnitude filtering"
             validity = DecisionValidity(
                 state="valid",
                 source="MAST TESS Input Catalog and QLP product metadata",
@@ -668,15 +691,12 @@ def _select_live_new_candidates(
                 retrieved_at=retrieved_at,
                 assessed_at=datetime.now(UTC),
                 transformations=(
-                    "TIC structural and magnitude filtering",
+                    discovery_transformation,
                     "deterministic first-stage priority scoring",
                     "ASAS-SN known-variable exclusion",
                     "QLP product availability and storage-size inspection",
                 ),
-                basis=(
-                    "Catalog criteria universe exhausted; metadata refreshed for "
-                    "every row needed by the top-N score bound"
-                ),
+                basis=validity_basis,
             )
             candidates = _build_new_candidates(
                 raw_targets,
@@ -695,9 +715,7 @@ def _select_live_new_candidates(
                 if len(ranked_eligible) >= targets
                 else None
             )
-            remaining_priorities = [
-                float(row["priority"]) for row in raw_targets[stage_two_goal:]
-            ]
+            remaining_priorities = [float(row["priority"]) for row in raw_targets[stage_two_goal:]]
             total_after_exclusion = int(
                 catalog_log.get("candidates_after_exclusion", len(raw_targets))
             )
@@ -708,17 +726,30 @@ def _select_live_new_candidates(
                 if remaining_priorities
                 else None
             )
-            supported = (
-                nth_selected_score is not None
-                and (
-                    remaining_score_upper_bound is None
-                    or nth_selected_score >= remaining_score_upper_bound
-                )
+            supported = nth_selected_score is not None and (
+                remaining_score_upper_bound is None
+                or nth_selected_score >= remaining_score_upper_bound
             )
             fully_inspected_universe = (
-                stage_two_goal == len(raw_targets)
-                and len(raw_targets) == total_after_exclusion
+                stage_two_goal == len(raw_targets) and len(raw_targets) == total_after_exclusion
             )
+            evaluated_now = {row.target_id for row in candidates[:stage_two_goal]}
+            candidates_added = len(evaluated_now - evaluated_target_ids)
+            evaluated_target_ids.update(evaluated_now)
+            top_n = [row.target_id for row in ranked_eligible[:targets]]
+            current_rank_by_id = {target_id: rank for rank, target_id in enumerate(top_n, 1)}
+            current_score_by_id = {
+                row.target_id: row.ranking_score for row in ranked_eligible[:targets]
+            }
+            common = set(previous_rank_by_id) & set(current_rank_by_id)
+            rank_changes = [
+                abs(previous_rank_by_id[target_id] - current_rank_by_id[target_id])
+                for target_id in common
+            ]
+            score_changes = [
+                abs(previous_score_by_id[target_id] - current_score_by_id[target_id])
+                for target_id in common
+            ]
             expansion_attempts.append(
                 {
                     "retained_limit": shortlist_limit,
@@ -730,8 +761,36 @@ def _select_live_new_candidates(
                     "remaining_score_upper_bound": remaining_score_upper_bound,
                     "selection_supported": supported,
                     "full_filtered_universe_inspected": fully_inspected_universe,
+                    "candidates_added": candidates_added,
+                    "top_n_target_ids": top_n,
+                    "top_n_membership_churn": {
+                        "added": [
+                            target_id for target_id in top_n if target_id not in previous_top_n
+                        ],
+                        "removed": [
+                            target_id for target_id in previous_top_n if target_id not in top_n
+                        ],
+                        "retained": [
+                            target_id for target_id in top_n if target_id in previous_top_n
+                        ],
+                    },
+                    "rank_stability": {
+                        "compared_targets": len(common),
+                        "unchanged_positions": sum(
+                            previous_rank_by_id[target_id] == current_rank_by_id[target_id]
+                            for target_id in common
+                        ),
+                        "maximum_absolute_rank_change": max(rank_changes, default=0),
+                    },
+                    "score_stability": {
+                        "compared_targets": len(common),
+                        "maximum_absolute_score_change": max(score_changes, default=0.0),
+                    },
                 }
             )
+            previous_top_n = top_n
+            previous_rank_by_id = current_rank_by_id
+            previous_score_by_id = current_score_by_id
             if supported:
                 sufficiency_reason = "top_n_score_upper_bound"
                 break
@@ -748,9 +807,7 @@ def _select_live_new_candidates(
 
         if sufficiency_reason:
             break
-        total_after_exclusion = int(
-            search_log.get("candidates_after_exclusion", len(raw_targets))
-        )
+        total_after_exclusion = int(search_log.get("candidates_after_exclusion", len(raw_targets)))
         next_limit = min(total_after_exclusion, max(shortlist_limit + 1, shortlist_limit * 2))
         if next_limit <= shortlist_limit:
             raise RuntimeError(
@@ -764,9 +821,102 @@ def _select_live_new_candidates(
             )
         shortlist_limit = next_limit
 
+    eligible_scores = sorted(row.ranking_score for row in candidates if row.eligible)
+    rejection_counts: dict[str, int] = {}
+    for candidate in candidates:
+        if candidate.eligible:
+            continue
+        rejection_counts[candidate.eligibility_reason] = (
+            rejection_counts.get(candidate.eligibility_reason, 0) + 1
+        )
+    total_after_exclusion = int(search_log.get("candidates_after_exclusion", len(raw_targets)))
+    positional_discovery = (
+        search_log.get("discovery_method")
+        == "mast_tic_filtered_position_adaptive_v1"
+    )
+    discovery_source_name = (
+        "MAST TIC filtered-position catalog"
+        if positional_discovery
+        else "MAST TIC filtered criteria catalog"
+    )
     search_log["discovery_expansion_attempts"] = expansion_attempts
     search_log.update(
         {
+            "requested_target_count": targets,
+            "discovered_count": len(candidates),
+            "eligible_count": len(eligible_scores),
+            "rejection_counts_by_reason": dict(sorted(rejection_counts.items())),
+            "source_identities": [
+                discovery_source_name,
+                "MAST TESS QLP product metadata",
+                "ASAS-SN variable-star catalog",
+                "Astrometrics Hunter cross-project history federation",
+            ],
+            "source_watermarks": {
+                "mast_tic": {
+                    "retrieved_at": search_log.get("retrieved_at"),
+                    "source_versions": search_log.get("source_versions", []),
+                    "discovery_method": search_log.get("discovery_method"),
+                    "service": search_log.get("service"),
+                    "pages_queried": search_log.get("pages_queried"),
+                    "segments_configured": search_log.get("segments_configured"),
+                    "segments_queried": search_log.get("segments_queried"),
+                    "remaining_discovery_segments": search_log.get(
+                        "remaining_discovery_segments"
+                    ),
+                    "catalog_rows_seen": search_log.get("catalog_rows_seen"),
+                },
+                "mast_qlp": {
+                    "pipeline": "QLP",
+                    "exptime": "long",
+                    "targets_inspected": len(inspected),
+                },
+                "asas_sn": {
+                    "targets_checked": len(checked_for_variable),
+                    "variables_excluded": len(known_variables),
+                },
+                "cross_project_history": federation_watermarks,
+            },
+            "sources_exhausted": (
+                [discovery_source_name]
+                if search_log.get("universe_exhausted") is True
+                else []
+            ),
+            "remaining_unexplored_universe": (
+                0
+                if sufficiency_reason
+                in {"top_n_score_upper_bound", "accessible_filtered_universe_exhausted"}
+                else max(total_after_exclusion - stage_two_goal, 0)
+            ),
+            "metadata_rows_not_inspected": max(
+                total_after_exclusion - stage_two_goal, 0
+            ),
+            "remaining_discovery_segments": search_log.get(
+                "remaining_discovery_segments", 0
+            ),
+            "termination_reason": sufficiency_reason,
+            "quality_distribution": {
+                "count": len(eligible_scores),
+                "minimum": eligible_scores[0] if eligible_scores else None,
+                "median": median(eligible_scores) if eligible_scores else None,
+                "maximum": eligible_scores[-1] if eligible_scores else None,
+                "units": "deterministic ranking-score points",
+            },
+            "limitations": [
+                (
+                    "The accessible discovery universe is the deterministic set "
+                    "of bounded MAST TIC filtered-position segments recorded in "
+                    "the selector log; unswept segments remain explicit."
+                    if positional_discovery
+                    else "The accessible universe is the filtered MAST TIC "
+                    "response at the recorded watermark."
+                ),
+                "QLP availability and storage metadata are assessed only for "
+                "candidates needed by the top-N bound.",
+                "Best-available top-N membership is separate from absolute scientific quality.",
+                "Source changes after the recorded watermarks require a new "
+                "search, not mutation of this manifest.",
+            ],
             "candidate_universe_requested": pool_size,
             "candidate_universe_returned": len(raw_targets),
             "stage_two_metadata_count": stage_two_goal,
@@ -851,6 +1001,29 @@ def _require_decision_grade_history(
     return state, detail
 
 
+def _require_decision_grade_history_snapshot(
+    history_path: Path | None = None,
+) -> tuple[str, str, dict[str, Any]]:
+    """Return the exact validated federation snapshot used for eligibility."""
+    state, detail, per_project, snapshot = cross_project_history_federation_snapshot(history_path)
+    if state not in CROSS_PROJECT_DECISION_STATES or snapshot is None:
+        blocking = sorted(
+            project
+            for project, (project_state, _) in per_project.items()
+            if project_state not in CROSS_PROJECT_DECISION_STATES
+        )
+        raise RuntimeError(
+            "New eligibility requires decision-grade cross-project history from "
+            f"all {len(per_project)} Astrometrics Hunter projects; weakest "
+            f"validity is {state!r} from {', '.join(blocking)}. {detail}. "
+            "Publish or refresh the blocking project's export "
+            "(data_selection/hunter_prior_search_history_v1.json), or run a "
+            "follow-up search instead. New selection fails closed rather than "
+            "assuming novelty (IDENT-03)."
+        )
+    return state, detail, snapshot
+
+
 def _parser_export_history() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="Export-Cross-Project-History",
@@ -914,19 +1087,33 @@ def create_new_search(
             raise ValueError(f"workers must be between 1 and {MAX_LIVE_WORKERS}")
         pool_size = max(args.pool_size or 0, DEFAULT_POOL_SIZE, args.targets * 100)
         cross_project_import: dict[str, Any] | None = None
+        legacy_copy_validation: dict[str, Any] | None = None
         history_state: str | None = None
         history_detail: str | None = None
+        federation_snapshot: dict[str, Any] | None = None
         if args.mode == "new":
             # IDENT-03: refuse before touching the datastore, so a blocked New
             # search freezes nothing at all.
-            history_state, history_detail = _require_decision_grade_history()
-            copied_history = require_repo_local_history_path(
-                args.cross_project_history_path or DEFAULT_COPIED_HISTORY
+            history_state, history_detail, federation_snapshot = (
+                _require_decision_grade_history_snapshot()
             )
+            if args.cross_project_history_path is not None:
+                copied_history = require_repo_local_history_path(args.cross_project_history_path)
+                copied_payload = load_cross_project_history(copied_history, source_root=None)
+                legacy_copy_validation = {
+                    "manifest_path": copied_payload["manifest_path"],
+                    "manifest_sha256": copied_payload["manifest_sha256"],
+                    "validity_state": copied_payload["validity_state"],
+                    "source_hashes_verified": copied_payload["source_hashes_verified"],
+                    "entries_total": len(copied_payload["entries"]),
+                    "entries_created": 0,
+                    "role": "validated legacy copy; not used for New eligibility",
+                }
         store = HunterStore(args.db)
         if args.mode == "new":
+            assert federation_snapshot is not None
             cross_project_import = store.import_cross_project_history(
-                copied_history,
+                federation_snapshot,
                 source_root=None,
             )
         if args.mode == "follow-up":
@@ -959,7 +1146,8 @@ def create_new_search(
             "tmag_range": [args.tmag_min, args.tmag_max],
             "pool_size_requested": pool_size,
             "selector_log": selector_log,
-            "cross_project_history_import": cross_project_import,
+            "cross_project_history_import": (legacy_copy_validation or cross_project_import),
+            "cross_project_history_federation_import": cross_project_import,
             # IDENT-04: the federation evidence this selection rests on.
             "cross_project_history_validity": history_state,
             "cross_project_history_source": history_detail,
@@ -967,14 +1155,11 @@ def create_new_search(
         }
         prewrite_integrity = store.validity_summary(
             history_manifest=args.history_manifest if args.mode == "follow-up" else None,
-            history_source_root=(
-                args.history_source_root if args.mode == "follow-up" else None
-            ),
+            history_source_root=(args.history_source_root if args.mode == "follow-up" else None),
         )
         if not prewrite_integrity["ok"]:
             raise RuntimeError(
-                "Hunter database integrity failed before search creation: "
-                f"{prewrite_integrity}"
+                f"Hunter database integrity failed before search creation: {prewrite_integrity}"
             )
         search = store.create_search(
             candidates,
@@ -984,12 +1169,8 @@ def create_new_search(
             config=config,
         )
         integrity = store.validity_summary(
-            history_manifest=(
-                args.history_manifest if args.mode == "follow-up" else None
-            ),
-            history_source_root=(
-                args.history_source_root if args.mode == "follow-up" else None
-            ),
+            history_manifest=(args.history_manifest if args.mode == "follow-up" else None),
+            history_source_root=(args.history_source_root if args.mode == "follow-up" else None),
         )
         if not integrity["ok"]:
             raise RuntimeError(f"Hunter database integrity failed: {integrity}")
@@ -1255,9 +1436,7 @@ def run_new_search(
         if not 1 <= args.workers <= MAX_LIVE_WORKERS:
             raise ValueError(f"workers must be between 1 and {MAX_LIVE_WORKERS}")
         if args.scorer not in VALID_SCORERS:
-            raise ValueError(
-                f"scorer must be one of {sorted(VALID_SCORERS)}, got {args.scorer!r}"
-            )
+            raise ValueError(f"scorer must be one of {sorted(VALID_SCORERS)}, got {args.scorer!r}")
         model_path = args.model_path
         if args.scorer in {"xgboost", "ensemble", "full-ensemble"} and model_path is None:
             model_path = Path("models/xgboost_toi.json")
@@ -1355,8 +1534,7 @@ def show_follow_ups(argv: Sequence[str] | None = None) -> int:
             if prior_searches:
                 prior = prior_searches[-1]
                 prior_label = (
-                    f"{prior['source_project']} — {prior['searched_by']} — "
-                    f"{prior['searched_at']}"
+                    f"{prior['source_project']} — {prior['searched_by']} — {prior['searched_at']}"
                 )
                 for prior_index, prior_entry in enumerate(prior_searches, 1):
                     provenance_details.append(
@@ -1384,9 +1562,7 @@ def show_follow_ups(argv: Sequence[str] | None = None) -> int:
         for detail in provenance_details:
             console.print(detail)
         deferred = [
-            row
-            for row in rows
-            if not bool(row["search_eligible"]) and row.get("revisit_reason")
+            row for row in rows if not bool(row["search_eligible"]) and row.get("revisit_reason")
         ]
         if deferred:
             console.print("[bold]Revisit gates[/bold]")
@@ -1398,9 +1574,7 @@ def show_follow_ups(argv: Sequence[str] | None = None) -> int:
         return 2
 
 
-def _match_manifest_target(
-    search: Mapping[str, Any], reference: str
-) -> dict[str, Any] | None:
+def _match_manifest_target(search: Mapping[str, Any], reference: str) -> dict[str, Any] | None:
     """Resolve one manifest row by ordinal rank or by identifier.
 
     A purely numeric reference is a rank (the manifest ordinal shown in the
@@ -1452,9 +1626,7 @@ def _inspection_report(
         "metrics": candidate.get("metrics") or {},
         "estimated_download_gb": candidate.get("estimated_download_gb"),
         "prior_searches": [dict(entry) for entry in prior_searches],
-        "search_status": _candidate_search_status(
-            HunterCandidate.model_validate(candidate)
-        )
+        "search_status": _candidate_search_status(HunterCandidate.model_validate(candidate))
         if candidate
         else None,
         "durable_history": [dict(entry) for entry in history],
@@ -1692,9 +1864,7 @@ def recheck_follow_ups(
         errors = 0
 
         if not deferred:
-            print(
-                "No deferred follow-ups to recheck.", file=progress_stream, flush=True
-            )
+            print("No deferred follow-ups to recheck.", file=progress_stream, flush=True)
         else:
             print(
                 f"Recheck-Follow-Ups: {len(deferred)} deferred follow-up(s), "
@@ -1733,9 +1903,7 @@ def recheck_follow_ups(
                     done += 1
                     elapsed = time.monotonic() - start_monotonic
                     rate = done / elapsed if elapsed > 0 else 0.0
-                    remaining = (
-                        (len(deferred) - done) / rate if rate > 0 else float("inf")
-                    )
+                    remaining = (len(deferred) - done) / rate if rate > 0 else float("inf")
                     print(
                         f"  [{done}/{len(deferred)}] elapsed={elapsed:.0f}s "
                         f"ETA={format_eta(remaining)}",

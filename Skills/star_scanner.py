@@ -678,6 +678,26 @@ def _query_one_tile(
     return None, errors
 
 
+_TIC_FILTERED_POSITION_SERVICE = "Mast.Catalogs.Filtered.Tic.Position.Rows"
+_TIC_DISCOVERY_COLUMNS = (
+    "ID,HIP,objType,Tmag,Teff,contratio,rad,ra,dec,d,e_d,distFlag,version"
+)
+_TIC_DISCOVERY_RADIUS_DEG = 0.5
+
+
+@dataclass(frozen=True)
+class _TicFilteredTile:
+    """One bounded, server-filtered TIC discovery segment."""
+
+    rows: tuple[Any, ...]
+    tile_index: int
+    tile_count: int
+    pages_queried: int
+    ra_deg: float
+    dec_deg: float
+    radius_deg: float
+
+
 def _query_tic_criteria_page(
     page: int,
     pagesize: int,
@@ -685,18 +705,288 @@ def _query_tic_criteria_page(
     *,
     query_timeout_seconds: float,
 ) -> Any:
-    """Return one non-positional TIC criteria page from MAST."""
-    from astroquery.mast import Catalogs
+    """Return one bounded, filtered-position TIC discovery segment.
+
+    A non-positional ``Tmag``/``objType`` query spans tens of millions of TIC
+    rows and MAST closes it before returning even the first requested page.
+    The supported filtered-position service applies those same scientific
+    filters inside one bounded cone and permits a restricted column list.
+    ``page`` is therefore the one-based deterministic sky-segment index; any
+    row pagination required inside that segment is exhausted here.
+    """
+    from astroquery.mast import Mast
     from astroquery.mast import conf as mast_conf
 
+    centers = _search_centers(TOTAL_SEARCH_TILES)
+    if page < 1 or page > len(centers):
+        raise ValueError(f"TIC discovery segment must be between 1 and {len(centers)}")
+    ra_deg, dec_deg = centers[page - 1]
     mast_conf.timeout = int(query_timeout_seconds)
-    return Catalogs.query_criteria(
-        catalog="TIC",
-        Tmag=list(tmag_range),
-        objType="STAR",
-        pagesize=pagesize,
-        page=page,
+    params = {
+        "columns": _TIC_DISCOVERY_COLUMNS,
+        "ra": ra_deg,
+        "dec": dec_deg,
+        "radius": _TIC_DISCOVERY_RADIUS_DEG,
+        "filters": [
+            {
+                "paramName": "Tmag",
+                "values": [{"min": tmag_range[0], "max": tmag_range[1]}],
+            },
+            {"paramName": "objType", "values": ["STAR"]},
+        ],
+    }
+    rows: list[Any] = []
+    response_page = 1
+    while True:
+        result = Mast.service_request(
+            _TIC_FILTERED_POSITION_SERVICE,
+            params,
+            pagesize=pagesize,
+            page=response_page,
+        )
+        page_rows = list(result)
+        rows.extend(page_rows)
+        if len(page_rows) < pagesize:
+            break
+        response_page += 1
+    return _TicFilteredTile(
+        rows=tuple(rows),
+        tile_index=page,
+        tile_count=len(centers),
+        pages_queried=response_page,
+        ra_deg=ra_deg,
+        dec_deg=dec_deg,
+        radius_deg=_TIC_DISCOVERY_RADIUS_DEG,
     )
+
+
+def _select_targets_from_filtered_tiles(
+    n: int,
+    *,
+    first_tile: _TicFilteredTile,
+    tmag_range: tuple[float, float],
+    excluded: set[int],
+    pagesize: int,
+    retry_attempts: int,
+    retry_delay: float,
+    query_timeout_seconds: float,
+    max_workers: int,
+    search_log: dict[str, Any] | None,
+    query: Any,
+    started: float,
+    retrieved_at: str,
+) -> list[dict[str, Any]]:
+    """Adaptively retain top-N from bounded filtered-position TIC segments."""
+    heap: list[tuple[float, int, dict[str, Any]]] = []
+    seen: set[int] = set()
+    source_versions: set[str] = set()
+    rows_seen = 0
+    rows_matching = 0
+    excluded_count = 0
+    tiles_queried = 0
+    pages_queried = 0
+    errors: list[str] = []
+    expansion_rounds: list[dict[str, Any]] = []
+    theoretical_upper_bound = priority_score(
+        12.5,
+        teff=4_000.0,
+        contratio=0.0,
+        radius_rsun=0.7,
+    )
+
+    def retain(tile: _TicFilteredTile) -> int:
+        nonlocal rows_seen, rows_matching, excluded_count, tiles_queried, pages_queried
+        before = len(seen)
+        tiles_queried += 1
+        pages_queried += tile.pages_queried
+        rows_seen += len(tile.rows)
+        for row in tile.rows:
+            obj_type = _row_get(row, "objType")
+            if obj_type is not None and str(obj_type).strip().upper() != "STAR":
+                continue
+            try:
+                tic_id = int(_row_get(row, "ID"))
+                tmag = float(_row_get(row, "Tmag"))
+            except (TypeError, ValueError):
+                continue
+            if tic_id in seen or not math.isfinite(tmag):
+                continue
+            seen.add(tic_id)
+            if not tmag_range[0] <= tmag <= tmag_range[1]:
+                continue
+            rows_matching += 1
+            if tic_id in excluded:
+                excluded_count += 1
+                continue
+            teff = _row_float_or_none(row, "Teff")
+            contratio = _row_float_or_none(row, "contratio")
+            radius_rsun = _row_float_or_none(row, "rad")
+            priority = priority_score(
+                tmag,
+                teff=teff,
+                contratio=contratio,
+                radius_rsun=radius_rsun,
+            )
+            version = _row_get(row, "version")
+            if version is not None and str(version).strip():
+                source_versions.add(str(version).strip())
+            target = {
+                "tic_id": tic_id,
+                "hip_id": _row_get(row, "HIP"),
+                "ra_deg": _row_float_or_none(row, "ra"),
+                "dec_deg": _row_float_or_none(row, "dec"),
+                "distance_pc": _row_float_or_none(row, "d"),
+                "distance_error_pc": _row_float_or_none(row, "e_d"),
+                "distance_source_flag": _row_get(row, "distFlag"),
+                "tmag": tmag,
+                "teff": teff,
+                "contratio": contratio,
+                "radius_rsun": radius_rsun,
+                "priority": priority,
+            }
+            item = (priority, -tic_id, target)
+            if len(heap) < n:
+                heapq.heappush(heap, item)
+            elif item[:2] > heap[0][:2]:
+                heapq.heapreplace(heap, item)
+        return len(seen) - before
+
+    def load(tile_index: int) -> tuple[_TicFilteredTile | None, list[str]]:
+        tile_errors: list[str] = []
+        for attempt in range(1, retry_attempts + 1):
+            try:
+                result = query(
+                    tile_index,
+                    pagesize,
+                    tmag_range,
+                    query_timeout_seconds=query_timeout_seconds,
+                )
+                if not isinstance(result, _TicFilteredTile):
+                    raise TypeError("filtered-position query returned an invalid segment")
+                return result, tile_errors
+            except Exception as exc:  # noqa: BLE001
+                tile_errors.append(
+                    f"filtered position segment {tile_index} attempt "
+                    f"{attempt}/{retry_attempts}: {type(exc).__name__}: {exc}"
+                )
+                if attempt < retry_attempts:
+                    time.sleep(retry_delay)
+        return None, tile_errors
+
+    retain(first_tile)
+    next_tile = first_tile.tile_index + 1
+    termination_reason = ""
+    round_index = 0
+    while True:
+        retained_floor = float(heap[0][0]) if len(heap) == n else None
+        supported = (
+            retained_floor is not None
+            and retained_floor >= theoretical_upper_bound - 1e-12
+        )
+        if supported:
+            termination_reason = "top_n_theoretical_priority_bound"
+            break
+        if next_tile > first_tile.tile_count:
+            termination_reason = "configured_filtered_position_universe_exhausted"
+            break
+
+        round_index += 1
+        batch = list(
+            range(
+                next_tile,
+                min(next_tile + max_workers, first_tile.tile_count + 1),
+            )
+        )
+        candidates_before = len(seen)
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = {pool.submit(load, tile_index): tile_index for tile_index in batch}
+            loaded: dict[int, _TicFilteredTile] = {}
+            for future in as_completed(futures):
+                tile_index = futures[future]
+                tile, tile_errors = future.result()
+                errors.extend(tile_errors)
+                if tile is not None:
+                    loaded[tile_index] = tile
+        for tile_index in batch:
+            tile = loaded.get(tile_index)
+            if tile is not None:
+                retain(tile)
+        next_tile = batch[-1] + 1
+        retained_floor = float(heap[0][0]) if len(heap) == n else None
+        expansion_rounds.append(
+            {
+                "round": round_index,
+                "segments_attempted": batch,
+                "segments_succeeded": sorted(loaded),
+                "candidates_added": len(seen) - candidates_before,
+                "retained_count": len(heap),
+                "retained_priority_floor": retained_floor,
+                "theoretical_priority_upper_bound": theoretical_upper_bound,
+                "selection_supported": (
+                    retained_floor is not None
+                    and retained_floor >= theoretical_upper_bound - 1e-12
+                ),
+            }
+        )
+        elapsed = time.monotonic() - started
+        print(
+            f"  [round {round_index}] segments={batch[0]}-{batch[-1]} "
+            f"rows={rows_seen} retained={len(heap)} elapsed={elapsed:.0f}s "
+            "ETA=unknown",
+            flush=True,
+        )
+
+    retained_floor = float(heap[0][0]) if heap else None
+    supported = (
+        len(heap) == n
+        and retained_floor is not None
+        and retained_floor >= theoretical_upper_bound - 1e-12
+    )
+    if errors and not supported:
+        raise RuntimeError(
+            "TIC filtered-position discovery failed before a defensible "
+            "sufficiency bound: " + "; ".join(errors[-3:])
+        )
+
+    targets = [item[2] for item in heap]
+    targets.sort(key=lambda row: (-float(row["priority"]), int(row["tic_id"])))
+    if search_log is not None:
+        search_log.update(
+            {
+                "discovery_method": "mast_tic_filtered_position_adaptive_v1",
+                "catalog": "TIC",
+                "service": _TIC_FILTERED_POSITION_SERVICE,
+                "source_versions": sorted(source_versions),
+                "retrieved_at": retrieved_at,
+                "tmag_range": list(tmag_range),
+                "pagesize": pagesize,
+                "pages_queried": pages_queried,
+                "segments_configured": first_tile.tile_count,
+                "segments_queried": tiles_queried,
+                "remaining_discovery_segments": max(
+                    first_tile.tile_count - tiles_queried, 0
+                ),
+                "sky_coverage_deg2": round(
+                    tiles_queried * math.pi * first_tile.radius_deg**2, 4
+                ),
+                "catalog_rows_seen": rows_seen,
+                "raw_candidates_before_exclusion": rows_matching,
+                "candidates_after_exclusion": rows_matching - excluded_count,
+                "excluded_count": excluded_count,
+                "retained_count": len(targets),
+                "retained_priority_floor": retained_floor,
+                "theoretical_priority_upper_bound": theoretical_upper_bound,
+                "universe_exhausted": (
+                    tiles_queried == first_tile.tile_count and not errors
+                ),
+                "full_tic_universe_exhausted": False,
+                "termination_reason": termination_reason,
+                "source_expansion_rounds": expansion_rounds,
+                "query_errors": errors,
+                "elapsed_seconds": round(time.monotonic() - started, 3),
+            }
+        )
+    return targets
 
 
 def select_targets_catalog(
@@ -710,15 +1000,15 @@ def select_targets_catalog(
     search_log: dict[str, Any] | None = None,
     query_timeout_seconds: float = 120.0,
     query_page_fn: Any | None = None,
+    max_workers: int = 6,
 ) -> list[dict[str, Any]]:
-    """Scan the complete accessible filtered TIC universe and retain its top *n*.
+    """Adaptively scan bounded filtered TIC segments and retain their top *n*.
 
-    Unlike :func:`select_targets`, this production-discovery primitive is not
-    sky-tiled and has no fixed candidate-page count. It requests consecutive
-    non-positional MAST TIC criteria pages until MAST returns a short page,
-    while a bounded heap retains only the strongest first-stage rows. Callers
-    can increase *n* and repeat only when downstream metadata cannot yet prove
-    top-N sufficiency.
+    The live query uses server-filtered positional segments because a single
+    non-positional magnitude query spans tens of millions of TIC rows. Test and
+    explicitly injected query functions may still supply ordinary consecutive
+    pages; that compatibility path retains the global best rows until a short
+    page proves that injected universe exhausted.
     """
     if n < 1:
         raise ValueError("n must be at least 1")
@@ -726,6 +1016,8 @@ def select_targets_catalog(
         raise ValueError("pagesize must be at least 1")
     if retry_attempts < 1:
         raise ValueError("retry_attempts must be at least 1")
+    if max_workers < 1:
+        raise ValueError("max_workers must be at least 1")
     min_tmag, max_tmag = tmag_range
     if not min_tmag < max_tmag:
         raise ValueError("tmag_range minimum must be less than maximum")
@@ -773,6 +1065,23 @@ def select_targets_catalog(
             raise RuntimeError(
                 "TIC criteria discovery failed before universe exhaustion: "
                 + "; ".join(page_errors[-3:])
+            )
+
+        if isinstance(result, _TicFilteredTile):
+            return _select_targets_from_filtered_tiles(
+                n,
+                first_tile=result,
+                tmag_range=tmag_range,
+                excluded=excluded,
+                pagesize=pagesize,
+                retry_attempts=retry_attempts,
+                retry_delay=retry_delay,
+                query_timeout_seconds=query_timeout_seconds,
+                max_workers=max_workers,
+                search_log=search_log,
+                query=query,
+                started=started,
+                retrieved_at=retrieved_at,
             )
 
         page_rows = list(result)

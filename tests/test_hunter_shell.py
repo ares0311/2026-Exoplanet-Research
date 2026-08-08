@@ -44,6 +44,7 @@ def _shell(
         show_fn=_recorder("show", calls),
         import_fn=_recorder("import", calls),
         recheck_fn=_recorder("recheck", calls),
+        inspect_fn=_recorder("inspect", calls),
         input_stream=io.StringIO(),
         output_stream=io.StringIO(),
         error_stream=io.StringIO(),
@@ -284,3 +285,118 @@ def test_explicit_db_option_is_not_overridden(tmp_path: Path) -> None:
 
     assert "--db=custom.sqlite3" in calls[0][1]
     assert calls[0][1].count("--db") == 0
+
+
+class TestInspectTargetCommand:
+    """CLI-02 required command and UX-TABLE-02 detail view."""
+
+    def test_inspect_target_is_registered_in_the_command_surface(self) -> None:
+        from exo_toolkit.hunter_shell import _SLASH_COMMANDS
+
+        assert "/Inspect-Target" in _SLASH_COMMANDS
+
+    def test_pyproject_registers_the_inspect_target_entry_point(self) -> None:
+        project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+        assert (
+            project["project"]["scripts"]["Inspect-Target"]
+            == "exo_toolkit.hunter_cli:inspect_target_entry"
+        )
+
+    def test_rank_argument_routes_to_the_canonical_function(self, tmp_path: Path) -> None:
+        calls: list[tuple[str, tuple[str, ...]]] = []
+        shell = _shell(tmp_path, calls)
+
+        assert shell.dispatch("/Inspect-Target 3").exit_code == 0
+
+        assert calls[0][0] == "inspect"
+        assert "--rank-or-id" in calls[0][1]
+        assert "3" in calls[0][1]
+
+    def test_identifier_argument_is_passed_through_unchanged(self, tmp_path: Path) -> None:
+        calls: list[tuple[str, tuple[str, ...]]] = []
+        shell = _shell(tmp_path, calls)
+
+        assert shell.dispatch('/Inspect-Target "TIC 12345"').exit_code == 0
+
+        argv = calls[0][1]
+        assert argv[argv.index("--rank-or-id") + 1] == "TIC 12345"
+
+    def test_missing_argument_is_actionable_and_nonzero(self, tmp_path: Path) -> None:
+        calls: list[tuple[str, tuple[str, ...]]] = []
+        shell = _shell(tmp_path, calls)
+        errors = io.StringIO()
+        shell._error = errors  # noqa: SLF001
+
+        result = shell.dispatch("/Inspect-Target")
+
+        assert result.exit_code == 2
+        assert not result.should_exit
+        assert not calls, "no canonical call should be made for invalid input"
+        assert "rank number or target identifier" in errors.getvalue()
+
+
+class TestPaletteDiscovery:
+    """UX-CMD-01: typing / opens a searchable palette without needing /Help."""
+
+    def _captured_shell(self, tmp_path: Path, calls: list[tuple[str, tuple[str, ...]]]):
+        shell = _shell(tmp_path, calls)
+        output = io.StringIO()
+        shell._console = shell._console.__class__(  # noqa: SLF001
+            file=output, no_color=True, force_terminal=False, highlight=False, width=100
+        )
+        return shell, output
+
+    def test_bare_slash_lists_every_command_with_parameter_shapes(self, tmp_path: Path) -> None:
+        calls: list[tuple[str, tuple[str, ...]]] = []
+        shell, output = self._captured_shell(tmp_path, calls)
+
+        assert shell.dispatch("/").exit_code == 0
+
+        rendered = output.getvalue()
+        assert "/Inspect-Target" in rendered
+        assert "Required:" in rendered and "Optional:" in rendered
+
+    def test_partial_token_filters_the_palette(self, tmp_path: Path) -> None:
+        calls: list[tuple[str, tuple[str, ...]]] = []
+        shell, output = self._captured_shell(tmp_path, calls)
+
+        assert shell.dispatch("/foll").exit_code == 0
+
+        rendered = output.getvalue()
+        assert "/Follow-Up-Search" in rendered
+        assert "/Exit" not in rendered
+
+    def test_unmatched_token_stays_a_hard_error(self, tmp_path: Path) -> None:
+        calls: list[tuple[str, tuple[str, ...]]] = []
+        shell = _shell(tmp_path, calls)
+
+        result = shell.dispatch("/Not-A-Command")
+
+        assert result.exit_code == 2
+        assert not result.should_exit
+
+
+class TestSharedValidatorParity:
+    """UX-IN-04: interactive input uses the same validators as the scriptable path."""
+
+    @pytest.mark.parametrize("bad", ["twenty", "0", "-3", "2.5"])
+    def test_invalid_target_counts_never_reach_the_canonical_layer(
+        self, tmp_path: Path, bad: str
+    ) -> None:
+        calls: list[tuple[str, tuple[str, ...]]] = []
+        shell = _shell(tmp_path, calls)
+        errors = io.StringIO()
+        shell._error = errors  # noqa: SLF001
+
+        assert shell.dispatch(f"/New-Search {bad}").exit_code == 2
+        assert not calls
+        assert "Invalid -" in errors.getvalue()
+
+    def test_valid_count_reaches_the_canonical_layer(self, tmp_path: Path) -> None:
+        calls: list[tuple[str, tuple[str, ...]]] = []
+        shell = _shell(tmp_path, calls)
+
+        assert shell.dispatch("/New-Search 5").exit_code == 0
+
+        assert calls[0][0] == "create"
+        assert "--targets" in calls[0][1] and "5" in calls[0][1]

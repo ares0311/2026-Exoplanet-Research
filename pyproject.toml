@@ -74,8 +74,9 @@ prod-check = "exo_toolkit.prod_check:main_entry"
 Recheck-Follow-Ups = "exo_toolkit.hunter_cli:recheck_follow_ups_entry"
 Export-Cross-Project-History = "exo_toolkit.hunter_cli:export_cross_project_history_entry"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.setuptools]
+packages = ["exo_toolkit", "exo_toolkit.background", "exo_toolkit.ml", "Skills"]
+package-dir = { exo_toolkit = "src/exo_toolkit", Skills = "Skills" }
 
 [tool.setuptools.package-data]
 exo_toolkit = ["background/fixtures/*.json", "py.typed"]

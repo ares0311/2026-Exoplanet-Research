@@ -15,7 +15,11 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
+import importlib
 import json
+import platform
+import shlex
 import subprocess
 import sys
 import tomllib
@@ -28,6 +32,8 @@ from typing import Any, Literal
 REPORT_VERSION = "exo-hunter-prod-check-v1"
 CONTRACT_VERSION = "HUNTER-PROD-2026-07-30.3"
 CLI_UX_VERSION = "HUNTER-CLI-UX-2026-07-30.3"
+LEDGER_SCHEMA_VERSION = "1.3.0"
+STATE_WRITER = "exo_toolkit.prod_state:update_state_from_report"
 
 Status = Literal["PASS", "FAIL", "NOT_EXECUTED"]
 
@@ -122,6 +128,17 @@ REQUIRED_SHELL_UX_SYMBOLS = ("GuidedEntry", "render_action_preview")
 
 # A behavioural PTY acceptance bundle, when one has been retained, lives here.
 PTY_EVIDENCE_PATH = "artifacts/manifests/exohunter_pty_acceptance.json"
+
+PHASE_CHECK_IDS: dict[int, frozenset[str]] = {
+    0: frozenset(
+        {
+            "governing_artifacts",
+            "state_ledger",
+            "state_authority",
+            "sibling_write_isolation",
+        }
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -519,7 +536,7 @@ def _check_readme_conformance(root: Path) -> CheckResult:
 
 
 def _check_state_ledger(root: Path) -> CheckResult:
-    """The durable acceptance ledger must be machine-readable."""
+    """The durable ledger must have one coherent, machine-owned active state."""
     ledger = root / "configs" / "HUNTER_PROD_STATE.json"
     if not ledger.is_file():
         return CheckResult(
@@ -545,12 +562,192 @@ def _check_state_ledger(root: Path) -> CheckResult:
             "FAIL",
             f"ledger contract version {data.get('contract_version')!r} != {CONTRACT_VERSION}",
         )
+    if data.get("schema_version") != LEDGER_SCHEMA_VERSION:
+        return CheckResult(
+            "state_ledger",
+            ("CLAIM-04",),
+            "FAIL",
+            f"ledger schema {data.get('schema_version')!r} != {LEDGER_SCHEMA_VERSION}",
+        )
+    active_phase = data.get("active_phase")
+    if active_phase not in {f"PHASE {index}" for index in range(8)}:
+        return CheckResult(
+            "state_ledger",
+            ("CLAIM-04",),
+            "FAIL",
+            f"ledger must name exactly one active phase, got {active_phase!r}",
+        )
+    implementation_state = data.get("implementation_state")
+    allowed_implementation_states = set(data.get("allowed_implementation_states", []))
+    required_implementation_states = {
+        "BLOCKING",
+        "IN_PROGRESS",
+        "IMPLEMENTED_NOT_VERIFIED",
+    }
+    if allowed_implementation_states != required_implementation_states:
+        return CheckResult(
+            "state_ledger",
+            ("CLAIM-04",),
+            "FAIL",
+            "allowed implementation states must be exactly BLOCKING, IN_PROGRESS, "
+            "and IMPLEMENTED_NOT_VERIFIED",
+        )
+    if implementation_state not in allowed_implementation_states:
+        return CheckResult(
+            "state_ledger",
+            ("CLAIM-04",),
+            "FAIL",
+            f"invalid implementation_state {implementation_state!r}",
+        )
+    if data.get("gate_execution_state") not in {
+        "EXECUTED",
+        "NOT_EXECUTED",
+        "UNKNOWN",
+    }:
+        return CheckResult(
+            "state_ledger", ("CLAIM-04",), "FAIL", "invalid gate_execution_state"
+        )
+    if data.get("gate_result") not in {"PASS", "FAIL", "NOT_EXECUTED", "UNKNOWN"}:
+        return CheckResult("state_ledger", ("CLAIM-04",), "FAIL", "invalid gate_result")
+    requirements = data.get("requirements")
+    if not isinstance(requirements, dict) or not requirements:
+        return CheckResult(
+            "state_ledger", ("CLAIM-04",), "FAIL", "active requirements map is missing"
+        )
+    required_fields = {"implementation_state", "gate_execution_state", "gate_result"}
+    for requirement_id, requirement in requirements.items():
+        if not isinstance(requirement, dict) or not required_fields.issubset(requirement):
+            return CheckResult(
+                "state_ledger",
+                ("CLAIM-04",),
+                "FAIL",
+                f"requirement {requirement_id} does not separate implementation and gate state",
+            )
+        if "status" in requirement:
+            return CheckResult(
+                "state_ledger",
+                ("CLAIM-04",),
+                "FAIL",
+                f"requirement {requirement_id} uses ambiguous agent-writable status",
+            )
+        if requirement["implementation_state"] not in allowed_implementation_states:
+            return CheckResult(
+                "state_ledger",
+                ("CLAIM-04",),
+                "FAIL",
+                f"requirement {requirement_id} has invalid implementation_state",
+            )
+        if requirement["gate_execution_state"] not in {
+            "EXECUTED",
+            "NOT_EXECUTED",
+            "UNKNOWN",
+        }:
+            return CheckResult(
+                "state_ledger",
+                ("CLAIM-04",),
+                "FAIL",
+                f"requirement {requirement_id} has invalid gate_execution_state",
+            )
+        if requirement["gate_result"] not in {"PASS", "FAIL", "NOT_EXECUTED", "UNKNOWN"}:
+            return CheckResult(
+                "state_ledger",
+                ("CLAIM-04",),
+                "FAIL",
+                f"requirement {requirement_id} has invalid gate_result",
+            )
+        verification_state = requirement.get("verification_state")
+        if verification_state not in {None, "VERIFIED"}:
+            return CheckResult(
+                "state_ledger",
+                ("CLAIM-04",),
+                "FAIL",
+                f"requirement {requirement_id} has invalid verification_state",
+            )
+        if verification_state == "VERIFIED" and (
+            requirement["gate_execution_state"] != "EXECUTED"
+            or requirement["gate_result"] != "PASS"
+            or not requirement.get("evidence_ref")
+            or not isinstance(requirement.get("tested_code_identity"), dict)
+            or not isinstance(requirement.get("gate_hashes"), dict)
+        ):
+            return CheckResult(
+                "state_ledger",
+                ("CLAIM-04",),
+                "FAIL",
+                f"requirement {requirement_id} claims VERIFIED without complete passing "
+                "machine evidence",
+            )
+    prod_status = data.get("prod_status")
+    if prod_status not in {None, "PROD"}:
+        return CheckResult(
+            "state_ledger",
+            ("CLAIM-04",),
+            "FAIL",
+            f"prod_status must be null or machine-written PROD, got {prod_status!r}",
+        )
     return CheckResult(
         "state_ledger",
         ("CLAIM-04",),
         "PASS",
-        f"ledger parses; schema {data.get('schema_version')}, "
-        f"profile {data.get('repository_profile')}",
+        f"ledger schema {LEDGER_SCHEMA_VERSION}; one active phase; "
+        f"{len(requirements)} requirements separate implementation and gate state",
+    )
+
+
+def _check_state_authority(root: Path) -> CheckResult:
+    """Only the deterministic runner may own VERIFIED and PROD state."""
+    ledger = root / "configs" / "HUNTER_PROD_STATE.json"
+    try:
+        data = json.loads(ledger.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return CheckResult(
+            "state_authority", ("CLAIM-04", "PROD-01"), "FAIL", f"ledger unavailable: {exc}"
+        )
+    authority = data.get("verification_authority")
+    if not isinstance(authority, dict):
+        return CheckResult(
+            "state_authority",
+            ("CLAIM-04", "PROD-01"),
+            "FAIL",
+            "verification_authority object is missing",
+        )
+    if authority.get("verified_and_prod_writer") != STATE_WRITER:
+        return CheckResult(
+            "state_authority",
+            ("CLAIM-04", "PROD-01"),
+            "FAIL",
+            f"verified_and_prod_writer must be {STATE_WRITER}",
+        )
+    writer_path = root / "src" / "exo_toolkit" / "prod_state.py"
+    if not writer_path.is_file():
+        return CheckResult(
+            "state_authority",
+            ("CLAIM-04", "PROD-01"),
+            "FAIL",
+            "deterministic state writer src/exo_toolkit/prod_state.py is missing",
+        )
+    try:
+        tree = ast.parse(writer_path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError) as exc:
+        return CheckResult(
+            "state_authority",
+            ("CLAIM-04", "PROD-01"),
+            "FAIL",
+            f"deterministic state writer is unreadable: {exc}",
+        )
+    functions = {node.name for node in tree.body if isinstance(node, ast.FunctionDef)}
+    if "update_state_from_report" not in functions:
+        return CheckResult(
+            "state_authority",
+            ("CLAIM-04", "PROD-01"),
+            "FAIL",
+            "deterministic state writer lacks update_state_from_report",
+        )
+    return CheckResult(
+        "state_authority",
+        ("CLAIM-04", "PROD-01"),
+        "PASS",
+        f"VERIFIED and PROD ownership is bound to {STATE_WRITER}",
     )
 
 
@@ -575,7 +772,14 @@ def _check_governing_artifacts(root: Path) -> CheckResult:
 
 
 def _check_sibling_write_isolation(root: Path) -> CheckResult:
-    """WS-01 / WS-03: no runtime coupling to sibling Hunter repositories."""
+    """WS-01 / WS-03: sibling history is read-only and never runtime-coupled.
+
+    The contract requires current, versioned sibling-history *reads*.  A raw
+    marker scan therefore rejects required production behaviour.  This check
+    instead follows sibling-derived path values through the AST and rejects
+    observable mutation, command execution, runtime-import coupling, symlinks,
+    and hard-coded absolute sibling paths while permitting ordinary reads.
+    """
     markers = (
         "NEOHunter",
         "TechnoHunter",
@@ -589,26 +793,179 @@ def _check_sibling_write_isolation(root: Path) -> CheckResult:
     # site-packages and would never compare equal to the checkout copy, so the
     # gate would flag its own marker constants on that surface only.
     self_relative = Path("exo_toolkit") / Path(__file__).name
+    write_methods = {
+        "chmod",
+        "hardlink_to",
+        "mkdir",
+        "rename",
+        "replace",
+        "rmdir",
+        "symlink_to",
+        "touch",
+        "unlink",
+        "write_bytes",
+        "write_text",
+    }
+    command_calls = {
+        "subprocess.call",
+        "subprocess.check_call",
+        "subprocess.check_output",
+        "subprocess.Popen",
+        "subprocess.run",
+    }
+    mutating_calls = {
+        "os.chmod",
+        "os.link",
+        "os.makedirs",
+        "os.mkdir",
+        "os.remove",
+        "os.rename",
+        "os.replace",
+        "os.rmdir",
+        "os.symlink",
+        "os.unlink",
+        "shutil.copy",
+        "shutil.copy2",
+        "shutil.copyfile",
+        "shutil.copytree",
+        "shutil.move",
+        "shutil.rmtree",
+    }
+    import_calls = {
+        "importlib.import_module",
+        "importlib.machinery.SourceFileLoader",
+        "importlib.util.spec_from_file_location",
+    }
+
+    def dotted_name(node: ast.AST) -> str:
+        if isinstance(node, ast.Name):
+            return node.id
+        if isinstance(node, ast.Attribute):
+            prefix = dotted_name(node.value)
+            return f"{prefix}.{node.attr}" if prefix else node.attr
+        return ""
+
+    def contains_marker(value: str) -> bool:
+        return any(marker in value for marker in markers)
+
+    def references_tainted(node: ast.AST, names: set[str]) -> bool:
+        return any(
+            (isinstance(child, ast.Name) and child.id in names)
+            or (isinstance(child, ast.Constant) and isinstance(child.value, str)
+                and contains_marker(child.value))
+            or (
+                isinstance(child, ast.Call)
+                and dotted_name(child.func).endswith("sibling_history_export_path")
+            )
+            for child in ast.walk(node)
+        )
+
+    def assigned_names(node: ast.AST) -> set[str]:
+        return {child.id for child in ast.walk(node) if isinstance(child, ast.Name)}
+
     offenders: list[str] = []
     for path in (root / "src").rglob("*.py"):
         if path.relative_to(root / "src") == self_relative:
             continue
-        text = path.read_text(encoding="utf-8", errors="replace")
-        for marker in markers:
-            if marker in text:
-                offenders.append(f"{path.relative_to(root)}:{marker}")
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+        except SyntaxError as exc:
+            offenders.append(f"{path.relative_to(root)}:unparseable:{exc.lineno}")
+            continue
+
+        tainted: set[str] = set()
+        assignments = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr))
+        ]
+        changed = True
+        while changed:
+            changed = False
+            for assignment in assignments:
+                value = assignment.value
+                if value is None:
+                    continue
+                if not references_tainted(value, tainted):
+                    continue
+                targets: list[ast.AST]
+                if isinstance(assignment, ast.Assign):
+                    targets = assignment.targets
+                else:
+                    targets = [assignment.target]
+                new_names = set().union(*(assigned_names(target) for target in targets))
+                if not new_names.issubset(tainted):
+                    tainted.update(new_names)
+                    changed = True
+
+        relative = path.relative_to(root)
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+                and contains_marker(node.value)
+                and Path(node.value).is_absolute()
+            ):
+                offenders.append(f"{relative}:{node.lineno}:hardcoded-absolute-sibling-path")
+            if not isinstance(node, ast.Call):
+                continue
+            call_name = dotted_name(node.func)
+            args = [*node.args, *(keyword.value for keyword in node.keywords)]
+            tainted_args = any(references_tainted(arg, tainted) for arg in args)
+
+            if isinstance(node.func, ast.Attribute):
+                receiver_tainted = references_tainted(node.func.value, tainted)
+                if node.func.attr in write_methods and receiver_tainted:
+                    offenders.append(f"{relative}:{node.lineno}:{node.func.attr}")
+                if call_name in {"sys.path.append", "sys.path.insert"} and tainted_args:
+                    offenders.append(f"{relative}:{node.lineno}:runtime-import-path")
+                if node.func.attr == "open" and receiver_tainted:
+                    mode_nodes = [
+                        *node.args,
+                        *(kw.value for kw in node.keywords if kw.arg == "mode"),
+                    ]
+                    modes = [
+                        child.value
+                        for mode in mode_nodes
+                        for child in ast.walk(mode)
+                        if isinstance(child, ast.Constant) and isinstance(child.value, str)
+                    ]
+                    if any(set(mode) & set("wax+") for mode in modes):
+                        offenders.append(f"{relative}:{node.lineno}:open-write")
+
+            if call_name == "open" and node.args and references_tainted(node.args[0], tainted):
+                mode_nodes = [
+                    *node.args[1:],
+                    *(kw.value for kw in node.keywords if kw.arg == "mode"),
+                ]
+                modes = [
+                    child.value
+                    for mode in mode_nodes
+                    for child in ast.walk(mode)
+                    if isinstance(child, ast.Constant) and isinstance(child.value, str)
+                ]
+                if any(set(mode) & set("wax+") for mode in modes):
+                    offenders.append(f"{relative}:{node.lineno}:open-write")
+            if call_name in command_calls and tainted_args:
+                offenders.append(f"{relative}:{node.lineno}:sibling-command")
+            if call_name in mutating_calls and tainted_args:
+                offenders.append(f"{relative}:{node.lineno}:sibling-mutation")
+            if call_name in import_calls and tainted_args:
+                offenders.append(f"{relative}:{node.lineno}:runtime-import")
     if offenders:
         return CheckResult(
             "sibling_write_isolation",
             ("WS-01", "WS-03"),
             "FAIL",
-            f"sibling references in runtime code: {', '.join(sorted(set(offenders))[:5])}",
+            f"prohibited sibling mutation or runtime coupling: "
+            f"{', '.join(sorted(set(offenders))[:5])}",
         )
     return CheckResult(
         "sibling_write_isolation",
         ("WS-01", "WS-03"),
         "PASS",
-        "no sibling-repository identifiers appear in src/ runtime code",
+        "sibling references are read-only: no writes, commands, runtime imports, "
+        "symlinks, generated output, or hard-coded absolute sibling paths",
     )
 
 
@@ -846,6 +1203,7 @@ def run_checks(root: Path | None = None) -> list[CheckResult]:
     static: list[Callable[[], CheckResult]] = [
         lambda: _check_governing_artifacts(base),
         lambda: _check_state_ledger(base),
+        lambda: _check_state_authority(base),
         lambda: _check_entry_points(base),
         _check_command_palette,
         lambda: _check_interactive_input_capability(base),
@@ -866,15 +1224,22 @@ def run_checks(root: Path | None = None) -> list[CheckResult]:
     return results
 
 
-def build_report(results: Sequence[CheckResult], *, commit: str | None = None) -> dict[str, Any]:
+def build_report(
+    results: Sequence[CheckResult],
+    *,
+    commit: str | None = None,
+    phase: int | None = None,
+) -> dict[str, Any]:
     """Assemble the versioned machine-readable report."""
     passed = [r for r in results if r.status == "PASS"]
     failed = [r for r in results if r.status == "FAIL"]
     not_executed = [r for r in results if r.status == "NOT_EXECUTED"]
+    gate_passed = not failed and not not_executed
     return {
         "report_version": REPORT_VERSION,
         "contract_version": CONTRACT_VERSION,
         "cli_ux_version": CLI_UX_VERSION,
+        "gate_scope": "FULL PROD" if phase is None else f"PHASE {phase}",
         "generated_at_utc": datetime.now(UTC).isoformat(),
         "commit": commit,
         "checks": [asdict(result) for result in results],
@@ -889,7 +1254,10 @@ def build_report(results: Sequence[CheckResult], *, commit: str | None = None) -
                 f"{len(not_executed)} NOT EXECUTED and excluded from any pass claim"
             ),
         },
-        "prod_ready": not failed and not not_executed,
+        "gate_passed": gate_passed,
+        # A phase-scoped pass is not a PROD decision.  Only the unscoped
+        # repository-native runner is permitted to make that claim.
+        "prod_ready": phase is None and gate_passed,
     }
 
 
@@ -901,6 +1269,131 @@ def _git_commit(root: Path) -> str | None:
     except OSError:
         return None
     return result.stdout.strip() or None if result.returncode == 0 else None
+
+
+MATERIAL_GATE_PATHS = (
+    "docs/HUNTER_PROD_CONTRACT.md",
+    "docs/CLI_UX_SPEC.md",
+    "docs/README_SPEC.md",
+    "src/exo_toolkit/prod_check.py",
+    "tests/test_prod_check.py",
+)
+
+
+def _material_hashes(root: Path) -> dict[str, str]:
+    """Hash the frozen gate and the governing fixtures it interprets."""
+    hashes: dict[str, str] = {}
+    for relative in MATERIAL_GATE_PATHS:
+        path = root / relative
+        hashes[relative] = (
+            hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else "MISSING"
+        )
+    return hashes
+
+
+def _relative_evidence_path(root: Path, output: Path) -> str:
+    resolved = output.resolve()
+    try:
+        return resolved.relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return str(resolved)
+
+
+def _gate_result(report: dict[str, Any]) -> Status:
+    if report["summary"]["failed"]:
+        return "FAIL"
+    if report["summary"]["not_executed"]:
+        return "NOT_EXECUTED"
+    return "PASS"
+
+
+def _validate_state_update(
+    *,
+    root: Path,
+    report: dict[str, Any],
+    phase: int,
+    command: str,
+    evidence_path: str,
+    gate_hashes: dict[str, str],
+) -> None:
+    """Independently validate the writer's durable, externally visible result."""
+    ledger = json.loads((root / "configs" / "HUNTER_PROD_STATE.json").read_text(encoding="utf-8"))
+    expected_result = _gate_result(report)
+    expected_exit = 0 if expected_result == "PASS" else 1
+    exact = {
+        "gate_execution_state": "EXECUTED",
+        "gate_result": expected_result,
+        "gate_exit_code": expected_exit,
+        "gate_command": command,
+        "gate_evidence_path": evidence_path,
+        "gate_hashes": gate_hashes,
+    }
+    mismatches = [key for key, value in exact.items() if ledger.get(key) != value]
+    identity = ledger.get("tested_code_identity", {})
+    if identity.get("git_head_sha") != report.get("commit"):
+        mismatches.append("tested_code_identity.git_head_sha")
+    phase_state = ledger.get("phase_results", {}).get(f"PHASE {phase}", {})
+    if phase_state.get("gate_result") != expected_result:
+        mismatches.append(f"phase_results.PHASE {phase}.gate_result")
+    expected_verification = "VERIFIED" if expected_result == "PASS" else None
+    if phase_state.get("verification_state") != expected_verification:
+        mismatches.append(f"phase_results.PHASE {phase}.verification_state")
+    expected_prod = "PROD" if phase == 6 and report.get("prod_ready") is True else None
+    if ledger.get("prod_status") != expected_prod:
+        mismatches.append("prod_status")
+    if mismatches:
+        raise ValueError("state writer postcondition mismatch: " + ", ".join(mismatches))
+
+
+def _update_state(
+    *,
+    root: Path,
+    report: dict[str, Any],
+    phase: int,
+    command: str,
+    evidence_path: str,
+    gate_hashes: dict[str, str],
+) -> CheckResult:
+    """Invoke and then independently check the deterministic state writer."""
+    try:
+        module_name, function_name = STATE_WRITER.split(":", 1)
+        module = importlib.import_module(module_name)
+        writer = getattr(module, function_name)
+        writer(
+            root=root,
+            report=report,
+            phase=phase,
+            command=command,
+            evidence_path=evidence_path,
+            gate_hashes=gate_hashes,
+            environment={
+                "platform": platform.platform(),
+                "python": platform.python_version(),
+                "python_executable": str(Path(sys.executable).resolve()),
+                "resolved_executable": str((root / ".venv" / "bin" / "EXO-Hunter").resolve()),
+            },
+        )
+        _validate_state_update(
+            root=root,
+            report=report,
+            phase=phase,
+            command=command,
+            evidence_path=evidence_path,
+            gate_hashes=gate_hashes,
+        )
+    except Exception as exc:  # noqa: BLE001 - state authority failure must block the gate
+        return CheckResult(
+            "state_update",
+            ("PHASE0-STATUS-AUTHORITY", "CLAIM-04", "PROD-01"),
+            "FAIL",
+            f"deterministic state update failed: {type(exc).__name__}: {exc}",
+        )
+    return CheckResult(
+        "state_update",
+        ("PHASE0-STATUS-AUTHORITY", "CLAIM-04", "PROD-01"),
+        "PASS",
+        f"machine state durably updated and independently re-read via {STATE_WRITER}",
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -916,11 +1409,62 @@ def main(argv: Sequence[str] | None = None) -> int:
         type=Path,
         help="Repository checkout to inspect; defaults to autodetection.",
     )
+    parser.add_argument(
+        "--phase",
+        type=int,
+        choices=sorted(PHASE_CHECK_IDS),
+        help="Run one frozen phase gate; currently Phase 0 is registered.",
+    )
+    parser.add_argument(
+        "--update-state",
+        action="store_true",
+        help="Let the deterministic writer update the machine ledger from this phase result.",
+    )
     args = parser.parse_args(argv)
+    if args.update_state and args.output is None:
+        parser.error("--update-state requires --output")
 
     root = args.root.resolve() if args.root else _repo_root()
     results = run_checks(root)
-    report = build_report(results, commit=_git_commit(root) if root else None)
+    if args.phase is not None:
+        wanted = PHASE_CHECK_IDS[args.phase]
+        results = [result for result in results if result.check_id in wanted]
+        present = {result.check_id for result in results}
+        for missing in sorted(wanted - present):
+            results.append(
+                _not_executed(
+                    missing,
+                    ("PROD-01",),
+                    f"registered Phase {args.phase} check was not produced by the runner",
+                )
+            )
+
+    command_tokens = [sys.argv[0], *sys.argv[1:]] if argv is None else ["prod-check", *argv]
+    command = shlex.join(str(token) for token in command_tokens)
+    commit = _git_commit(root) if root else None
+    gate_hashes = _material_hashes(root) if root else {}
+
+    if args.update_state and root and args.output:
+        # Include the writer assertion in the report that the writer consumes.
+        # A failure replaces this provisional result before the report is saved.
+        provisional = CheckResult(
+            "state_update",
+            ("PHASE0-STATUS-AUTHORITY", "CLAIM-04", "PROD-01"),
+            "PASS",
+            f"machine state update requested through {STATE_WRITER}",
+        )
+        results.append(provisional)
+        report = build_report(results, commit=commit, phase=args.phase)
+        update = _update_state(
+            root=root,
+            report=report,
+            phase=args.phase if args.phase is not None else 6,
+            command=command,
+            evidence_path=_relative_evidence_path(root, args.output),
+            gate_hashes=gate_hashes,
+        )
+        results[-1] = update
+    report = build_report(results, commit=commit, phase=args.phase)
 
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -935,13 +1479,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         summary = report["summary"]
         print()
         print(summary["passed_denominator"])
-        if report["prod_ready"]:
+        if args.phase is not None:
+            phase_result = _gate_result(report)
+            display = "NOT EXECUTED" if phase_result == "NOT_EXECUTED" else phase_result
+            print(f"PRIMARY PHASE GATE: {display}")
+        elif report["prod_ready"]:
             print("PROD gate: PASS")
         else:
             print(f"PROD gate: BLOCKED ({summary['failed']} failed, "
                   f"{summary['not_executed']} not executed)")
 
-    return 0 if report["prod_ready"] else 1
+    return 0 if report["gate_passed"] else 1
 
 
 def main_entry() -> None:
